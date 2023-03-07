@@ -6,7 +6,9 @@ using IGoLibrary_Winform.Notify;
 using Notifications.Wpf;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using IGoLibrary_Winform.Controller;
+using IGoLibrary_Winform.Crypt;
 using System;
+using System.IO;
 
 namespace IGoLibrary_Winform.Pages
 {
@@ -89,12 +91,33 @@ namespace IGoLibrary_Winform.Pages
 
         private void uiSymbolButton_SaveDataSource_Click(object sender, EventArgs e)
         {
-
+            if (uiTextBox_Cookies.Text.Contains("Authorization") && uiTextBox_Cookies.Text.Contains("SERVERID"))
+            {
+                try
+                {
+                    File.WriteAllText("SavedCookie", Encrypt.DES(uiTextBox_Cookies.Text, "ejianzqq"));
+                    Toast.ShowNotifiy("保存Cookie成功","已将Cookie加密保存至目录下的SavedCookie文件中",NotificationType.Success);
+                }
+                catch
+                {
+                    Toast.ShowNotifiy("保存Cookie失败","将Cookie写入文件时发生了错误",NotificationType.Error);
+                }
+            }
+            else
+                Toast.ShowNotifiy("保存Cookie失败", "当前Cookie不合法，不包含关键要素，禁止写入", NotificationType.Warning);
         }
 
         private void uiSymbolButton_ReadDataSource_Click(object sender, EventArgs e)
         {
-
+            try
+            {
+                uiTextBox_Cookies.Text = Decrypt.DES(File.ReadAllText("SavedCookie"), "ejianzqq");
+                Toast.ShowNotifiy("读取Cookie成功", "已将Cookie解密并读取至Cookie文本框中", NotificationType.Success);
+            }
+            catch
+            {
+                Toast.ShowNotifiy("读取Cookie失败", "将Cookie从文件取出时发生了错误", NotificationType.Error);
+            }
         }
 
         private void uiSymbolButton_GetCookie_Click(object sender, EventArgs e)
