@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.CompilerServices;
+using System.Reflection.Metadata;
 
 namespace ConsoleDemo
 {
@@ -14,14 +15,7 @@ namespace ConsoleDemo
     {
         static async Task  Main(string[] args)
         {
-            for(int i = 0;i < 20; i++)
-            {
-                await Task.Run(async () =>
-                {
-                    Console.WriteLine($"i is {i}");
-                    
-                });
-            }
+            GetCookie();
             Console.ReadLine();
         }
 
@@ -127,6 +121,19 @@ namespace ConsoleDemo
         public static void CancelSeat()
         {
 
+        }
+
+        public static void GetCookie()
+        {
+            var client = new RestClient("http://wechat.v2.traceint.com/index.php/urlNew/auth.html?r=https%3A%2F%2Fweb.traceint.com%2Fweb%2Findex.html&code=021jTrFa1uImTE0ZTTFa1Tg41k4jTrFP&state=1");
+            var request = new RestRequest();
+            request.Method = Method.Get;
+            RestResponse response = client.Execute(request);
+            var responseContent = response.Cookies;
+            foreach(var temp in responseContent)
+            {
+                Console.WriteLine(temp.ToString());
+            }
         }
     }
 }

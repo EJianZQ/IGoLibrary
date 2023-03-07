@@ -5,22 +5,28 @@ using System.Text.RegularExpressions;
 using IGoLibrary_Winform.Notify;
 using Notifications.Wpf;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using IGoLibrary_Winform.Controller;
+using System;
 
 namespace IGoLibrary_Winform.Pages
 {
     public partial class FDataSource : UIPage
     {
         private readonly IGetLibInfoService getLibInfoService;
+        private readonly IGetCookieService getCookieService;
+        private readonly IGetAllLibsSummaryService getAllLibsSummaryService;
         private MainForm mainForm;
         public FDataSource(MainForm mainForm)
         {
             InitializeComponent();
             this.uiTextBox_Cookies.FillColor = Color.FromArgb(243, 249, 255);
             this.uiTextBox_QueryLibInfoSyntax.FillColor = Color.FromArgb(243, 249, 255);
-            this.uiTextBox_Session.FillColor = Color.FromArgb(243, 249, 255);
+            this.uiTextBox_CodeSourceURL.FillColor = Color.FromArgb(243, 249, 255);
             using (var serviceProvider = MainForm.services.BuildServiceProvider())
             {
                 getLibInfoService = serviceProvider.GetRequiredService<IGetLibInfoService>();
+                getCookieService = serviceProvider.GetRequiredService<IGetCookieService>();
+                getAllLibsSummaryService = serviceProvider.GetRequiredService<IGetAllLibsSummaryService>();
             }
 
             this.mainForm = mainForm;
@@ -28,31 +34,42 @@ namespace IGoLibrary_Winform.Pages
 
         private void uiSymbolButton_Verify_Click(object sender, EventArgs e)
         {
-            uiSymbolButton_Verify.Enabled = false;
-            if (uiTextBox_Cookies.Text.Contains("Hm_lvt")  && uiTextBox_Cookies.Text.Contains("SERVERID"))
+            uiSymbolButton_BindLibrary.Enabled = false;
+            if (uiTextBox_Cookies.Text.Contains("Authorization")  && uiTextBox_Cookies.Text.Contains("SERVERID"))
             {
                 try
                 {
-                    var libraryData = getLibInfoService.GetLibInfo(this.uiTextBox_Cookies.Text, this.uiTextBox_QueryLibInfoSyntax.Text.Replace("ReplaceMe", uiIntegerUpDown_LibID.Value.ToString()));
-                    uiSymbolLabel_LibStatus.Text = "状态：" + (libraryData.IsOpen ? "开放中" : "已关闭");
-                    uiSymbolLabel_LibName.Text = "图书馆(室)名称：" + libraryData.Name;
-                    uiSymbolLabel_LibFloor.Text = "图书馆(室)楼层：" + libraryData.Floor;
-                    uiSymbolLabel_LibAvailableSeatsNum.Text = "图书馆(室)余座：" + libraryData.SeatsInfo.AvailableSeats.ToString();
-
-                    MainForm.authentication.IsAuthenticated = true;
-                    MainForm.authentication.LastAuthenticationTime = DateTime.Now;
-                    MainForm.authentication.LatestLibraryData = libraryData;
-                    MainForm.authentication.Authenticator.Cookies = this.uiTextBox_Cookies.Text;
-                    MainForm.authentication.Authenticator.LibID = libraryData.LibID;
-                    MainForm.authentication.Authenticator.Syntax.QueryLibInfo = this.uiTextBox_QueryLibInfoSyntax.Text.Replace("ReplaceMe", libraryData.LibID.ToString());
-                    MainForm.authentication.Authenticator.Syntax.ReserveSeat = this.uiTextBox_ReserveSeatSyntax.Text.Replace("ReplaceMeByLibID", libraryData.LibID.ToString());
-
-                    //向抢座页面的座位信息列表添加数据
-                    var grabSeatPage = mainForm.GetPage<FGrabSeat>();
-                    if(grabSeatPage != null)
+                    var allLibsSummary = getAllLibsSummaryService.GetAllLibsSummary(this.uiTextBox_Cookies.Text,this.uiTextBox_QueryAllLibsSummarySyntax.Text);
+                    int libSelectedIndex = 0;
+                    List<string> items = new List<string>();
+                    foreach (var item in allLibsSummary.libSummaries)
                     {
-                        grabSeatPage.UpdateSeatsGridView(libraryData.Seats);
-                        grabSeatPage.uiSwitch_GrabSeatSwitch.Enabled= true;
+                        items.Add(string.Format("{0} - {1} - {2}", item.Name,item.Floor,item.IsOpen ? "开放" :"关闭"));
+                    }
+                    if (this.ShowSelectDialog(ref libSelectedIndex, items,"选择想要绑定的图书馆","选择一个场馆绑定，在绑定成功后即可在抢座页面选择待抢座位并监控"))
+                    {
+                        var libraryData = getLibInfoService.GetLibInfo(this.uiTextBox_Cookies.Text, this.uiTextBox_QueryLibInfoSyntax.Text.Replace("ReplaceMe", allLibsSummary.libSummaries[libSelectedIndex].LibID.ToString()));
+                        uiIntegerUpDown_LibID.Value = allLibsSummary.libSummaries[libSelectedIndex].LibID;
+                        uiSymbolLabel_LibStatus.Text = "状态：" + (libraryData.IsOpen ? "开放中" : "已关闭");
+                        uiSymbolLabel_LibName.Text = "图书馆(室)名称：" + libraryData.Name;
+                        uiSymbolLabel_LibFloor.Text = "图书馆(室)楼层：" + libraryData.Floor;
+                        uiSymbolLabel_LibAvailableSeatsNum.Text = "图书馆(室)余座：" + libraryData.SeatsInfo.AvailableSeats.ToString();
+
+                        MainForm.authentication.IsAuthenticated = true;
+                        MainForm.authentication.LastAuthenticationTime = DateTime.Now;
+                        MainForm.authentication.LatestLibraryData = libraryData;
+                        MainForm.authentication.Authenticator.Cookies = this.uiTextBox_Cookies.Text;
+                        MainForm.authentication.Authenticator.LibID = libraryData.LibID;
+                        MainForm.authentication.Authenticator.Syntax.QueryLibInfo = this.uiTextBox_QueryLibInfoSyntax.Text.Replace("ReplaceMe", libraryData.LibID.ToString());
+                        MainForm.authentication.Authenticator.Syntax.ReserveSeat = this.uiTextBox_ReserveSeatSyntax.Text.Replace("ReplaceMeByLibID", libraryData.LibID.ToString());
+
+                        //向抢座页面的座位信息列表添加数据
+                        var grabSeatPage = mainForm.GetPage<FGrabSeat>();
+                        if (grabSeatPage != null)
+                        {
+                            grabSeatPage.UpdateSeatsGridView(libraryData.Seats);
+                            grabSeatPage.uiSwitch_GrabSeatSwitch.Enabled = true;
+                        }
                     }
                 }
                 catch (GetLibInfoException ex)
@@ -67,7 +84,7 @@ namespace IGoLibrary_Winform.Pages
             {
                 Toast.ShowNotifiy("Cookies验证失败", "Cookies不合法，不包含关键要素", NotificationType.Error);
             }
-            uiSymbolButton_Verify.Enabled = true;
+            uiSymbolButton_BindLibrary.Enabled = true;
         }
 
         private void uiSymbolButton_SaveDataSource_Click(object sender, EventArgs e)
@@ -80,50 +97,31 @@ namespace IGoLibrary_Winform.Pages
 
         }
 
-        private void uiSymbolButton_AutoIdentify_Click(object sender, EventArgs e)
+        private void uiSymbolButton_GetCookie_Click(object sender, EventArgs e)
         {
-            uiSymbolButton_AutoIdentify.Enabled = false;
-            if (uiTextBox_Session.Text.Contains("libId") && uiTextBox_Session.Text.Contains("Cookie:"))
+            if(Regex.IsMatch(uiTextBox_CodeSourceURL.Text, @".*wechat\.v2\.traceint\.com\/index\.php\/graphql\/\?operationName=index&query=query.*&code=.{32}&state=(0|1)"))
             {
-                Match match = Regex.Match(uiTextBox_Session.Text, @"libId"":\d{6,8}");
-                if (match.Success)
+                var match = Regex.Match(uiTextBox_CodeSourceURL.Text, @"code=.{32}");
+                if(match.Success)
                 {
-                    int libID = match.Value.Replace(@"libId"":", string.Empty).ToInt();
-                    string header = uiTextBox_Session.Text.Substring(0, (uiTextBox_Session.Text.IndexOf(@"{""operationName")));
-                    var headerArray = header.Split(Environment.NewLine);
-                    foreach (var headerSingle in headerArray)
+                    try
                     {
-                        if (headerSingle.Contains("Cookie"))
-                        {
-                            if (headerSingle.Contains("Hm_lvt")&& headerSingle.Contains("Hm_lpvt") && headerSingle.Contains("SERVERID"))
-                            {
-                                uiTextBox_Cookies.Text = headerSingle.Replace(@"Cookie: ", string.Empty);
-                                uiIntegerUpDown_LibID.Value = libID;
-                                Toast.ShowNotifiy("自动识别成功","已自动填写Cookie和LibID并返回验证界面",NotificationType.Success);
-                                uiTabControl_DataSource.SelectedIndex = 0;
-                                uiSymbolButton_AutoIdentify.Enabled = true;
-                                return;
-                            }
-                            else
-                            {
-                                Toast.ShowNotifiy("自动识别失败", "解析后的Cookie不合法，不包含关键要素", NotificationType.Error);
-                                uiSymbolButton_AutoIdentify.Enabled = true;
-                                return;
-                            }
-                        }
+                        uiTextBox_Cookies.Text = getCookieService.GetCookie(match.Value.Replace("code=", string.Empty));
+                        uiTabControl_DataSource.SelectedIndex = 0;
+                        Toast.ShowNotifiy("获取Cookies成功","已自动填写Cookie并跳转至验证页面，请点击\"验证\"按钮",NotificationType.Success);
                     }
-                    Toast.ShowNotifiy("自动识别失败", "解析后的文本未寻找到Cookie", NotificationType.Error);
+                    catch(GetCookieException ex)
+                    {
+                        Toast.ShowNotifiy("获取Cookie失败", ex.Message, NotificationType.Error);
+                    }
                 }
                 else
-                {
-                    Toast.ShowNotifiy("自动识别失败", "该Session中不包含LibID", NotificationType.Error);
-                }
+                    Toast.ShowNotifiy("获取Cookie失败", "从链接中匹配出code失败", NotificationType.Error);
             }
             else
             {
-                Toast.ShowNotifiy("自动识别失败", "Session不合法，不包含关键要素", NotificationType.Error);
+                Toast.ShowNotifiy("获取Cookie失败","提供的含code链接格式有误，不符合格式规范",NotificationType.Error);
             }
-            uiSymbolButton_AutoIdentify.Enabled= true;
         }
     }
 }

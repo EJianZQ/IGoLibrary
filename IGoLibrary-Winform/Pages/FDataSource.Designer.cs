@@ -30,10 +30,10 @@
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FDataSource));
             this.uiTabControl_DataSource = new Sunny.UI.UITabControl();
-            this.tabPage_DirectFilling = new System.Windows.Forms.TabPage();
+            this.tabPage_VerifyCookie = new System.Windows.Forms.TabPage();
             this.uiTitlePanel_Operation1 = new Sunny.UI.UITitlePanel();
             this.uiSymbolButton_ReadDataSource = new Sunny.UI.UISymbolButton();
-            this.uiSymbolButton_Verify = new Sunny.UI.UISymbolButton();
+            this.uiSymbolButton_BindLibrary = new Sunny.UI.UISymbolButton();
             this.uiSymbolButton_SaveDataSource = new Sunny.UI.UISymbolButton();
             this.uiTitlePanel_LibID = new Sunny.UI.UITitlePanel();
             this.uiIntegerUpDown_LibID = new Sunny.UI.UIIntegerUpDown();
@@ -44,34 +44,44 @@
             this.uiSymbolLabel_LibStatus = new Sunny.UI.UISymbolLabel();
             this.uiTitlePanel_Cookie = new Sunny.UI.UITitlePanel();
             this.uiTextBox_Cookies = new Sunny.UI.UITextBox();
-            this.tabPage_AutoIdentify = new System.Windows.Forms.TabPage();
+            this.tabPage_GetCookie = new System.Windows.Forms.TabPage();
+            this.uiTitlePanel1 = new Sunny.UI.UITitlePanel();
+            this.uiLabel1 = new Sunny.UI.UILabel();
+            this.pictureBox_QR = new System.Windows.Forms.PictureBox();
             this.uiTitlePanel_Operation2 = new Sunny.UI.UITitlePanel();
-            this.uiSymbolButton_AutoIdentify = new Sunny.UI.UISymbolButton();
-            this.uiTitlePanel_Session = new Sunny.UI.UITitlePanel();
-            this.uiTextBox_Session = new Sunny.UI.UITextBox();
+            this.uiSwitch1 = new Sunny.UI.UISwitch();
+            this.uiSymbolLabel_KeepCookieAlive = new Sunny.UI.UISymbolLabel();
+            this.uiSymbolButton_GetCookie = new Sunny.UI.UISymbolButton();
+            this.uiTitlePanel_CodeSourceURL = new Sunny.UI.UITitlePanel();
+            this.uiTextBox_CodeSourceURL = new Sunny.UI.UITextBox();
             this.tabPage_BuiltinQuerySyntax = new System.Windows.Forms.TabPage();
+            this.uiTitlePanel_QueryAllLibsSummarySyntax = new Sunny.UI.UITitlePanel();
+            this.uiTextBox_QueryAllLibsSummarySyntax = new Sunny.UI.UITextBox();
             this.uiTitlePanel_ReserveSeatSyntax = new Sunny.UI.UITitlePanel();
             this.uiTextBox_ReserveSeatSyntax = new Sunny.UI.UITextBox();
             this.uiTitlePanel_QueryLibInfoSyntax = new Sunny.UI.UITitlePanel();
             this.uiTextBox_QueryLibInfoSyntax = new Sunny.UI.UITextBox();
             this.uiTabControl_DataSource.SuspendLayout();
-            this.tabPage_DirectFilling.SuspendLayout();
+            this.tabPage_VerifyCookie.SuspendLayout();
             this.uiTitlePanel_Operation1.SuspendLayout();
             this.uiTitlePanel_LibID.SuspendLayout();
             this.uiTitlePanel_LibInfo.SuspendLayout();
             this.uiTitlePanel_Cookie.SuspendLayout();
-            this.tabPage_AutoIdentify.SuspendLayout();
+            this.tabPage_GetCookie.SuspendLayout();
+            this.uiTitlePanel1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox_QR)).BeginInit();
             this.uiTitlePanel_Operation2.SuspendLayout();
-            this.uiTitlePanel_Session.SuspendLayout();
+            this.uiTitlePanel_CodeSourceURL.SuspendLayout();
             this.tabPage_BuiltinQuerySyntax.SuspendLayout();
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.SuspendLayout();
             this.uiTitlePanel_ReserveSeatSyntax.SuspendLayout();
             this.uiTitlePanel_QueryLibInfoSyntax.SuspendLayout();
             this.SuspendLayout();
             // 
             // uiTabControl_DataSource
             // 
-            this.uiTabControl_DataSource.Controls.Add(this.tabPage_DirectFilling);
-            this.uiTabControl_DataSource.Controls.Add(this.tabPage_AutoIdentify);
+            this.uiTabControl_DataSource.Controls.Add(this.tabPage_VerifyCookie);
+            this.uiTabControl_DataSource.Controls.Add(this.tabPage_GetCookie);
             this.uiTabControl_DataSource.Controls.Add(this.tabPage_BuiltinQuerySyntax);
             this.uiTabControl_DataSource.DrawMode = System.Windows.Forms.TabDrawMode.OwnerDrawFixed;
             this.uiTabControl_DataSource.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
@@ -90,23 +100,23 @@
             this.uiTabControl_DataSource.TabUnSelectedForeColor = System.Drawing.Color.Black;
             this.uiTabControl_DataSource.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
-            // tabPage_DirectFilling
+            // tabPage_VerifyCookie
             // 
-            this.tabPage_DirectFilling.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(249)))), ((int)(((byte)(255)))));
-            this.tabPage_DirectFilling.Controls.Add(this.uiTitlePanel_Operation1);
-            this.tabPage_DirectFilling.Controls.Add(this.uiTitlePanel_LibID);
-            this.tabPage_DirectFilling.Controls.Add(this.uiTitlePanel_LibInfo);
-            this.tabPage_DirectFilling.Controls.Add(this.uiTitlePanel_Cookie);
-            this.tabPage_DirectFilling.Location = new System.Drawing.Point(0, 40);
-            this.tabPage_DirectFilling.Name = "tabPage_DirectFilling";
-            this.tabPage_DirectFilling.Size = new System.Drawing.Size(633, 451);
-            this.tabPage_DirectFilling.TabIndex = 0;
-            this.tabPage_DirectFilling.Text = "手动填写";
+            this.tabPage_VerifyCookie.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(249)))), ((int)(((byte)(255)))));
+            this.tabPage_VerifyCookie.Controls.Add(this.uiTitlePanel_Operation1);
+            this.tabPage_VerifyCookie.Controls.Add(this.uiTitlePanel_LibID);
+            this.tabPage_VerifyCookie.Controls.Add(this.uiTitlePanel_LibInfo);
+            this.tabPage_VerifyCookie.Controls.Add(this.uiTitlePanel_Cookie);
+            this.tabPage_VerifyCookie.Location = new System.Drawing.Point(0, 40);
+            this.tabPage_VerifyCookie.Name = "tabPage_VerifyCookie";
+            this.tabPage_VerifyCookie.Size = new System.Drawing.Size(633, 451);
+            this.tabPage_VerifyCookie.TabIndex = 0;
+            this.tabPage_VerifyCookie.Text = "绑定图书馆";
             // 
             // uiTitlePanel_Operation1
             // 
             this.uiTitlePanel_Operation1.Controls.Add(this.uiSymbolButton_ReadDataSource);
-            this.uiTitlePanel_Operation1.Controls.Add(this.uiSymbolButton_Verify);
+            this.uiTitlePanel_Operation1.Controls.Add(this.uiSymbolButton_BindLibrary);
             this.uiTitlePanel_Operation1.Controls.Add(this.uiSymbolButton_SaveDataSource);
             this.uiTitlePanel_Operation1.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.uiTitlePanel_Operation1.Location = new System.Drawing.Point(4, 281);
@@ -134,18 +144,18 @@
             this.uiSymbolButton_ReadDataSource.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             this.uiSymbolButton_ReadDataSource.Click += new System.EventHandler(this.uiSymbolButton_ReadDataSource_Click);
             // 
-            // uiSymbolButton_Verify
+            // uiSymbolButton_BindLibrary
             // 
-            this.uiSymbolButton_Verify.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiSymbolButton_Verify.Location = new System.Drawing.Point(14, 104);
-            this.uiSymbolButton_Verify.MinimumSize = new System.Drawing.Size(1, 1);
-            this.uiSymbolButton_Verify.Name = "uiSymbolButton_Verify";
-            this.uiSymbolButton_Verify.Size = new System.Drawing.Size(200, 35);
-            this.uiSymbolButton_Verify.Symbol = 61667;
-            this.uiSymbolButton_Verify.TabIndex = 1;
-            this.uiSymbolButton_Verify.Text = "验证";
-            this.uiSymbolButton_Verify.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
-            this.uiSymbolButton_Verify.Click += new System.EventHandler(this.uiSymbolButton_Verify_Click);
+            this.uiSymbolButton_BindLibrary.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiSymbolButton_BindLibrary.Location = new System.Drawing.Point(14, 104);
+            this.uiSymbolButton_BindLibrary.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiSymbolButton_BindLibrary.Name = "uiSymbolButton_BindLibrary";
+            this.uiSymbolButton_BindLibrary.Size = new System.Drawing.Size(200, 35);
+            this.uiSymbolButton_BindLibrary.Symbol = 61667;
+            this.uiSymbolButton_BindLibrary.TabIndex = 1;
+            this.uiSymbolButton_BindLibrary.Text = "绑定";
+            this.uiSymbolButton_BindLibrary.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiSymbolButton_BindLibrary.Click += new System.EventHandler(this.uiSymbolButton_Verify_Click);
             // 
             // uiSymbolButton_SaveDataSource
             // 
@@ -190,7 +200,6 @@
             this.uiIntegerUpDown_LibID.TabIndex = 0;
             this.uiIntegerUpDown_LibID.Text = null;
             this.uiIntegerUpDown_LibID.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
-            this.uiIntegerUpDown_LibID.Value = 100000;
             this.uiIntegerUpDown_LibID.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
             // uiTitlePanel_LibInfo
@@ -303,93 +312,194 @@
             this.uiTextBox_Cookies.Size = new System.Drawing.Size(617, 124);
             this.uiTextBox_Cookies.TabIndex = 0;
             this.uiTextBox_Cookies.TextAlignment = System.Drawing.ContentAlignment.MiddleLeft;
-            this.uiTextBox_Cookies.Watermark = "如不会填写Cookie请阅读教程并使用自动识别功能";
+            this.uiTextBox_Cookies.Watermark = "如不会填写Cookie请阅读教程并使用获取Cookie功能";
             this.uiTextBox_Cookies.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
-            // tabPage_AutoIdentify
+            // tabPage_GetCookie
             // 
-            this.tabPage_AutoIdentify.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(249)))), ((int)(((byte)(255)))));
-            this.tabPage_AutoIdentify.Controls.Add(this.uiTitlePanel_Operation2);
-            this.tabPage_AutoIdentify.Controls.Add(this.uiTitlePanel_Session);
-            this.tabPage_AutoIdentify.Location = new System.Drawing.Point(0, 40);
-            this.tabPage_AutoIdentify.Name = "tabPage_AutoIdentify";
-            this.tabPage_AutoIdentify.Size = new System.Drawing.Size(200, 60);
-            this.tabPage_AutoIdentify.TabIndex = 1;
-            this.tabPage_AutoIdentify.Text = "自动识别";
+            this.tabPage_GetCookie.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(249)))), ((int)(((byte)(255)))));
+            this.tabPage_GetCookie.Controls.Add(this.uiTitlePanel1);
+            this.tabPage_GetCookie.Controls.Add(this.uiTitlePanel_Operation2);
+            this.tabPage_GetCookie.Controls.Add(this.uiTitlePanel_CodeSourceURL);
+            this.tabPage_GetCookie.Location = new System.Drawing.Point(0, 40);
+            this.tabPage_GetCookie.Name = "tabPage_GetCookie";
+            this.tabPage_GetCookie.Size = new System.Drawing.Size(200, 60);
+            this.tabPage_GetCookie.TabIndex = 1;
+            this.tabPage_GetCookie.Text = "获取Cookie";
+            // 
+            // uiTitlePanel1
+            // 
+            this.uiTitlePanel1.Controls.Add(this.uiLabel1);
+            this.uiTitlePanel1.Controls.Add(this.pictureBox_QR);
+            this.uiTitlePanel1.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiTitlePanel1.Location = new System.Drawing.Point(8, 196);
+            this.uiTitlePanel1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiTitlePanel1.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiTitlePanel1.Name = "uiTitlePanel1";
+            this.uiTitlePanel1.Padding = new System.Windows.Forms.Padding(0, 35, 0, 0);
+            this.uiTitlePanel1.ShowText = false;
+            this.uiTitlePanel1.Size = new System.Drawing.Size(376, 247);
+            this.uiTitlePanel1.TabIndex = 2;
+            this.uiTitlePanel1.Text = "含code链接获取教程";
+            this.uiTitlePanel1.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
+            this.uiTitlePanel1.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            // 
+            // uiLabel1
+            // 
+            this.uiLabel1.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiLabel1.Location = new System.Drawing.Point(181, 39);
+            this.uiLabel1.Name = "uiLabel1";
+            this.uiLabel1.Size = new System.Drawing.Size(187, 194);
+            this.uiLabel1.TabIndex = 1;
+            this.uiLabel1.Text = "1.使用微信扫左侧二维码\r\n2.进入页面后点击右上角“…”符号，选择“复制链接”\r\n3.将链接粘贴至上方文本框";
+            this.uiLabel1.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.uiLabel1.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            // 
+            // pictureBox_QR
+            // 
+            this.pictureBox_QR.Image = global::IGoLibrary_Winform.Properties.Resources.qr;
+            this.pictureBox_QR.Location = new System.Drawing.Point(9, 59);
+            this.pictureBox_QR.Name = "pictureBox_QR";
+            this.pictureBox_QR.Size = new System.Drawing.Size(166, 169);
+            this.pictureBox_QR.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+            this.pictureBox_QR.TabIndex = 0;
+            this.pictureBox_QR.TabStop = false;
             // 
             // uiTitlePanel_Operation2
             // 
-            this.uiTitlePanel_Operation2.Controls.Add(this.uiSymbolButton_AutoIdentify);
+            this.uiTitlePanel_Operation2.Controls.Add(this.uiSwitch1);
+            this.uiTitlePanel_Operation2.Controls.Add(this.uiSymbolLabel_KeepCookieAlive);
+            this.uiTitlePanel_Operation2.Controls.Add(this.uiSymbolButton_GetCookie);
             this.uiTitlePanel_Operation2.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiTitlePanel_Operation2.Location = new System.Drawing.Point(364, 338);
+            this.uiTitlePanel_Operation2.Location = new System.Drawing.Point(392, 286);
             this.uiTitlePanel_Operation2.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.uiTitlePanel_Operation2.MinimumSize = new System.Drawing.Size(1, 1);
             this.uiTitlePanel_Operation2.Name = "uiTitlePanel_Operation2";
             this.uiTitlePanel_Operation2.Padding = new System.Windows.Forms.Padding(0, 35, 0, 0);
             this.uiTitlePanel_Operation2.ShowText = false;
-            this.uiTitlePanel_Operation2.Size = new System.Drawing.Size(265, 105);
+            this.uiTitlePanel_Operation2.Size = new System.Drawing.Size(237, 157);
             this.uiTitlePanel_Operation2.TabIndex = 1;
             this.uiTitlePanel_Operation2.Text = "操作";
             this.uiTitlePanel_Operation2.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
             this.uiTitlePanel_Operation2.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
-            // uiSymbolButton_AutoIdentify
+            // uiSwitch1
             // 
-            this.uiSymbolButton_AutoIdentify.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiSymbolButton_AutoIdentify.Location = new System.Drawing.Point(32, 48);
-            this.uiSymbolButton_AutoIdentify.MinimumSize = new System.Drawing.Size(1, 1);
-            this.uiSymbolButton_AutoIdentify.Name = "uiSymbolButton_AutoIdentify";
-            this.uiSymbolButton_AutoIdentify.Size = new System.Drawing.Size(206, 37);
-            this.uiSymbolButton_AutoIdentify.Symbol = 61648;
-            this.uiSymbolButton_AutoIdentify.TabIndex = 0;
-            this.uiSymbolButton_AutoIdentify.Text = "识别并自动填写";
-            this.uiSymbolButton_AutoIdentify.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
-            this.uiSymbolButton_AutoIdentify.Click += new System.EventHandler(this.uiSymbolButton_AutoIdentify_Click);
+            this.uiSwitch1.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiSwitch1.Location = new System.Drawing.Point(159, 53);
+            this.uiSwitch1.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiSwitch1.Name = "uiSwitch1";
+            this.uiSwitch1.Size = new System.Drawing.Size(63, 29);
+            this.uiSwitch1.TabIndex = 2;
+            this.uiSwitch1.Text = "uiSwitch1";
+            this.uiSwitch1.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
-            // uiTitlePanel_Session
+            // uiSymbolLabel_KeepCookieAlive
             // 
-            this.uiTitlePanel_Session.Controls.Add(this.uiTextBox_Session);
-            this.uiTitlePanel_Session.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiTitlePanel_Session.Location = new System.Drawing.Point(4, 12);
-            this.uiTitlePanel_Session.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.uiTitlePanel_Session.MinimumSize = new System.Drawing.Size(1, 1);
-            this.uiTitlePanel_Session.Name = "uiTitlePanel_Session";
-            this.uiTitlePanel_Session.Padding = new System.Windows.Forms.Padding(0, 35, 0, 0);
-            this.uiTitlePanel_Session.ShowText = false;
-            this.uiTitlePanel_Session.Size = new System.Drawing.Size(625, 316);
-            this.uiTitlePanel_Session.TabIndex = 0;
-            this.uiTitlePanel_Session.Text = "待识别内容 - Fiddler Session";
-            this.uiTitlePanel_Session.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
-            this.uiTitlePanel_Session.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiSymbolLabel_KeepCookieAlive.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiSymbolLabel_KeepCookieAlive.Location = new System.Drawing.Point(16, 53);
+            this.uiSymbolLabel_KeepCookieAlive.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiSymbolLabel_KeepCookieAlive.Name = "uiSymbolLabel_KeepCookieAlive";
+            this.uiSymbolLabel_KeepCookieAlive.Padding = new System.Windows.Forms.Padding(34, 0, 0, 0);
+            this.uiSymbolLabel_KeepCookieAlive.Size = new System.Drawing.Size(142, 30);
+            this.uiSymbolLabel_KeepCookieAlive.Symbol = 62014;
+            this.uiSymbolLabel_KeepCookieAlive.SymbolSize = 30;
+            this.uiSymbolLabel_KeepCookieAlive.TabIndex = 1;
+            this.uiSymbolLabel_KeepCookieAlive.Text = "Cookie保活";
+            this.uiSymbolLabel_KeepCookieAlive.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.uiSymbolLabel_KeepCookieAlive.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
-            // uiTextBox_Session
+            // uiSymbolButton_GetCookie
             // 
-            this.uiTextBox_Session.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiTextBox_Session.Location = new System.Drawing.Point(4, 40);
-            this.uiTextBox_Session.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.uiTextBox_Session.MinimumSize = new System.Drawing.Size(1, 16);
-            this.uiTextBox_Session.Multiline = true;
-            this.uiTextBox_Session.Name = "uiTextBox_Session";
-            this.uiTextBox_Session.RectSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.None;
-            this.uiTextBox_Session.ShowScrollBar = true;
-            this.uiTextBox_Session.ShowText = false;
-            this.uiTextBox_Session.Size = new System.Drawing.Size(617, 271);
-            this.uiTextBox_Session.TabIndex = 0;
-            this.uiTextBox_Session.TextAlignment = System.Drawing.ContentAlignment.MiddleLeft;
-            this.uiTextBox_Session.Watermark = "填入Fiddler中复制来的Session";
-            this.uiTextBox_Session.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiSymbolButton_GetCookie.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiSymbolButton_GetCookie.Location = new System.Drawing.Point(16, 103);
+            this.uiSymbolButton_GetCookie.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiSymbolButton_GetCookie.Name = "uiSymbolButton_GetCookie";
+            this.uiSymbolButton_GetCookie.Size = new System.Drawing.Size(206, 37);
+            this.uiSymbolButton_GetCookie.Symbol = 61648;
+            this.uiSymbolButton_GetCookie.TabIndex = 0;
+            this.uiSymbolButton_GetCookie.Text = "获取并填写Cookie";
+            this.uiSymbolButton_GetCookie.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiSymbolButton_GetCookie.Click += new System.EventHandler(this.uiSymbolButton_GetCookie_Click);
+            // 
+            // uiTitlePanel_CodeSourceURL
+            // 
+            this.uiTitlePanel_CodeSourceURL.Controls.Add(this.uiTextBox_CodeSourceURL);
+            this.uiTitlePanel_CodeSourceURL.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiTitlePanel_CodeSourceURL.Location = new System.Drawing.Point(4, 12);
+            this.uiTitlePanel_CodeSourceURL.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiTitlePanel_CodeSourceURL.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiTitlePanel_CodeSourceURL.Name = "uiTitlePanel_CodeSourceURL";
+            this.uiTitlePanel_CodeSourceURL.Padding = new System.Windows.Forms.Padding(0, 35, 0, 0);
+            this.uiTitlePanel_CodeSourceURL.ShowText = false;
+            this.uiTitlePanel_CodeSourceURL.Size = new System.Drawing.Size(625, 174);
+            this.uiTitlePanel_CodeSourceURL.TabIndex = 0;
+            this.uiTitlePanel_CodeSourceURL.Text = "扫码后获取的含code链接";
+            this.uiTitlePanel_CodeSourceURL.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
+            this.uiTitlePanel_CodeSourceURL.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            // 
+            // uiTextBox_CodeSourceURL
+            // 
+            this.uiTextBox_CodeSourceURL.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiTextBox_CodeSourceURL.Location = new System.Drawing.Point(4, 40);
+            this.uiTextBox_CodeSourceURL.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiTextBox_CodeSourceURL.MinimumSize = new System.Drawing.Size(1, 16);
+            this.uiTextBox_CodeSourceURL.Multiline = true;
+            this.uiTextBox_CodeSourceURL.Name = "uiTextBox_CodeSourceURL";
+            this.uiTextBox_CodeSourceURL.RectSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.None;
+            this.uiTextBox_CodeSourceURL.ShowScrollBar = true;
+            this.uiTextBox_CodeSourceURL.ShowText = false;
+            this.uiTextBox_CodeSourceURL.Size = new System.Drawing.Size(617, 126);
+            this.uiTextBox_CodeSourceURL.TabIndex = 0;
+            this.uiTextBox_CodeSourceURL.TextAlignment = System.Drawing.ContentAlignment.MiddleLeft;
+            this.uiTextBox_CodeSourceURL.Watermark = "填入复制来的链接";
+            this.uiTextBox_CodeSourceURL.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
             // tabPage_BuiltinQuerySyntax
             // 
             this.tabPage_BuiltinQuerySyntax.AutoScroll = true;
             this.tabPage_BuiltinQuerySyntax.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(249)))), ((int)(((byte)(255)))));
+            this.tabPage_BuiltinQuerySyntax.Controls.Add(this.uiTitlePanel_QueryAllLibsSummarySyntax);
             this.tabPage_BuiltinQuerySyntax.Controls.Add(this.uiTitlePanel_ReserveSeatSyntax);
             this.tabPage_BuiltinQuerySyntax.Controls.Add(this.uiTitlePanel_QueryLibInfoSyntax);
             this.tabPage_BuiltinQuerySyntax.Location = new System.Drawing.Point(0, 40);
             this.tabPage_BuiltinQuerySyntax.Name = "tabPage_BuiltinQuerySyntax";
-            this.tabPage_BuiltinQuerySyntax.Size = new System.Drawing.Size(633, 451);
+            this.tabPage_BuiltinQuerySyntax.Size = new System.Drawing.Size(200, 60);
             this.tabPage_BuiltinQuerySyntax.TabIndex = 2;
             this.tabPage_BuiltinQuerySyntax.Text = "内置查询语法";
+            // 
+            // uiTitlePanel_QueryAllLibsSummarySyntax
+            // 
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.Controls.Add(this.uiTextBox_QueryAllLibsSummarySyntax);
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.Location = new System.Drawing.Point(7, 368);
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.Name = "uiTitlePanel_QueryAllLibsSummarySyntax";
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.Padding = new System.Windows.Forms.Padding(0, 35, 0, 0);
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.ShowText = false;
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.Size = new System.Drawing.Size(608, 168);
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.TabIndex = 2;
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.Text = "查询账号中所有图书馆语法(Json)";
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            // 
+            // uiTextBox_QueryAllLibsSummarySyntax
+            // 
+            this.uiTextBox_QueryAllLibsSummarySyntax.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiTextBox_QueryAllLibsSummarySyntax.Location = new System.Drawing.Point(4, 40);
+            this.uiTextBox_QueryAllLibsSummarySyntax.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiTextBox_QueryAllLibsSummarySyntax.MinimumSize = new System.Drawing.Size(1, 16);
+            this.uiTextBox_QueryAllLibsSummarySyntax.Multiline = true;
+            this.uiTextBox_QueryAllLibsSummarySyntax.Name = "uiTextBox_QueryAllLibsSummarySyntax";
+            this.uiTextBox_QueryAllLibsSummarySyntax.ShowScrollBar = true;
+            this.uiTextBox_QueryAllLibsSummarySyntax.ShowText = false;
+            this.uiTextBox_QueryAllLibsSummarySyntax.Size = new System.Drawing.Size(601, 123);
+            this.uiTextBox_QueryAllLibsSummarySyntax.TabIndex = 0;
+            this.uiTextBox_QueryAllLibsSummarySyntax.Text = resources.GetString("uiTextBox_QueryAllLibsSummarySyntax.Text");
+            this.uiTextBox_QueryAllLibsSummarySyntax.TextAlignment = System.Drawing.ContentAlignment.MiddleLeft;
+            this.uiTextBox_QueryAllLibsSummarySyntax.Watermark = "";
+            this.uiTextBox_QueryAllLibsSummarySyntax.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
             // uiTitlePanel_ReserveSeatSyntax
             // 
@@ -436,7 +546,7 @@
             this.uiTitlePanel_QueryLibInfoSyntax.ShowText = false;
             this.uiTitlePanel_QueryLibInfoSyntax.Size = new System.Drawing.Size(608, 168);
             this.uiTitlePanel_QueryLibInfoSyntax.TabIndex = 0;
-            this.uiTitlePanel_QueryLibInfoSyntax.Text = "查询图书馆(室)所有信息语法(Json)：替换入Lib ID";
+            this.uiTitlePanel_QueryLibInfoSyntax.Text = "查询单个图书馆(室)所有信息语法(Json)：替换入Lib ID";
             this.uiTitlePanel_QueryLibInfoSyntax.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
             this.uiTitlePanel_QueryLibInfoSyntax.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
@@ -471,15 +581,18 @@
             this.SymbolSize = 30;
             this.Text = "数据源";
             this.uiTabControl_DataSource.ResumeLayout(false);
-            this.tabPage_DirectFilling.ResumeLayout(false);
+            this.tabPage_VerifyCookie.ResumeLayout(false);
             this.uiTitlePanel_Operation1.ResumeLayout(false);
             this.uiTitlePanel_LibID.ResumeLayout(false);
             this.uiTitlePanel_LibInfo.ResumeLayout(false);
             this.uiTitlePanel_Cookie.ResumeLayout(false);
-            this.tabPage_AutoIdentify.ResumeLayout(false);
+            this.tabPage_GetCookie.ResumeLayout(false);
+            this.uiTitlePanel1.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox_QR)).EndInit();
             this.uiTitlePanel_Operation2.ResumeLayout(false);
-            this.uiTitlePanel_Session.ResumeLayout(false);
+            this.uiTitlePanel_CodeSourceURL.ResumeLayout(false);
             this.tabPage_BuiltinQuerySyntax.ResumeLayout(false);
+            this.uiTitlePanel_QueryAllLibsSummarySyntax.ResumeLayout(false);
             this.uiTitlePanel_ReserveSeatSyntax.ResumeLayout(false);
             this.uiTitlePanel_QueryLibInfoSyntax.ResumeLayout(false);
             this.ResumeLayout(false);
@@ -489,8 +602,8 @@
         #endregion
 
         private Sunny.UI.UITabControl uiTabControl_DataSource;
-        private TabPage tabPage_DirectFilling;
-        private TabPage tabPage_AutoIdentify;
+        private TabPage tabPage_VerifyCookie;
+        private TabPage tabPage_GetCookie;
         private Sunny.UI.UITitlePanel uiTitlePanel_Cookie;
         private TabPage tabPage_BuiltinQuerySyntax;
         private Sunny.UI.UITitlePanel uiTitlePanel_LibInfo;
@@ -498,7 +611,7 @@
         private Sunny.UI.UIIntegerUpDown uiIntegerUpDown_LibID;
         private Sunny.UI.UITitlePanel uiTitlePanel_Operation1;
         private Sunny.UI.UISymbolButton uiSymbolButton_ReadDataSource;
-        private Sunny.UI.UISymbolButton uiSymbolButton_Verify;
+        private Sunny.UI.UISymbolButton uiSymbolButton_BindLibrary;
         private Sunny.UI.UISymbolButton uiSymbolButton_SaveDataSource;
         private Sunny.UI.UISymbolLabel uiSymbolLabel_LibStatus;
         private Sunny.UI.UISymbolLabel uiSymbolLabel_LibAvailableSeatsNum;
@@ -507,11 +620,18 @@
         public Sunny.UI.UITextBox uiTextBox_Cookies;
         private Sunny.UI.UITitlePanel uiTitlePanel_QueryLibInfoSyntax;
         public Sunny.UI.UITextBox uiTextBox_QueryLibInfoSyntax;
-        private Sunny.UI.UITitlePanel uiTitlePanel_Session;
+        private Sunny.UI.UITitlePanel uiTitlePanel_CodeSourceURL;
         private Sunny.UI.UITitlePanel uiTitlePanel_Operation2;
-        private Sunny.UI.UISymbolButton uiSymbolButton_AutoIdentify;
-        private Sunny.UI.UITextBox uiTextBox_Session;
+        private Sunny.UI.UISymbolButton uiSymbolButton_GetCookie;
+        private Sunny.UI.UITextBox uiTextBox_CodeSourceURL;
         private Sunny.UI.UITitlePanel uiTitlePanel_ReserveSeatSyntax;
         private Sunny.UI.UITextBox uiTextBox_ReserveSeatSyntax;
+        private Sunny.UI.UITitlePanel uiTitlePanel1;
+        private PictureBox pictureBox_QR;
+        private Sunny.UI.UILabel uiLabel1;
+        private Sunny.UI.UISwitch uiSwitch1;
+        private Sunny.UI.UISymbolLabel uiSymbolLabel_KeepCookieAlive;
+        private Sunny.UI.UITitlePanel uiTitlePanel_QueryAllLibsSummarySyntax;
+        private Sunny.UI.UITextBox uiTextBox_QueryAllLibsSummarySyntax;
     }
 }

@@ -11,11 +11,11 @@ namespace IGoLibrary_Winform.Controller
         /// <summary>
         /// 获取图书馆所有信息，成功且信息合法返回Library类型，否则抛出异常
         /// </summary>
-        /// <param name="Cookies"></param>
+        /// <param name="Cookie"></param>
         /// <param name="QueryStatement"></param>
         /// <returns></returns>
         /// <exception cref="GetLibInfoException"></exception>
-        public Library? GetLibInfo(string Cookies, string QueryStatement)
+        public Library? GetLibInfo(string Cookie, string QueryStatement)
         {
             using (var client = new RestClient("https://wechat.v2.traceint.com/index.php/graphql/"))
             {
@@ -37,7 +37,7 @@ namespace IGoLibrary_Winform.Controller
                 request.AddHeader("Accept-Language", @"zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7");
                 //以上信息都是通用的
                 request.AddHeader("Content-Length", QueryStatement.Length);
-                request.AddHeader("Cookie", Cookies);
+                request.AddHeader("Cookie", Cookie);
                 request.AddParameter("application/json", QueryStatement, ParameterType.RequestBody);
                 //必要的Header和Body都填写完毕，获取响应报文
                 CancellationTokenSource cts = new CancellationTokenSource();
@@ -82,6 +82,11 @@ namespace IGoLibrary_Winform.Controller
             }
         }
 
+        /// <summary>
+        /// 根据Lib根数据获取所有座位的信息，成功返回SeatsItem
+        /// </summary>
+        /// <param name="root"></param>
+        /// <returns></returns>
         public List<SeatsItem> GetLibSeats(LibRoot root)
         {
             if(root != null)

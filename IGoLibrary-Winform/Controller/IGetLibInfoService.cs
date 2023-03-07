@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using IGoLibrary_Winform.Data;
 
-namespace IGoLibrary_Winform
+namespace IGoLibrary_Winform.Controller
 {
     public interface IGetLibInfoService
     {

@@ -28,6 +28,8 @@ namespace IGoLibrary_Winform
             services = new ServiceCollection();
             services.AddSingleton<IGetLibInfoService, GetLibInfoServiceImpl>();
             services.AddSingleton<IReserveSeatService, ReserveSeatServiceImpl>();
+            services.AddSingleton<IGetCookieService, GetCookieServiceImpl>();
+            services.AddSingleton<IGetAllLibsSummaryService, GetAllLibsSummaryImpl>();
             using (var serviceProvider = services.BuildServiceProvider())
             {
                 int pageIndex = 1000;
