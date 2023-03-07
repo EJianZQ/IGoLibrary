@@ -46,7 +46,7 @@ namespace IGoLibrary_Winform.Pages
                     {
                         items.Add(string.Format("{0} - {1} - {2}", item.Name,item.Floor,item.IsOpen ? "开放" :"关闭"));
                     }
-                    if (this.ShowSelectDialog(ref libSelectedIndex, items,"选择想要绑定的图书馆","选择一个场馆绑定，在绑定成功后即可在抢座页面选择待抢座位并监控"))
+                    if (this.ShowSelectDialog(ref libSelectedIndex, items,"选择想要绑定的图书馆","绑定成功后在抢座页面选择待抢座位并监控"))
                     {
                         var libraryData = getLibInfoService.GetLibInfo(this.uiTextBox_Cookies.Text, this.uiTextBox_QueryLibInfoSyntax.Text.Replace("ReplaceMe", allLibsSummary.libSummaries[libSelectedIndex].LibID.ToString()));
                         uiIntegerUpDown_LibID.Value = allLibsSummary.libSummaries[libSelectedIndex].LibID;

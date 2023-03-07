@@ -114,7 +114,7 @@ namespace IGoLibrary_Winform.Pages
                                         }
                                         else
                                         {
-                                            uiTextBox_RealTimeData.AppendText($"[第{count}次][{DateTime.Now.ToString("T")}]{singleKeyData.Name}号座位预定失败" + Environment.NewLine);
+                                            uiTextBox_RealTimeData.AppendText($"[第{count}次][{DateTime.Now.ToString("T")}]{singleKeyData.Name}号座位预定失败，原因未知，结束监控" + Environment.NewLine); //这个地方可能永远也用不到 因为如果预定失败的话按照协议的规则应该是返回错误原因的，不会没有错误原因
                                         }
                                         uiSwitch_GrabSeatSwitch.Active = false;
                                         _grabSeatsSignal = false;
@@ -137,6 +137,14 @@ namespace IGoLibrary_Winform.Pages
                                 _grabSeatsSignal = false; //抛异常了可能是cookie过期了或者其他，另行判断
                                 uiTextBox_RealTimeData.AppendText($"[第{count}次][{DateTime.Now.ToString("T")}]出现异常，异常信息:{ex.Message}，需要重新填写Cookie并验证后再使用" + Environment.NewLine);
                                 Toast.ShowNotifiy(" 获取座位信息时出现致命错误",$"错误信息：{ex.Message}",NotificationType.Warning);
+                                uiSwitch_GrabSeatSwitch.Active = false;
+                            }
+                            catch(ReserveSeatException ex)
+                            {
+                                _grabSeatsSignal = false; //抛异常了可能是cookie过期了或者其他，另行判断
+                                uiTextBox_RealTimeData.AppendText($"[第{count}次][{DateTime.Now.ToString("T")}]预定座位失败，失败信息:{ex.Message}，结束监控" + Environment.NewLine);
+                                Toast.ShowNotifiy(" 预定座位信息时出现错误", $"错误信息：{ex.Message}", NotificationType.Warning);
+                                uiSwitch_GrabSeatSwitch.Active = false;
                             }
                         }
                     });

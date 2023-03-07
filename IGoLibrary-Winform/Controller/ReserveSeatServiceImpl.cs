@@ -43,16 +43,15 @@ namespace IGoLibrary_Winform.Controller
                     var reserveSeatRoot = JsonConvert.DeserializeObject<ReserveSeatRoot>(outputString);
                     if (reserveSeatRoot.errors != null) //判断是否有错误信息，有就抛异常
                     {
-                        throw new GetLibInfoException(reserveSeatRoot.errors[0].msg);
+                        throw new ReserveSeatException(reserveSeatRoot.errors[0].msg);
                     }
                     if (reserveSeatRoot.data.userAuth.reserve != null) //如果reserve不为null则有正常数据，可返回Library
                     {
-                        //return reserveSeatRoot.data.userAuth.reserve.reserueSeat;
-                        return true;
+                        return reserveSeatRoot.data.userAuth.reserve.reserueSeat;
                     }
                     else
                     {
-                        throw new GetLibInfoException("响应报文中未包含预定座位信息");
+                        throw new ReserveSeatException("响应报文中未包含预定座位信息");
                     }
                 }
                 else
