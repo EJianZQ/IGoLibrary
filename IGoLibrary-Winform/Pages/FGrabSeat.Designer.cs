@@ -28,17 +28,17 @@
         /// </summary>
         private void InitializeComponent()
         {
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle4 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle5 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle6 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle7 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle8 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle9 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle10 = new System.Windows.Forms.DataGridViewCellStyle();
             this.uiTabControl_GrabSeat = new Sunny.UI.UITabControl();
             this.tabPage_GrabController = new System.Windows.Forms.TabPage();
             this.uiTitlePanel_SelectedGrabSeats = new Sunny.UI.UITitlePanel();
             this.uiListBox_SelectedGrabSeats = new Sunny.UI.UIListBox();
             this.uiTitlePanel2 = new Sunny.UI.UITitlePanel();
-            this.uiTimePicker1 = new Sunny.UI.UITimePicker();
+            this.uiTimePicker_TimingTime = new Sunny.UI.UITimePicker();
             this.uiMarkLabel2 = new Sunny.UI.UIMarkLabel();
             this.uiComboBox_GrabSeatMode = new Sunny.UI.UIComboBox();
             this.uiMarkLabel1 = new Sunny.UI.UIMarkLabel();
@@ -128,7 +128,7 @@
             // 
             // uiTitlePanel2
             // 
-            this.uiTitlePanel2.Controls.Add(this.uiTimePicker1);
+            this.uiTitlePanel2.Controls.Add(this.uiTimePicker_TimingTime);
             this.uiTitlePanel2.Controls.Add(this.uiMarkLabel2);
             this.uiTitlePanel2.Controls.Add(this.uiComboBox_GrabSeatMode);
             this.uiTitlePanel2.Controls.Add(this.uiMarkLabel1);
@@ -145,25 +145,25 @@
             this.uiTitlePanel2.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
             this.uiTitlePanel2.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
-            // uiTimePicker1
+            // uiTimePicker_TimingTime
             // 
-            this.uiTimePicker1.FillColor = System.Drawing.Color.White;
-            this.uiTimePicker1.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiTimePicker1.Location = new System.Drawing.Point(13, 144);
-            this.uiTimePicker1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.uiTimePicker1.MaxLength = 8;
-            this.uiTimePicker1.MinimumSize = new System.Drawing.Size(63, 0);
-            this.uiTimePicker1.Name = "uiTimePicker1";
-            this.uiTimePicker1.Padding = new System.Windows.Forms.Padding(0, 0, 30, 2);
-            this.uiTimePicker1.Size = new System.Drawing.Size(158, 29);
-            this.uiTimePicker1.SymbolDropDown = 61555;
-            this.uiTimePicker1.SymbolNormal = 61555;
-            this.uiTimePicker1.TabIndex = 3;
-            this.uiTimePicker1.Text = "00:00:00";
-            this.uiTimePicker1.TextAlignment = System.Drawing.ContentAlignment.MiddleLeft;
-            this.uiTimePicker1.Value = new System.DateTime(2023, 2, 26, 0, 0, 0, 0);
-            this.uiTimePicker1.Watermark = "";
-            this.uiTimePicker1.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiTimePicker_TimingTime.FillColor = System.Drawing.Color.White;
+            this.uiTimePicker_TimingTime.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiTimePicker_TimingTime.Location = new System.Drawing.Point(13, 144);
+            this.uiTimePicker_TimingTime.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiTimePicker_TimingTime.MaxLength = 8;
+            this.uiTimePicker_TimingTime.MinimumSize = new System.Drawing.Size(63, 0);
+            this.uiTimePicker_TimingTime.Name = "uiTimePicker_TimingTime";
+            this.uiTimePicker_TimingTime.Padding = new System.Windows.Forms.Padding(0, 0, 30, 2);
+            this.uiTimePicker_TimingTime.Size = new System.Drawing.Size(158, 29);
+            this.uiTimePicker_TimingTime.SymbolDropDown = 61555;
+            this.uiTimePicker_TimingTime.SymbolNormal = 61555;
+            this.uiTimePicker_TimingTime.TabIndex = 3;
+            this.uiTimePicker_TimingTime.Text = "00:00:00";
+            this.uiTimePicker_TimingTime.TextAlignment = System.Drawing.ContentAlignment.MiddleLeft;
+            this.uiTimePicker_TimingTime.Value = new System.DateTime(2023, 3, 7, 0, 0, 0, 0);
+            this.uiTimePicker_TimingTime.Watermark = "";
+            this.uiTimePicker_TimingTime.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
             // uiMarkLabel2
             // 
@@ -231,7 +231,6 @@
             // 
             // uiSwitch_GrabSeatSwitch
             // 
-            this.uiSwitch_GrabSeatSwitch.Enabled = false;
             this.uiSwitch_GrabSeatSwitch.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.uiSwitch_GrabSeatSwitch.Location = new System.Drawing.Point(30, 56);
             this.uiSwitch_GrabSeatSwitch.MinimumSize = new System.Drawing.Size(1, 1);
@@ -314,45 +313,45 @@
             // uiDataGridView_SeatInfo
             // 
             this.uiDataGridView_SeatInfo.AllowUserToOrderColumns = true;
-            dataGridViewCellStyle1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(243)))), ((int)(((byte)(255)))));
-            this.uiDataGridView_SeatInfo.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
+            dataGridViewCellStyle6.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(243)))), ((int)(((byte)(255)))));
+            this.uiDataGridView_SeatInfo.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle6;
             this.uiDataGridView_SeatInfo.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
             this.uiDataGridView_SeatInfo.BackgroundColor = System.Drawing.Color.White;
             this.uiDataGridView_SeatInfo.ColumnHeadersBorderStyle = System.Windows.Forms.DataGridViewHeaderBorderStyle.Single;
-            dataGridViewCellStyle2.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(80)))), ((int)(((byte)(160)))), ((int)(((byte)(255)))));
-            dataGridViewCellStyle2.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            dataGridViewCellStyle2.ForeColor = System.Drawing.Color.White;
-            dataGridViewCellStyle2.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle2.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle2.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
-            this.uiDataGridView_SeatInfo.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
+            dataGridViewCellStyle7.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle7.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(80)))), ((int)(((byte)(160)))), ((int)(((byte)(255)))));
+            dataGridViewCellStyle7.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            dataGridViewCellStyle7.ForeColor = System.Drawing.Color.White;
+            dataGridViewCellStyle7.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle7.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle7.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
+            this.uiDataGridView_SeatInfo.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle7;
             this.uiDataGridView_SeatInfo.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle3.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle3.BackColor = System.Drawing.SystemColors.Window;
-            dataGridViewCellStyle3.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            dataGridViewCellStyle3.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(48)))), ((int)(((byte)(48)))), ((int)(((byte)(48)))));
-            dataGridViewCellStyle3.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle3.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle3.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
-            this.uiDataGridView_SeatInfo.DefaultCellStyle = dataGridViewCellStyle3;
+            dataGridViewCellStyle8.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle8.BackColor = System.Drawing.SystemColors.Window;
+            dataGridViewCellStyle8.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            dataGridViewCellStyle8.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(48)))), ((int)(((byte)(48)))), ((int)(((byte)(48)))));
+            dataGridViewCellStyle8.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle8.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle8.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
+            this.uiDataGridView_SeatInfo.DefaultCellStyle = dataGridViewCellStyle8;
             this.uiDataGridView_SeatInfo.EnableHeadersVisualStyles = false;
             this.uiDataGridView_SeatInfo.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.uiDataGridView_SeatInfo.GridColor = System.Drawing.Color.FromArgb(((int)(((byte)(80)))), ((int)(((byte)(160)))), ((int)(((byte)(255)))));
             this.uiDataGridView_SeatInfo.Location = new System.Drawing.Point(3, 10);
             this.uiDataGridView_SeatInfo.Name = "uiDataGridView_SeatInfo";
-            dataGridViewCellStyle4.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle4.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(243)))), ((int)(((byte)(255)))));
-            dataGridViewCellStyle4.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            dataGridViewCellStyle4.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(48)))), ((int)(((byte)(48)))), ((int)(((byte)(48)))));
-            dataGridViewCellStyle4.SelectionBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(80)))), ((int)(((byte)(160)))), ((int)(((byte)(255)))));
-            dataGridViewCellStyle4.SelectionForeColor = System.Drawing.Color.White;
-            dataGridViewCellStyle4.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
-            this.uiDataGridView_SeatInfo.RowHeadersDefaultCellStyle = dataGridViewCellStyle4;
+            dataGridViewCellStyle9.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle9.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(235)))), ((int)(((byte)(243)))), ((int)(((byte)(255)))));
+            dataGridViewCellStyle9.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            dataGridViewCellStyle9.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(48)))), ((int)(((byte)(48)))), ((int)(((byte)(48)))));
+            dataGridViewCellStyle9.SelectionBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(80)))), ((int)(((byte)(160)))), ((int)(((byte)(255)))));
+            dataGridViewCellStyle9.SelectionForeColor = System.Drawing.Color.White;
+            dataGridViewCellStyle9.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
+            this.uiDataGridView_SeatInfo.RowHeadersDefaultCellStyle = dataGridViewCellStyle9;
             this.uiDataGridView_SeatInfo.RowHeadersWidth = 62;
-            dataGridViewCellStyle5.BackColor = System.Drawing.Color.White;
-            dataGridViewCellStyle5.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiDataGridView_SeatInfo.RowsDefaultCellStyle = dataGridViewCellStyle5;
+            dataGridViewCellStyle10.BackColor = System.Drawing.Color.White;
+            dataGridViewCellStyle10.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiDataGridView_SeatInfo.RowsDefaultCellStyle = dataGridViewCellStyle10;
             this.uiDataGridView_SeatInfo.RowTemplate.Height = 25;
             this.uiDataGridView_SeatInfo.ScrollBarRectColor = System.Drawing.Color.FromArgb(((int)(((byte)(80)))), ((int)(((byte)(160)))), ((int)(((byte)(255)))));
             this.uiDataGridView_SeatInfo.SelectedIndex = -1;
@@ -400,7 +399,7 @@
         private Sunny.UI.UIComboBox uiComboBox_GrabSeatMode;
         private Sunny.UI.UITitlePanel uiTitlePanel_SelectedGrabSeats;
         private Sunny.UI.UIListBox uiListBox_SelectedGrabSeats;
-        private Sunny.UI.UITimePicker uiTimePicker1;
+        private Sunny.UI.UITimePicker uiTimePicker_TimingTime;
         private Sunny.UI.UIMarkLabel uiMarkLabel2;
         public Sunny.UI.UISwitch uiSwitch_GrabSeatSwitch;
     }

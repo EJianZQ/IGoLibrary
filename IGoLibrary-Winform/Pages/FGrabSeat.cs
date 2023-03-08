@@ -96,6 +96,24 @@ namespace IGoLibrary_Winform.Pages
                     Random rd = new Random();
                     Thread grabSeatThread = new Thread(() =>
                     {
+                        if (uiTimePicker_TimingTime.Text != "00:00:00") //先检查是否设置了定时，如果设置了定时就用循环卡住不让程序往下走进监控环节
+                        {
+                            while (_grabSeatsSignal)
+                            {
+                                var settingTime = DateTime.Parse(uiTimePicker_TimingTime.Text).TimeOfDay;
+                                var nowTime = DateTime.Now.TimeOfDay;
+                                if (nowTime >= settingTime)
+                                {
+                                    uiTextBox_RealTimeData.AppendText("已到抢座时间，开始监控并抢座" + Environment.NewLine);
+                                    break;
+                                }
+                                else
+                                {
+                                    uiTextBox_RealTimeData.AppendText("由于设定了定时抢座，当前未到设定时间" + Environment.NewLine);
+                                    Thread.Sleep(1000);
+                                }
+                            }
+                        }
                         while (_grabSeatsSignal)
                         {
                             try
@@ -156,7 +174,6 @@ namespace IGoLibrary_Winform.Pages
                     uiSwitch_GrabSeatSwitch.Active = false;
                     Toast.ShowNotifiy("开始抢座失败","未设置待抢座位，请设置后重试",NotificationType.Error);
                 }
-
             }
             else
                 _grabSeatsSignal = false;
