@@ -48,6 +48,10 @@ namespace IGoLibrary_Winform.Controller
                 {
                     var outputString = Regex.Unescape(responseContent); //Unicode字符转义
                     var libRoot = JsonConvert.DeserializeObject<LibRoot>(outputString);
+                    if(libRoot == null)
+                    {
+                        throw new GetLibInfoException("解析返回的Json数据失败，可能响应报文为空");
+                    }
                     if (libRoot.errors != null) //判断是否有错误信息，有就抛异常
                     {
                         switch (libRoot.errors[0].code)

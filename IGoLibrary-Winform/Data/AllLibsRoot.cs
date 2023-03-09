@@ -11,6 +11,19 @@ namespace IGoLibrary_Winform.Data
     public class AllLibsRoot
     {
         public AllLibsRoot_Data data { get; set; }
+        public List<AllLibsRoot_ErrorsItem> errors { get; set; }
+    }
+
+    public class AllLibsRoot_ErrorsItem
+    {
+        /// <summary>
+        /// 如：场馆不存在
+        /// </summary>
+        public string msg { get; set; }
+        /// <summary>
+        /// 错误代码
+        /// </summary>
+        public int code { get; set; }
     }
 
     public class AllLibsRoot_Data

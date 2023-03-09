@@ -55,21 +55,45 @@ namespace IGoLibrary_Winform.Controller
                 {
                     var outputString = Regex.Unescape(responseContent); //Unicode字符转义
                     var allLibsRoot = JsonConvert.DeserializeObject<AllLibsRoot>(outputString);
-                    if(allLibsRoot.data.userAuth.reserve.libs != null)
+                    if(allLibsRoot == null)
+                    {
+                        throw new GetAllLibsSummaryException("解析返回的Json数据失败，可能响应报文为空");
+                    }
+                    if (allLibsRoot.errors != null) //判断是否有错误信息，有就抛异常
+                    {
+                        switch (allLibsRoot.errors[0].code)
+                        {
+                            case 1:
+                                {
+                                    throw new GetAllLibsSummaryException("LibID错误，不存在该图书馆(室)");
+                                }
+                            case 40001:
+                                {
+                                    throw new GetAllLibsSummaryException("Cookies已过期");
+                                }
+                            default:
+                                {
+                                    throw new GetAllLibsSummaryException(allLibsRoot.errors[0].msg);
+                                }
+                        }
+                    }
+                    if (allLibsRoot.data.userAuth.reserve.libs != null)
                     {
                         AllLibsSummary tempSummary = new AllLibsSummary();
-                        for(int i = 0 ; i < allLibsRoot.data.userAuth.reserve.libs.Count; i++)
+                        for (int i = 0; i < allLibsRoot.data.userAuth.reserve.libs.Count; i++)
                         {
                             if (allLibsRoot.data.userAuth.reserve.libs[i].lib_floor != "0")
                             {
-                                tempSummary.libSummaries.Add(new LibSummary() { LibID = allLibsRoot.data.userAuth.reserve.libs[i].lib_id,
+                                tempSummary.libSummaries.Add(new LibSummary()
+                                {
+                                    LibID = allLibsRoot.data.userAuth.reserve.libs[i].lib_id,
                                     Floor = allLibsRoot.data.userAuth.reserve.libs[i].lib_floor,
                                     Name = allLibsRoot.data.userAuth.reserve.libs[i].lib_name,
                                     IsOpen = allLibsRoot.data.userAuth.reserve.libs[i].is_open
                                 });
                             }
                         }
-                        if(tempSummary.libSummaries.Count > 0)
+                        if (tempSummary.libSummaries.Count > 0)
                             return tempSummary;
                         else
                             throw new GetAllLibsSummaryException("未获取到任何一个图书馆信息");

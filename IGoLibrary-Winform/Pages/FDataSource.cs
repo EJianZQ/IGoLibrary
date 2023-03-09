@@ -34,7 +34,7 @@ namespace IGoLibrary_Winform.Pages
             this.mainForm = mainForm;
         }
 
-        private void uiSymbolButton_Verify_Click(object sender, EventArgs e)
+        private void uiSymbolButton_BindLibrary_Click(object sender, EventArgs e)
         {
             uiSymbolButton_BindLibrary.Enabled = false;
             if (uiTextBox_Cookies.Text.Contains("Authorization")  && uiTextBox_Cookies.Text.Contains("SERVERID"))
@@ -75,6 +75,13 @@ namespace IGoLibrary_Winform.Pages
                     }
                 }
                 catch (GetLibInfoException ex)
+                {
+                    uiSymbolLabel_LibStatus.Text = $"状态：{ex.Message}";
+                    uiSymbolLabel_LibName.Text = "图书馆(室)名称：Error";
+                    uiSymbolLabel_LibFloor.Text = "图书馆(室)楼层：Error";
+                    uiSymbolLabel_LibAvailableSeatsNum.Text = "图书馆(室)余座：Error";
+                }
+                catch(GetAllLibsSummaryException ex)
                 {
                     uiSymbolLabel_LibStatus.Text = $"状态：{ex.Message}";
                     uiSymbolLabel_LibName.Text = "图书馆(室)名称：Error";

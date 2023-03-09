@@ -155,7 +155,7 @@
             this.uiSymbolButton_BindLibrary.TabIndex = 1;
             this.uiSymbolButton_BindLibrary.Text = "绑定";
             this.uiSymbolButton_BindLibrary.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
-            this.uiSymbolButton_BindLibrary.Click += new System.EventHandler(this.uiSymbolButton_Verify_Click);
+            this.uiSymbolButton_BindLibrary.Click += new System.EventHandler(this.uiSymbolButton_BindLibrary_Click);
             // 
             // uiSymbolButton_SaveDataSource
             // 
