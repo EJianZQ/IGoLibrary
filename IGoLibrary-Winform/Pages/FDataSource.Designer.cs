@@ -55,6 +55,8 @@
             this.uiTitlePanel_CodeSourceURL = new Sunny.UI.UITitlePanel();
             this.uiTextBox_CodeSourceURL = new Sunny.UI.UITextBox();
             this.tabPage_BuiltinQuerySyntax = new System.Windows.Forms.TabPage();
+            this.uiTitlePanel_QueryReserveInfo = new Sunny.UI.UITitlePanel();
+            this.uiTextBox_QueryReserveInfo = new Sunny.UI.UITextBox();
             this.uiTitlePanel_QueryAllLibsSummarySyntax = new Sunny.UI.UITitlePanel();
             this.uiTextBox_QueryAllLibsSummarySyntax = new Sunny.UI.UITextBox();
             this.uiTitlePanel_ReserveSeatSyntax = new Sunny.UI.UITitlePanel();
@@ -73,6 +75,7 @@
             this.uiTitlePanel_Operation2.SuspendLayout();
             this.uiTitlePanel_CodeSourceURL.SuspendLayout();
             this.tabPage_BuiltinQuerySyntax.SuspendLayout();
+            this.uiTitlePanel_QueryReserveInfo.SuspendLayout();
             this.uiTitlePanel_QueryAllLibsSummarySyntax.SuspendLayout();
             this.uiTitlePanel_ReserveSeatSyntax.SuspendLayout();
             this.uiTitlePanel_QueryLibInfoSyntax.SuspendLayout();
@@ -459,14 +462,48 @@
             // 
             this.tabPage_BuiltinQuerySyntax.AutoScroll = true;
             this.tabPage_BuiltinQuerySyntax.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(249)))), ((int)(((byte)(255)))));
+            this.tabPage_BuiltinQuerySyntax.Controls.Add(this.uiTitlePanel_QueryReserveInfo);
             this.tabPage_BuiltinQuerySyntax.Controls.Add(this.uiTitlePanel_QueryAllLibsSummarySyntax);
             this.tabPage_BuiltinQuerySyntax.Controls.Add(this.uiTitlePanel_ReserveSeatSyntax);
             this.tabPage_BuiltinQuerySyntax.Controls.Add(this.uiTitlePanel_QueryLibInfoSyntax);
             this.tabPage_BuiltinQuerySyntax.Location = new System.Drawing.Point(0, 40);
             this.tabPage_BuiltinQuerySyntax.Name = "tabPage_BuiltinQuerySyntax";
-            this.tabPage_BuiltinQuerySyntax.Size = new System.Drawing.Size(200, 60);
+            this.tabPage_BuiltinQuerySyntax.Size = new System.Drawing.Size(633, 451);
             this.tabPage_BuiltinQuerySyntax.TabIndex = 2;
             this.tabPage_BuiltinQuerySyntax.Text = "内置查询语法";
+            // 
+            // uiTitlePanel_QueryReserveInfo
+            // 
+            this.uiTitlePanel_QueryReserveInfo.Controls.Add(this.uiTextBox_QueryReserveInfo);
+            this.uiTitlePanel_QueryReserveInfo.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiTitlePanel_QueryReserveInfo.Location = new System.Drawing.Point(7, 546);
+            this.uiTitlePanel_QueryReserveInfo.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiTitlePanel_QueryReserveInfo.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiTitlePanel_QueryReserveInfo.Name = "uiTitlePanel_QueryReserveInfo";
+            this.uiTitlePanel_QueryReserveInfo.Padding = new System.Windows.Forms.Padding(0, 35, 0, 0);
+            this.uiTitlePanel_QueryReserveInfo.ShowText = false;
+            this.uiTitlePanel_QueryReserveInfo.Size = new System.Drawing.Size(608, 168);
+            this.uiTitlePanel_QueryReserveInfo.TabIndex = 3;
+            this.uiTitlePanel_QueryReserveInfo.Text = "查询预约信息语法(Json)";
+            this.uiTitlePanel_QueryReserveInfo.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
+            this.uiTitlePanel_QueryReserveInfo.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            // 
+            // uiTextBox_QueryReserveInfo
+            // 
+            this.uiTextBox_QueryReserveInfo.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiTextBox_QueryReserveInfo.Location = new System.Drawing.Point(4, 40);
+            this.uiTextBox_QueryReserveInfo.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiTextBox_QueryReserveInfo.MinimumSize = new System.Drawing.Size(1, 16);
+            this.uiTextBox_QueryReserveInfo.Multiline = true;
+            this.uiTextBox_QueryReserveInfo.Name = "uiTextBox_QueryReserveInfo";
+            this.uiTextBox_QueryReserveInfo.ShowScrollBar = true;
+            this.uiTextBox_QueryReserveInfo.ShowText = false;
+            this.uiTextBox_QueryReserveInfo.Size = new System.Drawing.Size(601, 123);
+            this.uiTextBox_QueryReserveInfo.TabIndex = 0;
+            this.uiTextBox_QueryReserveInfo.Text = resources.GetString("uiTextBox_QueryReserveInfo.Text");
+            this.uiTextBox_QueryReserveInfo.TextAlignment = System.Drawing.ContentAlignment.MiddleLeft;
+            this.uiTextBox_QueryReserveInfo.Watermark = "";
+            this.uiTextBox_QueryReserveInfo.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
             // uiTitlePanel_QueryAllLibsSummarySyntax
             // 
@@ -592,6 +629,7 @@
             this.uiTitlePanel_Operation2.ResumeLayout(false);
             this.uiTitlePanel_CodeSourceURL.ResumeLayout(false);
             this.tabPage_BuiltinQuerySyntax.ResumeLayout(false);
+            this.uiTitlePanel_QueryReserveInfo.ResumeLayout(false);
             this.uiTitlePanel_QueryAllLibsSummarySyntax.ResumeLayout(false);
             this.uiTitlePanel_ReserveSeatSyntax.ResumeLayout(false);
             this.uiTitlePanel_QueryLibInfoSyntax.ResumeLayout(false);
@@ -633,5 +671,7 @@
         private Sunny.UI.UISymbolLabel uiSymbolLabel_KeepCookieAlive;
         private Sunny.UI.UITitlePanel uiTitlePanel_QueryAllLibsSummarySyntax;
         private Sunny.UI.UITextBox uiTextBox_QueryAllLibsSummarySyntax;
+        private Sunny.UI.UITitlePanel uiTitlePanel_QueryReserveInfo;
+        private Sunny.UI.UITextBox uiTextBox_QueryReserveInfo;
     }
 }

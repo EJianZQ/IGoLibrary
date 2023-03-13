@@ -30,6 +30,7 @@ namespace IGoLibrary_Winform
             services.AddSingleton<IReserveSeatService, ReserveSeatServiceImpl>();
             services.AddSingleton<IGetCookieService, GetCookieServiceImpl>();
             services.AddSingleton<IGetAllLibsSummaryService, GetAllLibsSummaryImpl>();
+            services.AddSingleton<IGetReserveInfoService, GetReserveInfoServiceImpl>();
             using (var serviceProvider = services.BuildServiceProvider())
             {
                 int pageIndex = 1000;
@@ -38,6 +39,7 @@ namespace IGoLibrary_Winform
                 parent = Aside.CreateNode(AddPage(new FDataSource(this), ++pageIndex));
                 parent = Aside.CreateNode("座位", 61747, 30, ++pageIndex);
                 Aside.CreateChildNode(parent, AddPage(new FGrabSeat(), ++pageIndex));
+                Aside.CreateChildNode(parent, AddPage(new FOccupySeat(), ++pageIndex));
             }
         }
 

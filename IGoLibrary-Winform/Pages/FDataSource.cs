@@ -23,6 +23,9 @@ namespace IGoLibrary_Winform.Pages
             InitializeComponent();
             this.uiTextBox_Cookies.FillColor = Color.FromArgb(243, 249, 255);
             this.uiTextBox_QueryLibInfoSyntax.FillColor = Color.FromArgb(243, 249, 255);
+            this.uiTextBox_ReserveSeatSyntax.FillColor = Color.FromArgb(243, 249, 255);
+            this.uiTextBox_QueryAllLibsSummarySyntax.FillColor = Color.FromArgb(243, 249, 255);
+            this.uiTextBox_QueryReserveInfo.FillColor = Color.FromArgb(243, 249, 255);
             this.uiTextBox_CodeSourceURL.FillColor = Color.FromArgb(243, 249, 255);
             using (var serviceProvider = MainForm.services.BuildServiceProvider())
             {
@@ -64,6 +67,7 @@ namespace IGoLibrary_Winform.Pages
                         MainForm.authentication.Authenticator.LibID = libraryData.LibID;
                         MainForm.authentication.Authenticator.Syntax.QueryLibInfo = this.uiTextBox_QueryLibInfoSyntax.Text.Replace("ReplaceMe", libraryData.LibID.ToString());
                         MainForm.authentication.Authenticator.Syntax.ReserveSeat = this.uiTextBox_ReserveSeatSyntax.Text.Replace("ReplaceMeByLibID", libraryData.LibID.ToString());
+                        MainForm.authentication.Authenticator.Syntax.QueryReserveInfo = this.uiTextBox_QueryReserveInfo.Text;
 
                         //向抢座页面的座位信息列表添加数据
                         var grabSeatPage = mainForm.GetPage<FGrabSeat>();

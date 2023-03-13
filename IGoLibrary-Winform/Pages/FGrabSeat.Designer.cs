@@ -37,7 +37,7 @@
             this.tabPage_GrabController = new System.Windows.Forms.TabPage();
             this.uiTitlePanel_SelectedGrabSeats = new Sunny.UI.UITitlePanel();
             this.uiListBox_SelectedGrabSeats = new Sunny.UI.UIListBox();
-            this.uiTitlePanel2 = new Sunny.UI.UITitlePanel();
+            this.uiTitlePanel_Setting = new Sunny.UI.UITitlePanel();
             this.uiTimePicker_TimingTime = new Sunny.UI.UITimePicker();
             this.uiMarkLabel2 = new Sunny.UI.UIMarkLabel();
             this.uiComboBox_GrabSeatMode = new Sunny.UI.UIComboBox();
@@ -53,7 +53,7 @@
             this.uiTabControl_GrabSeat.SuspendLayout();
             this.tabPage_GrabController.SuspendLayout();
             this.uiTitlePanel_SelectedGrabSeats.SuspendLayout();
-            this.uiTitlePanel2.SuspendLayout();
+            this.uiTitlePanel_Setting.SuspendLayout();
             this.uiTitlePanel_GrabSeatSwitch.SuspendLayout();
             this.uiTitlePanel_RealTimeData.SuspendLayout();
             this.tabPage_SeatInfoList.SuspendLayout();
@@ -85,7 +85,7 @@
             // 
             this.tabPage_GrabController.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(249)))), ((int)(((byte)(255)))));
             this.tabPage_GrabController.Controls.Add(this.uiTitlePanel_SelectedGrabSeats);
-            this.tabPage_GrabController.Controls.Add(this.uiTitlePanel2);
+            this.tabPage_GrabController.Controls.Add(this.uiTitlePanel_Setting);
             this.tabPage_GrabController.Controls.Add(this.uiTitlePanel_GrabSeatSwitch);
             this.tabPage_GrabController.Controls.Add(this.uiTitlePanel_RealTimeData);
             this.tabPage_GrabController.Location = new System.Drawing.Point(0, 40);
@@ -126,24 +126,24 @@
             this.uiListBox_SelectedGrabSeats.Text = null;
             this.uiListBox_SelectedGrabSeats.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
-            // uiTitlePanel2
+            // uiTitlePanel_Setting
             // 
-            this.uiTitlePanel2.Controls.Add(this.uiTimePicker_TimingTime);
-            this.uiTitlePanel2.Controls.Add(this.uiMarkLabel2);
-            this.uiTitlePanel2.Controls.Add(this.uiComboBox_GrabSeatMode);
-            this.uiTitlePanel2.Controls.Add(this.uiMarkLabel1);
-            this.uiTitlePanel2.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiTitlePanel2.Location = new System.Drawing.Point(443, 140);
-            this.uiTitlePanel2.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.uiTitlePanel2.MinimumSize = new System.Drawing.Size(1, 1);
-            this.uiTitlePanel2.Name = "uiTitlePanel2";
-            this.uiTitlePanel2.Padding = new System.Windows.Forms.Padding(0, 35, 0, 0);
-            this.uiTitlePanel2.ShowText = false;
-            this.uiTitlePanel2.Size = new System.Drawing.Size(186, 180);
-            this.uiTitlePanel2.TabIndex = 2;
-            this.uiTitlePanel2.Text = "设置";
-            this.uiTitlePanel2.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
-            this.uiTitlePanel2.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiTitlePanel_Setting.Controls.Add(this.uiTimePicker_TimingTime);
+            this.uiTitlePanel_Setting.Controls.Add(this.uiMarkLabel2);
+            this.uiTitlePanel_Setting.Controls.Add(this.uiComboBox_GrabSeatMode);
+            this.uiTitlePanel_Setting.Controls.Add(this.uiMarkLabel1);
+            this.uiTitlePanel_Setting.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiTitlePanel_Setting.Location = new System.Drawing.Point(443, 140);
+            this.uiTitlePanel_Setting.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiTitlePanel_Setting.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiTitlePanel_Setting.Name = "uiTitlePanel_Setting";
+            this.uiTitlePanel_Setting.Padding = new System.Windows.Forms.Padding(0, 35, 0, 0);
+            this.uiTitlePanel_Setting.ShowText = false;
+            this.uiTitlePanel_Setting.Size = new System.Drawing.Size(186, 180);
+            this.uiTitlePanel_Setting.TabIndex = 2;
+            this.uiTitlePanel_Setting.Text = "设置";
+            this.uiTitlePanel_Setting.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
+            this.uiTitlePanel_Setting.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
             // uiTimePicker_TimingTime
             // 
@@ -231,6 +231,7 @@
             // 
             // uiSwitch_GrabSeatSwitch
             // 
+            this.uiSwitch_GrabSeatSwitch.Enabled = false;
             this.uiSwitch_GrabSeatSwitch.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
             this.uiSwitch_GrabSeatSwitch.Location = new System.Drawing.Point(30, 56);
             this.uiSwitch_GrabSeatSwitch.MinimumSize = new System.Drawing.Size(1, 1);
@@ -374,7 +375,7 @@
             this.uiTabControl_GrabSeat.ResumeLayout(false);
             this.tabPage_GrabController.ResumeLayout(false);
             this.uiTitlePanel_SelectedGrabSeats.ResumeLayout(false);
-            this.uiTitlePanel2.ResumeLayout(false);
+            this.uiTitlePanel_Setting.ResumeLayout(false);
             this.uiTitlePanel_GrabSeatSwitch.ResumeLayout(false);
             this.uiTitlePanel_RealTimeData.ResumeLayout(false);
             this.tabPage_SeatInfoList.ResumeLayout(false);
@@ -394,7 +395,7 @@
         private Sunny.UI.UISymbolButton uiSymbolButton1;
         private Sunny.UI.UITextBox uiTextBox_RealTimeData;
         private Sunny.UI.UITitlePanel uiTitlePanel_GrabSeatSwitch;
-        private Sunny.UI.UITitlePanel uiTitlePanel2;
+        private Sunny.UI.UITitlePanel uiTitlePanel_Setting;
         private Sunny.UI.UIMarkLabel uiMarkLabel1;
         private Sunny.UI.UIComboBox uiComboBox_GrabSeatMode;
         private Sunny.UI.UITitlePanel uiTitlePanel_SelectedGrabSeats;
