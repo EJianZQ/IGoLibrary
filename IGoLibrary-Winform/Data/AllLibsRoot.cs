@@ -76,7 +76,15 @@ namespace IGoLibrary_Winform.Data
         /// <summary>
         /// 
         /// </summary>
-        public string reserve { get; set; }
+        public AllLibsRoot_ReserveEx reserve { get; set; }
+    }
+
+    public class AllLibsRoot_ReserveEx
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        public string isRecordUser { get; set; }
     }
 
     public class AllLibsRoot_LibGroupsItem
