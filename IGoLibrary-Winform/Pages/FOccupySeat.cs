@@ -19,6 +19,8 @@ namespace IGoLibrary_Winform.Pages
     public partial class FOccupySeat : UIPage
     {
         private readonly IGetReserveInfoService getReserveInfoService;
+        private readonly ICancelReserveService cancelReserveService;
+        private readonly IReserveSeatService reserveSeatService;
         private bool _occupyLocker = false;
         private bool _occupySeatSignal;
         public FOccupySeat()
@@ -27,6 +29,8 @@ namespace IGoLibrary_Winform.Pages
             using (var serviceProvider = MainForm.services.BuildServiceProvider())
             {
                 getReserveInfoService = serviceProvider.GetRequiredService<IGetReserveInfoService>();
+                cancelReserveService = serviceProvider.GetRequiredService<ICancelReserveService>();
+                reserveSeatService = serviceProvider.GetRequiredService<IReserveSeatService>();
             }
             Control.CheckForIllegalCrossThreadCalls = false;
         }
@@ -74,9 +78,16 @@ namespace IGoLibrary_Winform.Pages
                         {
                             ReserveInfo info = new ReserveInfo();
                             int _getInfoRetryCount = 0;
+                            int _cancelReserveRetryCount = 0;
+                            int _reReserveRetryCount = 0;
                         GetInfo: try
                             {
-                                if(_getInfoRetryCount <= 2)
+                                if (_occupySeatSignal == false)
+                                {
+                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]已获取到终止信号，占座功能将被完全终止" + Environment.NewLine);
+                                    break;
+                                }//每个功能之间都加入验证，让功能更快地终止
+                                if (_getInfoRetryCount <= 2)
                                 {
                                     info = getReserveInfoService.GetReserveInfo(MainForm.authentication.Authenticator.Cookies, MainForm.authentication.Authenticator.Syntax.QueryReserveInfo);
                                     uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]获取预约信息成功" + Environment.NewLine);
@@ -91,30 +102,114 @@ namespace IGoLibrary_Winform.Pages
                             }
                             catch(GetReserveInfoException ex)
                             {
-                                uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]获取预约信息失败，现在开始第{++_getInfoRetryCount}次重试" + Environment.NewLine);
+                                if (_occupySeatSignal == false)
+                                {
+                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]已获取到终止信号，占座功能将被完全终止" + Environment.NewLine);
+                                    break;
+                                }//每个功能之间都加入验证，让功能更快地终止
+                                uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]获取预约信息失败：{ex.Message}，现在开始第{++_getInfoRetryCount}次重试" + Environment.NewLine);
                                 goto GetInfo;
                             }
-                            if(_occupySeatSignal == false) //每个功能之间都加入验证，让功能更快地终止
+                            if(_occupySeatSignal == false) 
                             {
                                 uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]已获取到终止信号，占座功能将被完全终止" + Environment.NewLine);
                                 break;
-                            }
+                            }//每个功能之间都加入验证，让功能更快地终止
                         TimeHandle:
                             {
+                                if (_occupySeatSignal == false)
+                                {
+                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]已获取到终止信号，占座功能将被完全终止" + Environment.NewLine);
+                                    break;
+                                }//每个功能之间都加入验证，让功能更快地终止
                                 TimeSpan ts = info.ExpiredTime - DateTime.Now;
-                                if(ts.TotalSeconds < 60) //如果还大于60秒，则延迟10秒后进入下一次循环。如果小于60秒了则取消预定
+                                if(ts.TotalSeconds > 60) 
                                 {
-
-                                }
-                                else
-                                {
-                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]距离预约过期还剩{ts.TotalSeconds}秒，10秒后继续检测" + Environment.NewLine);
+                                    //如果还大于60秒，则延迟10秒后进入下一次循环。如果小于60秒了则取消预定
+                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]距离预约过期还剩{(int)ts.TotalSeconds}秒，10秒后继续检测" + Environment.NewLine);
                                     Thread.Sleep(10000);
                                     continue; //直接进入下一次循环
                                 }
                             }
+                        CancelReserve: try
+                            {
+                                if (_occupySeatSignal == false)
+                                {
+                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]已获取到终止信号，占座功能将被完全终止" + Environment.NewLine);
+                                    break;
+                                }//每个功能之间都加入验证，让功能更快地终止
+                                string errorMessage = "By EJianZQ";
+                                if (_cancelReserveRetryCount <= 2)
+                                {
+                                    if(cancelReserveService.CancelReserve(MainForm.authentication.Authenticator.Cookies, MainForm.authentication.Authenticator.Syntax.CancelReserve.Replace("ReplaceMe", info.Token), ref errorMessage) == true)
+                                    {
+                                        uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约成功，将在1分钟后重新预约" + Environment.NewLine);
+                                        Thread.Sleep(61000); //延迟61秒后重新预约该座位
+                                        _cancelReserveRetryCount = 0;
+                                    }
+                                    else
+                                    {
+                                        uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约失败：{errorMessage}。将在10秒后重试最多3次，即将开始第{++_getInfoRetryCount}次尝试" + Environment.NewLine);
+                                        goto CancelReserve;
+                                    }
+                                }
+                                else
+                                {
+                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约失败重试次数已达上限，占座功能将被完全终止" + Environment.NewLine);
+                                    _occupySeatSignal = false;
+                                    break;
+                                }
+                            }
+                            catch(CancelReserveException ex)
+                            {
+                                if (_occupySeatSignal == false)
+                                {
+                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]已获取到终止信号，占座功能将被完全终止" + Environment.NewLine);
+                                    break;
+                                }//每个功能之间都加入验证，让功能更快地终止
+                                uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约失败，现在开始第{++_getInfoRetryCount}次重试" + Environment.NewLine);
+                                goto CancelReserve;
+                            }
+                        ReReserve: try
+                            {
+                                if (_occupySeatSignal == false)
+                                {
+                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]已获取到终止信号，占座功能将被完全终止" + Environment.NewLine);
+                                    break;
+                                }//每个功能之间都加入验证，让功能更快地终止
+                                if (_reReserveRetryCount <= 2)
+                                {
+                                    if(reserveSeatService.ReserveSeat(MainForm.authentication.Authenticator.Cookies, MainForm.authentication.Authenticator.Syntax.ReserveSeat.Replace("ReplaceMeBySeatKey", info.SeatKeyDta.Key)) == true)
+                                    {
+                                        uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]重新预约座位成功，延迟5秒后重新开始监控" + Environment.NewLine);
+                                        Thread.Sleep(5000);
+                                    }
+                                    else
+                                    {
+                                        uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约失败且原因未知。将在10秒后重试最多3次，即将开始第{++_getInfoRetryCount}次尝试" + Environment.NewLine);
+                                        goto ReReserve;
+                                    }
+                                }
+                                else
+                                {
+                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]重新预约座位失败重试次数已达上限，占座功能将被完全终止" + Environment.NewLine);
+                                    _occupySeatSignal = false;
+                                    break;
+                                }
+                            }
+                            catch(ReserveSeatException ex)
+                            {
+                                if (_occupySeatSignal == false)
+                                {
+                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]已获取到终止信号，占座功能将被完全终止" + Environment.NewLine);
+                                    break;
+                                }//每个功能之间都加入验证，让功能更快地终止
+                                uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]重新预约座位失败：{ex.Message}，现在开始第{++_getInfoRetryCount}次重试" + Environment.NewLine);
+                                goto ReReserve;
+                            }
                         }
                     });
+                    occupySeatThread.Start();
                 }
                 else
                 {

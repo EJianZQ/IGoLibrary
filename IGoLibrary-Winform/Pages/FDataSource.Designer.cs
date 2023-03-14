@@ -55,6 +55,8 @@
             this.uiTitlePanel_CodeSourceURL = new Sunny.UI.UITitlePanel();
             this.uiTextBox_CodeSourceURL = new Sunny.UI.UITextBox();
             this.tabPage_BuiltinQuerySyntax = new System.Windows.Forms.TabPage();
+            this.uiTitlePanel_CancelReserveSyntax = new Sunny.UI.UITitlePanel();
+            this.uiTextBox_CancelReserveSyntax = new Sunny.UI.UITextBox();
             this.uiTitlePanel_QueryReserveInfo = new Sunny.UI.UITitlePanel();
             this.uiTextBox_QueryReserveInfo = new Sunny.UI.UITextBox();
             this.uiTitlePanel_QueryAllLibsSummarySyntax = new Sunny.UI.UITitlePanel();
@@ -75,6 +77,7 @@
             this.uiTitlePanel_Operation2.SuspendLayout();
             this.uiTitlePanel_CodeSourceURL.SuspendLayout();
             this.tabPage_BuiltinQuerySyntax.SuspendLayout();
+            this.uiTitlePanel_CancelReserveSyntax.SuspendLayout();
             this.uiTitlePanel_QueryReserveInfo.SuspendLayout();
             this.uiTitlePanel_QueryAllLibsSummarySyntax.SuspendLayout();
             this.uiTitlePanel_ReserveSeatSyntax.SuspendLayout();
@@ -462,6 +465,7 @@
             // 
             this.tabPage_BuiltinQuerySyntax.AutoScroll = true;
             this.tabPage_BuiltinQuerySyntax.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(249)))), ((int)(((byte)(255)))));
+            this.tabPage_BuiltinQuerySyntax.Controls.Add(this.uiTitlePanel_CancelReserveSyntax);
             this.tabPage_BuiltinQuerySyntax.Controls.Add(this.uiTitlePanel_QueryReserveInfo);
             this.tabPage_BuiltinQuerySyntax.Controls.Add(this.uiTitlePanel_QueryAllLibsSummarySyntax);
             this.tabPage_BuiltinQuerySyntax.Controls.Add(this.uiTitlePanel_ReserveSeatSyntax);
@@ -471,6 +475,39 @@
             this.tabPage_BuiltinQuerySyntax.Size = new System.Drawing.Size(633, 451);
             this.tabPage_BuiltinQuerySyntax.TabIndex = 2;
             this.tabPage_BuiltinQuerySyntax.Text = "内置查询语法";
+            // 
+            // uiTitlePanel_CancelReserveSyntax
+            // 
+            this.uiTitlePanel_CancelReserveSyntax.Controls.Add(this.uiTextBox_CancelReserveSyntax);
+            this.uiTitlePanel_CancelReserveSyntax.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiTitlePanel_CancelReserveSyntax.Location = new System.Drawing.Point(7, 724);
+            this.uiTitlePanel_CancelReserveSyntax.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiTitlePanel_CancelReserveSyntax.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiTitlePanel_CancelReserveSyntax.Name = "uiTitlePanel_CancelReserveSyntax";
+            this.uiTitlePanel_CancelReserveSyntax.Padding = new System.Windows.Forms.Padding(0, 35, 0, 0);
+            this.uiTitlePanel_CancelReserveSyntax.ShowText = false;
+            this.uiTitlePanel_CancelReserveSyntax.Size = new System.Drawing.Size(608, 168);
+            this.uiTitlePanel_CancelReserveSyntax.TabIndex = 4;
+            this.uiTitlePanel_CancelReserveSyntax.Text = "取消预约语法(替换Token)";
+            this.uiTitlePanel_CancelReserveSyntax.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
+            this.uiTitlePanel_CancelReserveSyntax.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            // 
+            // uiTextBox_CancelReserveSyntax
+            // 
+            this.uiTextBox_CancelReserveSyntax.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiTextBox_CancelReserveSyntax.Location = new System.Drawing.Point(4, 40);
+            this.uiTextBox_CancelReserveSyntax.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiTextBox_CancelReserveSyntax.MinimumSize = new System.Drawing.Size(1, 16);
+            this.uiTextBox_CancelReserveSyntax.Multiline = true;
+            this.uiTextBox_CancelReserveSyntax.Name = "uiTextBox_CancelReserveSyntax";
+            this.uiTextBox_CancelReserveSyntax.ShowScrollBar = true;
+            this.uiTextBox_CancelReserveSyntax.ShowText = false;
+            this.uiTextBox_CancelReserveSyntax.Size = new System.Drawing.Size(601, 123);
+            this.uiTextBox_CancelReserveSyntax.TabIndex = 0;
+            this.uiTextBox_CancelReserveSyntax.Text = resources.GetString("uiTextBox_CancelReserveSyntax.Text");
+            this.uiTextBox_CancelReserveSyntax.TextAlignment = System.Drawing.ContentAlignment.MiddleLeft;
+            this.uiTextBox_CancelReserveSyntax.Watermark = "";
+            this.uiTextBox_CancelReserveSyntax.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
             // uiTitlePanel_QueryReserveInfo
             // 
@@ -629,6 +666,7 @@
             this.uiTitlePanel_Operation2.ResumeLayout(false);
             this.uiTitlePanel_CodeSourceURL.ResumeLayout(false);
             this.tabPage_BuiltinQuerySyntax.ResumeLayout(false);
+            this.uiTitlePanel_CancelReserveSyntax.ResumeLayout(false);
             this.uiTitlePanel_QueryReserveInfo.ResumeLayout(false);
             this.uiTitlePanel_QueryAllLibsSummarySyntax.ResumeLayout(false);
             this.uiTitlePanel_ReserveSeatSyntax.ResumeLayout(false);
@@ -673,5 +711,7 @@
         private Sunny.UI.UITextBox uiTextBox_QueryAllLibsSummarySyntax;
         private Sunny.UI.UITitlePanel uiTitlePanel_QueryReserveInfo;
         private Sunny.UI.UITextBox uiTextBox_QueryReserveInfo;
+        private Sunny.UI.UITitlePanel uiTitlePanel_CancelReserveSyntax;
+        private Sunny.UI.UITextBox uiTextBox_CancelReserveSyntax;
     }
 }

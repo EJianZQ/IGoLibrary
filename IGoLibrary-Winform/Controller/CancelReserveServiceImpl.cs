@@ -6,9 +6,9 @@ using System.Text.RegularExpressions;
 
 namespace IGoLibrary_Winform.Controller
 {
-    public class GetReserveInfoServiceImpl : IGetReserveInfoService
+    public class CancelReserveServiceImpl : ICancelReserveService
     {
-        public ReserveInfo GetReserveInfo(string Cookie, string QueryStatement)
+        public bool CancelReserve(string Cookie, string QueryStatement, ref string RetMessage)
         {
             using (var client = new RestClient("https://wechat.v2.traceint.com/index.php/graphql/"))
             {
@@ -31,7 +31,7 @@ namespace IGoLibrary_Winform.Controller
                 //以上信息都是通用的
                 request.AddHeader("Content-Length", QueryStatement.Length);
                 request.AddHeader("Cookie", Cookie);
-                request.AddParameter("application/json", QueryStatement, ParameterType.RequestBody,false);
+                request.AddParameter("application/json", QueryStatement, ParameterType.RequestBody);
                 //必要的Header和Body都填写完毕，获取响应报文
                 CancellationTokenSource cts = new CancellationTokenSource();
                 cts.CancelAfter(5000);//设定超时时间为5000ms
@@ -40,48 +40,31 @@ namespace IGoLibrary_Winform.Controller
                 if (responseContent != null)
                 {
                     var outputString = Regex.Unescape(responseContent); //Unicode字符转义
-                    var reserveInfoRoot = JsonConvert.DeserializeObject<ReserveInfoRoot>(outputString);
-                    if (reserveInfoRoot == null)
+                    var cancelReserveRoot = JsonConvert.DeserializeObject<CancelReserveRoot>(outputString);
+                    if (cancelReserveRoot == null)
                     {
-                        throw new GetReserveInfoException("解析返回的Json数据失败，可能响应报文为空");
+                        throw new CancelReserveException("解析返回的Json数据失败，可能响应报文为空");
                     }
-                    if (reserveInfoRoot.errors != null) //判断是否有错误信息，有就抛异常
+                    if(cancelReserveRoot.errors != null)
                     {
-                        switch (reserveInfoRoot.errors[0].code)
+                        if (cancelReserveRoot.errors[0].msg.Contains("成功") == true)
                         {
-                            case 1:
-                                {
-                                    throw new GetReserveInfoException("LibID错误，不存在该图书馆(室)");
-                                }
-                            case 40001:
-                                {
-                                    throw new GetReserveInfoException("Cookies已过期");
-                                }
-                            default:
-                                {
-                                    throw new GetReserveInfoException(reserveInfoRoot.errors[0].msg);
-                                }
+                            return true;
                         }
-                    }
-                    if (reserveInfoRoot.data.userAuth.reserve.reserve != null)
-                    {
-                        return new ReserveInfo() { Token = reserveInfoRoot.data.userAuth.reserve.getSToken,
-                            ExpiredTimeStamp = reserveInfoRoot.data.userAuth.reserve.reserve.exp_date.ToString(),
-                            LibName = reserveInfoRoot.data.userAuth.reserve.reserve.lib_name,
-                            SeatKeyDta = new SeatKeyData() { Name = reserveInfoRoot.data.userAuth.reserve.reserve.seat_name, 
-                                Status = null,
-                                Key = reserveInfoRoot.data.userAuth.reserve.reserve.seat_key
-                            }
-                        };
+                        else
+                        {
+                            RetMessage = cancelReserveRoot.errors[0].msg;
+                            return false;
+                        }
                     }
                     else
                     {
-                        throw new GetReserveInfoException("当前没有预定座位");
+                        throw new CancelReserveException("响应报文中未包含取消预约成功与否的信息");
                     }
                 }
                 else
-                { 
-                    throw new GetReserveInfoException("获取响应报文时为空");
+                {
+                    throw new CancelReserveException("获取响应报文时为空");
                 }
             }
         }

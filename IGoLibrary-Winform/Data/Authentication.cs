@@ -51,5 +51,6 @@ namespace IGoLibrary_Winform.Data
         public string? QueryLibInfo { get; set;}
         public string? ReserveSeat { get; set; }
         public string? QueryReserveInfo { get;set; }
+        public string? CancelReserve { get; set; }
     }
 }

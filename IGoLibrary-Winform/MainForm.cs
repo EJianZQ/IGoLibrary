@@ -31,6 +31,7 @@ namespace IGoLibrary_Winform
             services.AddSingleton<IGetCookieService, GetCookieServiceImpl>();
             services.AddSingleton<IGetAllLibsSummaryService, GetAllLibsSummaryImpl>();
             services.AddSingleton<IGetReserveInfoService, GetReserveInfoServiceImpl>();
+            services.AddSingleton<ICancelReserveService, CancelReserveServiceImpl>();
             using (var serviceProvider = services.BuildServiceProvider())
             {
                 int pageIndex = 1000;
