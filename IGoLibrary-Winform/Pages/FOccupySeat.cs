@@ -203,6 +203,8 @@ namespace IGoLibrary_Winform.Pages
                                 goto ReReserve;
                             }
                         }
+                        _occupyLocker = false;
+                        Toast.ShowNotifiy("占座功能提示", "每次关闭占座功能后都需要重新刷新预约状态才能再次开启功能", Notifications.Wpf.NotificationType.Warning);
                     });
                     occupySeatThread.Start();
                 }
@@ -215,6 +217,8 @@ namespace IGoLibrary_Winform.Pages
             else
             {
                 _occupySeatSignal = false;
+                _occupyLocker = false;
+                Toast.ShowNotifiy("占座功能提示","每次关闭占座功能后都需要重新刷新预约状态才能再次开启功能",Notifications.Wpf.NotificationType.Warning);
                 uiSymbolButton_UpdateStatus.Enabled = true;
             }
         }
