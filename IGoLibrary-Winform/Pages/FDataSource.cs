@@ -78,6 +78,12 @@ namespace IGoLibrary_Winform.Pages
                             grabSeatPage.UpdateSeatsGridView(libraryData.Seats);
                             grabSeatPage.uiSwitch_GrabSeatSwitch.Enabled = true;
                         }
+                        //绑定成功后更新一次预约信息
+                        var occupySeatPage = mainForm.GetPage<FOccupySeat>();
+                        if(occupySeatPage != null)
+                        {
+                            occupySeatPage.UpdateStatus();
+                        }
                     }
                 }
                 catch (GetLibInfoException ex)

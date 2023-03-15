@@ -51,6 +51,11 @@ namespace IGoLibrary_Winform
             {
                 grabSeatPage._grabSeatsSignal = false;
             }
+            var occpuySeatPage = GetPage<FOccupySeat>();
+            if (occpuySeatPage != null)
+            {
+                occpuySeatPage._occupySeatSignal = false;
+            }
         }
     }
 }

@@ -79,6 +79,7 @@
             this.uiTextBox_RealTimeData.TextAlignment = System.Drawing.ContentAlignment.MiddleLeft;
             this.uiTextBox_RealTimeData.Watermark = "";
             this.uiTextBox_RealTimeData.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiTextBox_RealTimeData.TextChanged += new System.EventHandler(this.uiTextBox_RealTimeData_TextChanged);
             // 
             // uiTitlePanel_ReserveInfo
             // 
@@ -170,6 +171,7 @@
             this.uiSymbolButton_Help.TabIndex = 4;
             this.uiSymbolButton_Help.Text = "获取帮助";
             this.uiSymbolButton_Help.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiSymbolButton_Help.Click += new System.EventHandler(this.uiSymbolButton_Help_Click);
             // 
             // uiComboBox_GrabSeatMode
             // 

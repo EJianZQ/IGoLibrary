@@ -1,13 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using IGoLibrary_Winform.Controller;
+﻿using IGoLibrary_Winform.Controller;
 using IGoLibrary_Winform.CustomException;
 using IGoLibrary_Winform.Data;
 using IGoLibrary_Winform.Notify;
@@ -22,7 +13,7 @@ namespace IGoLibrary_Winform.Pages
         private readonly ICancelReserveService cancelReserveService;
         private readonly IReserveSeatService reserveSeatService;
         private bool _occupyLocker = false;
-        private bool _occupySeatSignal;
+        public bool _occupySeatSignal;
         public FOccupySeat()
         {
             InitializeComponent();
@@ -33,6 +24,7 @@ namespace IGoLibrary_Winform.Pages
                 reserveSeatService = serviceProvider.GetRequiredService<IReserveSeatService>();
             }
             Control.CheckForIllegalCrossThreadCalls = false;
+            uiTextBox_RealTimeData.FillColor = Color.FromArgb(243, 249, 255);
         }
 
         public void UpdateStatus()
@@ -41,15 +33,17 @@ namespace IGoLibrary_Winform.Pages
             {
                 ReserveInfo info = getReserveInfoService.GetReserveInfo(MainForm.authentication.Authenticator.Cookies, MainForm.authentication.Authenticator.Syntax.QueryReserveInfo);
                 this.uiSymbolLabel_LibName.Text = info.LibName;
-                this.uiSymbolLabel_SeatName.Text = info.SeatKeyDta.Name;
-                this.uiSymbolLabel_SeatKey.Text = info.SeatKeyDta.Key + "坐标";
+                this.uiSymbolLabel_SeatName.Text = "座位号：" + info.SeatKeyDta.Name;
+                this.uiSymbolLabel_SeatKey.Text = "座位坐标：" + info.SeatKeyDta.Key;
+                Toast.ShowNotifiy("刷新预约状态成功","已有预约，可以开始进行占座",Notifications.Wpf.NotificationType.Success);
                 _occupyLocker = true; //说明已经有了预定好的座位 可以进行占座
             }
             catch(GetReserveInfoException ex)
             {
                 this.uiSymbolLabel_LibName.Text = ex.Message;
-                this.uiSymbolLabel_SeatName.Text = "Error";
-                this.uiSymbolLabel_SeatKey.Text = "Error";
+                this.uiSymbolLabel_SeatName.Text = "请先预约好座位";
+                this.uiSymbolLabel_SeatKey.Text = "才能使用占座功能";
+                //Toast.ShowNotifiy("刷新预约状态失败", $"失败原因：\n{ex.Message}", Notifications.Wpf.NotificationType.Error);
             }
         }
 
@@ -69,7 +63,8 @@ namespace IGoLibrary_Winform.Pages
         {
             if(uiSwitch_OccupySeat.Active == true)
             {
-                if(_occupyLocker == true)
+                uiSymbolButton_UpdateStatus.Enabled = false;
+                if (_occupyLocker == true)
                 {
                     _occupySeatSignal = true;
                     Thread occupySeatThread = new Thread(() =>
@@ -220,6 +215,7 @@ namespace IGoLibrary_Winform.Pages
             else
             {
                 _occupySeatSignal = false;
+                uiSymbolButton_UpdateStatus.Enabled = true;
             }
         }
         public static DateTime ConvertToDateTime(long timestamp)
@@ -230,6 +226,20 @@ namespace IGoLibrary_Winform.Pages
             long time_tricks = tricks_1970 + begtime;//日志日期刻度
             DateTime dt = new DateTime(time_tricks);//转化为DateTime
             return dt;
+        }
+
+        private void uiTextBox_RealTimeData_TextChanged(object sender, EventArgs e)
+        {
+            if (uiTextBox_RealTimeData.Text.Length >= 20000)
+            {
+                uiTextBox_RealTimeData.Clear();
+                uiTextBox_RealTimeData.AppendText("由于内容过多防止内存泄露，已清空并重新开始记录" + Environment.NewLine);
+            }
+        }
+
+        private void uiSymbolButton_Help_Click(object sender, EventArgs e)
+        {
+            UIMessageDialog.ShowMessageDialog("使用步骤：\n1.自己预约好座位或使用抢座功能抢到座位\n2.刷新预约状态直到预约座位信息处显示正确的信息\n3.打开占座开关，保持软件运行状态即可\n更多详细说明和介绍可访问：e剑终情.com", "占座使用帮助", false, Style,false,false);
         }
     }
 }
