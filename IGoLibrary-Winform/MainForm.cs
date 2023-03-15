@@ -34,6 +34,7 @@ namespace IGoLibrary_Winform
             services.AddSingleton<ICancelReserveService, CancelReserveServiceImpl>();
             using (var serviceProvider = services.BuildServiceProvider())
             {
+                this.Icon = Properties.Resources.main;
                 int pageIndex = 1000;
                 TreeNode parent = Aside.CreateNode(AddPage(new FIndex(), pageIndex));
                 Aside.SelectPage(1000);
