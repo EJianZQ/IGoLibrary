@@ -154,14 +154,14 @@ namespace IGoLibrary_Winform.Pages
                             {
                                 _grabSeatsSignal = false; //抛异常了可能是cookie过期了或者其他，另行判断
                                 uiTextBox_RealTimeData.AppendText($"[第{count}次][{DateTime.Now.ToString("T")}]出现异常，异常信息:{ex.Message}，需要重新填写Cookie并验证后再使用" + Environment.NewLine);
-                                Toast.ShowNotifiy(" 获取座位信息时出现致命错误",$"错误信息：{ex.Message}",NotificationType.Warning);
+                                Toast.ShowNotifiy("获取座位信息时出现致命错误",$"错误信息：{ex.Message}",NotificationType.Warning);
                                 uiSwitch_GrabSeatSwitch.Active = false;
                             }
                             catch(ReserveSeatException ex)
                             {
                                 _grabSeatsSignal = false; //抛异常了可能是cookie过期了或者其他，另行判断
                                 uiTextBox_RealTimeData.AppendText($"[第{count}次][{DateTime.Now.ToString("T")}]预定座位失败，失败信息:{ex.Message}，结束监控" + Environment.NewLine);
-                                Toast.ShowNotifiy(" 预定座位信息时出现错误", $"错误信息：{ex.Message}", NotificationType.Warning);
+                                Toast.ShowNotifiy("预定座位信息时出现错误", $"错误信息：{ex.Message}", NotificationType.Warning);
                                 uiSwitch_GrabSeatSwitch.Active = false;
                             }
                         }

@@ -25,7 +25,7 @@ namespace IGoLibrary_Winform.Data
 
     public class ReserveSeatRoot_Reserve
     {
-        public bool reserueSeat { get; set; }
+        public string reserueSeat { get; set; }
     }
 
     public class ReserveSeatRoot_ErrorsItem

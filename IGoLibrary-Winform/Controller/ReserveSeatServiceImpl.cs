@@ -47,7 +47,7 @@ namespace IGoLibrary_Winform.Controller
                     }
                     if (reserveSeatRoot.data.userAuth.reserve != null) //如果reserve不为null则有正常数据，可返回Library
                     {
-                        return reserveSeatRoot.data.userAuth.reserve.reserueSeat;
+                        return reserveSeatRoot.data.userAuth.reserve.reserueSeat == "true" ? true:false;
                     }
                     else
                     {
