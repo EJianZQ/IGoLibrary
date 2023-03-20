@@ -36,7 +36,7 @@
             this.uiSymbolLabel_LibName = new Sunny.UI.UISymbolLabel();
             this.uiTitlePane_Setting = new Sunny.UI.UITitlePanel();
             this.uiSymbolButton_Help = new Sunny.UI.UISymbolButton();
-            this.uiComboBox_GrabSeatMode = new Sunny.UI.UIComboBox();
+            this.uiComboBox_ReserveInfoRefreshInterval = new Sunny.UI.UIComboBox();
             this.uiMarkLabel1 = new Sunny.UI.UIMarkLabel();
             this.uiSymbolButton_UpdateStatus = new Sunny.UI.UISymbolButton();
             this.uiTitlePanel_OccupySeatSwitch = new Sunny.UI.UITitlePanel();
@@ -144,7 +144,7 @@
             // uiTitlePane_Setting
             // 
             this.uiTitlePane_Setting.Controls.Add(this.uiSymbolButton_Help);
-            this.uiTitlePane_Setting.Controls.Add(this.uiComboBox_GrabSeatMode);
+            this.uiTitlePane_Setting.Controls.Add(this.uiComboBox_ReserveInfoRefreshInterval);
             this.uiTitlePane_Setting.Controls.Add(this.uiMarkLabel1);
             this.uiTitlePane_Setting.Controls.Add(this.uiSymbolButton_UpdateStatus);
             this.uiTitlePane_Setting.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
@@ -173,26 +173,26 @@
             this.uiSymbolButton_Help.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             this.uiSymbolButton_Help.Click += new System.EventHandler(this.uiSymbolButton_Help_Click);
             // 
-            // uiComboBox_GrabSeatMode
+            // uiComboBox_ReserveInfoRefreshInterval
             // 
-            this.uiComboBox_GrabSeatMode.DataSource = null;
-            this.uiComboBox_GrabSeatMode.DropDownStyle = Sunny.UI.UIDropDownStyle.DropDownList;
-            this.uiComboBox_GrabSeatMode.FillColor = System.Drawing.Color.White;
-            this.uiComboBox_GrabSeatMode.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiComboBox_GrabSeatMode.Items.AddRange(new object[] {
-            "每29分钟取消",
-            "20~29分钟取消"});
-            this.uiComboBox_GrabSeatMode.Location = new System.Drawing.Point(19, 75);
-            this.uiComboBox_GrabSeatMode.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.uiComboBox_GrabSeatMode.MaxDropDownItems = 3;
-            this.uiComboBox_GrabSeatMode.MinimumSize = new System.Drawing.Size(63, 0);
-            this.uiComboBox_GrabSeatMode.Name = "uiComboBox_GrabSeatMode";
-            this.uiComboBox_GrabSeatMode.Padding = new System.Windows.Forms.Padding(0, 0, 30, 2);
-            this.uiComboBox_GrabSeatMode.Size = new System.Drawing.Size(178, 29);
-            this.uiComboBox_GrabSeatMode.TabIndex = 2;
-            this.uiComboBox_GrabSeatMode.TextAlignment = System.Drawing.ContentAlignment.MiddleLeft;
-            this.uiComboBox_GrabSeatMode.Watermark = "";
-            this.uiComboBox_GrabSeatMode.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiComboBox_ReserveInfoRefreshInterval.DataSource = null;
+            this.uiComboBox_ReserveInfoRefreshInterval.DropDownStyle = Sunny.UI.UIDropDownStyle.DropDownList;
+            this.uiComboBox_ReserveInfoRefreshInterval.FillColor = System.Drawing.Color.White;
+            this.uiComboBox_ReserveInfoRefreshInterval.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiComboBox_ReserveInfoRefreshInterval.Items.AddRange(new object[] {
+            "固定间隔10秒",
+            "随机10~20秒"});
+            this.uiComboBox_ReserveInfoRefreshInterval.Location = new System.Drawing.Point(19, 75);
+            this.uiComboBox_ReserveInfoRefreshInterval.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiComboBox_ReserveInfoRefreshInterval.MaxDropDownItems = 3;
+            this.uiComboBox_ReserveInfoRefreshInterval.MinimumSize = new System.Drawing.Size(63, 0);
+            this.uiComboBox_ReserveInfoRefreshInterval.Name = "uiComboBox_ReserveInfoRefreshInterval";
+            this.uiComboBox_ReserveInfoRefreshInterval.Padding = new System.Windows.Forms.Padding(0, 0, 30, 2);
+            this.uiComboBox_ReserveInfoRefreshInterval.Size = new System.Drawing.Size(178, 29);
+            this.uiComboBox_ReserveInfoRefreshInterval.TabIndex = 2;
+            this.uiComboBox_ReserveInfoRefreshInterval.TextAlignment = System.Drawing.ContentAlignment.MiddleLeft;
+            this.uiComboBox_ReserveInfoRefreshInterval.Watermark = "";
+            this.uiComboBox_ReserveInfoRefreshInterval.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
             // uiMarkLabel1
             // 
@@ -203,7 +203,7 @@
             this.uiMarkLabel1.Padding = new System.Windows.Forms.Padding(0, 0, 0, 5);
             this.uiMarkLabel1.Size = new System.Drawing.Size(178, 30);
             this.uiMarkLabel1.TabIndex = 1;
-            this.uiMarkLabel1.Text = "占座间隔";
+            this.uiMarkLabel1.Text = "信息刷新间隔";
             this.uiMarkLabel1.TextAlign = System.Drawing.ContentAlignment.TopCenter;
             this.uiMarkLabel1.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
@@ -278,7 +278,7 @@
         private Sunny.UI.UITitlePanel uiTitlePanel_OccupySeatSwitch;
         public Sunny.UI.UISwitch uiSwitch_OccupySeat;
         private Sunny.UI.UIMarkLabel uiMarkLabel1;
-        private Sunny.UI.UIComboBox uiComboBox_GrabSeatMode;
+        private Sunny.UI.UIComboBox uiComboBox_ReserveInfoRefreshInterval;
         private Sunny.UI.UISymbolButton uiSymbolButton_Help;
         private Sunny.UI.UISymbolButton uiSymbolButton_UpdateStatus;
         private Sunny.UI.UITextBox uiTextBox_RealTimeData;

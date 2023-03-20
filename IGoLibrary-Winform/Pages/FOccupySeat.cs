@@ -25,6 +25,7 @@ namespace IGoLibrary_Winform.Pages
             }
             Control.CheckForIllegalCrossThreadCalls = false;
             uiTextBox_RealTimeData.FillColor = Color.FromArgb(243, 249, 255);
+            uiComboBox_ReserveInfoRefreshInterval.SelectedIndex = 0;
         }
 
         public void UpdateStatus()
@@ -120,9 +121,12 @@ namespace IGoLibrary_Winform.Pages
                                 TimeSpan ts = info.ExpiredTime - DateTime.Now;
                                 if(ts.TotalSeconds > 60) 
                                 {
-                                    //如果还大于60秒，则延迟10秒后进入下一次循环。如果小于60秒了则取消预定
-                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]距离预约过期还剩{(int)ts.TotalSeconds}秒，10秒后继续检测" + Environment.NewLine);
-                                    Thread.Sleep(10000);
+                                    //如果还大于60秒，则延迟指定时间(2种模式)后进入下一次循环。如果小于60秒了则取消预定
+                                    int delayValue = 0;
+                                    Random rd = new Random();
+                                    delayValue = uiComboBox_ReserveInfoRefreshInterval.SelectedIndex == 0 ? 10000 : rd.Next(10000, 20000);
+                                    Thread.Sleep(delayValue);
+                                    uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]距离预约过期还剩{(int)ts.TotalSeconds}秒，{delayValue/1000}秒后继续检测" + Environment.NewLine);
                                     continue; //直接进入下一次循环
                                 }
                             }
