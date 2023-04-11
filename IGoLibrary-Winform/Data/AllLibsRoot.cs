@@ -40,7 +40,7 @@ namespace IGoLibrary_Winform.Data
         /// <summary>
         /// 
         /// </summary>
-        public AllLibsRoot_Record record { get; set; }
+        //public AllLibsRoot_Record record { get; set; }
         /// <summary>
         /// 
         /// </summary>

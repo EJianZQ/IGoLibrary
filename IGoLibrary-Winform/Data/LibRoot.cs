@@ -31,8 +31,12 @@ namespace IGoLibrary_Winform.Data
     public class LibRoot_UserAuth
     {
         public LibRoot_Reserve reserve { get; set; }
+        //public LibRoot_Record recode { get; set; }
     }
-
+    public class LibRoot_Record
+    {
+        public List<LibRoot_LibsItem> libs { get; set; }
+    }
     public class LibRoot_Reserve
     {
         public List<LibRoot_LibsItem> libs { get; set; }
