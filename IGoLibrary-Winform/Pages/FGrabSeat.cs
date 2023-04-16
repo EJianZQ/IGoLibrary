@@ -102,10 +102,20 @@ namespace IGoLibrary_Winform.Pages
                             {
                                 var settingTime = DateTime.Parse(uiTimePicker_TimingTime.Text).TimeOfDay;
                                 var nowTime = DateTime.Now.TimeOfDay;
-                                if (nowTime >= settingTime)
+                                TimeSpan interval = (settingTime - nowTime).Duration(); // 取开始和现在时间的时间间隔绝对值
+                                TimeSpan tenSeconds = new TimeSpan(0, 0, 10); //创建一个10秒的时间间隔
+                                if(interval < tenSeconds)
                                 {
-                                    uiTextBox_RealTimeData.AppendText("已到抢座时间，开始监控并抢座" + Environment.NewLine);
-                                    break;
+                                    if (nowTime >= settingTime)
+                                    {
+                                        uiTextBox_RealTimeData.AppendText("已到抢座时间，开始监控并抢座" + Environment.NewLine);
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        uiTextBox_RealTimeData.AppendText("倒计时已进入10秒内，即将开始抢座" + Environment.NewLine);
+                                        Thread.Sleep(1000);
+                                    }
                                 }
                                 else
                                 {
