@@ -35,6 +35,9 @@
             this.uiSymbolLabel_SeatName = new Sunny.UI.UISymbolLabel();
             this.uiSymbolLabel_LibName = new Sunny.UI.UISymbolLabel();
             this.uiTitlePane_Setting = new Sunny.UI.UITitlePanel();
+            this.uiLabel1 = new Sunny.UI.UILabel();
+            this.uiIntegerUpDown_ReReseveInterval = new Sunny.UI.UIIntegerUpDown();
+            this.uiMarkLabel2 = new Sunny.UI.UIMarkLabel();
             this.uiSymbolButton_Help = new Sunny.UI.UISymbolButton();
             this.uiComboBox_ReserveInfoRefreshInterval = new Sunny.UI.UIComboBox();
             this.uiMarkLabel1 = new Sunny.UI.UIMarkLabel();
@@ -143,6 +146,9 @@
             // 
             // uiTitlePane_Setting
             // 
+            this.uiTitlePane_Setting.Controls.Add(this.uiLabel1);
+            this.uiTitlePane_Setting.Controls.Add(this.uiIntegerUpDown_ReReseveInterval);
+            this.uiTitlePane_Setting.Controls.Add(this.uiMarkLabel2);
             this.uiTitlePane_Setting.Controls.Add(this.uiSymbolButton_Help);
             this.uiTitlePane_Setting.Controls.Add(this.uiComboBox_ReserveInfoRefreshInterval);
             this.uiTitlePane_Setting.Controls.Add(this.uiMarkLabel1);
@@ -154,22 +160,62 @@
             this.uiTitlePane_Setting.Name = "uiTitlePane_Setting";
             this.uiTitlePane_Setting.Padding = new System.Windows.Forms.Padding(0, 35, 0, 0);
             this.uiTitlePane_Setting.ShowText = false;
-            this.uiTitlePane_Setting.Size = new System.Drawing.Size(213, 214);
+            this.uiTitlePane_Setting.Size = new System.Drawing.Size(213, 225);
             this.uiTitlePane_Setting.TabIndex = 2;
             this.uiTitlePane_Setting.Text = "设置";
             this.uiTitlePane_Setting.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
             this.uiTitlePane_Setting.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
+            // uiLabel1
+            // 
+            this.uiLabel1.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiLabel1.Location = new System.Drawing.Point(156, 146);
+            this.uiLabel1.Name = "uiLabel1";
+            this.uiLabel1.Size = new System.Drawing.Size(27, 23);
+            this.uiLabel1.TabIndex = 7;
+            this.uiLabel1.Text = "秒";
+            this.uiLabel1.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.uiLabel1.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            // 
+            // uiIntegerUpDown_ReReseveInterval
+            // 
+            this.uiIntegerUpDown_ReReseveInterval.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiIntegerUpDown_ReReseveInterval.Location = new System.Drawing.Point(19, 144);
+            this.uiIntegerUpDown_ReReseveInterval.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.uiIntegerUpDown_ReReseveInterval.Maximum = 1800;
+            this.uiIntegerUpDown_ReReseveInterval.Minimum = 1;
+            this.uiIntegerUpDown_ReReseveInterval.MinimumSize = new System.Drawing.Size(100, 0);
+            this.uiIntegerUpDown_ReReseveInterval.Name = "uiIntegerUpDown_ReReseveInterval";
+            this.uiIntegerUpDown_ReReseveInterval.ShowText = false;
+            this.uiIntegerUpDown_ReReseveInterval.Size = new System.Drawing.Size(126, 29);
+            this.uiIntegerUpDown_ReReseveInterval.TabIndex = 6;
+            this.uiIntegerUpDown_ReReseveInterval.Text = "uiIntegerUpDown1";
+            this.uiIntegerUpDown_ReReseveInterval.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
+            this.uiIntegerUpDown_ReReseveInterval.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            // 
+            // uiMarkLabel2
+            // 
+            this.uiMarkLabel2.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiMarkLabel2.Location = new System.Drawing.Point(19, 109);
+            this.uiMarkLabel2.MarkPos = Sunny.UI.UIMarkLabel.UIMarkPos.Bottom;
+            this.uiMarkLabel2.Name = "uiMarkLabel2";
+            this.uiMarkLabel2.Padding = new System.Windows.Forms.Padding(0, 0, 0, 5);
+            this.uiMarkLabel2.Size = new System.Drawing.Size(178, 30);
+            this.uiMarkLabel2.TabIndex = 5;
+            this.uiMarkLabel2.Text = "重新预约间隔";
+            this.uiMarkLabel2.TextAlign = System.Drawing.ContentAlignment.TopCenter;
+            this.uiMarkLabel2.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            // 
             // uiSymbolButton_Help
             // 
             this.uiSymbolButton_Help.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiSymbolButton_Help.Location = new System.Drawing.Point(19, 166);
+            this.uiSymbolButton_Help.Location = new System.Drawing.Point(19, 181);
             this.uiSymbolButton_Help.MinimumSize = new System.Drawing.Size(1, 1);
             this.uiSymbolButton_Help.Name = "uiSymbolButton_Help";
-            this.uiSymbolButton_Help.Size = new System.Drawing.Size(178, 35);
+            this.uiSymbolButton_Help.Size = new System.Drawing.Size(86, 32);
             this.uiSymbolButton_Help.Symbol = 61529;
             this.uiSymbolButton_Help.TabIndex = 4;
-            this.uiSymbolButton_Help.Text = "获取帮助";
+            this.uiSymbolButton_Help.Text = "帮助";
             this.uiSymbolButton_Help.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             this.uiSymbolButton_Help.Click += new System.EventHandler(this.uiSymbolButton_Help_Click);
             // 
@@ -210,13 +256,13 @@
             // uiSymbolButton_UpdateStatus
             // 
             this.uiSymbolButton_UpdateStatus.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiSymbolButton_UpdateStatus.Location = new System.Drawing.Point(19, 115);
+            this.uiSymbolButton_UpdateStatus.Location = new System.Drawing.Point(111, 181);
             this.uiSymbolButton_UpdateStatus.MinimumSize = new System.Drawing.Size(1, 1);
             this.uiSymbolButton_UpdateStatus.Name = "uiSymbolButton_UpdateStatus";
-            this.uiSymbolButton_UpdateStatus.Size = new System.Drawing.Size(178, 35);
+            this.uiSymbolButton_UpdateStatus.Size = new System.Drawing.Size(86, 32);
             this.uiSymbolButton_UpdateStatus.Symbol = 61473;
             this.uiSymbolButton_UpdateStatus.TabIndex = 3;
-            this.uiSymbolButton_UpdateStatus.Text = "刷新预约状态";
+            this.uiSymbolButton_UpdateStatus.Text = "刷新";
             this.uiSymbolButton_UpdateStatus.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             this.uiSymbolButton_UpdateStatus.Click += new System.EventHandler(this.uiSymbolButton_UpdateStatus_Click);
             // 
@@ -224,13 +270,13 @@
             // 
             this.uiTitlePanel_OccupySeatSwitch.Controls.Add(this.uiSwitch_OccupySeat);
             this.uiTitlePanel_OccupySeatSwitch.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiTitlePanel_OccupySeatSwitch.Location = new System.Drawing.Point(431, 412);
+            this.uiTitlePanel_OccupySeatSwitch.Location = new System.Drawing.Point(431, 423);
             this.uiTitlePanel_OccupySeatSwitch.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.uiTitlePanel_OccupySeatSwitch.MinimumSize = new System.Drawing.Size(1, 1);
             this.uiTitlePanel_OccupySeatSwitch.Name = "uiTitlePanel_OccupySeatSwitch";
             this.uiTitlePanel_OccupySeatSwitch.Padding = new System.Windows.Forms.Padding(0, 35, 0, 0);
             this.uiTitlePanel_OccupySeatSwitch.ShowText = false;
-            this.uiTitlePanel_OccupySeatSwitch.Size = new System.Drawing.Size(213, 89);
+            this.uiTitlePanel_OccupySeatSwitch.Size = new System.Drawing.Size(213, 78);
             this.uiTitlePanel_OccupySeatSwitch.TabIndex = 3;
             this.uiTitlePanel_OccupySeatSwitch.Text = "操作";
             this.uiTitlePanel_OccupySeatSwitch.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
@@ -239,7 +285,7 @@
             // uiSwitch_OccupySeat
             // 
             this.uiSwitch_OccupySeat.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiSwitch_OccupySeat.Location = new System.Drawing.Point(22, 47);
+            this.uiSwitch_OccupySeat.Location = new System.Drawing.Point(19, 42);
             this.uiSwitch_OccupySeat.MinimumSize = new System.Drawing.Size(1, 1);
             this.uiSwitch_OccupySeat.Name = "uiSwitch_OccupySeat";
             this.uiSwitch_OccupySeat.Size = new System.Drawing.Size(168, 29);
@@ -282,5 +328,8 @@
         private Sunny.UI.UISymbolButton uiSymbolButton_Help;
         private Sunny.UI.UISymbolButton uiSymbolButton_UpdateStatus;
         private Sunny.UI.UITextBox uiTextBox_RealTimeData;
+        private Sunny.UI.UILabel uiLabel1;
+        private Sunny.UI.UIIntegerUpDown uiIntegerUpDown_ReReseveInterval;
+        private Sunny.UI.UIMarkLabel uiMarkLabel2;
     }
 }

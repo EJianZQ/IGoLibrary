@@ -15,7 +15,7 @@ namespace ConsoleDemo
     {
         static async Task  Main(string[] args)
         {
-            GetCookie();
+            KeepCookie();
             Console.ReadLine();
         }
 
@@ -134,6 +134,25 @@ namespace ConsoleDemo
             {
                 Console.WriteLine(temp.ToString());
             }
+        }
+
+        public static void KeepCookie()
+        {
+            var client = new RestClient("https://wechat.v2.traceint.com/index.php/graphql/");
+            var request = new RestRequest();
+            request.Method = Method.Post;
+            request.RequestFormat = DataFormat.Json;
+            request.AddHeader("Cookie", @"Authorization=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1c2VySWQiOjM3NTgwNDM0LCJzY2hJZCI6MjAxNzUsImV4cGlyZUF0IjoxNjgxNzIxMjc1fQ.GnXDQrxCPAE7hXbUCYWlxbuqb6rDQZUQXZ0HZzKGYhZOiTBaCsDvEyLDVcHdfDnfpwEXT7XMwW1QOZP05Ico0aWphPsf7F6KplIbbLAZ2ZLfDRufj1b29WAIpsdp_qGNl7h2An3ocXoc5yGd31rONIwEGcnv9b5xsvEV1rq5oMnLkKVebL9bL0lIAldv73cQsxUXYQ8SthwOojIcPr3wSfnQ5oH5RBPT62BuRKwu0iGBhU_UrLA_9BVkZbiyS4nGcRGjshKrwZQmqPJBKc3MYidsyM7OlYc1OJ6l_v9K6ax_vUxN5NwID-UEU7_1RNfuI_-JRk6wHtvGz7O2EmceqQ; SERVERID=e3fa93b0fb9e2e6d4f53273540d4e924|1681714075|1681714075");
+            request.AddParameter("application/json", @"{
+        ""query"": 'query getUserCancleConfig { userAuth { user { holdValidate: getSchConfig(fields: ""hold_validate"", extra: true) } } }',
+        ""variables"": {},
+        ""operationName"": ""getUserCancleConfig""
+    }", ParameterType.RequestBody);
+            RestResponse response = client.Execute(request);
+            var responseContent = response.Content;
+            var outputString = Regex.Unescape(responseContent);
+            Console.WriteLine(outputString);
+
         }
     }
 }
