@@ -149,7 +149,7 @@ namespace IGoLibrary_Winform.Pages
                                     }
                                     else
                                     {
-                                        uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约失败：{errorMessage}。将在10秒后重试最多3次，即将开始第{++_getInfoRetryCount}次尝试" + Environment.NewLine);
+                                        uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约失败：{errorMessage}。将在10秒后重试最多3次，即将开始第{++_cancelReserveRetryCount}次尝试" + Environment.NewLine);
                                         goto CancelReserve;
                                     }
                                 }
@@ -167,7 +167,7 @@ namespace IGoLibrary_Winform.Pages
                                     uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]已获取到终止信号，占座功能将被完全终止" + Environment.NewLine);
                                     break;
                                 }//每个功能之间都加入验证，让功能更快地终止
-                                uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约失败，现在开始第{++_getInfoRetryCount}次重试" + Environment.NewLine);
+                                uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约失败，现在开始第{++_cancelReserveRetryCount}次重试" + Environment.NewLine);
                                 goto CancelReserve;
                             }
                         ReReserve: try
@@ -186,7 +186,7 @@ namespace IGoLibrary_Winform.Pages
                                     }
                                     else
                                     {
-                                        uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约失败且原因未知。将在10秒后重试最多3次，即将开始第{++_getInfoRetryCount}次尝试" + Environment.NewLine);
+                                        uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]重新预约座位失败且原因未知。将在10秒后重试最多3次，即将开始第{++_reReserveRetryCount}次尝试" + Environment.NewLine);
                                         goto ReReserve;
                                     }
                                 }
@@ -204,7 +204,7 @@ namespace IGoLibrary_Winform.Pages
                                     uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]已获取到终止信号，占座功能将被完全终止" + Environment.NewLine);
                                     break;
                                 }//每个功能之间都加入验证，让功能更快地终止
-                                uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]重新预约座位失败：{ex.Message}，现在开始第{++_getInfoRetryCount}次重试" + Environment.NewLine);
+                                uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]重新预约座位失败：{ex.Message}，现在开始第{++_reReserveRetryCount}次重试" + Environment.NewLine);
                                 goto ReReserve;
                             }
                         }
