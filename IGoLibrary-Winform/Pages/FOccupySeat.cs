@@ -76,6 +76,7 @@ namespace IGoLibrary_Winform.Pages
                             int _getInfoRetryCount = 0;
                             int _cancelReserveRetryCount = 0;
                             int _reReserveRetryCount = 0;
+                            int _reReserveInterval = this.uiIntegerUpDown_ReReseveInterval.Value >= 1 ? this.uiIntegerUpDown_ReReseveInterval.Value : 60;
                         GetInfo: try
                             {
                                 if (_occupySeatSignal == false)
@@ -137,13 +138,13 @@ namespace IGoLibrary_Winform.Pages
                                     uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]已获取到终止信号，占座功能将被完全终止" + Environment.NewLine);
                                     break;
                                 }//每个功能之间都加入验证，让功能更快地终止
-                                string errorMessage = "By EJianZQ";
+                                string errorMessage = @".-.. .. -.- . / -..- .-.. .---";
                                 if (_cancelReserveRetryCount <= 2)
                                 {
                                     if(cancelReserveService.CancelReserve(MainForm.authentication.Authenticator.Cookies, MainForm.authentication.Authenticator.Syntax.CancelReserve.Replace("ReplaceMe", info.Token), ref errorMessage) == true)
                                     {
-                                        uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约成功，将在1分钟后重新预约" + Environment.NewLine);
-                                        Thread.Sleep(61000); //延迟61秒后重新预约该座位
+                                        uiTextBox_RealTimeData.AppendText($"[{DateTime.Now.ToString("T")}]取消预约成功，将在{_reReserveInterval}秒后重新预约" + Environment.NewLine);
+                                        Thread.Sleep(_reReserveInterval * 1000); //延迟指定秒数后重新预约该座位
                                         _cancelReserveRetryCount = 0;
                                     }
                                     else

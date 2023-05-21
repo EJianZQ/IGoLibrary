@@ -191,6 +191,7 @@
             this.uiIntegerUpDown_ReReseveInterval.TabIndex = 6;
             this.uiIntegerUpDown_ReReseveInterval.Text = "uiIntegerUpDown1";
             this.uiIntegerUpDown_ReReseveInterval.TextAlignment = System.Drawing.ContentAlignment.MiddleCenter;
+            this.uiIntegerUpDown_ReReseveInterval.Value = 1;
             this.uiIntegerUpDown_ReReseveInterval.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
             // 
             // uiMarkLabel2
