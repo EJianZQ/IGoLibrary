@@ -47,7 +47,8 @@
             this.uiTitlePanel_RealTimeData = new Sunny.UI.UITitlePanel();
             this.uiTextBox_RealTimeData = new Sunny.UI.UITextBox();
             this.tabPage_SeatInfoList = new System.Windows.Forms.TabPage();
-            this.uiSymbolButton1 = new Sunny.UI.UISymbolButton();
+            this.uiSymbolButton_LoadFavorite = new Sunny.UI.UISymbolButton();
+            this.uiSymbolButton_Favorite = new Sunny.UI.UISymbolButton();
             this.uiSymbolButton_AddGrabList = new Sunny.UI.UISymbolButton();
             this.uiDataGridView_SeatInfo = new Sunny.UI.UIDataGridView();
             this.uiTabControl_GrabSeat.SuspendLayout();
@@ -278,26 +279,41 @@
             // tabPage_SeatInfoList
             // 
             this.tabPage_SeatInfoList.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(243)))), ((int)(((byte)(249)))), ((int)(((byte)(255)))));
-            this.tabPage_SeatInfoList.Controls.Add(this.uiSymbolButton1);
+            this.tabPage_SeatInfoList.Controls.Add(this.uiSymbolButton_LoadFavorite);
+            this.tabPage_SeatInfoList.Controls.Add(this.uiSymbolButton_Favorite);
             this.tabPage_SeatInfoList.Controls.Add(this.uiSymbolButton_AddGrabList);
             this.tabPage_SeatInfoList.Controls.Add(this.uiDataGridView_SeatInfo);
             this.tabPage_SeatInfoList.Location = new System.Drawing.Point(0, 40);
             this.tabPage_SeatInfoList.Name = "tabPage_SeatInfoList";
-            this.tabPage_SeatInfoList.Size = new System.Drawing.Size(200, 60);
+            this.tabPage_SeatInfoList.Size = new System.Drawing.Size(633, 451);
             this.tabPage_SeatInfoList.TabIndex = 1;
             this.tabPage_SeatInfoList.Text = "选择座位";
             // 
-            // uiSymbolButton1
+            // uiSymbolButton_LoadFavorite
             // 
-            this.uiSymbolButton1.Enabled = false;
-            this.uiSymbolButton1.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
-            this.uiSymbolButton1.Location = new System.Drawing.Point(211, 395);
-            this.uiSymbolButton1.MinimumSize = new System.Drawing.Size(1, 1);
-            this.uiSymbolButton1.Name = "uiSymbolButton1";
-            this.uiSymbolButton1.Size = new System.Drawing.Size(160, 40);
-            this.uiSymbolButton1.TabIndex = 3;
-            this.uiSymbolButton1.Text = "收藏选中座位";
-            this.uiSymbolButton1.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiSymbolButton_LoadFavorite.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiSymbolButton_LoadFavorite.Location = new System.Drawing.Point(45, 395);
+            this.uiSymbolButton_LoadFavorite.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiSymbolButton_LoadFavorite.Name = "uiSymbolButton_LoadFavorite";
+            this.uiSymbolButton_LoadFavorite.Size = new System.Drawing.Size(160, 40);
+            this.uiSymbolButton_LoadFavorite.Symbol = 61470;
+            this.uiSymbolButton_LoadFavorite.TabIndex = 4;
+            this.uiSymbolButton_LoadFavorite.Text = "加载收藏";
+            this.uiSymbolButton_LoadFavorite.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiSymbolButton_LoadFavorite.Click += new System.EventHandler(this.uiSymbolButton_LoadFavorite_Click);
+            // 
+            // uiSymbolButton_Favorite
+            // 
+            this.uiSymbolButton_Favorite.Font = new System.Drawing.Font("微软雅黑", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point);
+            this.uiSymbolButton_Favorite.Location = new System.Drawing.Point(211, 395);
+            this.uiSymbolButton_Favorite.MinimumSize = new System.Drawing.Size(1, 1);
+            this.uiSymbolButton_Favorite.Name = "uiSymbolButton_Favorite";
+            this.uiSymbolButton_Favorite.Size = new System.Drawing.Size(160, 40);
+            this.uiSymbolButton_Favorite.Symbol = 61444;
+            this.uiSymbolButton_Favorite.TabIndex = 3;
+            this.uiSymbolButton_Favorite.Text = "收藏选中座位";
+            this.uiSymbolButton_Favorite.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
+            this.uiSymbolButton_Favorite.Click += new System.EventHandler(this.uiSymbolButton_Favorite_Click);
             // 
             // uiSymbolButton_AddGrabList
             // 
@@ -306,6 +322,7 @@
             this.uiSymbolButton_AddGrabList.MinimumSize = new System.Drawing.Size(1, 1);
             this.uiSymbolButton_AddGrabList.Name = "uiSymbolButton_AddGrabList";
             this.uiSymbolButton_AddGrabList.Size = new System.Drawing.Size(253, 40);
+            this.uiSymbolButton_AddGrabList.Symbol = 61543;
             this.uiSymbolButton_AddGrabList.TabIndex = 2;
             this.uiSymbolButton_AddGrabList.Text = "添加选中座位至抢座列表";
             this.uiSymbolButton_AddGrabList.ZoomScaleRect = new System.Drawing.Rectangle(0, 0, 0, 0);
@@ -392,7 +409,7 @@
         private Sunny.UI.UIDataGridView uiDataGridView_SeatInfo;
         private Sunny.UI.UISymbolButton uiSymbolButton_AddGrabList;
         private Sunny.UI.UITitlePanel uiTitlePanel_RealTimeData;
-        private Sunny.UI.UISymbolButton uiSymbolButton1;
+        private Sunny.UI.UISymbolButton uiSymbolButton_Favorite;
         private Sunny.UI.UITextBox uiTextBox_RealTimeData;
         private Sunny.UI.UITitlePanel uiTitlePanel_GrabSeatSwitch;
         private Sunny.UI.UITitlePanel uiTitlePanel_Setting;
@@ -403,5 +420,6 @@
         private Sunny.UI.UITimePicker uiTimePicker_TimingTime;
         private Sunny.UI.UIMarkLabel uiMarkLabel2;
         public Sunny.UI.UISwitch uiSwitch_GrabSeatSwitch;
+        private Sunny.UI.UISymbolButton uiSymbolButton_LoadFavorite;
     }
 }

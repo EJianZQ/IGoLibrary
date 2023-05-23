@@ -1,19 +1,15 @@
 ﻿using IGoLibrary_Winform.Data;
 using IGoLibrary_Winform.Notify;
 using Sunny.UI;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 using Notifications.Wpf;
 using Microsoft.Extensions.DependencyInjection;
 using IGoLibrary_Winform.CustomException;
 using IGoLibrary_Winform.Controller;
+using System.IO;
+using Newtonsoft.Json;
+using Sunny.UI.Win32;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace IGoLibrary_Winform.Pages
 {
@@ -196,6 +192,103 @@ namespace IGoLibrary_Winform.Pages
                 uiTextBox_RealTimeData.Clear();
                 uiTextBox_RealTimeData.AppendText("由于内容过多防止内存泄露，已清空并重新开始记录" + Environment.NewLine);
             }
+        }
+
+        private void uiSymbolButton_Favorite_Click(object sender, EventArgs e)
+        {
+            if(uiDataGridView_SeatInfo.SelectedRows.Count < 1)
+            {
+                Toast.ShowNotifiy("收藏选中座位失败", "还未选中任何座位，无法收藏", NotificationType.Error);
+                return;
+            }
+
+            if(Directory.Exists("Favorites") == false)
+            {
+                try
+                {
+                    Directory.CreateDirectory("Favorites");
+                }
+                catch
+                {
+                    Toast.ShowNotifiy("收藏选中座位失败", "在创建收藏文件夹时遇到了异常", NotificationType.Error);
+                    return;
+                }
+            }
+
+            List<int> selectedRowIndex = new List<int>();
+            for (int i = 0; i < uiDataGridView_SeatInfo.SelectedRows.Count; i++)
+            {
+                selectedRowIndex.Add(uiDataGridView_SeatInfo.SelectedRows[i].Index);
+            }
+
+            if(selectedRowIndex.Count < 1)
+            {
+                Toast.ShowNotifiy("收藏选中座位失败", "还未选中任何座位，无法收藏", NotificationType.Error);
+                return;
+            }
+
+            FavoriteSeats favs = new FavoriteSeats();
+            favs.SelectedRowIndex = selectedRowIndex.ToArray();
+            favs.LibID = MainForm.authentication.Authenticator.LibID;
+
+            string favoriteSeatsContent = JsonConvert.SerializeObject(favs);
+            if(favoriteSeatsContent != null || favoriteSeatsContent != string.Empty)
+            {
+                try
+                {
+                    string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Favorites", favs.LibID.ToString() + ".json");
+                    File.WriteAllText(filePath, favoriteSeatsContent);
+                    if (File.Exists(filePath) == true)
+                    {
+                        Toast.ShowNotifiy("收藏选中座位成功", $"已成功收藏{favs.SelectedRowIndex.Length}个座位，可下次恢复使用", NotificationType.Success);
+                    }
+                    else
+                    {
+                        Toast.ShowNotifiy("收藏选中座位失败", "数据文件因未知原因而不存在", NotificationType.Error);
+                    }
+                }
+                catch 
+                {
+                    Toast.ShowNotifiy("收藏选中座位失败", "在写入座位数据时发生了异常", NotificationType.Error);
+                }
+            }
+            else
+                Toast.ShowNotifiy("收藏选中座位失败", "座位数据序列化时发生了错误导致数据为空", NotificationType.Error);
+        }
+
+        private void uiSymbolButton_LoadFavorite_Click(object sender, EventArgs e)
+        {
+            if (Directory.Exists("Favorites") == false)
+            {
+                Toast.ShowNotifiy("加载收藏座位失败", "收藏座位数据不存在，可能是并未收藏", NotificationType.Error);
+                return;
+            }
+
+            string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Favorites", MainForm.authentication.Authenticator.LibID.ToString() + ".json");
+            if(File.Exists(filePath) == true)
+            {
+                try
+                {
+                    string favoriteSeatsContent = File.ReadAllText(filePath);
+                    var favs = JsonConvert.DeserializeObject<FavoriteSeats>(favoriteSeatsContent);
+                    if(favs.SelectedRowIndex.Length > 0)
+                    {
+                        for(int i = 0;i < favs.SelectedRowIndex.Length; i++)
+                        {
+                            uiDataGridView_SeatInfo.Rows[favs.SelectedRowIndex[i]].Selected = true;
+                        }
+                        Toast.ShowNotifiy("加载收藏座位成功", $"已成功加载{favs.SelectedRowIndex.Length}个座位至列表", NotificationType.Success);
+                    }
+                    else
+                        Toast.ShowNotifiy("加载收藏座位失败", "数据中不存在收藏的座位数据", NotificationType.Error);
+                }
+                catch
+                {
+                    Toast.ShowNotifiy("加载收藏座位失败", "读取数据时发生了异常", NotificationType.Error);
+                }
+            }
+            else
+                Toast.ShowNotifiy("加载收藏座位失败", "收藏座位数据不存在，可能是并未收藏该场馆的座位或还未绑定图书馆", NotificationType.Error);
         }
     }
 }
