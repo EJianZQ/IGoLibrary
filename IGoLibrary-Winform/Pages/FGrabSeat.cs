@@ -64,6 +64,11 @@ namespace IGoLibrary_Winform.Pages
         {
             if(uiDataGridView_SeatInfo.Rows.Count >= 2)
             {
+                if (uiDataGridView_SeatInfo.SelectedRows.Count < 1)
+                {
+                    Toast.ShowNotifiy("添加抢座列表失败", "还未选中任何座位，无法添加", NotificationType.Error);
+                    return;
+                }
                 var allSeatsList = (List<SeatKeyData>)uiDataGridView_SeatInfo.DataSource;
                 waitingGrabSeats = new List<SeatKeyData>();
                 uiListBox_SelectedGrabSeats.Items.Clear();
