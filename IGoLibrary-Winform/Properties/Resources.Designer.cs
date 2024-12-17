@@ -83,9 +83,9 @@ namespace IGoLibrary_Winform.Properties {
         /// <summary>
         ///   查找 System.Drawing.Bitmap 类型的本地化资源。
         /// </summary>
-        internal static System.Drawing.Bitmap qr {
+        internal static System.Drawing.Bitmap qrcode {
             get {
-                object obj = ResourceManager.GetObject("qr", resourceCulture);
+                object obj = ResourceManager.GetObject("qrcode", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
