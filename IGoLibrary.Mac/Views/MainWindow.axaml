@@ -1,0 +1,204 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:IGoLibrary.Mac.ViewModels"
+        xmlns:views="using:IGoLibrary.Mac.Views"
+        x:Class="IGoLibrary.Mac.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="我去图书馆 - Mac 版"
+        Width="1000"
+        Height="600"
+        MinWidth="800"
+        MinHeight="500">
+
+    <Grid ColumnDefinitions="200,*">
+
+        <!-- 左侧导航栏 -->
+        <Border Grid.Column="0" Background="#2D2D30">
+            <StackPanel Margin="20">
+
+                <!-- 标题 -->
+                <TextBlock Text="我去图书馆"
+                           FontSize="20"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,40"/>
+
+                <!-- 导航按钮 -->
+                <Button Content="登录"
+                        Command="{Binding NavigateToCommand}"
+                        CommandParameter="Login"
+                        Margin="0,0,0,10"
+                        Height="40"/>
+
+                <Button Content="明日预约"
+                        Command="{Binding NavigateToCommand}"
+                        CommandParameter="GrabSeat"
+                        Margin="0,0,0,10"
+                        Height="40"/>
+
+                <Button Content="即时占座"
+                        Command="{Binding NavigateToCommand}"
+                        CommandParameter="OccupySeat"
+                        Margin="0,0,0,10"
+                        Height="40"/>
+
+                <Button Content="设置"
+                        Command="{Binding NavigateToCommand}"
+                        CommandParameter="Settings"
+                        Margin="0,0,0,10"
+                        Height="40"/>
+
+            </StackPanel>
+        </Border>
+
+        <!-- 右侧内容区 -->
+        <Border Grid.Column="1" Background="#1E1E1E">
+            <Panel>
+                <!-- 登录页面 -->
+                <ScrollViewer IsVisible="{Binding IsLoginPage}"
+                             ZIndex="1">
+                    <StackPanel Margin="40" MaxWidth="600">
+                        <TextBlock Text="登录"
+                                   FontSize="28"
+                                   FontWeight="Bold"
+                                   Foreground="White"
+                                   Margin="0,0,0,30"/>
+
+                        <TextBlock Text="请输入含有code的URL:"
+                                   FontSize="14"
+                                   Foreground="White"
+                                   Margin="0,0,0,10"/>
+
+                        <TextBox Text="{Binding LoginViewModel.CodeSourceURL}"
+                                 Watermark="粘贴扫码后的完整URL"
+                                 Height="80"
+                                 TextWrapping="Wrap"
+                                 Margin="0,0,0,15"/>
+
+                        <Button Content="从URL获取Cookie"
+                                Command="{Binding LoginViewModel.GetCookieFromUrlCommand}"
+                                Height="40"
+                                Margin="0,0,0,20"/>
+
+                        <TextBlock Text="或直接输入Cookie:"
+                                   FontSize="14"
+                                   Foreground="White"
+                                   Margin="0,0,0,10"/>
+
+                        <TextBox Text="{Binding LoginViewModel.Cookie}"
+                                 Watermark="直接粘贴Cookie"
+                                 Height="80"
+                                 TextWrapping="Wrap"
+                                 Margin="0,0,0,15"/>
+
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Button Content="验证并获取图书馆列表"
+                                    Command="{Binding LoginViewModel.BindLibraryCommand}"
+                                    Height="40"
+                                    Width="180"/>
+                            <Button Content="保存Cookie"
+                                    Command="{Binding LoginViewModel.SaveCookieCommand}"
+                                    Height="40"
+                                    Width="120"/>
+                            <Button Content="读取Cookie"
+                                    Command="{Binding LoginViewModel.LoadCookieCommand}"
+                                    Height="40"
+                                    Width="120"/>
+                        </StackPanel>
+
+                        <!-- 楼层选择区域 -->
+                        <Border Background="#2D2D30"
+                                BorderBrush="#3F3F46"
+                                BorderThickness="1"
+                                CornerRadius="5"
+                                Padding="20"
+                                Margin="0,20,0,0"
+                                IsVisible="{Binding LoginViewModel.ShowLibrarySelection}">
+                            <StackPanel Spacing="15">
+                                <TextBlock Text="选择图书馆楼层"
+                                           FontSize="16"
+                                           FontWeight="Bold"
+                                           Foreground="White"/>
+
+                                <TextBlock Text="请选择要绑定的图书馆:"
+                                           FontSize="14"
+                                           Foreground="White"
+                                           Margin="0,0,0,5"/>
+
+                                <ComboBox ItemsSource="{Binding LoginViewModel.LibraryOptions}"
+                                          SelectedIndex="{Binding LoginViewModel.SelectedLibraryIndex}"
+                                          Height="40"
+                                          Background="#252526"
+                                          Foreground="White"
+                                          BorderBrush="#3F3F46"/>
+
+                                <Button Content="确认绑定"
+                                        Command="{Binding LoginViewModel.ConfirmBindLibraryCommand}"
+                                        Height="40"
+                                        Width="150"
+                                        HorizontalAlignment="Left"
+                                        Background="Green"
+                                        Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30"
+                                BorderBrush="#3F3F46"
+                                BorderThickness="1"
+                                CornerRadius="5"
+                                Padding="20"
+                                Margin="0,30,0,0">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="图书馆信息"
+                                           FontSize="16"
+                                           FontWeight="Bold"
+                                           Foreground="White"/>
+                                <TextBlock Text="{Binding LoginViewModel.LibStatus}"
+                                           Foreground="White"/>
+                                <TextBlock Text="{Binding LoginViewModel.LibName}"
+                                           Foreground="White"/>
+                                <TextBlock Text="{Binding LoginViewModel.LibFloor}"
+                                           Foreground="White"/>
+                                <TextBlock Text="{Binding LoginViewModel.LibAvailableSeats}"
+                                           Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- 明日预约页面 -->
+                <Border IsVisible="{Binding IsGrabSeatPage}"
+                       Background="#1E1E1E"
+                       ZIndex="2">
+                    <views:GrabSeatView DataContext="{Binding GrabSeatViewModel}"/>
+                </Border>
+
+                <!-- 即时占座页面 -->
+                <Border IsVisible="{Binding IsOccupySeatPage}"
+                       Background="#1E1E1E"
+                       ZIndex="3">
+                    <views:OccupySeatView DataContext="{Binding OccupySeatViewModel}"/>
+                </Border>
+
+                <!-- 设置页面 -->
+                <Border IsVisible="{Binding IsSettingsPage}"
+                       Background="#1E1E1E"
+                       ZIndex="4">
+                    <StackPanel HorizontalAlignment="Center"
+                               VerticalAlignment="Center">
+                        <TextBlock Text="设置"
+                                   FontSize="24"
+                                   Foreground="White"/>
+                        <TextBlock Text="版本: 1.0.0 Mac版"
+                                   FontSize="14"
+                                   Foreground="#B0B0B0"
+                                   Margin="0,10,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Panel>
+        </Border>
+
+    </Grid>
+
+</Window>

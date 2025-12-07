@@ -1,0 +1,440 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:IGoLibrary.Mac.ViewModels"
+             x:Class="IGoLibrary.Mac.Views.GrabSeatView"
+             x:DataType="vm:GrabSeatViewModel">
+
+    <Grid RowDefinitions="Auto,*" Margin="20">
+
+        <!-- 顶部控制区 -->
+        <StackPanel Grid.Row="0" Spacing="15">
+
+            <!-- 标题 -->
+            <TextBlock Text="明日预约"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       Margin="0,0,0,10"/>
+
+            <!-- 当前预约座位显示区 -->
+            <Border Background="#2D4A3E"
+                    BorderBrush="#4CAF50"
+                    BorderThickness="2"
+                    CornerRadius="8"
+                    Padding="20,15"
+                    Margin="0,0,0,15">
+                <StackPanel Spacing="10">
+                    <!-- 标题行 -->
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="📍"
+                                   FontSize="20"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="当前预约座位"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#4CAF50"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="（系统将在20:00自动预约，支持主选+备选座位）"
+                                   FontSize="12"
+                                   Foreground="#AAAAAA"
+                                   VerticalAlignment="Center"
+                                   Margin="10,0,0,0"/>
+                    </StackPanel>
+
+                    <!-- 座位列表显示 -->
+                    <Border Background="#1E1E1E"
+                            CornerRadius="5"
+                            Padding="15,10"
+                            MinHeight="50">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <!-- 如果有座位，显示座位列表 -->
+                            <ItemsControl ItemsSource="{Binding WaitingGrabSeats}"
+                                          IsVisible="{Binding WaitingGrabSeats.Count}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#4CAF50"
+                                                CornerRadius="5"
+                                                Padding="12,6"
+                                                Margin="0,0,8,8">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <!-- 优先级标签 -->
+                                                <Border Background="{Binding PriorityBadgeColor}"
+                                                        CornerRadius="3"
+                                                        Padding="6,2">
+                                                    <TextBlock Text="{Binding PriorityText}"
+                                                               Foreground="White"
+                                                               FontSize="11"
+                                                               FontWeight="Bold"/>
+                                                </Border>
+
+                                                <!-- 座位信息 -->
+                                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                                    <TextBlock Text="座位"
+                                                               Foreground="White"
+                                                               FontSize="14"
+                                                               FontWeight="Bold"/>
+                                                    <TextBlock Text="{Binding Name}"
+                                                               Foreground="White"
+                                                               FontSize="16"
+                                                               FontWeight="Bold"/>
+                                                    <TextBlock Text="号"
+                                                               Foreground="White"
+                                                               FontSize="14"
+                                                               FontWeight="Bold"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- 如果没有座位，显示提示 -->
+                            <TextBlock Text="⚠️ 未设置预约座位，请先添加座位到预约列表或加载收藏座位"
+                                       Foreground="#FF9800"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       VerticalAlignment="Center"
+                                       IsVisible="{Binding !WaitingGrabSeats.Count}"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 楼层切换区 -->
+            <Border Background="#2D3E50"
+                    BorderBrush="#3498DB"
+                    BorderThickness="2"
+                    CornerRadius="8"
+                    Padding="20,15"
+                    Margin="0,0,0,15">
+                <StackPanel Spacing="12">
+                    <!-- 标题行 -->
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="🏢"
+                                   FontSize="18"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="楼层切换"
+                                   FontSize="16"
+                                   FontWeight="Bold"
+                                   Foreground="#3498DB"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding CurrentLibraryInfo}"
+                                   FontSize="13"
+                                   Foreground="#AAAAAA"
+                                   VerticalAlignment="Center"
+                                   Margin="15,0,0,0"/>
+                    </StackPanel>
+
+                    <!-- 楼层选择和切换 -->
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="加载楼层列表"
+                                Command="{Binding LoadLibrariesCommand}"
+                                Width="130"
+                                Height="35"
+                                Background="#3498DB"
+                                Foreground="White"/>
+
+                        <ComboBox ItemsSource="{Binding LibraryOptions}"
+                                  SelectedIndex="{Binding SelectedLibraryIndex}"
+                                  Width="350"
+                                  Height="35"
+                                  Background="#2D2D30"
+                                  Foreground="White"
+                                  BorderBrush="#3F3F46"
+                                  PlaceholderText="请先加载楼层列表"/>
+
+                        <Button Content="切换楼层"
+                                Command="{Binding SwitchLibraryCommand}"
+                                Width="120"
+                                Height="35"
+                                Background="#27AE60"
+                                Foreground="White"/>
+
+                        <TextBlock Text="💡 提示：切换楼层后会自动刷新座位列表"
+                                   FontSize="12"
+                                   Foreground="#95A5A6"
+                                   VerticalAlignment="Center"
+                                   Margin="10,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- 控制按钮区 -->
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Content="🔍 系统自检"
+                        Command="{Binding SystemSelfCheckCommand}"
+                        Width="130"
+                        Height="35"
+                        Background="#E74C3C"
+                        Foreground="White"
+                        FontWeight="Bold"/>
+
+                <Button Content="刷新座位"
+                        Command="{Binding RefreshSeatsCommand}"
+                        Width="120"
+                        Height="35"/>
+
+                <Button Content="添加到预约列表"
+                        Command="{Binding AddToGrabListCommand}"
+                        Width="150"
+                        Height="35"/>
+
+                <Button Content="清空预约列表"
+                        Command="{Binding ClearGrabListCommand}"
+                        Width="150"
+                        Height="35"/>
+
+                <Button Content="收藏选中座位"
+                        Command="{Binding SaveFavoriteSeatsCommand}"
+                        Width="150"
+                        Height="35"/>
+
+                <Button Content="加载收藏座位"
+                        Command="{Binding LoadFavoriteSeatsCommand}"
+                        Width="150"
+                        Height="35"/>
+
+                <Button Content="🚀 开始监控"
+                        Command="{Binding StartMonitorCommand}"
+                        Width="150"
+                        Height="35"
+                        Background="#1E5631"
+                        Foreground="White"
+                        FontWeight="Bold"/>
+
+                <Button Content="⏹ 停止监控"
+                        Command="{Binding StopMonitorCommand}"
+                        Width="150"
+                        Height="35"
+                        Background="#8B0000"
+                        Foreground="White"
+                        FontWeight="Bold"/>
+            </StackPanel>
+
+            <!-- 系统状态信息 -->
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="预约模式:"
+                           VerticalAlignment="Center"
+                           FontSize="14"
+                           Foreground="White"/>
+                <Border Background="#2D2D30"
+                        BorderBrush="#3F3F46"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="10,5">
+                    <TextBlock Text="🚀 激进模式 (1秒)"
+                               FontSize="14"
+                               Foreground="#4EC9B0"
+                               FontWeight="Bold"/>
+                </Border>
+
+                <!-- 系统自动运行提示 -->
+                <Border Background="#1E5631"
+                        CornerRadius="5"
+                        Padding="15,8"
+                        Margin="20,0,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="🤖"
+                                   FontSize="16"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="14"
+                                   Foreground="White">
+                            <Run Text="自动预约系统" FontWeight="Bold"/>
+                            <Run Text=" | 准备时间: 19:55:00 | 开始时间: 20:00:00"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <!-- 运行状态指示器 -->
+                <Border Background="#1E3A5F"
+                        CornerRadius="5"
+                        Padding="15,8"
+                        Margin="10,0,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Ellipse Width="10" Height="10"
+                                 Fill="LimeGreen"
+                                 VerticalAlignment="Center"
+                                 IsVisible="{Binding IsMonitoring}"/>
+                        <Ellipse Width="10" Height="10"
+                                 Fill="Gray"
+                                 VerticalAlignment="Center"
+                                 IsVisible="{Binding !IsMonitoring}"/>
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="14"
+                                   Foreground="White"
+                                   FontWeight="Bold"
+                                   IsVisible="{Binding IsMonitoring}">
+                            <Run Text="系统状态: "/>
+                            <Run Text="运行中" Foreground="LimeGreen"/>
+                        </TextBlock>
+                        <TextBlock VerticalAlignment="Center"
+                                   FontSize="14"
+                                   Foreground="White"
+                                   FontWeight="Bold"
+                                   IsVisible="{Binding !IsMonitoring}">
+                            <Run Text="系统状态: "/>
+                            <Run Text="等待中" Foreground="Gray"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <Separator Margin="0,10"/>
+        </StackPanel>
+
+        <!-- 主内容区 -->
+        <Grid Grid.Row="1" ColumnDefinitions="2*,*,2*" Margin="0,10,0,0">
+
+            <!-- 左侧：座位列表 -->
+            <Border Grid.Column="0"
+                    BorderBrush="#3F3F46"
+                    BorderThickness="1"
+                    CornerRadius="5"
+                    Padding="10"
+                    Background="#2D2D30"
+                    Margin="0,0,10,0">
+                <DockPanel>
+                    <TextBlock Text="所有座位"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               DockPanel.Dock="Top"
+                               Margin="0,0,0,10"/>
+
+                    <ListBox ItemsSource="{Binding SeatList}"
+                             SelectedItem="{Binding SelectedSeat}"
+                             Background="#252526"
+                             BorderBrush="#3F3F46"
+                             BorderThickness="1">
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0"/>
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="#3F3F46"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="12,10"
+                                        Background="{Binding BackgroundColor}">
+                                    <Grid ColumnDefinitions="Auto,Auto,*">
+                                        <!-- 座位号 -->
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" Width="120">
+                                            <TextBlock Text="座位"
+                                                       Foreground="#AAAAAA"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Name}"
+                                                       Foreground="White"
+                                                       FontSize="16"
+                                                       FontWeight="Bold"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <!-- 状态标签 -->
+                                        <Border Grid.Column="1"
+                                                Padding="12,6"
+                                                CornerRadius="4"
+                                                HorizontalAlignment="Left"
+                                                Margin="10,0,0,0"
+                                                Background="{Binding BadgeColor}">
+                                            <TextBlock Text="{Binding Status}"
+                                                       Foreground="White"
+                                                       FontSize="13"
+                                                       FontWeight="Bold"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- 座位Key -->
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding Key}"
+                                                   Foreground="#999999"
+                                                   FontSize="10"
+                                                   FontFamily="Consolas,Menlo,Monaco,monospace"
+                                                   VerticalAlignment="Center"
+                                                   Margin="15,0,0,0"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- 中间：待预约座位列表 -->
+            <Border Grid.Column="1"
+                    BorderBrush="#3F3F46"
+                    BorderThickness="1"
+                    CornerRadius="5"
+                    Padding="10"
+                    Background="#2D2D30"
+                    Margin="0,0,10,0">
+                <DockPanel>
+                    <TextBlock Text="待预约座位"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               DockPanel.Dock="Top"
+                               Margin="0,0,0,10"/>
+
+                    <ListBox ItemsSource="{Binding WaitingGrabSeats}"
+                             Background="#252526"
+                             BorderBrush="#3F3F46">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <TextBlock Text="{Binding Name}" Foreground="White"/>
+                                    <TextBlock Text="号" Foreground="White"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- 右侧：运行日志 -->
+            <Border Grid.Column="2"
+                    BorderBrush="#3F3F46"
+                    BorderThickness="1"
+                    CornerRadius="5"
+                    Padding="10"
+                    Background="#2D2D30">
+                <DockPanel>
+                    <TextBlock Text="运行日志"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               DockPanel.Dock="Top"
+                               Margin="0,0,0,10"/>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  Background="#252526">
+                        <ItemsControl ItemsSource="{Binding Logs}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}"
+                                               TextWrapping="Wrap"
+                                               FontFamily="Consolas,Menlo,Monaco,monospace"
+                                               FontSize="12"
+                                               Foreground="#D4D4D4"
+                                               Margin="0,2"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+        </Grid>
+
+    </Grid>
+
+</UserControl>

@@ -1,0 +1,219 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:IGoLibrary.Mac.ViewModels"
+             x:Class="IGoLibrary.Mac.Views.LoginView"
+             x:DataType="vm:LoginViewModel"
+             Background="#1E1E1E">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- 标题 -->
+            <TextBlock Grid.Row="0"
+                       Text="数据源配置"
+                       FontSize="24"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       Margin="0,0,0,20"/>
+
+            <!-- 主内容区 -->
+            <TabControl Grid.Row="1" Background="#2D2D30">
+
+                <!-- Tab 1: Cookie验证 -->
+                <TabItem Header="Cookie验证">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="20" Spacing="15">
+
+                            <!-- Cookie输入区 -->
+                            <TextBlock Text="Cookie:"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="White"/>
+                            <TextBox Text="{Binding Cookie}"
+                                     Watermark="请输入从浏览器获取的 Cookie"
+                                     Height="100"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     Background="#252526"
+                                     Foreground="White"
+                                     BorderBrush="#3F3F46"/>
+
+                            <!-- 语法配置区 -->
+                            <TextBlock Text="查询图书馆信息语法:"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="White"
+                                       Margin="0,10,0,0"/>
+                            <TextBox Text="{Binding QueryLibInfoSyntax}"
+                                     Height="60"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     Background="#252526"
+                                     Foreground="White"
+                                     BorderBrush="#3F3F46"/>
+
+                            <TextBlock Text="预约座位语法:"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="White"/>
+                            <TextBox Text="{Binding ReserveSeatSyntax}"
+                                     Height="60"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     Background="#252526"
+                                     Foreground="White"
+                                     BorderBrush="#3F3F46"/>
+
+                            <TextBlock Text="查询所有图书馆语法:"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="White"/>
+                            <TextBox Text="{Binding QueryAllLibsSummarySyntax}"
+                                     Height="60"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     Background="#252526"
+                                     Foreground="White"
+                                     BorderBrush="#3F3F46"/>
+
+                            <TextBlock Text="查询预约信息语法:"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="White"/>
+                            <TextBox Text="{Binding QueryReserveInfoSyntax}"
+                                     Height="60"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     Background="#252526"
+                                     Foreground="White"
+                                     BorderBrush="#3F3F46"/>
+
+                            <TextBlock Text="取消预约语法:"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="White"/>
+                            <TextBox Text="{Binding CancelReserveSyntax}"
+                                     Height="60"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     Background="#252526"
+                                     Foreground="White"
+                                     BorderBrush="#3F3F46"/>
+
+                            <!-- 按钮区 -->
+                            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
+                                <Button Content="验证并绑定图书馆"
+                                        Command="{Binding BindLibraryCommand}"
+                                        Width="150"
+                                        Height="35"/>
+                                <Button Content="保存Cookie"
+                                        Command="{Binding SaveCookieCommand}"
+                                        Width="120"
+                                        Height="35"/>
+                                <Button Content="读取Cookie"
+                                        Command="{Binding LoadCookieCommand}"
+                                        Width="120"
+                                        Height="35"/>
+                            </StackPanel>
+
+                            <!-- 图书馆信息显示区 -->
+                            <Border BorderBrush="#3F3F46"
+                                    BorderThickness="1"
+                                    CornerRadius="5"
+                                    Padding="15"
+                                    Background="#2D2D30"
+                                    Margin="0,20,0,0">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="图书馆信息"
+                                               FontSize="16"
+                                               FontWeight="Bold"
+                                               Foreground="White"/>
+                                    <TextBlock Text="{Binding LibStatus}"
+                                               Foreground="White"/>
+                                    <TextBlock Text="{Binding LibName}"
+                                               Foreground="White"/>
+                                    <TextBlock Text="{Binding LibFloor}"
+                                               Foreground="White"/>
+                                    <TextBlock Text="{Binding LibAvailableSeats}"
+                                               Foreground="White"/>
+                                    <TextBlock Text="{Binding LibID, StringFormat='图书馆ID: {0}'}"
+                                               Foreground="White"/>
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Tab 2: 扫码获取Cookie -->
+                <TabItem Header="扫码获取Cookie">
+                    <StackPanel Margin="20" Spacing="15" HorizontalAlignment="Center" VerticalAlignment="Center">
+
+                        <!-- 二维码区域 -->
+                        <Border BorderBrush="#3F3F46"
+                                BorderThickness="2"
+                                CornerRadius="10"
+                                Padding="20"
+                                Background="#2D2D30"
+                                HorizontalAlignment="Center">
+                            <StackPanel Spacing="15">
+                                <TextBlock Text="扫描二维码获取 Cookie"
+                                           FontSize="16"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"/>
+
+                                <!-- 二维码图片 -->
+                                <Image Source="avares://IGoLibrary.Mac/Assets/qrcode.png"
+                                       Width="200"
+                                       Height="200"
+                                       Stretch="Uniform"/>
+
+                                <TextBlock Text="使用微信扫描上方二维码"
+                                           FontSize="12"
+                                           Foreground="#B0B0B0"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- URL输入区 -->
+                        <StackPanel Spacing="10" Width="500">
+                            <TextBlock Text="扫码后跳转的URL（含code）:"
+                                       FontSize="14"
+                                       Foreground="White"/>
+                            <TextBox Text="{Binding CodeSourceURL}"
+                                     Watermark="请粘贴扫码后跳转的完整URL"
+                                     Height="80"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     Background="#252526"
+                                     Foreground="White"
+                                     BorderBrush="#3F3F46"/>
+                            <Button Content="从URL获取Cookie"
+                                    Command="{Binding GetCookieFromUrlCommand}"
+                                    Width="150"
+                                    Height="35"
+                                    HorizontalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- 说明文字 -->
+                        <TextBlock Text="提示：扫码后会自动跳转，请从浏览器地址栏复制完整URL并粘贴到上方输入框"
+                                   FontSize="12"
+                                   Foreground="#B0B0B0"
+                                   TextWrapping="Wrap"
+                                   HorizontalAlignment="Center"
+                                   MaxWidth="500"
+                                   Margin="0,10,0,0"/>
+
+                    </StackPanel>
+                </TabItem>
+
+            </TabControl>
+
+        </Grid>
+    </ScrollViewer>
+
+</UserControl>
