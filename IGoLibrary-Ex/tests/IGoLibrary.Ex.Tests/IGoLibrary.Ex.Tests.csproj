@@ -5,6 +5,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\IGoLibrary.Ex.Application\IGoLibrary.Ex.Application.csproj" />
+    <ProjectReference Include="..\..\src\IGoLibrary.Ex.Desktop\IGoLibrary.Ex.Desktop.csproj" />
     <ProjectReference Include="..\..\src\IGoLibrary.Ex.Domain\IGoLibrary.Ex.Domain.csproj" />
     <ProjectReference Include="..\..\src\IGoLibrary.Ex.Infrastructure\IGoLibrary.Ex.Infrastructure.csproj" />
   </ItemGroup>

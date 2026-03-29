@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Input.Platform;
 using Avalonia.Threading;
+using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Domain.Helpers;
@@ -13,17 +14,17 @@ namespace IGoLibrary.Ex.Desktop;
 public partial class MainWindow : Window
 {
     private readonly AppWindowService _appWindowService;
-    private readonly AvaloniaNotificationService _notificationService;
+    private readonly INotificationService _notificationService;
     private MainWindowViewModel? _observedViewModel;
     private string? _lastSuccessfullyParsedClipboardText;
     private bool _isAutoParsingClipboard;
 
     public MainWindow()
-        : this(new AppWindowService(), new AvaloniaNotificationService())
+        : this(new AppWindowService(), new NoOpNotificationService())
     {
     }
 
-    public MainWindow(AppWindowService appWindowService, AvaloniaNotificationService notificationService)
+    public MainWindow(AppWindowService appWindowService, INotificationService notificationService)
     {
         _appWindowService = appWindowService;
         _notificationService = notificationService;
@@ -37,20 +38,22 @@ public partial class MainWindow : Window
     private void OnOpened(object? sender, EventArgs e)
     {
         _appWindowService.Attach(this);
-        _notificationService.Attach(this);
     }
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (_appWindowService.AllowClose)
-        {
-            return;
-        }
-
-        if (DataContext is MainWindowViewModel viewModel && viewModel.ShouldHideToTrayOnClose)
+        if (!_appWindowService.AllowClose &&
+            DataContext is MainWindowViewModel viewModel &&
+            viewModel.ShouldHideToTrayOnClose)
         {
             e.Cancel = true;
             Hide();
+            return;
+        }
+
+        if (_notificationService is ToastNotificationService toastNotificationService)
+        {
+            toastNotificationService.DismissAllImmediately();
         }
     }
 

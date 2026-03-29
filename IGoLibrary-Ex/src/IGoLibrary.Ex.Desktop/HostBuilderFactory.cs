@@ -30,8 +30,7 @@ internal static class HostBuilderFactory
                 services.AddApplication();
                 services.AddInfrastructure();
                 services.AddSingleton<AppWindowService>();
-                services.AddSingleton<AvaloniaNotificationService>();
-                services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<AvaloniaNotificationService>());
+                services.AddSingleton<INotificationService, ToastNotificationService>();
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<MainWindowViewModel>();
             });

@@ -110,7 +110,7 @@
 
   <Window.DataTemplates>
     <DataTemplate x:DataType="vm:SeatItemViewModel">
-      <Grid Width="52" Height="52" Margin="3">
+      <Grid Width="52" Height="52" Margin="3" ClipToBounds="False">
         <ToolTip.Tip>
           <StackPanel Spacing="4">
             <TextBlock Text="{Binding SeatName, StringFormat=座位 {0}}" FontWeight="Bold" />
@@ -143,6 +143,18 @@
                    FontSize="15"
                    FontWeight="Bold"
                    Foreground="{Binding IsUnavailable, Converter={x:Static BoolConverters.Not}, FallbackValue={StaticResource SemiColorText0}}" />
+
+        <Path Width="18"
+              Height="18"
+              Margin="0,-4,-4,0"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Top"
+              Fill="#FBBF24"
+              Stroke="#B7791F"
+              StrokeThickness="1"
+              Stretch="Fill"
+              IsVisible="{Binding IsFavorite}"
+              Data="M12 2.2L14.9 8.07L21.38 9.01L16.69 13.58L17.8 20.03L12 16.98L6.2 20.03L7.31 13.58L2.62 9.01L9.1 8.07Z" />
 
         <ToggleButton IsChecked="{Binding IsSelected}"
                       Background="Transparent"
@@ -590,10 +602,6 @@
                               Command="{Binding RefreshSeatsCommand}"
                               Classes="Secondary"
                               Margin="0,0,8,8" />
-                      <Button Content="读取收藏"
-                              Command="{Binding LoadFavoritesCommand}"
-                              Classes="Secondary"
-                              Margin="0,0,8,8" />
                       <Button Content="存至收藏"
                               Command="{Binding SaveFavoritesCommand}"
                               Classes="Secondary"
@@ -956,7 +964,23 @@
                       </StackPanel>
                     </Grid>
                     
-                    <Button Content="💾 写入本地持久化存储" Command="{Binding SaveSettingsCommand}" Background="{DynamicResource SystemAccentColor}" Foreground="White" FontWeight="Bold" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,16,0,0"/>
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,16,0,0">
+                      <Button Content="💾 写入本地持久化存储"
+                              Command="{Binding SaveSettingsCommand}"
+                              Background="{DynamicResource SystemAccentColor}"
+                              Foreground="White"
+                              FontWeight="Bold"
+                              CornerRadius="8"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Center" />
+                      <Button Grid.Column="1"
+                              Content="测试通知"
+                              Command="{Binding TestToastCommand}"
+                              Classes="Secondary"
+                              CornerRadius="8"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Center" />
+                    </Grid>
                   </StackPanel>
                 </Border>
               </StackPanel>

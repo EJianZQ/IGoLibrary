@@ -9,6 +9,8 @@ public sealed class AppWindowService
 
     public bool AllowClose { get; private set; }
 
+    public Window? MainWindow => _mainWindow;
+
     public void Attach(Window window)
     {
         _mainWindow = window;

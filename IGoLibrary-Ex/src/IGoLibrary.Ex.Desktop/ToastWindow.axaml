@@ -1,0 +1,87 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:desktop="using:IGoLibrary.Ex.Desktop"
+        x:Class="IGoLibrary.Ex.Desktop.ToastWindow"
+        x:DataType="desktop:ToastWindow"
+        Width="360"
+        MinWidth="360"
+        MaxWidth="360"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        SystemDecorations="None"
+        WindowStartupLocation="Manual"
+        TransparencyLevelHint="Transparent, Blur, AcrylicBlur, None"
+        Background="Transparent"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1">
+  <Border Margin="10"
+          Padding="18"
+          CornerRadius="18"
+          Background="{Binding SurfaceBrush}"
+          BorderBrush="{Binding ToastBorderBrush}"
+          BorderThickness="1"
+          BoxShadow="0 12 32 0 #220F172A">
+    <Grid ColumnDefinitions="Auto,*,Auto"
+          RowDefinitions="Auto,Auto"
+          ColumnSpacing="12"
+          RowSpacing="10">
+      <Border Width="34"
+              Height="34"
+              CornerRadius="17"
+              Background="{Binding AccentSoftBrush}"
+              VerticalAlignment="Top">
+        <TextBlock Text="{Binding BadgeText}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   FontSize="15"
+                   FontWeight="Bold"
+                   Foreground="{Binding AccentBrush}" />
+      </Border>
+
+      <StackPanel Grid.Column="1"
+                  Spacing="6">
+        <TextBlock Text="{Binding TitleText}"
+                   FontSize="15"
+                   FontWeight="Bold"
+                   Foreground="{Binding TitleBrush}"
+                   TextWrapping="Wrap" />
+        <TextBlock Text="{Binding MessageText}"
+                   FontSize="13"
+                   Foreground="{Binding MessageBrush}"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+
+      <Button Grid.Column="2"
+              Width="24"
+              Height="24"
+              Padding="0"
+              Background="Transparent"
+              BorderThickness="0"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Top"
+              Click="OnCloseButtonClick">
+        <TextBlock Text="×"
+                   FontSize="16"
+                   Foreground="{Binding CloseBrush}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center" />
+      </Button>
+
+      <Border Grid.Row="1"
+              Grid.Column="1"
+              HorizontalAlignment="Left"
+              Padding="8,3"
+              CornerRadius="999"
+              Background="{Binding AccentSoftBrush}">
+        <TextBlock Text="{Binding KindText}"
+                   FontSize="11"
+                   FontWeight="SemiBold"
+                   Foreground="{Binding AccentBrush}" />
+      </Border>
+    </Grid>
+  </Border>
+</Window>

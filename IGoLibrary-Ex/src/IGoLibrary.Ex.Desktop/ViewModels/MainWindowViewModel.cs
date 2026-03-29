@@ -565,6 +565,7 @@ public partial class MainWindowViewModel(
             UpdateBoundLibraryPresentation(layout);
             await LoadVenueRulePresentationAsync(SelectedLibrary.LibraryId, persistLockedSnapshot: true);
             PopulateSeats(layout);
+            await LoadFavoritesAsync();
             await RefreshReservationAsync(showNotificationOnError: false);
         }
         catch (Exception ex)
@@ -582,6 +583,7 @@ public partial class MainWindowViewModel(
             var layout = await libraryService.RefreshBoundLibraryAsync();
             UpdateBoundLibraryPresentation(layout);
             PopulateSeats(layout);
+            await LoadFavoritesAsync();
         }
         catch (Exception ex)
         {
@@ -640,6 +642,7 @@ public partial class MainWindowViewModel(
                 .Select(x => new TrackedSeat(x.SeatKey, x.SeatName))
                 .ToList();
             await libraryService.SaveFavoritesAsync(SelectedLibrary.LibraryId, selected);
+            ApplyFavoriteStates(selected.Select(x => x.SeatKey), syncSelection: false);
         }
         catch (Exception ex)
         {
@@ -659,11 +662,8 @@ public partial class MainWindowViewModel(
         try
         {
             var favorites = await libraryService.GetFavoritesAsync(SelectedLibrary.LibraryId);
-            var keys = favorites.Select(x => x.SeatKey).ToHashSet(StringComparer.Ordinal);
-            foreach (var seat in _allSeats)
-            {
-                seat.IsSelected = keys.Contains(seat.SeatKey);
-            }
+            ApplyFavoriteStates(favorites.Select(x => x.SeatKey), syncSelection: true);
+            await notificationService.ShowInfoAsync("收藏已加载", $"已加载 {favorites.Count} 个收藏座位。");
         }
         catch (Exception ex)
         {
@@ -810,6 +810,18 @@ public partial class MainWindowViewModel(
             SelectedLibrary?.Name);
         await settingsService.SaveAsync(settings);
         await notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库。");
+    }
+
+    [RelayCommand]
+    private async Task TestToastAsync()
+    {
+        if (notificationService is ToastNotificationService toastNotificationService)
+        {
+            await toastNotificationService.ShowPreviewAsync("测试通知", "这是一条用于测试界面动效与停留时间的 Toast 通知。");
+            return;
+        }
+
+        await notificationService.ShowInfoAsync("测试通知", "这是一条用于测试界面动效与停留时间的 Toast 通知。");
     }
 
     [RelayCommand]
@@ -1053,6 +1065,27 @@ public partial class MainWindowViewModel(
         OnPropertyChanged(nameof(HasNoSelectedSeats));
         OnPropertyChanged(nameof(SelectedSeatSummaryText));
         OnPropertyChanged(nameof(SelectedSeatHintText));
+    }
+
+    private void ApplyFavoriteStates(IEnumerable<string> favoriteSeatKeys, bool syncSelection)
+    {
+        var favoriteKeys = favoriteSeatKeys.ToHashSet(StringComparer.Ordinal);
+
+        foreach (var seat in _allSeats)
+        {
+            var isFavorite = favoriteKeys.Contains(seat.SeatKey);
+            seat.IsFavorite = isFavorite;
+
+            if (syncSelection)
+            {
+                seat.IsSelected = isFavorite;
+            }
+        }
+
+        if (syncSelection)
+        {
+            UpdateSelectedSeatSummary();
+        }
     }
 
     private TimeOnly? ParseScheduledTime()
