@@ -1,0 +1,28 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:semi="https://irihi.tech/semi"
+             x:Class="IGoLibrary.Ex.Desktop.App"
+             x:CompileBindings="False"
+             RequestedThemeVariant="Default">
+  <Application.Styles>
+    <FluentTheme />
+    <semi:SemiTheme Locale="zh-CN" />
+  </Application.Styles>
+
+  <TrayIcon.Icons>
+    <TrayIcons>
+      <TrayIcon Icon="/Assets/avalonia-logo.ico"
+                ToolTipText="IGoLibrary-Ex"
+                Command="{Binding ShowWindowCommand}">
+        <TrayIcon.Menu>
+          <NativeMenu>
+            <NativeMenuItem Header="显示主窗口" Command="{Binding ShowWindowCommand}" />
+            <NativeMenuItem Header="切换到首页" Command="{Binding OpenHomeCommand}" />
+            <NativeMenuItemSeparator />
+            <NativeMenuItem Header="退出应用" Command="{Binding QuitApplicationCommand}" />
+          </NativeMenu>
+        </TrayIcon.Menu>
+      </TrayIcon>
+    </TrayIcons>
+  </TrayIcon.Icons>
+</Application>

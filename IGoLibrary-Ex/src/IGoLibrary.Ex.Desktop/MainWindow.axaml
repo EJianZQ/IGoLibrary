@@ -1,0 +1,1088 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:IGoLibrary.Ex.Desktop.ViewModels"
+        mc:Ignorable="d"
+        x:Class="IGoLibrary.Ex.Desktop.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="IGoLibrary-Ex"
+        Width="1188"
+        Height="774"
+        MinWidth="1000"
+        MinHeight="680"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="40"
+        TransparencyLevelHint="Mica, AcrylicBlur, None"
+        Background="Transparent"
+        Icon="/Assets/avalonia-logo.ico">
+
+  <Window.Resources>
+    <PathGeometry x:Key="IconHome">M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z</PathGeometry>
+    <PathGeometry x:Key="IconLogin">M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z</PathGeometry>
+    <PathGeometry x:Key="IconGrab">M7 2v11h3v9l7-12h-4l4-8z</PathGeometry>
+    <PathGeometry x:Key="IconOccupy">M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z</PathGeometry>
+    <PathGeometry x:Key="IconSettings">M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z</PathGeometry>
+    <SolidColorBrush x:Key="SemiPageBrush" Color="#F4F6FA" />
+    <SolidColorBrush x:Key="SemiCardBackgroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SemiCardBorderBrush" Color="#E7EAEE" />
+    <SolidColorBrush x:Key="SemiColorText0" Color="#1D2129" />
+    <SolidColorBrush x:Key="SemiColorText2" Color="#86909C" />
+    <SolidColorBrush x:Key="SemiColorFill0" Color="#F7F8FA" />
+    <SolidColorBrush x:Key="SemiTextPrimaryBrush" Color="#1D2129" />
+    <SolidColorBrush x:Key="SemiTextSecondaryBrush" Color="#4E5969" />
+    <SolidColorBrush x:Key="SemiTextTertiaryBrush" Color="#86909C" />
+    <SolidColorBrush x:Key="SemiAccentBrush" Color="#0077FA" />
+    <SolidColorBrush x:Key="SemiAccentSoftBrush" Color="#E8F3FF" />
+    <SolidColorBrush x:Key="SemiAccentGlowBrush" Color="#F5F9FF" />
+    <SolidColorBrush x:Key="SemiSuccessSoftBrush" Color="#E8FFEA" />
+    <SolidColorBrush x:Key="SemiSuccessTextBrush" Color="#14804A" />
+    <SolidColorBrush x:Key="SemiWarningSoftBrush" Color="#FFF7E8" />
+    <SolidColorBrush x:Key="SemiWarningTextBrush" Color="#9A5D00" />
+    <SolidColorBrush x:Key="SemiLogSurfaceBrush" Color="#0F172A" />
+    <LinearGradientBrush x:Key="SemiHeroBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#FFFFFF" Offset="0" />
+      <GradientStop Color="#F4F9FF" Offset="0.55" />
+      <GradientStop Color="#EAF3FF" Offset="1" />
+    </LinearGradientBrush>
+  </Window.Resources>
+
+  <Window.Styles>
+    <Style Selector="TextBlock.page-title">
+      <Setter Property="FontSize" Value="32" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Margin" Value="0,0,0,24" />
+    </Style>
+    <Style Selector="TextBlock.section-title">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Opacity" Value="0.8" />
+      <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="24" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+    </Style>
+    <Style Selector="ListBox.sidebar ListBoxItem">
+      <Setter Property="Padding" Value="16,12" />
+      <Setter Property="Margin" Value="16,4" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="Border.semi-card">
+      <Setter Property="Background" Value="{StaticResource SemiCardBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource SemiCardBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="20" />
+      <Setter Property="Padding" Value="24" />
+    </Style>
+    <Style Selector="TextBlock.semi-section-caption">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextTertiaryBrush}" />
+      <Setter Property="Margin" Value="0,0,0,10" />
+    </Style>
+    <Style Selector="TextBlock.hero-title">
+      <Setter Property="FontSize" Value="24" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.hero-meta">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiAccentBrush}" />
+    </Style>
+    <Style Selector="TextBlock.helper-text">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextSecondaryBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.field-label">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextSecondaryBrush}" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+  </Window.Styles>
+
+  <Window.DataTemplates>
+    <DataTemplate x:DataType="vm:SeatItemViewModel">
+      <Grid Width="52" Height="52" Margin="3">
+        <ToolTip.Tip>
+          <StackPanel Spacing="4">
+            <TextBlock Text="{Binding SeatName, StringFormat=座位 {0}}" FontWeight="Bold" />
+            <TextBlock Text="{Binding SeatKey}" Classes="helper-text" />
+            <TextBlock Text="{Binding StatusText, StringFormat=状态：{0}}" Classes="helper-text" />
+          </StackPanel>
+        </ToolTip.Tip>
+
+        <Border CornerRadius="12"
+                Background="{StaticResource SemiColorFill0}"
+                BorderThickness="1.5"
+                BorderBrush="{StaticResource SemiSuccessTextBrush}"
+                IsVisible="{Binding IsAvailable}" />
+
+        <Border CornerRadius="12"
+                Background="{StaticResource SemiColorFill2}"
+                BorderThickness="1"
+                BorderBrush="{StaticResource SemiCardBorderBrush}"
+                IsVisible="{Binding IsUnavailable}" />
+
+        <Border CornerRadius="12"
+                Background="{StaticResource SemiAccentSoftBrush}"
+                BorderThickness="2"
+                BorderBrush="{StaticResource SemiAccentBrush}"
+                IsVisible="{Binding IsSelected}" />
+
+        <TextBlock Text="{Binding SeatName}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   FontSize="15"
+                   FontWeight="Bold"
+                   Foreground="{Binding IsUnavailable, Converter={x:Static BoolConverters.Not}, FallbackValue={StaticResource SemiColorText0}}" />
+
+        <ToggleButton IsChecked="{Binding IsSelected}"
+                      Background="Transparent"
+                      BorderThickness="0"
+                      Opacity="0.01"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch" />
+      </Grid>
+    </DataTemplate>
+    <DataTemplate x:DataType="vm:LogLineViewModel">
+      <TextBlock Margin="0,0,0,8"
+                 FontFamily="Consolas, Cascadia Mono, Monaco, monospace"
+                 FontSize="12.5"
+                 LineHeight="20"
+                 TextWrapping="Wrap">
+        <Run Text="{Binding TimestampText}" Foreground="{DynamicResource SemiColorText2}" />
+        <Run Text=" " />
+        <Run Text="{Binding Message}" Foreground="{Binding MessageBrush}" />
+      </TextBlock>
+    </DataTemplate>
+  </Window.DataTemplates>
+
+  <Grid ColumnDefinitions="232,*">
+    
+    <!-- Sidebar -->
+    <Border Grid.Column="0" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+      <Grid RowDefinitions="40, *, Auto">
+        <!-- Window Title / Drag Area -->
+        <TextBlock Grid.Row="0" Text="IGoLibrary-Ex 端" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Margin="24,0,0,0" Opacity="0.7" IsHitTestVisible="False"/>
+        
+        <!-- Navigation Menu -->
+        <ListBox Grid.Row="1" Classes="sidebar" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,16,0,0" Background="Transparent" BorderThickness="0">
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal" Spacing="16">
+              <PathIcon Data="{StaticResource IconHome}" Width="18" Height="18" Opacity="0.8"/>
+              <TextBlock Text="首页" FontSize="15" VerticalAlignment="Center"/>
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal" Spacing="16">
+              <PathIcon Data="{StaticResource IconLogin}" Width="18" Height="18" Opacity="0.8"/>
+              <TextBlock Text="账户与场馆" FontSize="15" VerticalAlignment="Center"/>
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal" Spacing="16">
+              <PathIcon Data="{StaticResource IconGrab}" Width="18" Height="18" Opacity="0.8"/>
+              <TextBlock Text="抢座" FontSize="15" VerticalAlignment="Center"/>
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal" Spacing="16">
+              <PathIcon Data="{StaticResource IconOccupy}" Width="18" Height="18" Opacity="0.8"/>
+              <TextBlock Text="占座" FontSize="15" VerticalAlignment="Center"/>
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal" Spacing="16">
+              <PathIcon Data="{StaticResource IconSettings}" Width="18" Height="18" Opacity="0.8"/>
+              <TextBlock Text="系统设置" FontSize="15" VerticalAlignment="Center"/>
+            </StackPanel>
+          </ListBoxItem>
+        </ListBox>
+        
+        <!-- Bottom Info -->
+        <StackPanel Grid.Row="2" Margin="24,24,24,32" Spacing="8">
+          <TextBlock Text="当前状态" FontSize="12" Opacity="0.5" FontWeight="Bold"/>
+          <TextBlock Text="{Binding SessionSummary}" FontSize="13" TextWrapping="Wrap" Opacity="0.8"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Content Area -->
+    <Grid Grid.Column="1" RowDefinitions="40, *">
+      <!-- Top drag area for content pane -->
+      <Border Grid.Row="0" Background="Transparent" IsHitTestVisible="False" />
+      
+      <!-- Views -->
+      <Carousel Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex}" Margin="24,8,24,24">
+        <Carousel.PageTransition>
+          <CrossFade Duration="0:0:0.25" />
+        </Carousel.PageTransition>
+        
+        <!-- Tab 0: Home -->
+        <ScrollViewer>
+          <StackPanel Spacing="24" Margin="0,0,16,0">
+            <TextBlock Classes="page-title" Text="首页" />
+            
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
+              <Border Classes="card">
+                <StackPanel Spacing="12">
+                  <TextBlock Text="抢座引擎状态" Classes="section-title" Margin="0"/>
+                  <TextBlock Text="{Binding GrabStatusText}" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource SystemAccentColor}"/>
+                </StackPanel>
+              </Border>
+              <Border Classes="card" Grid.Column="1">
+                <StackPanel Spacing="12">
+                  <TextBlock Text="占座守护状态" Classes="section-title" Margin="0"/>
+                  <TextBlock Text="{Binding OccupyStatusText}" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource SystemAccentColor}"/>
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <Border Classes="card">
+                <StackPanel Spacing="12">
+                  <TextBlock Classes="section-title" Text="综合运行日志" />
+                <TextBox Text="{Binding AllLogsText}" MinHeight="320" AcceptsReturn="True" IsReadOnly="True" TextWrapping="Wrap" CornerRadius="8" FontFamily="Consolas, monospace" FontSize="13" />
+                </StackPanel>
+              </Border>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Tab 1: Login -->
+        <ScrollViewer>
+          <Grid RowDefinitions="Auto,*"
+                RowSpacing="16"
+                Margin="0,0,16,0"
+                Background="Transparent">
+            <TextBlock Classes="page-title" Text="账户与场馆" />
+            <Grid Grid.Row="1" ColumnDefinitions="2*,3*" ColumnSpacing="16" Background="Transparent">
+              <Border Classes="semi-card Shadow" Grid.Column="0" VerticalAlignment="Top">
+                <StackPanel Spacing="16">
+                  <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <TextBlock Text="授权"
+                              FontSize="22"
+                              FontWeight="Bold"
+                              VerticalAlignment="Center" />
+                    <Border Grid.Column="1"
+                            Theme="{DynamicResource TagLabel}"
+                            Classes="Green"
+                            IsVisible="{Binding IsAuthorized}">
+                      <TextBlock Text="已授权" />
+                    </Border>
+                    <Border Grid.Column="2"
+                            Theme="{DynamicResource TagLabel}"
+                            Classes="Grey"
+                            IsVisible="{Binding IsUnauthorized}">
+                      <TextBlock Text="未授权" />
+                    </Border>
+                  </Grid>
+
+                  <TextBlock Text="{Binding SessionSummary}" Classes="helper-text" />
+
+                  <StackPanel Spacing="16" IsVisible="{Binding IsUnauthorized}">
+                    <Border Background="{StaticResource SemiColorFill0}"
+                            BorderBrush="{StaticResource SemiCardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="20">
+                      <StackPanel Spacing="12" HorizontalAlignment="Center">
+                        <Image Source="/Assets/qrcode.png"
+                              MaxWidth="208"
+                              MaxHeight="208"
+                              Stretch="Uniform"
+                              HorizontalAlignment="Center" />
+                        <TextBlock Text="微信扫一扫获取授权链接"
+                                  Classes="helper-text"
+                                  HorizontalAlignment="Center"
+                                  TextAlignment="Center" />
+                      </StackPanel>
+                    </Border>
+
+                    <StackPanel Spacing="8">
+                      <TextBlock Classes="field-label" Text="授权链接" />
+                      <TextBox Watermark="在此粘贴包含 code 的链接..." Text="{Binding QrLinkText}" CornerRadius="10" />
+                      <CheckBox Content="记住会话"
+                                IsChecked="{Binding RememberSession}"
+                                HorizontalAlignment="Right" />
+                    </StackPanel>
+
+                    <Button Content="从链接解析"
+                            Command="{Binding GetCookieFromLinkCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Background="{DynamicResource SystemAccentColor}"
+                            Foreground="White"
+                            FontWeight="Bold" />
+                  </StackPanel>
+
+                  <StackPanel Spacing="12"
+                              IsVisible="{Binding IsAuthorized}"
+                              HorizontalAlignment="Center">
+                    <TextBlock Text="✓"
+                              FontSize="56"
+                              FontWeight="Bold"
+                              Foreground="#00B42A"
+                              HorizontalAlignment="Center" />
+                    <TextBlock Text="当前已成功授权"
+                              FontSize="24"
+                              FontWeight="Bold"
+                              HorizontalAlignment="Center" />
+                    <TextBlock Text="如需切换账号，可先注销再重新扫码授权"
+                              Classes="helper-text"
+                              TextAlignment="Center"
+                              MaxWidth="260" />
+                    <Button Content="注销授权 / 重新授权"
+                            Command="{Binding SignOutCommand}"
+                            Classes="Danger"
+                            MinWidth="160"
+                            HorizontalAlignment="Center"
+                            HorizontalContentAlignment="Center" />
+                  </StackPanel>
+
+                  <Expander IsExpanded="False">
+                    <Expander.Header>
+                      <TextBlock Text="高级：手动填写 Cookie" FontWeight="SemiBold" />
+                    </Expander.Header>
+                    <StackPanel Margin="0,16,0,0" Spacing="16">
+                      <TextBox Watermark="如有需要可自行抓包并在此手动粘贴完整 Cookie..."
+                              Text="{Binding ManualCookieText}"
+                              Margin="0,8,0,0"
+                              AcceptsReturn="True"
+                              MinHeight="96"
+                              TextWrapping="Wrap"
+                              CornerRadius="10" />
+                      <Button Content="验证有效性"
+                              Command="{Binding ValidateManualCookieCommand}"
+                              Classes="Secondary"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Center" />
+                    </StackPanel>
+                  </Expander>
+                </StackPanel>
+              </Border>
+
+              <Border Grid.Column="1"
+                      Classes="semi-card Shadow"
+                      IsEnabled="{Binding IsAuthorized}"
+                      VerticalAlignment="Stretch">
+                <Grid>
+                  <StackPanel Spacing="16">
+                    <TextBlock Text="场馆配置"
+                              FontSize="22"
+                              FontWeight="Bold" />
+                    <TextBlock Text="通过看板切换候选场馆，再用下方操作正式锁定"
+                              Classes="helper-text" />
+
+                    <Border Padding="24,16,24,24"
+                            CornerRadius="16"
+                            Background="{StaticResource SemiAccentGlowBrush}"
+                            BorderBrush="{StaticResource SemiCardBorderBrush}"
+                            BorderThickness="1">
+                    <Grid ColumnDefinitions="*,Auto"
+                            RowDefinitions="Auto,Auto"
+                            ColumnSpacing="32"
+                            RowSpacing="18">
+                      <StackPanel Margin="16,8,16,16"
+                                  VerticalAlignment="Center"
+                                  Spacing="8">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Padding="10,4"
+                                    CornerRadius="999"
+                                    Background="{StaticResource SemiSuccessSoftBrush}"
+                                    IsVisible="{Binding ShowVenueOpenStatusTag}">
+                              <TextBlock Text="{Binding VenueStatusText}"
+                                         FontSize="12"
+                                         FontWeight="SemiBold"
+                                         Foreground="{StaticResource SemiSuccessTextBrush}" />
+                            </Border>
+                            <Border Padding="10,4"
+                                    CornerRadius="999"
+                                    Background="{StaticResource SemiColorFill0}"
+                                    IsVisible="{Binding ShowVenueClosedStatusTag}">
+                              <TextBlock Text="{Binding VenueStatusText}"
+                                         FontSize="12"
+                                         FontWeight="SemiBold"
+                                         Foreground="{StaticResource SemiColorText2}" />
+                            </Border>
+                            <Border Padding="10,4"
+                                    CornerRadius="999"
+                                    Background="{StaticResource SemiSuccessSoftBrush}"
+                                    IsVisible="{Binding IsCurrentLocked}">
+                              <TextBlock Text="{Binding CurrentVenueLockStateText}"
+                                         FontSize="12"
+                                         FontWeight="SemiBold"
+                                         Foreground="{StaticResource SemiSuccessTextBrush}" />
+                            </Border>
+                            <Border Padding="10,4"
+                                    CornerRadius="999"
+                                    IsVisible="{Binding ShowVenuePreviewStateTag}"
+                                    Background="{StaticResource SemiWarningSoftBrush}"
+                                    BorderBrush="#FFDFA85B"
+                                    BorderThickness="1">
+                              <TextBlock Text="{Binding CurrentVenueLockStateText}"
+                                         FontSize="12"
+                                         FontWeight="SemiBold"
+                                         Foreground="{StaticResource SemiWarningTextBrush}" />
+                            </Border>
+                          </StackPanel>
+                          <TextBlock Text="{Binding VenueName}"
+                                     FontSize="24"
+                                     FontWeight="Bold"
+                                     Margin="0,4,0,0"
+                                     TextWrapping="NoWrap"
+                                     TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding VenueFloor, StringFormat=楼层 · {0}}"
+                                     FontSize="14"
+                                     Foreground="{StaticResource SemiColorText2}"
+                                     Margin="0,8,0,0"
+                                     TextWrapping="NoWrap"
+                                     TextTrimming="CharacterEllipsis" />
+                          <TextBlock FontSize="13"
+                                     Foreground="{StaticResource SemiColorText2}"
+                                     Margin="0,8,0,0"
+                                     TextWrapping="NoWrap"
+                                     TextTrimming="CharacterEllipsis">
+                            <Run Text="开馆 · " />
+                            <Run Text="{Binding VenueOpenTimeText}" />
+                            <Run Text="    闭馆 · " />
+                            <Run Text="{Binding VenueCloseTimeText}" />
+                          </TextBlock>
+                      </StackPanel>
+
+                      <Button Grid.Column="1"
+                              Grid.Row="0"
+                              Command="{Binding RefreshSeatsCommand}"
+                              IsVisible="{Binding IsCurrentLocked}"
+                              Classes="Tertiary"
+                              Width="32"
+                              Height="32"
+                              Padding="0"
+                              Background="Transparent"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Top"
+                              HorizontalContentAlignment="Center"
+                              VerticalContentAlignment="Center"
+                              ToolTip.Tip="刷新当前锁定场馆信息">
+                        <PathIcon Data="M17.65 6.35C16.2 4.9 14.21 4 12 4V1L7 6l5 5V7c2.76 0 5 2.24 5 5 0 .65-.13 1.27-.36 1.84l1.46 1.46C18.68 14.27 19 13.17 19 12c0-2.21-.9-4.2-2.35-5.65zM6.35 17.65C7.8 19.1 9.79 20 12 20v3l5-5-5-5v4c-2.76 0-5-2.24-5-5 0-.65.13-1.27.36-1.84L5.9 8.7C5.32 9.73 5 10.83 5 12c0 2.21.9 4.2 2.35 5.65z"
+                                  Width="22"
+                                  Height="20"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Foreground="{DynamicResource SystemAccentColor}" />
+                      </Button>
+
+                        <StackPanel Grid.Column="1"
+                                    Grid.RowSpan="2"
+                                    MinWidth="132"
+                                    Spacing="1"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Bottom">
+                          <TextBlock Text="剩余座位"
+                                    FontSize="12"
+                                    Foreground="{StaticResource SemiColorText2}"
+                                    HorizontalAlignment="Right" />
+                          <TextBlock Text="{Binding VenueAvailableSeatsText}"
+                                    FontSize="56"
+                                    FontWeight="Bold"
+                                    Foreground="{DynamicResource SystemAccentColor}"
+                                    HorizontalAlignment="Right" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1"
+                                    Orientation="Horizontal"
+                                    Spacing="16"
+                                    HorizontalAlignment="Left">
+                          <Button Content="更换当前场馆..."
+                                  Command="{Binding OpenVenuePickerCommand}"
+                                  Classes="Secondary Large"
+                                  MinWidth="148"
+                                  IsVisible="{Binding ShowVenueChangeButton}"
+                                  HorizontalAlignment="Left"
+                                  HorizontalContentAlignment="Center" />
+                          <Button Content="取消预览 (恢复原锁定)"
+                                  Command="{Binding CancelVenuePreviewCommand}"
+                                  Classes="Secondary Large"
+                                  MinWidth="180"
+                                  IsVisible="{Binding ShowVenueCancelPreviewButton}"
+                                  IsEnabled="{Binding CanCancelVenuePreview}"
+                                  HorizontalAlignment="Left"
+                                  HorizontalContentAlignment="Center" />
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+
+                    <Button Content="{Binding LockVenueButtonText}"
+                            Command="{Binding BindSelectedLibraryCommand}"
+                            MinWidth="140"
+                            IsVisible="{Binding IsCurrentPreview}"
+                            HorizontalAlignment="Right"
+                            HorizontalContentAlignment="Center"
+                            Background="{DynamicResource SystemAccentColor}"
+                            Foreground="White"
+                            FontWeight="Bold" />
+                    <Button Content="{Binding LockVenueButtonText}"
+                            MinWidth="140"
+                            IsVisible="{Binding IsCurrentLocked}"
+                            IsEnabled="False"
+                            HorizontalAlignment="Right"
+                            HorizontalContentAlignment="Center"
+                            Background="{StaticResource SemiColorFill0}"
+                            BorderBrush="{StaticResource SemiCardBorderBrush}"
+                            BorderThickness="1"
+                            Foreground="{StaticResource SemiColorText2}"
+                            FontWeight="Bold" />
+                  </StackPanel>
+
+                </Grid>
+              </Border>
+            </Grid>
+          </Grid>
+        </ScrollViewer>
+
+          <!-- Tab 2: Grab -->
+          <Grid RowDefinitions="Auto,*"
+                RowSpacing="12"
+                Margin="0,0,16,0"
+                Background="Transparent">
+            <TextBlock Classes="page-title" Text="抢座" Margin="0" />
+
+            <Grid Grid.Row="1"
+                  ColumnDefinitions="6.5*,10,3.5*"
+                  ColumnSpacing="0">
+              <Grid Grid.Column="0"
+                    RowDefinitions="Auto,*"
+                    RowSpacing="12">
+                <Border Classes="semi-card Shadow"
+                        Padding="14">
+                  <Grid RowDefinitions="Auto,Auto"
+                        RowSpacing="8">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10"
+                                VerticalAlignment="Center">
+                      <TextBlock Text="监控入口"
+                                 FontSize="17"
+                                 FontWeight="Bold" />
+                      <TextBlock Text="筛选并勾选目标座位，任意一个释放后立即尝试预约。"
+                                 Classes="helper-text"
+                                 VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <WrapPanel Grid.Row="1"
+                               Orientation="Horizontal"
+                               VerticalAlignment="Center">
+                      <TextBox Width="260"
+                               Text="{Binding SeatFilterText}"
+                               Watermark="仅按座位号过滤..."
+                               CornerRadius="8"
+                               Margin="0,0,10,8" />
+                      <CheckBox Content="隐藏被占座位"
+                                IsChecked="{Binding ShowAvailableOnly}"
+                                VerticalAlignment="Center"
+                                Margin="0,0,10,8" />
+                      <Button Content="刷新"
+                              Command="{Binding RefreshSeatsCommand}"
+                              Classes="Secondary"
+                              Margin="0,0,8,8" />
+                      <Button Content="读取收藏"
+                              Command="{Binding LoadFavoritesCommand}"
+                              Classes="Secondary"
+                              Margin="0,0,8,8" />
+                      <Button Content="存至收藏"
+                              Command="{Binding SaveFavoritesCommand}"
+                              Classes="Secondary"
+                              Margin="0,0,8,8" />
+                    </WrapPanel>
+                  </Grid>
+                </Border>
+
+                <Border Grid.Row="1"
+                        Classes="semi-card Shadow"
+                        Padding="14">
+                  <Grid RowDefinitions="Auto,*"
+                        RowSpacing="10">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="12">
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="座位工作区"
+                                   FontSize="17"
+                                   FontWeight="Bold" />
+                      </StackPanel>
+                      <Border Grid.Column="1"
+                              Padding="10,4"
+                              CornerRadius="999"
+                              Background="{StaticResource SemiAccentSoftBrush}"
+                              VerticalAlignment="Center">
+                        <TextBlock Text="{Binding SelectedSeatCount, StringFormat=监控 {0}}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource SemiAccentBrush}" />
+                      </Border>
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="1"
+                                  Margin="-2,0,-2,-2"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                      <ItemsControl ItemsSource="{Binding VisibleSeats}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                      </ItemsControl>
+                    </ScrollViewer>
+                  </Grid>
+                </Border>
+              </Grid>
+
+              <GridSplitter Grid.Column="1"
+                            Width="10"
+                            HorizontalAlignment="Stretch"
+                            Background="Transparent" />
+
+              <Grid Grid.Column="2"
+                    RowDefinitions="Auto,Auto,*"
+                    RowSpacing="12"
+                    Margin="12,0,0,0">
+                <Border Classes="semi-card Shadow"
+                        Padding="16">
+                  <Grid RowDefinitions="Auto,Auto,Auto"
+                        RowSpacing="10">
+                    <TextBlock Text="执行面板"
+                                FontSize="17"
+                                FontWeight="Bold" />
+                    <TextBlock Grid.Row="1"
+                               Text="{Binding GrabStatusText}"
+                               Margin="0,4,0,8"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource SystemAccentColor}"
+                               TextWrapping="Wrap" />
+
+                      <Grid Grid.Row="2"
+                            RowDefinitions="Auto,Auto,Auto"
+                            RowSpacing="10">
+                      <Grid ColumnDefinitions="Auto,*"
+                            ColumnSpacing="10">
+                        <TextBlock Text="模式"
+                                   Classes="field-label"
+                                   VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="1"
+                                  SelectedIndex="{Binding SelectedGrabModeIndex}"
+                                  ItemsSource="{Binding GrabModes}"
+                                  CornerRadius="8"
+                                  HorizontalAlignment="Stretch" />
+                      </Grid>
+
+                      <Grid Grid.Row="1"
+                            ColumnDefinitions="Auto,*"
+                            ColumnSpacing="10">
+                        <TextBlock Text="定时"
+                                   Classes="field-label"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding ScheduledTimeText}"
+                                 Watermark="HH:mm:ss"
+                                 CornerRadius="8" />
+                      </Grid>
+
+                      <WrapPanel Grid.Row="2"
+                                 Orientation="Horizontal">
+                        <Button Content="开始监控"
+                                Command="{Binding StartGrabCommand}"
+                                Background="{DynamicResource SystemAccentColor}"
+                                Foreground="White"
+                                FontWeight="Bold"
+                                CornerRadius="8"
+                                Padding="14,8"
+                                Margin="0,0,8,8" />
+                        <Button Content="停止任务"
+                                Command="{Binding StopGrabCommand}"
+                                Classes="Danger"
+                                CornerRadius="8"
+                                Padding="14,8"
+                                Margin="0,0,8,8" />
+                      </WrapPanel>
+                    </Grid>
+                  </Grid>
+                </Border>
+
+                <Border Grid.Row="1"
+                        Classes="semi-card Shadow"
+                        Padding="16">
+                  <Grid RowDefinitions="Auto,Auto,*"
+                        RowSpacing="10"
+                        MaxHeight="170">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="12">
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="当前监控目标"
+                                   FontSize="17"
+                                   FontWeight="Bold" />
+                      </StackPanel>
+                      <Button Grid.Column="1"
+                              Content="清空"
+                              Command="{Binding ClearSelectedSeatsCommand}"
+                              Classes="Secondary"
+                              IsVisible="{Binding HasSelectedSeats}"
+                              HorizontalAlignment="Right" />
+                    </Grid>
+
+                    <Border Grid.Row="1"
+                            Padding="10,4"
+                            CornerRadius="999"
+                            Background="{StaticResource SemiColorFill0}"
+                            HorizontalAlignment="Left">
+                      <TextBlock Text="{Binding SelectedSeatSummaryText}"
+                                 FontSize="12"
+                                 FontWeight="SemiBold"
+                                 Foreground="{StaticResource SemiColorText2}" />
+                    </Border>
+
+                    <ScrollViewer Grid.Row="2"
+                                  IsVisible="{Binding HasSelectedSeats}"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                      <ItemsControl ItemsSource="{Binding SelectedSeatNames}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Border Margin="0,0,8,8"
+                                    Padding="10,6"
+                                    CornerRadius="999"
+                                    Background="{StaticResource SemiAccentSoftBrush}">
+                              <TextBlock Text="{Binding .}"
+                                         FontSize="12"
+                                         FontWeight="SemiBold"
+                                         Foreground="{StaticResource SemiAccentBrush}" />
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+
+                    <Border Grid.Row="2"
+                            IsVisible="{Binding HasNoSelectedSeats}"
+                            Background="{StaticResource SemiColorFill0}"
+                            BorderBrush="{StaticResource SemiCardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="14">
+                      <TextBlock Text="还没有选中任何目标座位。左侧点击色块后，这里会持续列出你当前监控的全部座位。"
+                                 Classes="helper-text" />
+                    </Border>
+                  </Grid>
+                </Border>
+
+                <Border Grid.Row="2"
+                        Classes="semi-card Shadow"
+                        Padding="16">
+                  <Grid RowDefinitions="Auto,*"
+                        RowSpacing="10">
+                    <TextBlock Text="抢座实时回显"
+                               FontSize="17"
+                               FontWeight="Bold" />
+
+                    <TextBox Grid.Row="1"
+                             Text="{Binding GrabLogsText}"
+                             AcceptsReturn="True"
+                             IsReadOnly="True"
+                             TextWrapping="Wrap"
+                             VerticalContentAlignment="Top"
+                             CornerRadius="10"
+                             FontFamily="Consolas, monospace"
+                             FontSize="12.5" />
+                  </Grid>
+                </Border>
+              </Grid>
+            </Grid>
+          </Grid>
+
+        <!-- Tab 3: Occupy -->
+        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="24" Margin="0,0,16,0" Background="Transparent">
+          <TextBlock Classes="page-title" Text="占座" Margin="0,0,0,16" />
+
+          <Border Grid.Row="1"
+                  Classes="semi-card Shadow"
+                  Background="{StaticResource SemiCardBackgroundBrush}"
+                  Padding="28">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="32" RowSpacing="20">
+              <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Top">
+                <TextBlock Classes="hero-title" Text="{Binding ReservationHeroTitle}" VerticalAlignment="Center" />
+                <Label Content="运行中"
+                       Theme="{DynamicResource TagLabel}"
+                       Classes="Green"
+                       VerticalAlignment="Center"
+                       IsVisible="{Binding IsOccupyRunning}" />
+                <Label Content="已停止"
+                       Theme="{DynamicResource TagLabel}"
+                       Classes="Grey"
+                       VerticalAlignment="Center"
+                       IsVisible="{Binding IsOccupyStopped}" />
+              </StackPanel>
+
+              <WrapPanel Grid.Row="1"
+                         Grid.Column="1"
+                         Orientation="Horizontal"
+                         HorizontalAlignment="Right"
+                         VerticalAlignment="Bottom">
+                <Button Content="手动刷新"
+                        Command="{Binding RefreshReservationCommand}"
+                        Classes="Secondary Large"
+                        Margin="0,0,12,8"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center" />
+                <Button Content="停止占座"
+                        Command="{Binding StopOccupyCommand}"
+                        Classes="Danger Large"
+                        Margin="0,0,12,8"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center" />
+                <Button Content="开始占座"
+                        Command="{Binding StartOccupyCommand}"
+                        Classes="Large"
+                        Background="{DynamicResource SystemAccentColor}"
+                        Foreground="White"
+                        FontWeight="Bold"
+                        Margin="0,0,12,8"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center" />
+              </WrapPanel>
+
+              <Grid Grid.Row="1" Grid.Column="0" ColumnDefinitions="*,*" ColumnSpacing="28" VerticalAlignment="Bottom">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="座位过期时间"
+                             FontSize="12"
+                             Foreground="{DynamicResource SemiColorText2}" />
+                  <TextBlock Text="{Binding ReservationExpiryText}"
+                             FontSize="20"
+                             FontWeight="SemiBold"
+                             Foreground="{DynamicResource SemiColorText0}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="4">
+                  <TextBlock Text="取消座位预约倒计时"
+                             FontSize="12"
+                             Foreground="{DynamicResource SemiColorText2}" />
+                  <TextBlock Text="{Binding ReservationCountdownText}"
+                             FontSize="20"
+                             FontWeight="SemiBold"
+                             Foreground="{DynamicResource SemiColorText0}" />
+                </StackPanel>
+              </Grid>
+            </Grid>
+          </Border>
+
+          <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="24" Background="Transparent">
+            <Border Classes="semi-card Shadow">
+              <Grid RowDefinitions="Auto,*" RowSpacing="16">
+                <TextBlock Classes="section-title" Text="策略设置" Margin="0" />
+                <StackPanel Grid.Row="1" Spacing="20">
+                  <StackPanel Spacing="0">
+                    <TextBlock Classes="field-label" Text="轮询刷新频率" />
+                    <ComboBox SelectedIndex="{Binding SelectedRefreshModeIndex}"
+                              ItemsSource="{Binding RefreshModes}"
+                              Classes="Bordered Large"
+                              HorizontalAlignment="Stretch" />
+                  </StackPanel>
+
+                  <StackPanel Spacing="0">
+                    <TextBlock Classes="field-label" Text="重新预约间隔时间" />
+                    <NumericUpDown Minimum="1"
+                                   Maximum="1800"
+                                   Value="{Binding ReReserveDelaySeconds}"
+                                   FormatString="{}{0} 秒"
+                                   Classes="Large"
+                                   HorizontalAlignment="Stretch" />
+                  </StackPanel>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Classes="semi-card Shadow">
+              <Grid RowDefinitions="Auto,*" RowSpacing="16">
+                <TextBlock Classes="section-title" Text="实时日志" Margin="0" />
+                <Border Grid.Row="1"
+                        Background="{DynamicResource SemiColorFill0}"
+                        CornerRadius="16"
+                        BorderBrush="{StaticResource SemiCardBorderBrush}"
+                        BorderThickness="1"
+                        Padding="16">
+                  <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                VerticalScrollBarVisibility="Auto"
+                                x:Name="OccupyLogScrollViewer">
+                    <ItemsControl ItemsSource="{Binding OccupyLogLines}" />
+                  </ScrollViewer>
+                </Border>
+              </Grid>
+            </Border>
+          </Grid>
+        </Grid>
+
+        <!-- Tab 4: Settings -->
+        <ScrollViewer>
+          <StackPanel Spacing="24" Margin="0,0,16,0">
+            <TextBlock Classes="page-title" Text="引擎参数配置" />
+            
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
+              <StackPanel Spacing="24">
+                <Border Classes="card">
+                  <StackPanel Spacing="16">
+                    <TextBlock Classes="section-title" Text="常规体验" />
+                    <CheckBox Content="在系统托盘及横幅展示通知" IsChecked="{Binding NotificationsEnabled}" />
+                    <CheckBox Content="主界面关闭时后台保活驻留托盘" IsChecked="{Binding MinimizeToTrayEnabled}" />
+                    <CheckBox Content="解锁开发者高级模式" IsChecked="{Binding AdvancedMode}" FontWeight="Bold" Foreground="#FF8000"/>
+                    
+                    <Separator Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" Margin="0,8"/>
+                    
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                      <StackPanel Spacing="8">
+                        <TextBlock Text="网络 API 超时封值（秒）" FontSize="13" Opacity="0.8"/>
+                        <NumericUpDown Minimum="3" Maximum="60" Value="{Binding ApiTimeoutSeconds}" HorizontalAlignment="Stretch" CornerRadius="8"/>
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Spacing="8">
+                        <TextBlock Text="断线恢复重试极值（次）" FontSize="13" Opacity="0.8"/>
+                        <NumericUpDown Minimum="1" Maximum="10" Value="{Binding RetryCount}" HorizontalAlignment="Stretch" CornerRadius="8"/>
+                      </StackPanel>
+                    </Grid>
+                    
+                    <Button Content="💾 写入本地持久化存储" Command="{Binding SaveSettingsCommand}" Background="{DynamicResource SystemAccentColor}" Foreground="White" FontWeight="Bold" CornerRadius="8" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,16,0,0"/>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+
+              <Border Classes="card" Grid.Column="1" IsVisible="{Binding AdvancedMode}" BorderBrush="#88FF8000">
+                <StackPanel Spacing="16">
+                  <TextBlock Classes="section-title" Text="⚠️ 动态协议拦截覆写模板" Foreground="#FF8000" />
+                  <TextBlock Text="仅在抓包发现参数哈希变动时使用正则变参更新下方 JSON/Url 模板，通常请保持留空回退默认引擎策略。" FontSize="13" Opacity="0.7" TextWrapping="Wrap" />
+                  
+                  <ScrollViewer MaxHeight="400">
+                     <StackPanel Spacing="16" Margin="0,0,16,0">
+                        <TextBlock Text="扫码换 Cookie (Code 注入)" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding GetCookieTemplateText}" AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        
+                        <TextBlock Text="场馆列举拉取模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding QueryLibrariesTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        
+                        <TextBlock Text="座位级联检索布局模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding QueryLibraryLayoutTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="场馆规则查询模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding QueryLibraryRuleTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        
+                        <TextBlock Text="预约态检验查表模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding QueryReservationInfoTemplateText}" AcceptsReturn="True" MinHeight="100" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        
+                        <TextBlock Text="核心预约握手提交流模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding ReserveSeatTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        
+                        <TextBlock Text="预约销毁撤回请求模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding CancelReservationTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                     </StackPanel>
+                  </ScrollViewer>
+
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
+                    <Button Content="✅ 下发至解析引擎" Command="{Binding SaveProtocolOverridesCommand}" Background="#88FF8000" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" CornerRadius="8"/>
+                    <Button Grid.Column="1" Content="🔄 清除并重置原厂" Command="{Binding ResetProtocolOverridesCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" CornerRadius="8"/>
+                  </Grid>
+                </StackPanel>
+              </Border>
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </Carousel>
+
+      <Border Grid.Row="1"
+              ZIndex="20"
+              IsVisible="{Binding IsVenuePickerOpen}"
+              Background="#660F172A">
+        <Grid HorizontalAlignment="Stretch"
+              VerticalAlignment="Stretch"
+              Margin="24,8,24,24">
+          <Border Classes="semi-card Shadow"
+                  Width="400"
+                  MaxWidth="400"
+                  MaxHeight="600"
+                  Padding="20"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center">
+            <Grid RowDefinitions="Auto,*" RowSpacing="16">
+              <Grid Grid.Row="0" RowDefinitions="Auto,Auto" RowSpacing="12">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                  <TextBlock Text="选择作业场馆"
+                             FontSize="20"
+                             FontWeight="Bold"
+                             VerticalAlignment="Center" />
+                  <Button Grid.Column="1"
+                          Content="关闭"
+                          Command="{Binding CloseVenuePickerCommand}"
+                          Classes="Secondary"
+                          HorizontalContentAlignment="Center" />
+                </Grid>
+
+                <TextBlock Grid.Row="1"
+                           Text="下方已自动刷新最新场馆列表，点击一个场馆后，Dashboard 会立即刷新为该场馆预览。"
+                           Classes="helper-text" />
+              </Grid>
+
+              <Border Grid.Row="1"
+                      Background="{StaticResource SemiColorFill0}"
+                      BorderBrush="{StaticResource SemiCardBorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="14"
+                      Padding="8"
+                      VerticalAlignment="Stretch">
+                <ListBox ItemsSource="{Binding AvailableLibraries}"
+                         SelectedItem="{Binding SelectedLibrary}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         VerticalAlignment="Stretch"
+                         Margin="0,12">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <Grid ColumnDefinitions="*,Auto" Margin="4" MinHeight="72">
+                        <StackPanel Spacing="4" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding Floor}"
+                                     FontSize="12"
+                                     Foreground="{StaticResource SemiColorText2}" />
+                          <TextBlock FontSize="12"
+                                     Foreground="{StaticResource SemiColorText2}">
+                            <Run Text="总座 " />
+                            <Run Text="{Binding SeatsTotal}" />
+                            <Run Text=" · 已占用 " />
+                            <Run Text="{Binding SeatsUsed}" />
+                            <Run Text=" · 已预定 " />
+                            <Run Text="{Binding SeatsBooking}" />
+                          </TextBlock>
+                        </StackPanel>
+                        <Border Grid.Column="1"
+                                Theme="{DynamicResource TagLabel}"
+                                Classes="Green"
+                                VerticalAlignment="Center"
+                                IsVisible="{Binding IsOpen}">
+                          <TextBlock Text="开放中" />
+                        </Border>
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </Border>
+
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</Window>
