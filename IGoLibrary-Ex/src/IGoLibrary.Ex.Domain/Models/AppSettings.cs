@@ -1,3 +1,5 @@
+using IGoLibrary.Ex.Domain.Enums;
+
 namespace IGoLibrary.Ex.Domain.Models;
 
 public sealed record AppSettings(
@@ -6,6 +8,7 @@ public sealed record AppSettings(
     bool AdvancedMode,
     int ApiTimeoutSeconds,
     int RetryCount,
+    GrabReservationStrategy GrabReservationStrategy,
     int? LastLibraryId,
     string? LastLibraryName)
 {
@@ -15,6 +18,7 @@ public sealed record AppSettings(
         AdvancedMode: false,
         ApiTimeoutSeconds: 5,
         RetryCount: 3,
+        GrabReservationStrategy: GrabReservationStrategy.QueryThenReserve,
         LastLibraryId: null,
         LastLibraryName: null);
 }

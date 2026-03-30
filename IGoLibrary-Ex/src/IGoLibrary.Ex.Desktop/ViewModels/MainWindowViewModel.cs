@@ -52,6 +52,8 @@ public partial class MainWindowViewModel(
 
     public string[] RefreshModes { get; } = ["固定间隔 10 秒", "随机 10~20 秒"];
 
+    public string[] GrabReservationStrategies { get; } = ["先查列表再预约", "直接预约看返回值"];
+
     [ObservableProperty]
     private int selectedTabIndex;
 
@@ -164,6 +166,9 @@ public partial class MainWindowViewModel(
 
     [ObservableProperty]
     private int selectedGrabModeIndex = 2;
+
+    [ObservableProperty]
+    private int selectedGrabReservationStrategyIndex;
 
     [ObservableProperty]
     private string scheduledTimeText = "00:00:00";
@@ -809,6 +814,7 @@ public partial class MainWindowViewModel(
             AdvancedMode,
             Math.Max(3, ApiTimeoutSeconds),
             Math.Max(1, RetryCount),
+            (GrabReservationStrategy)Math.Clamp(SelectedGrabReservationStrategyIndex, 0, GrabReservationStrategies.Length - 1),
             SelectedLibrary?.LibraryId,
             SelectedLibrary?.Name);
         await settingsService.SaveAsync(settings);
@@ -858,6 +864,7 @@ public partial class MainWindowViewModel(
         AdvancedMode = settings.AdvancedMode;
         ApiTimeoutSeconds = settings.ApiTimeoutSeconds;
         RetryCount = settings.RetryCount;
+        SelectedGrabReservationStrategyIndex = (int)settings.GrabReservationStrategy;
     }
 
     private async Task LoadProtocolTemplatesAsync()
@@ -897,6 +904,25 @@ public partial class MainWindowViewModel(
         {
             activityLogService.Write(LogEntryKind.Error, "Library", $"预览场馆失败：{ex.Message}");
             await notificationService.ShowWarningAsync("预览场馆失败", ex.Message);
+        }
+    }
+
+    public async Task HandleVenuePickerLibraryClickAsync(LibrarySummary library)
+    {
+        if (!IsAuthorized)
+        {
+            return;
+        }
+
+        if (SelectedLibrary?.LibraryId != library.LibraryId)
+        {
+            SelectedLibrary = library;
+            return;
+        }
+
+        if (IsVenuePickerOpen)
+        {
+            await PreviewSelectedLibraryAsync(library);
         }
     }
 

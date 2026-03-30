@@ -1,6 +1,7 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Input.Platform;
 using Avalonia.Threading;
@@ -8,6 +9,7 @@ using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Domain.Helpers;
+using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Desktop;
 
@@ -98,6 +100,17 @@ public partial class MainWindow : Window
         {
             await TryAutoParseClipboardAsync(viewModel);
         }
+    }
+
+    private async void OnVenuePickerItemPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (sender is not Control { DataContext: LibrarySummary library } ||
+            DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        await viewModel.HandleVenuePickerLibraryClickAsync(library);
     }
 
     private async Task TryAutoParseClipboardAsync(MainWindowViewModel viewModel)
