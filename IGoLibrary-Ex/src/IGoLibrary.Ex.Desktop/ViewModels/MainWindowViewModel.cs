@@ -26,7 +26,9 @@ public partial class MainWindowViewModel(
     AppWindowService appWindowService) : ViewModelBase
 {
     private readonly ObservableCollection<SeatItemViewModel> _allSeats = [];
+    private readonly object _filterGate = new();
     private readonly DispatcherTimer _reservationCountdownTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private CancellationTokenSource? _filteringCts;
     private ReservationInfo? _currentReservation;
     private bool _reservationCountdownTimerInitialized;
     private LibrarySummary? _lockedLibrarySummary;
@@ -336,9 +338,9 @@ public partial class MainWindowViewModel(
         }
     }
 
-    partial void OnSeatFilterTextChanged(string value) => ApplySeatFilter();
+    partial void OnSeatFilterTextChanged(string value) => _ = ApplySeatFilterAsync();
 
-    partial void OnShowAvailableOnlyChanged(bool value) => ApplySeatFilter();
+    partial void OnShowAvailableOnlyChanged(bool value) => _ = ApplySeatFilterAsync();
 
     partial void OnSelectedLibraryChanged(LibrarySummary? value)
     {
@@ -493,6 +495,7 @@ public partial class MainWindowViewModel(
     private async Task SignOutAsync()
     {
         await sessionService.SignOutAsync();
+        CancelFiltering();
         AvailableLibraries.Clear();
         _allSeats.Clear();
         VisibleSeats.Clear();
@@ -564,7 +567,7 @@ public partial class MainWindowViewModel(
             var layout = await libraryService.BindLibraryAsync(SelectedLibrary.LibraryId);
             UpdateBoundLibraryPresentation(layout);
             await LoadVenueRulePresentationAsync(SelectedLibrary.LibraryId, persistLockedSnapshot: true);
-            PopulateSeats(layout);
+            await PopulateSeatsAsync(layout);
             await LoadFavoritesAsync();
             await RefreshReservationAsync(showNotificationOnError: false);
         }
@@ -582,7 +585,7 @@ public partial class MainWindowViewModel(
         {
             var layout = await libraryService.RefreshBoundLibraryAsync();
             UpdateBoundLibraryPresentation(layout);
-            PopulateSeats(layout);
+            await PopulateSeatsAsync(layout);
             await LoadFavoritesAsync();
         }
         catch (Exception ex)
@@ -662,7 +665,7 @@ public partial class MainWindowViewModel(
         try
         {
             var favorites = await libraryService.GetFavoritesAsync(SelectedLibrary.LibraryId);
-            ApplyFavoriteStates(favorites.Select(x => x.SeatKey), syncSelection: true);
+            ApplyFavoriteStates(favorites.Select(x => x.SeatKey), syncSelection: false);
             await notificationService.ShowInfoAsync("收藏已加载", $"已加载 {favorites.Count} 个收藏座位。");
         }
         catch (Exception ex)
@@ -996,47 +999,105 @@ public partial class MainWindowViewModel(
         return IsAuthorized ? "等待绑定场馆后获取" : "等待授权并绑定场馆";
     }
 
-    private void PopulateSeats(LibraryLayout layout)
+    private async Task PopulateSeatsAsync(LibraryLayout layout)
     {
+        CancelFiltering();
+
         foreach (var seat in _allSeats)
         {
             seat.PropertyChanged -= OnSeatItemPropertyChanged;
         }
 
         _allSeats.Clear();
+        VisibleSeats.Clear();
         foreach (var seat in layout.Seats)
         {
             var item = new SeatItemViewModel(seat.SeatKey, seat.SeatName, seat.IsOccupied);
             item.PropertyChanged += OnSeatItemPropertyChanged;
             _allSeats.Add(item);
+            VisibleSeats.Add(item);
         }
 
-        ApplySeatFilter();
+        await ApplySeatFilterAsync();
         UpdateSelectedSeatSummary();
     }
 
-    private void ApplySeatFilter()
+    private async Task ApplySeatFilterAsync()
     {
-        VisibleSeats.Clear();
-
-        var filtered = _allSeats.Where(seat =>
+        CancellationTokenSource cts;
+        CancellationTokenSource? previousCts;
+        lock (_filterGate)
         {
-            if (ShowAvailableOnly && seat.IsOccupied)
+            previousCts = _filteringCts;
+            _filteringCts = new CancellationTokenSource();
+            cts = _filteringCts;
+        }
+
+        previousCts?.Cancel();
+        previousCts?.Dispose();
+
+        var filterText = SeatFilterText;
+        var showAvailableOnly = ShowAvailableOnly;
+        var snapshot = _allSeats
+            .Select(seat => new SeatFilterSnapshot(seat, seat.SeatName, seat.IsOccupied))
+            .ToArray();
+
+        try
+        {
+            await Task.Yield();
+
+            var filtered = await Task.Run(() =>
             {
-                return false;
+                cts.Token.ThrowIfCancellationRequested();
+
+                return snapshot
+                    .Select(seat => new SeatFilterResult(
+                        seat.ViewModel,
+                        ShouldSeatBeVisible(seat.SeatName, seat.IsOccupied, filterText, showAvailableOnly)))
+                    .ToArray();
+            }, cts.Token);
+
+            if (cts.IsCancellationRequested)
+            {
+                return;
             }
 
-            if (string.IsNullOrWhiteSpace(SeatFilterText))
+            const int batchSize = 48;
+            for (var start = 0; start < filtered.Length; start += batchSize)
             {
-                return true;
+                cts.Token.ThrowIfCancellationRequested();
+
+                var count = Math.Min(batchSize, filtered.Length - start);
+                for (var offset = 0; offset < count; offset++)
+                {
+                    var result = filtered[start + offset];
+                    result.ViewModel.IsFilterVisible = result.IsVisible;
+                }
+
+                if (start + count < filtered.Length)
+                {
+                    await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Error, "Library", $"筛选座位失败：{ex.Message}");
+        }
+        finally
+        {
+            lock (_filterGate)
+            {
+                if (ReferenceEquals(_filteringCts, cts))
+                {
+                    _filteringCts = null;
+                }
             }
 
-            return seat.SeatName.Contains(SeatFilterText, StringComparison.OrdinalIgnoreCase);
-        });
-
-        foreach (var seat in filtered)
-        {
-            VisibleSeats.Add(seat);
+            cts.Dispose();
         }
     }
 
@@ -1238,4 +1299,47 @@ public partial class MainWindowViewModel(
             or CoordinatorTaskState.Running
             or CoordinatorTaskState.Stopping;
     }
+
+    private void CancelFiltering()
+    {
+        lock (_filterGate)
+        {
+            if (_filteringCts is null)
+            {
+                return;
+            }
+
+            _filteringCts.Cancel();
+            _filteringCts.Dispose();
+            _filteringCts = null;
+        }
+    }
+
+    private static bool ShouldSeatBeVisible(
+        string seatName,
+        bool isOccupied,
+        string filterText,
+        bool showAvailableOnly)
+    {
+        if (showAvailableOnly && isOccupied)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(filterText))
+        {
+            return true;
+        }
+
+        return seatName.Contains(filterText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed record SeatFilterSnapshot(
+        SeatItemViewModel ViewModel,
+        string SeatName,
+        bool IsOccupied);
+
+    private sealed record SeatFilterResult(
+        SeatItemViewModel ViewModel,
+        bool IsVisible);
 }

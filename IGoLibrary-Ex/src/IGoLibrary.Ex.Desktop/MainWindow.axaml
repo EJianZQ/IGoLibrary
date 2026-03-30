@@ -110,7 +110,11 @@
 
   <Window.DataTemplates>
     <DataTemplate x:DataType="vm:SeatItemViewModel">
-      <Grid Width="52" Height="52" Margin="3" ClipToBounds="False">
+      <Grid Width="52"
+            Height="52"
+            Margin="3"
+            ClipToBounds="False"
+            IsVisible="{Binding IsFilterVisible}">
         <ToolTip.Tip>
           <StackPanel Spacing="4">
             <TextBlock Text="{Binding SeatName, StringFormat=座位 {0}}" FontWeight="Bold" />

@@ -21,4 +21,7 @@ public sealed partial class SeatItemViewModel(string seatKey, string seatName, b
 
     [ObservableProperty]
     private bool isFavorite;
+
+    [ObservableProperty]
+    private bool isFilterVisible = true;
 }
