@@ -54,8 +54,12 @@ public partial class MainWindowViewModel(
 
     public string[] GrabReservationStrategies { get; } = ["先查列表再预约", "直接预约看返回值"];
 
+    public const int AccountAndVenueTabIndex = 1;
+
     [ObservableProperty]
     private int selectedTabIndex;
+
+    public bool IsAccountAndVenuePageActive => SelectedTabIndex == AccountAndVenueTabIndex;
 
     [ObservableProperty]
     private string sessionSummary = "未登录";
