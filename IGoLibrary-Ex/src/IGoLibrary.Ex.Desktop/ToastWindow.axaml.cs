@@ -1,6 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Interactivity;
+using Avalonia.Input;
 using Avalonia.Media;
 using IGoLibrary.Ex.Desktop.Services;
 using Avalonia.Threading;
@@ -13,6 +13,7 @@ public partial class ToastWindow : Window
     private static readonly TimeSpan ShowAnimationDuration = TimeSpan.FromMilliseconds(300);
     private static readonly TimeSpan MoveAnimationDuration = TimeSpan.FromMilliseconds(200);
     private static readonly TimeSpan CloseAnimationDuration = TimeSpan.FromMilliseconds(180);
+    private static readonly TimeSpan ProgressAnimationFrameInterval = TimeSpan.FromMilliseconds(16);
     private const int EnterOvershootX = 24;
     private const int ExitOffsetY = 14;
     private static readonly IBrush InfoAccentBrush = new SolidColorBrush(Color.Parse("#0F6FFF"));
@@ -25,9 +26,9 @@ public partial class ToastWindow : Window
     private static readonly IBrush BorderBrushValue = new SolidColorBrush(Color.Parse("#D8E0EA"));
     private static readonly IBrush TitleBrushValue = new SolidColorBrush(Color.Parse("#111827"));
     private static readonly IBrush MessageBrushValue = new SolidColorBrush(Color.Parse("#516072"));
-    private static readonly IBrush CloseBrushValue = new SolidColorBrush(Color.Parse("#7A8699"));
     private CancellationTokenSource? _movementAnimationCts;
     private CancellationTokenSource? _lifecycleAnimationCts;
+    private CancellationTokenSource? _progressAnimationCts;
     private PixelPoint _anchoredPosition;
     private bool _isOpening;
     private bool _isClosing;
@@ -49,8 +50,6 @@ public partial class ToastWindow : Window
         DataContext = this;
     }
 
-    public event EventHandler? CloseRequested;
-
     public ToastVisualKind Kind { get; }
 
     public string TitleText { get; }
@@ -58,13 +57,6 @@ public partial class ToastWindow : Window
     public string MessageText { get; }
 
     public bool HasShownAnimation { get; private set; }
-
-    public string KindText => Kind switch
-    {
-        ToastVisualKind.Warning => "警告",
-        ToastVisualKind.Success => "成功",
-        _ => "提示"
-    };
 
     public string BadgeText => Kind switch
     {
@@ -95,11 +87,33 @@ public partial class ToastWindow : Window
 
     public IBrush MessageBrush => MessageBrushValue;
 
-    public IBrush CloseBrush => CloseBrushValue;
+    public IBrush ProgressTrackBrush => AccentSoftBrush;
 
-    private void OnCloseButtonClick(object? sender, RoutedEventArgs e)
+    private void OnToastPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        CloseRequested?.Invoke(this, EventArgs.Empty);
+        if (_isClosing || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        BeginCloseAnimation();
+    }
+
+    public void BeginLifetimeProgress(TimeSpan lifetime)
+    {
+        CancelProgressAnimation();
+        LifetimeProgressBar.Value = 1;
+
+        if (lifetime <= TimeSpan.Zero)
+        {
+            LifetimeProgressBar.Value = 0;
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _progressAnimationCts = cts;
+        _ = AnimateLifetimeProgressAsync(lifetime, cts);
     }
 
     public void SetAnchoredPosition(PixelPoint targetPosition, bool animate)
@@ -172,6 +186,7 @@ public partial class ToastWindow : Window
         _isOpening = false;
         CancelMovementAnimation();
         CancelLifecycleAnimation();
+        CancelProgressAnimation();
 
         var startPosition = Position;
         var targetPosition = new PixelPoint(startPosition.X, startPosition.Y + ExitOffsetY);
@@ -208,6 +223,7 @@ public partial class ToastWindow : Window
         _isOpening = false;
         CancelMovementAnimation();
         CancelLifecycleAnimation();
+        CancelProgressAnimation();
         Close();
     }
 
@@ -286,6 +302,39 @@ public partial class ToastWindow : Window
         }
     }
 
+    private async Task AnimateLifetimeProgressAsync(TimeSpan lifetime, CancellationTokenSource animationCts)
+    {
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            while (true)
+            {
+                animationCts.Token.ThrowIfCancellationRequested();
+
+                var progress = CalculateLifetimeProgress(stopwatch.Elapsed, lifetime);
+                await Dispatcher.UIThread.InvokeAsync(() => LifetimeProgressBar.Value = progress);
+                if (progress <= 0)
+                {
+                    return;
+                }
+
+                await Task.Delay(ProgressAnimationFrameInterval, animationCts.Token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_progressAnimationCts, animationCts))
+            {
+                animationCts.Dispose();
+                _progressAnimationCts = null;
+            }
+        }
+    }
+
     private static async Task RunAnimationLoopAsync(
         TimeSpan duration,
         Func<double, double> easing,
@@ -337,6 +386,28 @@ public partial class ToastWindow : Window
         _lifecycleAnimationCts.Cancel();
         _lifecycleAnimationCts.Dispose();
         _lifecycleAnimationCts = null;
+    }
+
+    private void CancelProgressAnimation()
+    {
+        if (_progressAnimationCts is null)
+        {
+            return;
+        }
+
+        _progressAnimationCts.Cancel();
+        _progressAnimationCts.Dispose();
+        _progressAnimationCts = null;
+    }
+
+    internal static double CalculateLifetimeProgress(TimeSpan elapsed, TimeSpan lifetime)
+    {
+        if (lifetime <= TimeSpan.Zero)
+        {
+            return 0;
+        }
+
+        return Math.Clamp(1 - (elapsed.TotalMilliseconds / lifetime.TotalMilliseconds), 0, 1);
     }
 
     private static PixelPoint Lerp(PixelPoint from, PixelPoint to, double progress)

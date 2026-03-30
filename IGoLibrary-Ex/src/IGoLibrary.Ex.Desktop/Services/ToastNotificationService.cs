@@ -64,7 +64,6 @@ public sealed class ToastNotificationService(
                 toast = new ToastWindow(kind, title, message);
                 toast.Opened += OnToastOpened;
                 toast.Closed += OnToastClosed;
-                toast.CloseRequested += OnToastCloseRequested;
 
                 lock (_gate)
                 {
@@ -77,6 +76,7 @@ public sealed class ToastNotificationService(
                 }
 
                 toast.Show();
+                toast.BeginLifetimeProgress(ToastLifetime);
                 ArrangeToasts(preferredToast: toast);
                 if (overflowToast is not null)
                 {
@@ -174,14 +174,6 @@ public sealed class ToastNotificationService(
 
         CleanupToastState(toast);
         ArrangeToasts();
-    }
-
-    private void OnToastCloseRequested(object? sender, EventArgs e)
-    {
-        if (sender is ToastWindow toast)
-        {
-            CloseToast(toast, immediate: false);
-        }
     }
 
     private void CloseToast(ToastWindow toast, bool immediate = false)
@@ -288,7 +280,6 @@ public sealed class ToastNotificationService(
     {
         toast.Opened -= OnToastOpened;
         toast.Closed -= OnToastClosed;
-        toast.CloseRequested -= OnToastCloseRequested;
 
         lock (_gate)
         {
