@@ -325,7 +325,7 @@ public partial class MainWindowViewModel(
                     IsAuthorized = true;
                     SessionSummary = $"已恢复会话：{restored.Source} / {restored.SavedAt:yyyy-MM-dd HH:mm:ss}";
                     ManualCookieText = restored.Cookie;
-                    await LoadLibrariesAsync();
+                    await LoadLibrariesAsync(restorePreferredSelection: true);
                     if (SelectedLibrary is not null)
                     {
                         await BindSelectedLibraryAsync();
@@ -430,7 +430,7 @@ public partial class MainWindowViewModel(
                 var session = await sessionService.AuthenticateFromCookieAsync(cookie, RememberSession);
                 IsAuthorized = true;
                 SessionSummary = $"登录成功：{session.Source} / {session.SavedAt:yyyy-MM-dd HH:mm:ss}";
-                await LoadLibrariesAsync();
+                await LoadLibrariesAsync(restorePreferredSelection: false);
             }
             catch (Exception ex)
             {
@@ -462,7 +462,7 @@ public partial class MainWindowViewModel(
             var session = await sessionService.AuthenticateFromCookieAsync(ManualCookieText, RememberSession);
             IsAuthorized = true;
             SessionSummary = $"登录成功：{session.Source} / {session.SavedAt:yyyy-MM-dd HH:mm:ss}";
-            await LoadLibrariesAsync();
+            await LoadLibrariesAsync(restorePreferredSelection: false);
             SelectedTabIndex = 1;
         }
         catch (Exception ex)
@@ -487,7 +487,7 @@ public partial class MainWindowViewModel(
             IsAuthorized = true;
             SessionSummary = $"已恢复会话：{session.Source} / {session.SavedAt:yyyy-MM-dd HH:mm:ss}";
             ManualCookieText = session.Cookie;
-            await LoadLibrariesAsync();
+            await LoadLibrariesAsync(restorePreferredSelection: false);
         }
         catch (Exception ex)
         {
@@ -500,6 +500,7 @@ public partial class MainWindowViewModel(
     private async Task SignOutAsync()
     {
         await sessionService.SignOutAsync();
+        await ClearStoredLibrarySelectionAsync();
         CancelFiltering();
         AvailableLibraries.Clear();
         _allSeats.Clear();
@@ -538,6 +539,11 @@ public partial class MainWindowViewModel(
     [RelayCommand]
     private async Task LoadLibrariesAsync()
     {
+        await LoadLibrariesAsync(restorePreferredSelection: true);
+    }
+
+    private async Task LoadLibrariesAsync(bool restorePreferredSelection, int? preferredLibraryId = null)
+    {
         try
         {
             var libraries = await libraryService.LoadLibrariesAsync();
@@ -545,6 +551,18 @@ public partial class MainWindowViewModel(
             foreach (var library in libraries)
             {
                 AvailableLibraries.Add(library);
+            }
+
+            if (preferredLibraryId is not null)
+            {
+                SelectedLibrary = AvailableLibraries.FirstOrDefault(x => x.LibraryId == preferredLibraryId.Value);
+                return;
+            }
+
+            if (!restorePreferredSelection)
+            {
+                SelectedLibrary = null;
+                return;
             }
 
             var settings = await settingsService.LoadAsync();
@@ -603,7 +621,9 @@ public partial class MainWindowViewModel(
     [RelayCommand]
     private async Task OpenVenuePickerAsync()
     {
-        await LoadLibrariesAsync();
+        await LoadLibrariesAsync(
+            restorePreferredSelection: false,
+            preferredLibraryId: _lockedLibrarySummary?.LibraryId);
 
         IsVenuePickerOpen = true;
     }
@@ -877,6 +897,28 @@ public partial class MainWindowViewModel(
         QueryReservationInfoTemplateText = templates.QueryReservationInfoTemplate;
         ReserveSeatTemplateText = templates.ReserveSeatTemplate;
         CancelReservationTemplateText = templates.CancelReservationTemplate;
+    }
+
+    private async Task ClearStoredLibrarySelectionAsync()
+    {
+        try
+        {
+            var settings = await settingsService.LoadAsync();
+            if (settings.LastLibraryId is null && string.IsNullOrWhiteSpace(settings.LastLibraryName))
+            {
+                return;
+            }
+
+            await settingsService.SaveAsync(settings with
+            {
+                LastLibraryId = null,
+                LastLibraryName = null
+            });
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Auth", $"清理上次场馆选择失败：{ex.Message}");
+        }
     }
 
     private async Task PreviewSelectedLibraryAsync(LibrarySummary library)

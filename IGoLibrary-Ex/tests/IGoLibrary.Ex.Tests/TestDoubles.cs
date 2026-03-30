@@ -124,6 +124,181 @@ internal sealed class FakeSettingsService(AppSettings settings) : ISettingsServi
     }
 }
 
+internal sealed class FakeSessionService : ISessionService
+{
+    public SessionCredentials? CurrentSession { get; set; }
+
+    public SessionCredentials AuthenticateFromCookieResult { get; set; }
+        = new("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
+
+    public SessionCredentials? RestoreResult { get; set; }
+
+    public int AuthenticateFromCookieCalls { get; private set; }
+
+    public int RestoreCalls { get; private set; }
+
+    public int SignOutCalls { get; private set; }
+
+    public Task<SessionCredentials> AuthenticateFromCodeAsync(string code, CancellationToken cancellationToken = default)
+    {
+        CurrentSession = AuthenticateFromCookieResult with
+        {
+            Source = SessionSource.QrCodeLink
+        };
+        return Task.FromResult(CurrentSession);
+    }
+
+    public Task<SessionCredentials> AuthenticateFromCookieAsync(string cookie, bool remember, CancellationToken cancellationToken = default)
+    {
+        AuthenticateFromCookieCalls++;
+        CurrentSession = AuthenticateFromCookieResult with
+        {
+            Cookie = cookie,
+            SavedAt = DateTimeOffset.Now,
+            CanAutoRestore = remember
+        };
+        return Task.FromResult(CurrentSession);
+    }
+
+    public Task<SessionCredentials?> RestoreAsync(CancellationToken cancellationToken = default)
+    {
+        RestoreCalls++;
+        CurrentSession = RestoreResult;
+        return Task.FromResult(RestoreResult);
+    }
+
+    public Task SignOutAsync(CancellationToken cancellationToken = default)
+    {
+        SignOutCalls++;
+        CurrentSession = null;
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeLibraryService : ILibraryService
+{
+    public LibrarySummary? BoundLibrary { get; private set; }
+
+    public IReadOnlyList<LibrarySummary> LibrariesToLoad { get; set; } = [];
+
+    public Dictionary<int, LibraryLayout> LayoutsByLibraryId { get; } = [];
+
+    public Dictionary<int, IReadOnlyList<TrackedSeat>> FavoritesByLibraryId { get; } = [];
+
+    public int LoadLibrariesCalls { get; private set; }
+
+    public int BindLibraryCalls { get; private set; }
+
+    public int RefreshBoundLibraryCalls { get; private set; }
+
+    public int SaveFavoritesCalls { get; private set; }
+
+    public Task<IReadOnlyList<LibrarySummary>> LoadLibrariesAsync(CancellationToken cancellationToken = default)
+    {
+        LoadLibrariesCalls++;
+        return Task.FromResult(LibrariesToLoad);
+    }
+
+    public Task<LibraryLayout> BindLibraryAsync(int libraryId, CancellationToken cancellationToken = default)
+    {
+        BindLibraryCalls++;
+        BoundLibrary = LibrariesToLoad.FirstOrDefault(x => x.LibraryId == libraryId);
+        return Task.FromResult(LayoutsByLibraryId[libraryId]);
+    }
+
+    public Task<LibraryLayout> RefreshBoundLibraryAsync(CancellationToken cancellationToken = default)
+    {
+        RefreshBoundLibraryCalls++;
+        if (BoundLibrary is null)
+        {
+            throw new InvalidOperationException("No bound library configured.");
+        }
+
+        return Task.FromResult(LayoutsByLibraryId[BoundLibrary.LibraryId]);
+    }
+
+    public Task<IReadOnlyList<TrackedSeat>> GetFavoritesAsync(int libraryId, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(
+            FavoritesByLibraryId.TryGetValue(libraryId, out var favorites)
+                ? favorites
+                : Array.Empty<TrackedSeat>() as IReadOnlyList<TrackedSeat>);
+    }
+
+    public Task SaveFavoritesAsync(int libraryId, IReadOnlyList<TrackedSeat> seats, CancellationToken cancellationToken = default)
+    {
+        SaveFavoritesCalls++;
+        FavoritesByLibraryId[libraryId] = seats.ToArray();
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeGrabSeatCoordinator : IGrabSeatCoordinator
+{
+    private CoordinatorStatus _status = CoordinatorStatus.Idle("抢座");
+
+    public event EventHandler<CoordinatorStatus>? StatusChanged;
+
+    public Task StartAsync(GrabSeatPlan plan, CancellationToken cancellationToken = default)
+    {
+        _status = new CoordinatorStatus(
+            CoordinatorTaskState.Running,
+            "抢座",
+            "测试中的抢座任务",
+            DateTimeOffset.Now,
+            DateTimeOffset.Now);
+        StatusChanged?.Invoke(this, _status);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        _status = new CoordinatorStatus(
+            CoordinatorTaskState.Completed,
+            "抢座",
+            "测试中的抢座任务已停止",
+            _status.StartedAt,
+            DateTimeOffset.Now);
+        StatusChanged?.Invoke(this, _status);
+        return Task.CompletedTask;
+    }
+
+    public CoordinatorStatus GetStatus() => _status;
+}
+
+internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
+{
+    private CoordinatorStatus _status = CoordinatorStatus.Idle("占座");
+
+    public event EventHandler<CoordinatorStatus>? StatusChanged;
+
+    public Task StartAsync(OccupySeatPlan plan, CancellationToken cancellationToken = default)
+    {
+        _status = new CoordinatorStatus(
+            CoordinatorTaskState.Running,
+            "占座",
+            "测试中的占座任务",
+            DateTimeOffset.Now,
+            DateTimeOffset.Now);
+        StatusChanged?.Invoke(this, _status);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        _status = new CoordinatorStatus(
+            CoordinatorTaskState.Completed,
+            "占座",
+            "测试中的占座任务已停止",
+            _status.StartedAt,
+            DateTimeOffset.Now);
+        StatusChanged?.Invoke(this, _status);
+        return Task.CompletedTask;
+    }
+
+    public CoordinatorStatus GetStatus() => _status;
+}
+
 internal sealed class FakeProtocolTemplateStore(ProtocolTemplateSet templates) : IProtocolTemplateStore
 {
     public ProtocolTemplateSet Templates { get; private set; } = templates;
