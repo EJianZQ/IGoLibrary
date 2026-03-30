@@ -14,10 +14,9 @@
         SystemDecorations="None"
         WindowStartupLocation="Manual"
         TransparencyLevelHint="Transparent, Blur, AcrylicBlur, None"
+        TransparencyBackgroundFallback="Transparent"
         Background="Transparent"
-        ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome"
-        ExtendClientAreaTitleBarHeightHint="-1">
+        ExtendClientAreaToDecorationsHint="False">
   <Border Margin="10"
           Padding="18"
           CornerRadius="18"
