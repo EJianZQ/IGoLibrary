@@ -916,11 +916,25 @@
 
                   <StackPanel Spacing="0">
                     <TextBlock Classes="field-label" Text="重新预约间隔时间" />
-                    <NumericUpDown Minimum="1"
-                                   Maximum="1800"
-                                   Value="{Binding ReReserveDelaySeconds}"
-                                   FormatString="{}{0} 秒"
-                                   HorizontalAlignment="Stretch" />
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="10">
+                      <NumericUpDown Minimum="1"
+                                     Maximum="1800"
+                                     Increment="1"
+                                     ClipValueToMinMax="True"
+                                     ParsingNumberStyle="Integer"
+                                     Value="{Binding ReReserveDelaySeconds}"
+                                     FormatString="0"
+                                     TextInput="OnUnsignedIntegerNumericUpDownTextInput"
+                                     KeyDown="OnUnsignedIntegerNumericUpDownKeyDown"
+                                     HorizontalAlignment="Stretch" />
+                      <TextBlock Grid.Column="1"
+                                 Text="秒"
+                                 FontSize="13"
+                                 FontWeight="SemiBold"
+                                 Foreground="{StaticResource SemiTextSecondaryBrush}"
+                                 VerticalAlignment="Center" />
+                    </Grid>
                   </StackPanel>
                 </StackPanel>
               </Grid>

@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -215,5 +216,29 @@ public partial class MainWindow : Window
         }
 
         Dispatcher.UIThread.Post(() => OccupyLogScrollViewer?.ScrollToEnd(), DispatcherPriority.Background);
+    }
+
+    private void OnUnsignedIntegerNumericUpDownTextInput(object? sender, TextInputEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.Text))
+        {
+            return;
+        }
+
+        if (e.Text.Any(ch => !char.IsDigit(ch)))
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void OnUnsignedIntegerNumericUpDownKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || sender is not InputElement inputElement)
+        {
+            return;
+        }
+
+        TopLevel.GetTopLevel(inputElement)?.FocusManager?.ClearFocus();
+        e.Handled = true;
     }
 }
