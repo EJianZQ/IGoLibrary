@@ -283,7 +283,7 @@
             <Border Classes="card">
                 <StackPanel Spacing="12">
                   <TextBlock Classes="section-title" Text="综合运行日志" />
-                <TextBox Text="{Binding AllLogsText}" MinHeight="320" AcceptsReturn="True" IsReadOnly="True" TextWrapping="Wrap" CornerRadius="8" FontFamily="Consolas, monospace" FontSize="13" />
+                <TextBox Text="{Binding AllLogsText}" MinHeight="320" AcceptsReturn="True" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="13" />
                 </StackPanel>
               </Border>
           </StackPanel>
@@ -341,7 +341,7 @@
 
                     <StackPanel Spacing="8">
                       <TextBlock Classes="field-label" Text="授权链接" />
-                      <TextBox Watermark="在此粘贴包含 code 的链接..." Text="{Binding QrLinkText}" CornerRadius="10" />
+                      <TextBox Watermark="在此粘贴包含 code 的链接..." Text="{Binding QrLinkText}" />
                       <CheckBox Content="记住会话"
                                 IsChecked="{Binding RememberSession}"
                                 HorizontalAlignment="Right" />
@@ -390,8 +390,7 @@
                               Margin="0,8,0,0"
                               AcceptsReturn="True"
                               MinHeight="96"
-                              TextWrapping="Wrap"
-                              CornerRadius="10" />
+                              TextWrapping="Wrap" />
                       <Button Content="验证有效性"
                               Command="{Binding ValidateManualCookieCommand}"
                               Classes="Secondary"
@@ -494,10 +493,7 @@
                               Grid.Row="0"
                               Command="{Binding RefreshSeatsCommand}"
                               IsVisible="{Binding IsCurrentLocked}"
-                              Classes="Tertiary"
-                              Width="32"
-                              Height="32"
-                              Padding="0"
+                              Classes="Tertiary compact-icon"
                               Background="Transparent"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Top"
@@ -535,14 +531,14 @@
                                     HorizontalAlignment="Left">
                           <Button Content="更换当前场馆..."
                                   Command="{Binding OpenVenuePickerCommand}"
-                                  Classes="Secondary Large"
+                                  Classes="Secondary"
                                   MinWidth="148"
                                   IsVisible="{Binding ShowVenueChangeButton}"
                                   HorizontalAlignment="Left"
                                   HorizontalContentAlignment="Center" />
                           <Button Content="取消预览 (恢复原锁定)"
                                   Command="{Binding CancelVenuePreviewCommand}"
-                                  Classes="Secondary Large"
+                                  Classes="Secondary"
                                   MinWidth="180"
                                   IsVisible="{Binding ShowVenueCancelPreviewButton}"
                                   IsEnabled="{Binding CanCancelVenuePreview}"
@@ -629,8 +625,6 @@
                               Background="{DynamicResource SystemAccentColor}"
                               Foreground="White"
                               FontWeight="Bold"
-                              CornerRadius="12"
-                              Padding="18,12"
                               MinWidth="160"
                               HorizontalContentAlignment="Center"
                               VerticalAlignment="Top" />
@@ -666,12 +660,10 @@
                                     <Button Content="✕"
                                             Command="{Binding DataContext.RemoveSelectedSeatCommand, ElementName=MainWindowRoot}"
                                             CommandParameter="{Binding .}"
+                                            Classes="chip-close"
                                             IsEnabled="{Binding DataContext.CanEditGrabConfiguration, ElementName=MainWindowRoot}"
                                             Background="Transparent"
                                             BorderThickness="0"
-                                            Padding="0"
-                                            MinWidth="18"
-                                            MinHeight="18"
                                             Foreground="{StaticResource SemiAccentBrush}"
                                             FontSize="11"
                                             FontWeight="Bold"
@@ -699,7 +691,6 @@
                       <ComboBox SelectedIndex="{Binding SelectedGrabReservationStrategyIndex}"
                                 ItemsSource="{Binding GrabReservationStrategies}"
                                 IsEnabled="{Binding CanEditGrabConfiguration}"
-                                CornerRadius="10"
                                 HorizontalAlignment="Stretch" />
                     </StackPanel>
 
@@ -710,7 +701,6 @@
                       <ComboBox SelectedIndex="{Binding SelectedGrabModeIndex}"
                                 ItemsSource="{Binding GrabModes}"
                                 IsEnabled="{Binding CanEditGrabConfiguration}"
-                                CornerRadius="10"
                                 HorizontalAlignment="Stretch" />
                     </StackPanel>
 
@@ -720,8 +710,7 @@
                                  Classes="field-label" />
                       <TextBox Text="{Binding ScheduledTimeText}"
                                Watermark="HH:mm:ss"
-                               IsEnabled="{Binding CanEditGrabConfiguration}"
-                               CornerRadius="10" />
+                               IsEnabled="{Binding CanEditGrabConfiguration}" />
                     </StackPanel>
                   </Grid>
                 </StackPanel>
@@ -737,15 +726,11 @@
                           Background="{DynamicResource SystemAccentColor}"
                           Foreground="White"
                           FontWeight="Bold"
-                          CornerRadius="12"
-                          Padding="16,12"
                           HorizontalContentAlignment="Center" />
                   <Button Content="停止任务"
                           Command="{Binding StopGrabCommand}"
                           IsEnabled="{Binding IsGrabTaskActive}"
                           Classes="Danger"
-                          CornerRadius="12"
-                          Padding="16,12"
                           HorizontalContentAlignment="Center" />
                 </StackPanel>
               </Grid>
@@ -874,19 +859,18 @@
                          VerticalAlignment="Bottom">
                 <Button Content="手动刷新"
                         Command="{Binding RefreshReservationCommand}"
-                        Classes="Secondary Large"
+                        Classes="Secondary"
                         Margin="0,0,12,8"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center" />
                 <Button Content="停止占座"
                         Command="{Binding StopOccupyCommand}"
-                        Classes="Danger Large"
+                        Classes="Danger"
                         Margin="0,0,12,8"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center" />
                 <Button Content="开始占座"
                         Command="{Binding StartOccupyCommand}"
-                        Classes="Large"
                         Background="{DynamicResource SystemAccentColor}"
                         Foreground="White"
                         FontWeight="Bold"
@@ -927,7 +911,6 @@
                     <TextBlock Classes="field-label" Text="轮询刷新频率" />
                     <ComboBox SelectedIndex="{Binding SelectedRefreshModeIndex}"
                               ItemsSource="{Binding RefreshModes}"
-                              Classes="Bordered Large"
                               HorizontalAlignment="Stretch" />
                   </StackPanel>
 
@@ -937,7 +920,6 @@
                                    Maximum="1800"
                                    Value="{Binding ReReserveDelaySeconds}"
                                    FormatString="{}{0} 秒"
-                                   Classes="Large"
                                    HorizontalAlignment="Stretch" />
                   </StackPanel>
                 </StackPanel>
@@ -983,11 +965,11 @@
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
                       <StackPanel Spacing="8">
                         <TextBlock Text="网络 API 超时阈值（秒）" FontSize="13" Opacity="0.8"/>
-                        <NumericUpDown Minimum="3" Maximum="60" Value="{Binding ApiTimeoutSeconds}" HorizontalAlignment="Stretch" CornerRadius="8"/>
+                        <NumericUpDown Minimum="3" Maximum="60" Value="{Binding ApiTimeoutSeconds}" HorizontalAlignment="Stretch"/>
                       </StackPanel>
                       <StackPanel Grid.Column="1" Spacing="8">
                         <TextBlock Text="断线恢复重试次数（次）" FontSize="13" Opacity="0.8"/>
-                        <NumericUpDown Minimum="1" Maximum="10" Value="{Binding RetryCount}" HorizontalAlignment="Stretch" CornerRadius="8"/>
+                        <NumericUpDown Minimum="1" Maximum="10" Value="{Binding RetryCount}" HorizontalAlignment="Stretch"/>
                       </StackPanel>
                     </Grid>
 
@@ -997,14 +979,12 @@
                               Background="{DynamicResource SystemAccentColor}"
                               Foreground="White"
                               FontWeight="Bold"
-                              CornerRadius="8"
                               HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Center" />
                       <Button Grid.Column="1"
                               Content="测试Toast通知"
                               Command="{Binding TestToastCommand}"
                               Classes="Secondary"
-                              CornerRadius="8"
                               HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Center" />
                     </Grid>
@@ -1020,31 +1000,31 @@
                   <ScrollViewer MaxHeight="400">
                      <StackPanel Spacing="16" Margin="0,0,16,0">
                         <TextBlock Text="获取Cookie地址 (替换模板中的ReplaceMeByCode)" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding GetCookieTemplateText}" AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        <TextBox Text="{Binding GetCookieTemplateText}" AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
                         
                         <TextBlock Text="列出所有可用场馆模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding QueryLibrariesTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        <TextBox Text="{Binding QueryLibrariesTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
                         
                         <TextBlock Text="获取指定场馆所有座位信息模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding QueryLibraryLayoutTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        <TextBox Text="{Binding QueryLibraryLayoutTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
 
                         <TextBlock Text="查询指定场馆规则模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding QueryLibraryRuleTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        <TextBox Text="{Binding QueryLibraryRuleTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
                         
                         <TextBlock Text="获取当前预约信息模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding QueryReservationInfoTemplateText}" AcceptsReturn="True" MinHeight="100" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        <TextBox Text="{Binding QueryReservationInfoTemplateText}" AcceptsReturn="True" MinHeight="100" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
                         
                         <TextBlock Text="预约指定座位模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding ReserveSeatTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        <TextBox Text="{Binding ReserveSeatTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
                         
                         <TextBlock Text="取消当前预约模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding CancelReservationTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" CornerRadius="6" FontFamily="Consolas, monospace" FontSize="11"/>
+                        <TextBox Text="{Binding CancelReservationTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
                      </StackPanel>
                   </ScrollViewer>
 
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
-                    <Button Content="✅ 应用至程序" Command="{Binding SaveProtocolOverridesCommand}" Background="#88FF8000" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" CornerRadius="8"/>
-                    <Button Grid.Column="1" Content="🔄 恢复默认" Command="{Binding ResetProtocolOverridesCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" CornerRadius="8"/>
+                    <Button Content="✅ 应用至程序" Command="{Binding SaveProtocolOverridesCommand}" Background="#88FF8000" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                    <Button Grid.Column="1" Content="🔄 恢复默认" Command="{Binding ResetProtocolOverridesCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                   </Grid>
                 </StackPanel>
               </Border>
@@ -1090,7 +1070,6 @@
                     ColumnSpacing="12">
                 <TextBox Text="{Binding SeatFilterText}"
                          Watermark="仅按座位号过滤"
-                         CornerRadius="10"
                          VerticalAlignment="Center" />
                 <CheckBox Grid.Column="1"
                           Content="隐藏被占座位"
@@ -1182,8 +1161,6 @@
                         Background="{DynamicResource SystemAccentColor}"
                         Foreground="White"
                         FontWeight="Bold"
-                        CornerRadius="12"
-                        Padding="20,12"
                         HorizontalContentAlignment="Center" />
               </Grid>
             </Grid>

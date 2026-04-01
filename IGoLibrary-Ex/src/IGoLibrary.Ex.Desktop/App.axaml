@@ -7,6 +7,39 @@
   <Application.Styles>
     <FluentTheme />
     <semi:SemiTheme Locale="zh-CN" />
+    <Style Selector="Button">
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="16,12" />
+      <Setter Property="MinHeight" Value="44" />
+    </Style>
+    <Style Selector="Button.compact-icon">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Width" Value="32" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="MinWidth" Value="32" />
+      <Setter Property="MinHeight" Value="32" />
+    </Style>
+    <Style Selector="Button.chip-close">
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinWidth" Value="18" />
+      <Setter Property="MinHeight" Value="18" />
+    </Style>
+    <Style Selector="ComboBox">
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="14,10" />
+      <Setter Property="MinHeight" Value="44" />
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="14,10" />
+      <Setter Property="MinHeight" Value="44" />
+    </Style>
+    <Style Selector="NumericUpDown">
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="MinHeight" Value="44" />
+    </Style>
   </Application.Styles>
 
   <TrayIcon.Icons>
