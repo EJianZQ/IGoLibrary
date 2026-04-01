@@ -3,6 +3,7 @@ using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
+using Avalonia.Media;
 
 namespace IGoLibrary.Ex.Tests;
 
@@ -128,11 +129,27 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(1, libraryService.LoadLibrariesCalls);
     }
 
+    [Fact]
+    public async Task GrabDashboardStatusBrush_UsesFailureColor_WhenTaskCompletedByStopping()
+    {
+        var grabCoordinator = new FakeGrabSeatCoordinator();
+        await grabCoordinator.StopAsync();
+
+        var viewModel = CreateViewModel(grabSeatCoordinator: grabCoordinator);
+        await viewModel.InitializeAsync();
+
+        var brush = Assert.IsType<SolidColorBrush>(viewModel.GrabDashboardStatusBrush);
+
+        Assert.Equal("已停止", viewModel.GrabDashboardStatusText);
+        Assert.Equal(Color.Parse("#C93C37"), brush.Color);
+    }
+
     private static MainWindowViewModel CreateViewModel(
         FakeSessionService? sessionService = null,
         FakeLibraryService? libraryService = null,
         FakeSettingsService? settingsService = null,
-        FakeTraceIntApiClient? apiClient = null)
+        FakeTraceIntApiClient? apiClient = null,
+        FakeGrabSeatCoordinator? grabSeatCoordinator = null)
     {
         return new MainWindowViewModel(
             sessionService ?? new FakeSessionService(),
@@ -140,7 +157,7 @@ public sealed class MainWindowViewModelTests
             apiClient ?? new FakeTraceIntApiClient(),
             settingsService ?? new FakeSettingsService(AppSettings.Default),
             new FakeProtocolTemplateStore(new ProtocolTemplateSet("", "", "", "", "", "", "")),
-            new FakeGrabSeatCoordinator(),
+            grabSeatCoordinator ?? new FakeGrabSeatCoordinator(),
             new FakeOccupySeatCoordinator(),
             new ActivityLogService(),
             new FakeNotificationService(),

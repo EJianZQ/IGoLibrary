@@ -5,7 +5,7 @@ namespace IGoLibrary.Ex.Domain.Models;
 public sealed record AppSettings(
     bool NotificationsEnabled,
     bool MinimizeToTray,
-    bool AdvancedMode,
+    bool CustomApiOverridesEnabled,
     int ApiTimeoutSeconds,
     int RetryCount,
     GrabReservationStrategy GrabReservationStrategy,
@@ -15,7 +15,7 @@ public sealed record AppSettings(
     public static AppSettings Default { get; } = new(
         NotificationsEnabled: true,
         MinimizeToTray: true,
-        AdvancedMode: false,
+        CustomApiOverridesEnabled: false,
         ApiTimeoutSeconds: 5,
         RetryCount: 3,
         GrabReservationStrategy: GrabReservationStrategy.QueryThenReserve,

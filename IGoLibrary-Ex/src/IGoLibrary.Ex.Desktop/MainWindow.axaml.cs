@@ -93,7 +93,17 @@ public partial class MainWindow : Window
 
     private async void OnObservedViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is not MainWindowViewModel viewModel || !IsActive)
+        if (sender is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        if (e.PropertyName == nameof(MainWindowViewModel.GrabLogsText))
+        {
+            Dispatcher.UIThread.Post(() => GrabLogScrollViewer?.ScrollToEnd(), DispatcherPriority.Background);
+        }
+
+        if (!IsActive)
         {
             return;
         }
@@ -121,6 +131,22 @@ public partial class MainWindow : Window
         }
 
         await viewModel.HandleVenuePickerLibraryClickAsync(library);
+    }
+
+    private void OnGrabSeatOverlayPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        viewModel.CancelGrabSeatSelectionCommand.Execute(null);
+    }
+
+    private static void OnGrabSeatModalPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        e.Handled = true;
     }
 
     private async Task TryAutoParseClipboardAsync(MainWindowViewModel viewModel, bool isWindowInteractionReady)

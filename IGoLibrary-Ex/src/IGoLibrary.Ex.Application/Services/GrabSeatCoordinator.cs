@@ -98,6 +98,8 @@ public sealed class GrabSeatCoordinator(
             activityLogService.Write(LogEntryKind.Info, "Grab", $"开始监控 {plan.Seats.Count} 个目标座位。");
 
             var cycle = 0;
+            var requestCount = 0;
+            DateTimeOffset? lastRequestAt = null;
             var random = new Random();
             var settings = await settingsService.LoadAsync(cancellationToken);
             var reservationStrategy = settings.GrabReservationStrategy;
@@ -107,10 +109,18 @@ public sealed class GrabSeatCoordinator(
             while (!cancellationToken.IsCancellationRequested)
             {
                 cycle++;
+                UpdateRunningMetrics("抢座任务运行中。", cycle, requestCount, lastRequestAt);
                 var cookie = runtimeState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
+                void MarkRequestSent()
+                {
+                    requestCount++;
+                    lastRequestAt = DateTimeOffset.Now;
+                    UpdateRunningMetrics("抢座任务运行中。", cycle, requestCount, lastRequestAt);
+                }
+
                 var reservationResult = reservationStrategy == GrabReservationStrategy.ReserveDirectly
-                    ? await TryReserveDirectlyAsync(cookie, plan, directReservationStartIndex, cancellationToken)
-                    : await TryReserveAfterAvailabilityCheckAsync(cookie, plan, cancellationToken);
+                    ? await TryReserveDirectlyAsync(cookie, plan, directReservationStartIndex, MarkRequestSent, cancellationToken)
+                    : await TryReserveAfterAvailabilityCheckAsync(cookie, plan, MarkRequestSent, cancellationToken);
                 directReservationStartIndex = reservationResult.NextSeatStartIndex;
 
                 if (reservationResult.ReservedSeat is not null)
@@ -192,6 +202,15 @@ public sealed class GrabSeatCoordinator(
 
     private void SetRunning(string message)
     {
+        UpdateRunningMetrics(message, _status.PollCount, _status.RequestCount, _status.LastRequestAt);
+    }
+
+    private void UpdateRunningMetrics(
+        string message,
+        int pollCount,
+        int requestCount,
+        DateTimeOffset? lastRequestAt)
+    {
         lock (_gate)
         {
             _status = new CoordinatorStatus(
@@ -199,7 +218,10 @@ public sealed class GrabSeatCoordinator(
                 "抢座",
                 message,
                 _status.StartedAt ?? DateTimeOffset.Now,
-                DateTimeOffset.Now);
+                DateTimeOffset.Now,
+                pollCount,
+                requestCount,
+                lastRequestAt);
         }
 
         NotifyStatusChanged();
@@ -216,7 +238,10 @@ public sealed class GrabSeatCoordinator(
                 "抢座",
                 message,
                 _status.StartedAt,
-                DateTimeOffset.Now);
+                DateTimeOffset.Now,
+                _status.PollCount,
+                _status.RequestCount,
+                _status.LastRequestAt);
         }
 
         NotifyStatusChanged();
@@ -233,7 +258,10 @@ public sealed class GrabSeatCoordinator(
                 "抢座",
                 message,
                 _status.StartedAt,
-                DateTimeOffset.Now);
+                DateTimeOffset.Now,
+                _status.PollCount,
+                _status.RequestCount,
+                _status.LastRequestAt);
         }
 
         NotifyStatusChanged();
@@ -247,8 +275,10 @@ public sealed class GrabSeatCoordinator(
     private async Task<GrabReservationAttemptResult> TryReserveAfterAvailabilityCheckAsync(
         string cookie,
         GrabSeatPlan plan,
+        Action markRequestSent,
         CancellationToken cancellationToken)
     {
+        markRequestSent();
         var layout = await apiClient.GetLibraryLayoutAsync(cookie, plan.LibraryId, cancellationToken);
         runtimeState.CurrentLayout = layout;
 
@@ -262,6 +292,7 @@ public sealed class GrabSeatCoordinator(
         }
 
         activityLogService.Write(LogEntryKind.Success, "Grab", $"{availableSeat.SeatName} 空闲，正在尝试预约。");
+        markRequestSent();
         var reserved = await apiClient.ReserveSeatAsync(cookie, plan.LibraryId, availableSeat.SeatKey, cancellationToken);
         return reserved
             ? new GrabReservationAttemptResult(new TrackedSeat(availableSeat.SeatKey, availableSeat.SeatName), true, false, 0)
@@ -272,6 +303,7 @@ public sealed class GrabSeatCoordinator(
         string cookie,
         GrabSeatPlan plan,
         int startIndex,
+        Action markRequestSent,
         CancellationToken cancellationToken)
     {
         if (plan.Seats.Count == 0)
@@ -286,6 +318,7 @@ public sealed class GrabSeatCoordinator(
             bool reserved;
             try
             {
+                markRequestSent();
                 reserved = await apiClient.ReserveSeatAsync(cookie, plan.LibraryId, seat.SeatKey, cancellationToken);
             }
             catch (Exception ex) when (TryGetExpectedDirectReservationMiss(ex, out var missKind))

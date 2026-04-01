@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Domain.Models;
@@ -20,7 +21,8 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connectionF
         var result = await command.ExecuteScalarAsync(cancellationToken);
         if (result is string json && !string.IsNullOrWhiteSpace(json))
         {
-            return JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default) ?? AppSettings.Default;
+            var migratedJson = MigrateLegacyAppSettingsJson(json);
+            return JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default) ?? AppSettings.Default;
         }
 
         return AppSettings.Default;
@@ -43,5 +45,36 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connectionF
         command.Parameters.AddWithValue("$key", SettingsKey);
         command.Parameters.AddWithValue("$value", json);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static string MigrateLegacyAppSettingsJson(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object ||
+            document.RootElement.TryGetProperty("customApiOverridesEnabled", out _) ||
+            !document.RootElement.TryGetProperty("advancedMode", out _))
+        {
+            return json;
+        }
+
+        using var stream = new MemoryStream();
+        using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
+
+        writer.WriteStartObject();
+        foreach (var property in document.RootElement.EnumerateObject())
+        {
+            if (property.NameEquals("advancedMode"))
+            {
+                writer.WritePropertyName("customApiOverridesEnabled");
+                property.Value.WriteTo(writer);
+                continue;
+            }
+
+            property.WriteTo(writer);
+        }
+
+        writer.WriteEndObject();
+        writer.Flush();
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 }

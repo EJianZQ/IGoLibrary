@@ -234,7 +234,6 @@ public sealed class TraceIntApiClient(
 
         using var response = await SendGraphQlAsync(cookie, payload, cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
-        Debug.WriteLine($"[ReserveSeatAsync] seatKey={seatKey}, libraryId={libraryId}, raw={raw}");
         using var document = JsonDocument.Parse(raw);
 
         ThrowIfGraphQlError(document.RootElement);

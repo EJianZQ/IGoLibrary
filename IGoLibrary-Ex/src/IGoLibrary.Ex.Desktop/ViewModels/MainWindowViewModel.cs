@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.ComponentModel;
 using System.Text;
 using Avalonia.Threading;
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IGoLibrary.Ex.Application.Abstractions;
@@ -39,12 +40,23 @@ public partial class MainWindowViewModel(
     private string _lockedVenueAvailableSeatsText = "--";
     private string _lockedVenueOpenTimeText = "--";
     private string _lockedVenueCloseTimeText = "--";
+    private static readonly IBrush GrabStateIdleBrush = new SolidColorBrush(Color.Parse("#86909C"));
+    private static readonly IBrush GrabStateRunningBrush = new SolidColorBrush(Color.Parse("#0077FA"));
+    private static readonly IBrush GrabStateSuccessBrush = new SolidColorBrush(Color.Parse("#14804A"));
+    private static readonly IBrush GrabStateWarningBrush = new SolidColorBrush(Color.Parse("#C27803"));
+    private static readonly IBrush GrabStateFailureBrush = new SolidColorBrush(Color.Parse("#C93C37"));
+    private readonly HashSet<string> _committedSelectedSeatKeys = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _draftSelectedSeatKeys = new(StringComparer.Ordinal);
+    private bool _isSynchronizingSeatSelection;
+    private CoordinatorTaskState _grabTaskState = CoordinatorTaskState.Idle;
+    private DateTimeOffset? _grabLastRequestAt;
+    private DateTimeOffset? _grabRuntimeStartedAt;
 
     public ObservableCollection<LibrarySummary> AvailableLibraries { get; } = [];
 
     public ObservableCollection<SeatItemViewModel> VisibleSeats { get; } = [];
 
-    public ObservableCollection<string> SelectedSeatNames { get; } = [];
+    public ObservableCollection<TrackedSeat> SelectedSeats { get; } = [];
 
     public ObservableCollection<LogLineViewModel> OccupyLogLines { get; } = [];
 
@@ -52,7 +64,7 @@ public partial class MainWindowViewModel(
 
     public string[] RefreshModes { get; } = ["固定间隔 10 秒", "随机 10~20 秒"];
 
-    public string[] GrabReservationStrategies { get; } = ["先查列表再预约", "直接预约看返回值"];
+    public string[] GrabReservationStrategies { get; } = ["先获取列表判断状态", "直接发送预约请求"];
 
     public const int AccountAndVenueTabIndex = 1;
 
@@ -169,6 +181,15 @@ public partial class MainWindowViewModel(
     private bool showAvailableOnly;
 
     [ObservableProperty]
+    private bool isGrabSeatSelectionOverlayOpen;
+
+    [ObservableProperty]
+    private bool isApplyingSeatFilter;
+
+    [ObservableProperty]
+    private int visibleSeatResultCount;
+
+    [ObservableProperty]
     private int selectedGrabModeIndex = 2;
 
     [ObservableProperty]
@@ -179,6 +200,21 @@ public partial class MainWindowViewModel(
 
     [ObservableProperty]
     private string grabStatusText = "未运行";
+
+    [ObservableProperty]
+    private bool isGrabTaskActive;
+
+    [ObservableProperty]
+    private int grabPollCount;
+
+    [ObservableProperty]
+    private int grabRequestCount;
+
+    [ObservableProperty]
+    private string grabLastRequestText = "无";
+
+    [ObservableProperty]
+    private string grabRuntimeText = "00:00:00";
 
     [ObservableProperty]
     private string occupyStatusText = "未运行";
@@ -201,7 +237,7 @@ public partial class MainWindowViewModel(
     private bool minimizeToTrayEnabled = true;
 
     [ObservableProperty]
-    private bool advancedMode;
+    private bool customApiOverridesEnabled;
 
     [ObservableProperty]
     private int apiTimeoutSeconds = 5;
@@ -243,23 +279,75 @@ public partial class MainWindowViewModel(
         MinimizeToTrayEnabled &&
         (IsTaskActive(grabSeatCoordinator.GetStatus()) || IsTaskActive(occupySeatCoordinator.GetStatus()));
 
-    public int SelectedSeatCount => SelectedSeatNames.Count;
+    public int SelectedSeatCount => SelectedSeats.Count;
 
     public bool HasSelectedSeats => SelectedSeatCount > 0;
 
     public bool HasNoSelectedSeats => !HasSelectedSeats;
 
+    public bool CanEditGrabConfiguration => !IsGrabTaskActive;
+
+    public int DraftSelectedSeatCount => _draftSelectedSeatKeys.Count;
+
+    public bool HasVisibleSeatResults => VisibleSeatResultCount > 0;
+
+    public bool HasNoVisibleSeatResults => !HasVisibleSeatResults;
+
+    public bool HasSeatLayout => _allSeats.Count > 0;
+
+    public bool HasNoSeatLayout => !HasSeatLayout;
+
+    public bool ShowSeatFilterEmptyState => HasSeatLayout && HasNoVisibleSeatResults;
+
     public string SelectedSeatSummaryText => HasSelectedSeats
         ? $"已选 {SelectedSeatCount} 个目标座位"
-        : "尚未选择监控目标";
+        : "尚未选择目标座位";
 
     public string SelectedSeatHintText => HasSelectedSeats
         ? "这些座位会被持续监控，任意一个释放后都会立即尝试预约。"
-        : "在左侧勾选要监控的座位，右侧会始终显示当前选择。";
+        : "点击上方按钮打开选座工作区，确认后才会同步到主界面。";
+
+    public string DraftSelectedSeatSummaryText => DraftSelectedSeatCount > 0
+        ? $"本次已勾选 {DraftSelectedSeatCount} 个目标座位"
+        : "本次尚未勾选目标座位";
+
+    public string GrabDashboardStatusText => _grabTaskState switch
+    {
+        CoordinatorTaskState.Starting => "启动中",
+        CoordinatorTaskState.Running => "运行中",
+        CoordinatorTaskState.Stopping => "停止中",
+        CoordinatorTaskState.Completed when GrabStatusText.Contains("停止", StringComparison.OrdinalIgnoreCase) => "已停止",
+        CoordinatorTaskState.Completed => "已完成",
+        CoordinatorTaskState.Failed => "异常",
+        _ => "未运行"
+    };
+
+    public IBrush GrabDashboardStatusBrush => _grabTaskState switch
+    {
+        CoordinatorTaskState.Starting => GrabStateWarningBrush,
+        CoordinatorTaskState.Running => GrabStateRunningBrush,
+        CoordinatorTaskState.Stopping => GrabStateWarningBrush,
+        CoordinatorTaskState.Completed when GrabStatusText.Contains("停止", StringComparison.OrdinalIgnoreCase) => GrabStateFailureBrush,
+        CoordinatorTaskState.Completed => GrabStateSuccessBrush,
+        CoordinatorTaskState.Failed => GrabStateFailureBrush,
+        _ => GrabStateIdleBrush
+    };
 
     partial void OnIsOccupyRunningChanged(bool value)
     {
         OnPropertyChanged(nameof(IsOccupyStopped));
+    }
+
+    partial void OnIsGrabTaskActiveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanEditGrabConfiguration));
+    }
+
+    partial void OnVisibleSeatResultCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(HasVisibleSeatResults));
+        OnPropertyChanged(nameof(HasNoVisibleSeatResults));
+        OnPropertyChanged(nameof(ShowSeatFilterEmptyState));
     }
 
     partial void OnIsAuthorizedChanged(bool value)
@@ -308,6 +396,8 @@ public partial class MainWindowViewModel(
         activityLogService.EntryWritten += OnLogEntryWritten;
         grabSeatCoordinator.StatusChanged += OnGrabStatusChanged;
         occupySeatCoordinator.StatusChanged += OnOccupyStatusChanged;
+        ApplyGrabStatus(grabSeatCoordinator.GetStatus());
+        ApplyOccupyStatus(occupySeatCoordinator.GetStatus());
 
         if (!_reservationCountdownTimerInitialized)
         {
@@ -506,10 +596,18 @@ public partial class MainWindowViewModel(
         await sessionService.SignOutAsync();
         await ClearStoredLibrarySelectionAsync();
         CancelFiltering();
+        IsGrabSeatSelectionOverlayOpen = false;
+        _draftSelectedSeatKeys.Clear();
+        _committedSelectedSeatKeys.Clear();
         AvailableLibraries.Clear();
         _allSeats.Clear();
         VisibleSeats.Clear();
-        UpdateSelectedSeatSummary();
+        OnPropertyChanged(nameof(HasSeatLayout));
+        OnPropertyChanged(nameof(HasNoSeatLayout));
+        OnPropertyChanged(nameof(ShowSeatFilterEmptyState));
+        RefreshSelectedSeatsPresentation();
+        UpdateDraftSelectionPresentation();
+        VisibleSeatResultCount = 0;
         SelectedLibrary = null;
         IsAuthorized = false;
         SessionSummary = "未登录";
@@ -538,6 +636,7 @@ public partial class MainWindowViewModel(
         OnPropertyChanged(nameof(ShowVenueCancelPreviewButton));
         OnPropertyChanged(nameof(CanCancelVenuePreview));
         UpdateReservationPresentation(null);
+        ApplyGrabStatus(CoordinatorStatus.Idle("抢座"));
     }
 
     [RelayCommand]
@@ -592,9 +691,10 @@ public partial class MainWindowViewModel(
             }
 
             var layout = await libraryService.BindLibraryAsync(SelectedLibrary.LibraryId);
+            var preserveSelection = _lockedLibrarySummary?.LibraryId == SelectedLibrary.LibraryId;
             UpdateBoundLibraryPresentation(layout);
             await LoadVenueRulePresentationAsync(SelectedLibrary.LibraryId, persistLockedSnapshot: true);
-            await PopulateSeatsAsync(layout);
+            await PopulateSeatsAsync(layout, preserveSelection);
             await LoadFavoritesAsync();
             await RefreshReservationAsync(showNotificationOnError: false);
         }
@@ -612,7 +712,7 @@ public partial class MainWindowViewModel(
         {
             var layout = await libraryService.RefreshBoundLibraryAsync();
             UpdateBoundLibraryPresentation(layout);
-            await PopulateSeatsAsync(layout);
+            await PopulateSeatsAsync(layout, preserveSelection: true);
             await LoadFavoritesAsync();
         }
         catch (Exception ex)
@@ -636,6 +736,69 @@ public partial class MainWindowViewModel(
     private void CloseVenuePicker()
     {
         IsVenuePickerOpen = false;
+    }
+
+    [RelayCommand]
+    private async Task OpenGrabSeatSelectionOverlayAsync()
+    {
+        if (!CanEditGrabConfiguration)
+        {
+            return;
+        }
+
+        if (SelectedLibrary is null)
+        {
+            await notificationService.ShowWarningAsync("未绑定场馆", "请先绑定场馆后再选择目标座位。");
+            return;
+        }
+
+        if (_allSeats.Count == 0)
+        {
+            await RefreshSeatsAsync();
+        }
+
+        if (_allSeats.Count == 0)
+        {
+            await notificationService.ShowInfoAsync("暂无座位数据", "当前场馆还没有可供编辑的座位布局。");
+            return;
+        }
+
+        BeginGrabSeatSelectionDraft();
+        IsGrabSeatSelectionOverlayOpen = true;
+    }
+
+    [RelayCommand]
+    private void ConfirmGrabSeatSelection()
+    {
+        CommitGrabSeatSelection();
+        IsGrabSeatSelectionOverlayOpen = false;
+    }
+
+    [RelayCommand]
+    private void CancelGrabSeatSelection()
+    {
+        RestoreCommittedSeatSelection();
+        IsGrabSeatSelectionOverlayOpen = false;
+    }
+
+    [RelayCommand]
+    private void RemoveSelectedSeat(TrackedSeat? seat)
+    {
+        if (seat is null || !CanEditGrabConfiguration)
+        {
+            return;
+        }
+
+        if (!_committedSelectedSeatKeys.Remove(seat.SeatKey))
+        {
+            return;
+        }
+
+        RefreshSelectedSeatsPresentation();
+        if (!IsGrabSeatSelectionOverlayOpen)
+        {
+            ApplySelectionToSeatItems(_committedSelectedSeatKeys);
+        }
     }
 
     [RelayCommand]
@@ -707,12 +870,16 @@ public partial class MainWindowViewModel(
     [RelayCommand]
     private void ClearSelectedSeats()
     {
-        foreach (var seat in _allSeats.Where(x => x.IsSelected))
+        if (!CanEditGrabConfiguration)
         {
-            seat.IsSelected = false;
+            return;
         }
 
-        UpdateSelectedSeatSummary();
+        _committedSelectedSeatKeys.Clear();
+        _draftSelectedSeatKeys.Clear();
+        RefreshSelectedSeatsPresentation();
+        UpdateDraftSelectionPresentation();
+        ApplySelectionToSeatItems(Array.Empty<string>());
     }
 
     [RelayCommand]
@@ -724,10 +891,7 @@ public partial class MainWindowViewModel(
             return;
         }
 
-        var selectedSeats = _allSeats
-            .Where(x => x.IsSelected)
-            .Select(x => new TrackedSeat(x.SeatKey, x.SeatName))
-            .ToList();
+        var selectedSeats = SelectedSeats.ToList();
         if (selectedSeats.Count == 0)
         {
             await notificationService.ShowWarningAsync("未选择座位", "请至少选中一个目标座位。");
@@ -738,6 +902,7 @@ public partial class MainWindowViewModel(
         {
             var mode = (GrabMode)SelectedGrabModeIndex;
             var scheduledStart = ParseScheduledTime();
+            await PersistGrabReservationStrategyAsync();
             var plan = new GrabSeatPlan(
                 SelectedLibrary.LibraryId,
                 SelectedLibrary.Name,
@@ -835,7 +1000,7 @@ public partial class MainWindowViewModel(
         var settings = new AppSettings(
             NotificationsEnabled,
             MinimizeToTrayEnabled,
-            AdvancedMode,
+            CustomApiOverridesEnabled,
             Math.Max(3, ApiTimeoutSeconds),
             Math.Max(1, RetryCount),
             (GrabReservationStrategy)Math.Clamp(SelectedGrabReservationStrategyIndex, 0, GrabReservationStrategies.Length - 1),
@@ -880,12 +1045,31 @@ public partial class MainWindowViewModel(
         await notificationService.ShowSuccessAsync("协议模板已重置", "已恢复内置默认模板。");
     }
 
+    private async Task PersistGrabReservationStrategyAsync()
+    {
+        var settings = await settingsService.LoadAsync();
+        var strategy = (GrabReservationStrategy)Math.Clamp(
+            SelectedGrabReservationStrategyIndex,
+            0,
+            GrabReservationStrategies.Length - 1);
+
+        if (settings.GrabReservationStrategy == strategy)
+        {
+            return;
+        }
+
+        await settingsService.SaveAsync(settings with
+        {
+            GrabReservationStrategy = strategy
+        });
+    }
+
     private async Task LoadSettingsAsync()
     {
         var settings = await settingsService.LoadAsync();
         NotificationsEnabled = settings.NotificationsEnabled;
         MinimizeToTrayEnabled = settings.MinimizeToTray;
-        AdvancedMode = settings.AdvancedMode;
+        CustomApiOverridesEnabled = settings.CustomApiOverridesEnabled;
         ApiTimeoutSeconds = settings.ApiTimeoutSeconds;
         RetryCount = settings.RetryCount;
         SelectedGrabReservationStrategyIndex = (int)settings.GrabReservationStrategy;
@@ -1071,9 +1255,20 @@ public partial class MainWindowViewModel(
         return IsAuthorized ? "等待绑定场馆后获取" : "等待授权并绑定场馆";
     }
 
-    private async Task PopulateSeatsAsync(LibraryLayout layout)
+    private async Task PopulateSeatsAsync(LibraryLayout layout, bool preserveSelection)
     {
         CancelFiltering();
+        var selectedKeysToRestore = preserveSelection
+            ? IsGrabSeatSelectionOverlayOpen
+                ? _draftSelectedSeatKeys.ToArray()
+                : _committedSelectedSeatKeys.ToArray()
+            : Array.Empty<string>();
+
+        if (!preserveSelection)
+        {
+            _draftSelectedSeatKeys.Clear();
+            _committedSelectedSeatKeys.Clear();
+        }
 
         foreach (var seat in _allSeats)
         {
@@ -1082,16 +1277,35 @@ public partial class MainWindowViewModel(
 
         _allSeats.Clear();
         VisibleSeats.Clear();
+        _isSynchronizingSeatSelection = true;
         foreach (var seat in layout.Seats)
         {
             var item = new SeatItemViewModel(seat.SeatKey, seat.SeatName, seat.IsOccupied);
             item.PropertyChanged += OnSeatItemPropertyChanged;
+            item.IsSelected = selectedKeysToRestore.Contains(item.SeatKey, StringComparer.Ordinal);
             _allSeats.Add(item);
             VisibleSeats.Add(item);
         }
+        _isSynchronizingSeatSelection = false;
 
         await ApplySeatFilterAsync();
-        UpdateSelectedSeatSummary();
+        OnPropertyChanged(nameof(HasSeatLayout));
+        OnPropertyChanged(nameof(HasNoSeatLayout));
+        OnPropertyChanged(nameof(ShowSeatFilterEmptyState));
+
+        if (IsGrabSeatSelectionOverlayOpen)
+        {
+            RefreshDraftSelectionFromCurrentItems();
+        }
+        else if (preserveSelection)
+        {
+            RefreshSelectedSeatsPresentation();
+        }
+        else
+        {
+            RefreshSelectedSeatsPresentation();
+            UpdateDraftSelectionPresentation();
+        }
     }
 
     private async Task ApplySeatFilterAsync()
@@ -1116,6 +1330,7 @@ public partial class MainWindowViewModel(
 
         try
         {
+            IsApplyingSeatFilter = true;
             await Task.Yield();
 
             var filtered = await Task.Run(() =>
@@ -1134,6 +1349,7 @@ public partial class MainWindowViewModel(
                 return;
             }
 
+            VisibleSeatResultCount = filtered.Count(result => result.IsVisible);
             const int batchSize = 48;
             for (var start = 0; start < filtered.Length; start += batchSize)
             {
@@ -1169,28 +1385,81 @@ public partial class MainWindowViewModel(
                 }
             }
 
+            IsApplyingSeatFilter = false;
             cts.Dispose();
         }
     }
 
     private void OnSeatItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(SeatItemViewModel.IsSelected))
+        if (_isSynchronizingSeatSelection || e.PropertyName != nameof(SeatItemViewModel.IsSelected))
         {
-            UpdateSelectedSeatSummary();
+            return;
         }
+
+        if (IsGrabSeatSelectionOverlayOpen)
+        {
+            RefreshDraftSelectionFromCurrentItems();
+            return;
+        }
+
+        RefreshCommittedSelectionFromCurrentItems();
     }
 
-    private void UpdateSelectedSeatSummary()
+    private void BeginGrabSeatSelectionDraft()
     {
-        SelectedSeatNames.Clear();
-
-        foreach (var seat in _allSeats
-                     .Where(x => x.IsSelected)
-                     .OrderBy(x => int.TryParse(x.SeatName, out var number) ? number : int.MaxValue)
-                     .ThenBy(x => x.SeatName, StringComparer.OrdinalIgnoreCase))
+        _draftSelectedSeatKeys.Clear();
+        foreach (var seatKey in _committedSelectedSeatKeys)
         {
-            SelectedSeatNames.Add(seat.SeatName);
+            _draftSelectedSeatKeys.Add(seatKey);
+        }
+
+        ApplySelectionToSeatItems(_draftSelectedSeatKeys);
+        UpdateDraftSelectionPresentation();
+    }
+
+    private void CommitGrabSeatSelection()
+    {
+        RefreshCommittedSelectionFromCurrentItems();
+        _draftSelectedSeatKeys.Clear();
+        UpdateDraftSelectionPresentation();
+    }
+
+    private void RestoreCommittedSeatSelection()
+    {
+        ApplySelectionToSeatItems(_committedSelectedSeatKeys);
+        _draftSelectedSeatKeys.Clear();
+        UpdateDraftSelectionPresentation();
+    }
+
+    private void RefreshDraftSelectionFromCurrentItems()
+    {
+        _draftSelectedSeatKeys.Clear();
+        foreach (var seatKey in EnumerateSelectedSeats().Select(seat => seat.SeatKey))
+        {
+            _draftSelectedSeatKeys.Add(seatKey);
+        }
+
+        UpdateDraftSelectionPresentation();
+    }
+
+    private void RefreshCommittedSelectionFromCurrentItems()
+    {
+        _committedSelectedSeatKeys.Clear();
+        foreach (var seatKey in EnumerateSelectedSeats().Select(seat => seat.SeatKey))
+        {
+            _committedSelectedSeatKeys.Add(seatKey);
+        }
+
+        RefreshSelectedSeatsPresentation();
+    }
+
+    private void RefreshSelectedSeatsPresentation()
+    {
+        SelectedSeats.Clear();
+        foreach (var seat in EnumerateSelectedSeats(_committedSelectedSeatKeys))
+        {
+            SelectedSeats.Add(seat);
         }
 
         OnPropertyChanged(nameof(SelectedSeatCount));
@@ -1198,6 +1467,45 @@ public partial class MainWindowViewModel(
         OnPropertyChanged(nameof(HasNoSelectedSeats));
         OnPropertyChanged(nameof(SelectedSeatSummaryText));
         OnPropertyChanged(nameof(SelectedSeatHintText));
+    }
+
+    private void UpdateDraftSelectionPresentation()
+    {
+        OnPropertyChanged(nameof(DraftSelectedSeatCount));
+        OnPropertyChanged(nameof(DraftSelectedSeatSummaryText));
+    }
+
+    private void ApplySelectionToSeatItems(IEnumerable<string> selectedSeatKeys)
+    {
+        var seatKeySet = selectedSeatKeys.ToHashSet(StringComparer.Ordinal);
+        _isSynchronizingSeatSelection = true;
+        try
+        {
+            foreach (var seat in _allSeats)
+            {
+                seat.IsSelected = seatKeySet.Contains(seat.SeatKey);
+            }
+        }
+        finally
+        {
+            _isSynchronizingSeatSelection = false;
+        }
+    }
+
+    private IEnumerable<TrackedSeat> EnumerateSelectedSeats()
+    {
+        return EnumerateSelectedSeats(_allSeats.Where(x => x.IsSelected).Select(x => x.SeatKey));
+    }
+
+    private IEnumerable<TrackedSeat> EnumerateSelectedSeats(IEnumerable<string> selectedSeatKeys)
+    {
+        var selectedKeySet = selectedSeatKeys.ToHashSet(StringComparer.Ordinal);
+
+        return _allSeats
+            .Where(seat => selectedKeySet.Contains(seat.SeatKey))
+            .OrderBy(seat => int.TryParse(seat.SeatName, out var number) ? number : int.MaxValue)
+            .ThenBy(seat => seat.SeatName, StringComparer.OrdinalIgnoreCase)
+            .Select(seat => new TrackedSeat(seat.SeatKey, seat.SeatName));
     }
 
     private void ApplyFavoriteStates(IEnumerable<string> favoriteSeatKeys, bool syncSelection)
@@ -1217,7 +1525,14 @@ public partial class MainWindowViewModel(
 
         if (syncSelection)
         {
-            UpdateSelectedSeatSummary();
+            if (IsGrabSeatSelectionOverlayOpen)
+            {
+                RefreshDraftSelectionFromCurrentItems();
+            }
+            else
+            {
+                RefreshCommittedSelectionFromCurrentItems();
+            }
         }
     }
 
@@ -1284,7 +1599,7 @@ public partial class MainWindowViewModel(
 
     private void OnGrabStatusChanged(object? sender, CoordinatorStatus status)
     {
-        Dispatcher.UIThread.Post(() => GrabStatusText = status.Message);
+        Dispatcher.UIThread.Post(() => ApplyGrabStatus(status));
 
         if (status.State == CoordinatorTaskState.Completed && status.Message == "已成功预约到目标座位。")
         {
@@ -1304,16 +1619,121 @@ public partial class MainWindowViewModel(
 
     private void OnOccupyStatusChanged(object? sender, CoordinatorStatus status)
     {
-        Dispatcher.UIThread.Post(() =>
-        {
-            OccupyStatusText = status.Message;
-            IsOccupyRunning = IsTaskActive(status);
-        });
+        Dispatcher.UIThread.Post(() => ApplyOccupyStatus(status));
     }
 
     private void OnReservationCountdownTick(object? sender, EventArgs e)
     {
         UpdateReservationCountdown();
+        UpdateGrabLastRequestText();
+        UpdateGrabRuntimeClock();
+    }
+
+    private void ApplyGrabStatus(CoordinatorStatus status)
+    {
+        GrabStatusText = status.Message;
+        IsGrabTaskActive = IsTaskActive(status);
+        GrabPollCount = status.PollCount;
+        GrabRequestCount = status.RequestCount;
+        _grabLastRequestAt = status.LastRequestAt;
+        _grabTaskState = status.State;
+        UpdateGrabLastRequestText();
+        ApplyGrabRuntime(status);
+        OnPropertyChanged(nameof(GrabDashboardStatusText));
+        OnPropertyChanged(nameof(GrabDashboardStatusBrush));
+    }
+
+    private void ApplyOccupyStatus(CoordinatorStatus status)
+    {
+        OccupyStatusText = status.Message;
+        IsOccupyRunning = IsTaskActive(status);
+    }
+
+    private void UpdateGrabLastRequestText()
+    {
+        if (_grabLastRequestAt is null)
+        {
+            GrabLastRequestText = "无";
+            return;
+        }
+
+        var elapsed = DateTimeOffset.Now - _grabLastRequestAt.Value;
+        if (elapsed < TimeSpan.Zero)
+        {
+            elapsed = TimeSpan.Zero;
+        }
+
+        GrabLastRequestText = elapsed < TimeSpan.FromSeconds(1)
+            ? "刚刚"
+            : $"{Math.Max(1, (int)Math.Floor(elapsed.TotalSeconds))} 秒前";
+    }
+
+    private void ApplyGrabRuntime(CoordinatorStatus status)
+    {
+        switch (status.State)
+        {
+            case CoordinatorTaskState.Idle:
+            case CoordinatorTaskState.Starting:
+                ResetGrabRuntime();
+                return;
+            case CoordinatorTaskState.Running:
+                _grabRuntimeStartedAt ??= status.LastUpdatedAt ?? DateTimeOffset.Now;
+                UpdateGrabRuntimeText(DateTimeOffset.Now);
+                return;
+            case CoordinatorTaskState.Stopping:
+            case CoordinatorTaskState.Completed:
+            case CoordinatorTaskState.Failed:
+                FreezeGrabRuntime(status.LastUpdatedAt);
+                return;
+        }
+    }
+
+    private void UpdateGrabRuntimeClock()
+    {
+        if (_grabRuntimeStartedAt is null)
+        {
+            return;
+        }
+
+        UpdateGrabRuntimeText(DateTimeOffset.Now);
+    }
+
+    private void FreezeGrabRuntime(DateTimeOffset? stoppedAt)
+    {
+        if (_grabRuntimeStartedAt is null)
+        {
+            return;
+        }
+
+        UpdateGrabRuntimeText(stoppedAt ?? DateTimeOffset.Now);
+        _grabRuntimeStartedAt = null;
+    }
+
+    private void ResetGrabRuntime()
+    {
+        _grabRuntimeStartedAt = null;
+        GrabRuntimeText = "00:00:00";
+    }
+
+    private void UpdateGrabRuntimeText(DateTimeOffset timestamp)
+    {
+        if (_grabRuntimeStartedAt is null)
+        {
+            GrabRuntimeText = "00:00:00";
+            return;
+        }
+
+        GrabRuntimeText = FormatElapsedClock(timestamp - _grabRuntimeStartedAt.Value);
+    }
+
+    private static string FormatElapsedClock(TimeSpan elapsed)
+    {
+        if (elapsed < TimeSpan.Zero)
+        {
+            elapsed = TimeSpan.Zero;
+        }
+
+        return $"{Math.Max(0, (int)elapsed.TotalHours):D2}:{elapsed.Minutes:D2}:{elapsed.Seconds:D2}";
     }
 
     private void UpdateReservationPresentation(ReservationInfo? info)

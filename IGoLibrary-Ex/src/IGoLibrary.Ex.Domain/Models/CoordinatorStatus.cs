@@ -7,12 +7,18 @@ public sealed record CoordinatorStatus(
     string Title,
     string Message,
     DateTimeOffset? StartedAt,
-    DateTimeOffset? LastUpdatedAt)
+    DateTimeOffset? LastUpdatedAt,
+    int PollCount = 0,
+    int RequestCount = 0,
+    DateTimeOffset? LastRequestAt = null)
 {
     public static CoordinatorStatus Idle(string title) => new(
         CoordinatorTaskState.Idle,
         title,
         "未运行",
         null,
+        null,
+        0,
+        0,
         null);
 }
