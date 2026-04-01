@@ -10,7 +10,9 @@ public sealed record AppSettings(
     int RetryCount,
     GrabReservationStrategy GrabReservationStrategy,
     int? LastLibraryId,
-    string? LastLibraryName)
+    string? LastLibraryName,
+    int SuccessfulReservationCount = 0,
+    long TotalGuardSeconds = 0)
 {
     public static AppSettings Default { get; } = new(
         NotificationsEnabled: true,
@@ -20,5 +22,7 @@ public sealed record AppSettings(
         RetryCount: 3,
         GrabReservationStrategy: GrabReservationStrategy.QueryThenReserve,
         LastLibraryId: null,
-        LastLibraryName: null);
+        LastLibraryName: null,
+        SuccessfulReservationCount: 0,
+        TotalGuardSeconds: 0);
 }

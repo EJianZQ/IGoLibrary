@@ -144,12 +144,77 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(Color.Parse("#C93C37"), brush.Color);
     }
 
+    [Fact]
+    public async Task InitializeAsync_LoadsDashboardMetricsIntoHomeCards()
+    {
+        var viewModel = CreateViewModel(settingsService: new FakeSettingsService(AppSettings.Default with
+        {
+            SuccessfulReservationCount = 7,
+            TotalGuardSeconds = 5400
+        }));
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal(7, viewModel.HomeHistoricalSuccessCount);
+        Assert.Equal("1 小时 30 分", viewModel.HomeTotalGuardDurationText);
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_PreservesDashboardMetrics()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            SuccessfulReservationCount = 4,
+            TotalGuardSeconds = 7200
+        });
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        Assert.Equal(4, settingsService.CurrentSettings.SuccessfulReservationCount);
+        Assert.Equal(7200, settingsService.CurrentSettings.TotalGuardSeconds);
+    }
+
+    [Fact]
+    public async Task CancelCurrentReservationAsync_ClearsHomeReservationCard_WhenApiSucceeds()
+    {
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) => Task.FromResult<ReservationInfo?>(new ReservationInfo(
+                "token-1",
+                1,
+                "自科阅览区一",
+                "seat-4",
+                "4",
+                DateTimeOffset.Now.AddMinutes(30))),
+            OnCancelReservationAsync = (_, _, _) => Task.FromResult(true)
+        };
+        var notifications = new FakeNotificationService();
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            apiClient: apiClient,
+            notificationService: notifications);
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+        await viewModel.CancelCurrentReservationCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.HasNoCurrentReservation);
+        Assert.Equal("--", viewModel.HomeReservationSeatNumberText);
+        Assert.Contains(notifications.Successes, x => x.Title == "已取消预约");
+    }
+
     private static MainWindowViewModel CreateViewModel(
         FakeSessionService? sessionService = null,
         FakeLibraryService? libraryService = null,
         FakeSettingsService? settingsService = null,
         FakeTraceIntApiClient? apiClient = null,
-        FakeGrabSeatCoordinator? grabSeatCoordinator = null)
+        FakeGrabSeatCoordinator? grabSeatCoordinator = null,
+        FakeNotificationService? notificationService = null)
     {
         return new MainWindowViewModel(
             sessionService ?? new FakeSessionService(),
@@ -160,7 +225,7 @@ public sealed class MainWindowViewModelTests
             grabSeatCoordinator ?? new FakeGrabSeatCoordinator(),
             new FakeOccupySeatCoordinator(),
             new ActivityLogService(),
-            new FakeNotificationService(),
+            notificationService ?? new FakeNotificationService(),
             new AppWindowService());
     }
 }

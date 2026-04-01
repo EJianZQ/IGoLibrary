@@ -1,12 +1,14 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.ComponentModel;
+using System.Globalization;
 using System.Text;
 using Avalonia.Threading;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Desktop.Platform;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Helpers;
@@ -40,17 +42,27 @@ public partial class MainWindowViewModel(
     private string _lockedVenueAvailableSeatsText = "--";
     private string _lockedVenueOpenTimeText = "--";
     private string _lockedVenueCloseTimeText = "--";
+    private static readonly CultureInfo DashboardCulture = CultureInfo.GetCultureInfo("zh-CN");
     private static readonly IBrush GrabStateIdleBrush = new SolidColorBrush(Color.Parse("#86909C"));
     private static readonly IBrush GrabStateRunningBrush = new SolidColorBrush(Color.Parse("#0077FA"));
     private static readonly IBrush GrabStateSuccessBrush = new SolidColorBrush(Color.Parse("#14804A"));
     private static readonly IBrush GrabStateWarningBrush = new SolidColorBrush(Color.Parse("#C27803"));
     private static readonly IBrush GrabStateFailureBrush = new SolidColorBrush(Color.Parse("#C93C37"));
+    private static readonly IBrush DashboardRunningSoftBrush = new SolidColorBrush(Color.Parse("#E8F3FF"));
+    private static readonly IBrush DashboardSuccessSoftBrush = new SolidColorBrush(Color.Parse("#E8FFF1"));
+    private static readonly IBrush DashboardWarningSoftBrush = new SolidColorBrush(Color.Parse("#FFF5E7"));
+    private static readonly IBrush DashboardNeutralSoftBrush = new SolidColorBrush(Color.Parse("#F1F5F9"));
     private readonly HashSet<string> _committedSelectedSeatKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _draftSelectedSeatKeys = new(StringComparer.Ordinal);
     private bool _isSynchronizingSeatSelection;
     private CoordinatorTaskState _grabTaskState = CoordinatorTaskState.Idle;
     private DateTimeOffset? _grabLastRequestAt;
     private DateTimeOffset? _grabRuntimeStartedAt;
+    private int _historicalSuccessCount;
+    private long _totalGuardSeconds;
+    private DateTimeOffset? _guardTrackingStartedAt;
+    private DateTimeOffset? _lastRecordedGrabSuccessAt;
+    private DateTimeOffset? _lastRecordedOccupySuccessAt;
 
     public ObservableCollection<LibrarySummary> AvailableLibraries { get; } = [];
 
@@ -83,8 +95,86 @@ public partial class MainWindowViewModel(
 
     public bool IsUnauthorized => !IsAuthorized;
 
+    public bool HasCurrentReservation => _currentReservation is not null;
+
+    public bool HasNoCurrentReservation => !HasCurrentReservation;
+
+    public bool CanCancelCurrentReservation => _currentReservation is not null && !IsCancellingCurrentReservation;
+
     [ObservableProperty]
     private bool isInitializationComplete;
+
+    [ObservableProperty]
+    private string homeGreetingTitleText = $"早安，{GetSystemUserDisplayName()}";
+
+    [ObservableProperty]
+    private string homeGreetingMessageText = "准备好开始今天的学习了吗？";
+
+    [ObservableProperty]
+    private string homeDateText = "--";
+
+    [ObservableProperty]
+    private string homeTimeText = "--:--:--";
+
+    [ObservableProperty]
+    private string homeHeroStatusText = "等待授权";
+
+    [ObservableProperty]
+    private string homeHeroStatusDetailText = "完成登录与场馆绑定后即可启用全部引擎。";
+
+    [ObservableProperty]
+    private IBrush homeHeroStatusBrush = GrabStateIdleBrush;
+
+    [ObservableProperty]
+    private IBrush homeHeroStatusBackgroundBrush = DashboardNeutralSoftBrush;
+
+    [ObservableProperty]
+    private string homeLockedVenueTitle = "尚未锁定场馆";
+
+    [ObservableProperty]
+    private string homeLockedVenueStateText = "待授权";
+
+    [ObservableProperty]
+    private IBrush homeLockedVenueStateBrush = GrabStateWarningBrush;
+
+    [ObservableProperty]
+    private IBrush homeLockedVenueStateBackgroundBrush = DashboardWarningSoftBrush;
+
+    [ObservableProperty]
+    private int homeHistoricalSuccessCount;
+
+    [ObservableProperty]
+    private string homeTotalGuardDurationText = "0 分钟";
+
+    [ObservableProperty]
+    private string homeEngineSummaryText = "等待授权";
+
+    [ObservableProperty]
+    private string homeMemoryUsageText = "--";
+
+    [ObservableProperty]
+    private string homeReservationSeatNumberText = "--";
+
+    [ObservableProperty]
+    private string homeReservationVenueText = "当前暂无预约记录";
+
+    [ObservableProperty]
+    private string homeReservationExpirationTimeText = "--:--:--";
+
+    [ObservableProperty]
+    private string homeReservationBadgeText = "暂无预约";
+
+    [ObservableProperty]
+    private IBrush homeReservationBadgeBrush = GrabStateIdleBrush;
+
+    [ObservableProperty]
+    private IBrush homeReservationBadgeBackgroundBrush = DashboardNeutralSoftBrush;
+
+    [ObservableProperty]
+    private string homeReservationRemainingText = "--";
+
+    [ObservableProperty]
+    private bool isCancellingCurrentReservation;
 
     [ObservableProperty]
     private string librarySummary = "未绑定场馆";
@@ -338,6 +428,11 @@ public partial class MainWindowViewModel(
         OnPropertyChanged(nameof(IsOccupyStopped));
     }
 
+    partial void OnIsCancellingCurrentReservationChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanCancelCurrentReservation));
+    }
+
     partial void OnIsGrabTaskActiveChanged(bool value)
     {
         OnPropertyChanged(nameof(CanEditGrabConfiguration));
@@ -363,6 +458,16 @@ public partial class MainWindowViewModel(
             VenueFloor = GetUnboundVenueFloorText();
             _lockedVenueFloor = GetUnboundVenueFloorText();
         }
+
+        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeLockedVenuePresentation();
+        UpdateHomeSystemInfoPresentation();
+        UpdateHomeReservationCardPresentation(DateTimeOffset.Now);
+    }
+
+    partial void OnSessionSummaryChanged(string value)
+    {
+        UpdateHomeHeroPresentation(DateTimeOffset.Now);
     }
 
     partial void OnIsVenueOpenChanged(bool value)
@@ -406,6 +511,8 @@ public partial class MainWindowViewModel(
             _reservationCountdownTimer.Start();
         }
 
+        UpdateHomeDashboardPresentation();
+
         try
         {
             await LoadSettingsAsync();
@@ -434,6 +541,7 @@ public partial class MainWindowViewModel(
         finally
         {
             IsInitializationComplete = true;
+            UpdateHomeDashboardPresentation();
         }
     }
 
@@ -635,6 +743,9 @@ public partial class MainWindowViewModel(
         OnPropertyChanged(nameof(ShowVenueChangeButton));
         OnPropertyChanged(nameof(ShowVenueCancelPreviewButton));
         OnPropertyChanged(nameof(CanCancelVenuePreview));
+        UpdateHomeLockedVenuePresentation();
+        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeSystemInfoPresentation();
         UpdateReservationPresentation(null);
         ApplyGrabStatus(CoordinatorStatus.Idle("抢座"));
     }
@@ -964,6 +1075,61 @@ public partial class MainWindowViewModel(
     }
 
     [RelayCommand]
+    private async Task CancelCurrentReservationAsync()
+    {
+        if (_currentReservation is null || IsCancellingCurrentReservation)
+        {
+            return;
+        }
+
+        var session = sessionService.CurrentSession;
+        if (session is null)
+        {
+            await notificationService.ShowWarningAsync("未登录", "当前会话已失效，请重新授权后再操作。");
+            return;
+        }
+
+        var reservation = _currentReservation;
+        IsCancellingCurrentReservation = true;
+
+        try
+        {
+            if (IsOccupyRunning)
+            {
+                try
+                {
+                    await occupySeatCoordinator.StopAsync();
+                }
+                catch (Exception ex)
+                {
+                    activityLogService.Write(LogEntryKind.Warning, "Occupy", $"取消预约前停止占座失败：{ex.Message}");
+                }
+            }
+
+            var cancelled = await apiClient.CancelReservationAsync(session.Cookie, reservation.ReservationToken);
+            if (!cancelled)
+            {
+                activityLogService.Write(LogEntryKind.Warning, "Occupy", $"{reservation.SeatName} 取消预约失败，接口未返回成功结果。");
+                await notificationService.ShowWarningAsync("取消预约失败", "接口未返回成功结果，请稍后重试。");
+                return;
+            }
+
+            activityLogService.Write(LogEntryKind.Success, "Occupy", $"{reservation.SeatName} 已手动取消预约。");
+            UpdateReservationPresentation(null);
+            await notificationService.ShowSuccessAsync("已取消预约", $"{reservation.SeatName} 已取消预约。");
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Error, "Occupy", $"取消预约失败：{ex.Message}");
+            await notificationService.ShowWarningAsync("取消预约失败", ex.Message);
+        }
+        finally
+        {
+            IsCancellingCurrentReservation = false;
+        }
+    }
+
+    [RelayCommand]
     private async Task StartOccupyAsync()
     {
         try
@@ -997,15 +1163,23 @@ public partial class MainWindowViewModel(
     [RelayCommand]
     private async Task SaveSettingsAsync()
     {
-        var settings = new AppSettings(
-            NotificationsEnabled,
-            MinimizeToTrayEnabled,
-            CustomApiOverridesEnabled,
-            Math.Max(3, ApiTimeoutSeconds),
-            Math.Max(1, RetryCount),
-            (GrabReservationStrategy)Math.Clamp(SelectedGrabReservationStrategyIndex, 0, GrabReservationStrategies.Length - 1),
-            SelectedLibrary?.LibraryId,
-            SelectedLibrary?.Name);
+        var current = await settingsService.LoadAsync();
+        var settings = current with
+        {
+            NotificationsEnabled = NotificationsEnabled,
+            MinimizeToTray = MinimizeToTrayEnabled,
+            CustomApiOverridesEnabled = CustomApiOverridesEnabled,
+            ApiTimeoutSeconds = Math.Max(3, ApiTimeoutSeconds),
+            RetryCount = Math.Max(1, RetryCount),
+            GrabReservationStrategy = (GrabReservationStrategy)Math.Clamp(
+                SelectedGrabReservationStrategyIndex,
+                0,
+                GrabReservationStrategies.Length - 1),
+            LastLibraryId = SelectedLibrary?.LibraryId,
+            LastLibraryName = SelectedLibrary?.Name,
+            SuccessfulReservationCount = _historicalSuccessCount,
+            TotalGuardSeconds = GetCurrentTotalGuardSeconds(DateTimeOffset.Now)
+        };
         await settingsService.SaveAsync(settings);
         await notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库。");
     }
@@ -1073,6 +1247,10 @@ public partial class MainWindowViewModel(
         ApiTimeoutSeconds = settings.ApiTimeoutSeconds;
         RetryCount = settings.RetryCount;
         SelectedGrabReservationStrategyIndex = (int)settings.GrabReservationStrategy;
+        _historicalSuccessCount = Math.Max(0, settings.SuccessfulReservationCount);
+        _totalGuardSeconds = Math.Max(0, settings.TotalGuardSeconds);
+        HomeHistoricalSuccessCount = _historicalSuccessCount;
+        UpdateHomeDashboardPresentation();
     }
 
     private async Task LoadProtocolTemplatesAsync()
@@ -1184,6 +1362,9 @@ public partial class MainWindowViewModel(
             OnPropertyChanged(nameof(ShowVenueChangeButton));
             OnPropertyChanged(nameof(ShowVenueCancelPreviewButton));
             OnPropertyChanged(nameof(CanCancelVenuePreview));
+            UpdateHomeLockedVenuePresentation();
+            UpdateHomeHeroPresentation(DateTimeOffset.Now);
+            UpdateHomeSystemInfoPresentation();
             return;
         }
 
@@ -1248,6 +1429,9 @@ public partial class MainWindowViewModel(
         _lockedVenueAvailableSeatsText = VenueAvailableSeatsText;
         _lockedVenueOpenTimeText = VenueOpenTimeText;
         _lockedVenueCloseTimeText = VenueCloseTimeText;
+        UpdateHomeLockedVenuePresentation();
+        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeSystemInfoPresentation();
     }
 
     private string GetUnboundVenueFloorText()
@@ -1578,6 +1762,12 @@ public partial class MainWindowViewModel(
                     hasSuccessSemantic,
                     hasFailureSemantic));
 
+                if (entry.Category == "Occupy" &&
+                    entry.Message.EndsWith("已重新预约成功。", StringComparison.Ordinal))
+                {
+                    TryRecordOccupySuccess(entry.Timestamp);
+                }
+
                 if (entry.Category == "Occupy" && hasSuccessSemantic)
                 {
                     _ = Dispatcher.UIThread.InvokeAsync(async () =>
@@ -1599,7 +1789,11 @@ public partial class MainWindowViewModel(
 
     private void OnGrabStatusChanged(object? sender, CoordinatorStatus status)
     {
-        Dispatcher.UIThread.Post(() => ApplyGrabStatus(status));
+        Dispatcher.UIThread.Post(() =>
+        {
+            ApplyGrabStatus(status);
+            TryRecordGrabSuccess(status);
+        });
 
         if (status.State == CoordinatorTaskState.Completed && status.Message == "已成功预约到目标座位。")
         {
@@ -1627,6 +1821,7 @@ public partial class MainWindowViewModel(
         UpdateReservationCountdown();
         UpdateGrabLastRequestText();
         UpdateGrabRuntimeClock();
+        UpdateHomeDashboardClock();
     }
 
     private void ApplyGrabStatus(CoordinatorStatus status)
@@ -1639,6 +1834,9 @@ public partial class MainWindowViewModel(
         _grabTaskState = status.State;
         UpdateGrabLastRequestText();
         ApplyGrabRuntime(status);
+        UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
+        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeSystemInfoPresentation();
         OnPropertyChanged(nameof(GrabDashboardStatusText));
         OnPropertyChanged(nameof(GrabDashboardStatusBrush));
     }
@@ -1647,6 +1845,9 @@ public partial class MainWindowViewModel(
     {
         OccupyStatusText = status.Message;
         IsOccupyRunning = IsTaskActive(status);
+        UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
+        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeSystemInfoPresentation();
     }
 
     private void UpdateGrabLastRequestText()
@@ -1726,6 +1927,265 @@ public partial class MainWindowViewModel(
         GrabRuntimeText = FormatElapsedClock(timestamp - _grabRuntimeStartedAt.Value);
     }
 
+    private void UpdateHomeDashboardPresentation()
+    {
+        var now = DateTimeOffset.Now;
+        UpdateHomeHeroPresentation(now);
+        UpdateHomeLockedVenuePresentation();
+        UpdateHomeReservationCardPresentation(now);
+        UpdateHomeSystemInfoPresentation();
+        UpdateHomeGuardDurationPresentation(now);
+    }
+
+    private void UpdateHomeDashboardClock()
+    {
+        var now = DateTimeOffset.Now;
+        UpdateHomeHeroPresentation(now);
+        UpdateHomeReservationCardPresentation(now);
+        UpdateHomeSystemInfoPresentation();
+        UpdateHomeGuardDurationPresentation(now);
+    }
+
+    private void UpdateHomeHeroPresentation(DateTimeOffset now)
+    {
+        var localNow = now.ToLocalTime();
+        HomeGreetingTitleText = BuildGreetingTitleText(localNow.Hour);
+        HomeGreetingMessageText = BuildGreetingMessageText(localNow.Hour);
+        HomeDateText = localNow.ToString("yyyy 年 MM 月 dd 日 dddd", DashboardCulture);
+        HomeTimeText = localNow.ToString("HH:mm:ss", DashboardCulture);
+
+        var (statusText, detailText, brush, backgroundBrush) = ResolveHomeHeroStatusPresentation();
+        HomeHeroStatusText = statusText;
+        HomeHeroStatusDetailText = detailText;
+        HomeHeroStatusBrush = brush;
+        HomeHeroStatusBackgroundBrush = backgroundBrush;
+    }
+
+    private (string StatusText, string DetailText, IBrush Brush, IBrush BackgroundBrush) ResolveHomeHeroStatusPresentation()
+    {
+        if (!IsAuthorized)
+        {
+            return ("等待授权", "完成登录与场馆绑定后即可启用全部引擎。", GrabStateWarningBrush, DashboardWarningSoftBrush);
+        }
+
+        if (IsGrabTaskActive && IsOccupyRunning)
+        {
+            return ("双引擎协同中", "抢座与占座守护都在后台稳定运行。", GrabStateRunningBrush, DashboardRunningSoftBrush);
+        }
+
+        if (IsGrabTaskActive)
+        {
+            return ("抢座任务运行中", "已进入实时监控阶段，请保持程序常驻。", GrabStateRunningBrush, DashboardRunningSoftBrush);
+        }
+
+        if (IsOccupyRunning)
+        {
+            return ("占座守护运行中", "预约过期前会自动续占，请安心保持后台运行。", GrabStateSuccessBrush, DashboardSuccessSoftBrush);
+        }
+
+        if (HasLockedVenue)
+        {
+            return ("核心引擎就绪", "授权、场馆与本地配置均已准备完成。", GrabStateSuccessBrush, DashboardSuccessSoftBrush);
+        }
+
+        return ("等待绑定场馆", "当前已授权，下一步锁定一个常用场馆即可开始执行。", GrabStateWarningBrush, DashboardWarningSoftBrush);
+    }
+
+    private void UpdateHomeLockedVenuePresentation()
+    {
+        if (!IsAuthorized)
+        {
+            HomeLockedVenueTitle = "尚未锁定场馆";
+            HomeLockedVenueStateText = "待授权";
+            HomeLockedVenueStateBrush = GrabStateWarningBrush;
+            HomeLockedVenueStateBackgroundBrush = DashboardWarningSoftBrush;
+            return;
+        }
+
+        HomeLockedVenueStateText = "已授权";
+        HomeLockedVenueStateBrush = GrabStateSuccessBrush;
+        HomeLockedVenueStateBackgroundBrush = DashboardSuccessSoftBrush;
+
+        if (!HasLockedVenue)
+        {
+            HomeLockedVenueTitle = "尚未锁定场馆";
+            return;
+        }
+
+        HomeLockedVenueTitle = string.IsNullOrWhiteSpace(_lockedVenueFloor)
+            ? _lockedVenueName
+            : $"{_lockedVenueName} · {_lockedVenueFloor}";
+    }
+
+    private void UpdateHomeReservationCardPresentation(DateTimeOffset now)
+    {
+        if (_currentReservation is null)
+        {
+            HomeReservationSeatNumberText = "--";
+            HomeReservationVenueText = "当前暂无预约记录";
+            HomeReservationExpirationTimeText = "--:--:--";
+            HomeReservationBadgeText = "空闲中";
+            HomeReservationBadgeBrush = GrabStateIdleBrush;
+            HomeReservationBadgeBackgroundBrush = DashboardNeutralSoftBrush;
+            HomeReservationRemainingText = "--";
+            return;
+        }
+
+        var remaining = _currentReservation.ExpirationTime - now;
+        HomeReservationSeatNumberText = ExtractSeatNumberText(_currentReservation.SeatName);
+        HomeReservationVenueText = _currentReservation.LibraryName;
+        HomeReservationExpirationTimeText = _currentReservation.ExpirationTime.ToString("HH:mm:ss", DashboardCulture);
+
+        if (remaining <= TimeSpan.Zero)
+        {
+            HomeReservationBadgeText = "待刷新";
+            HomeReservationBadgeBrush = GrabStateWarningBrush;
+            HomeReservationBadgeBackgroundBrush = DashboardWarningSoftBrush;
+            HomeReservationRemainingText = "已到期";
+            return;
+        }
+
+        HomeReservationBadgeText = "生效中";
+        HomeReservationBadgeBrush = GrabStateSuccessBrush;
+        HomeReservationBadgeBackgroundBrush = DashboardSuccessSoftBrush;
+        HomeReservationRemainingText = FormatReservationRemaining(remaining);
+    }
+
+    private void UpdateHomeSystemInfoPresentation()
+    {
+        HomeEngineSummaryText = BuildHomeEngineSummaryText();
+        HomeMemoryUsageText = MeasureMemoryUsageText();
+    }
+
+    private string BuildHomeEngineSummaryText()
+    {
+        if (!IsAuthorized)
+        {
+            return "等待授权";
+        }
+
+        if (IsGrabTaskActive && IsOccupyRunning)
+        {
+            return "抢座运行中 · 占座守护运行中";
+        }
+
+        if (IsGrabTaskActive)
+        {
+            return "抢座运行中 · 占座守护待命";
+        }
+
+        if (IsOccupyRunning)
+        {
+            return "抢座待命 · 占座守护运行中";
+        }
+
+        return HasLockedVenue ? "所有核心模块已就绪" : "等待绑定场馆";
+    }
+
+    private void UpdateGuardTracking(DateTimeOffset timestamp)
+    {
+        if (IsGrabTaskActive || IsOccupyRunning)
+        {
+            _guardTrackingStartedAt ??= timestamp;
+            UpdateHomeGuardDurationPresentation(timestamp);
+            return;
+        }
+
+        if (_guardTrackingStartedAt is null)
+        {
+            UpdateHomeGuardDurationPresentation(timestamp);
+            return;
+        }
+
+        _totalGuardSeconds = GetCurrentTotalGuardSeconds(timestamp);
+        _guardTrackingStartedAt = null;
+        UpdateHomeGuardDurationPresentation(timestamp);
+        _ = PersistDashboardMetricsAsync();
+    }
+
+    private void UpdateHomeGuardDurationPresentation(DateTimeOffset timestamp)
+    {
+        HomeTotalGuardDurationText = FormatGuardDuration(GetCurrentTotalGuardSeconds(timestamp));
+    }
+
+    private long GetCurrentTotalGuardSeconds(DateTimeOffset timestamp)
+    {
+        var total = _totalGuardSeconds;
+        if (_guardTrackingStartedAt is null)
+        {
+            return Math.Max(0, total);
+        }
+
+        var elapsed = timestamp - _guardTrackingStartedAt.Value;
+        if (elapsed <= TimeSpan.Zero)
+        {
+            return Math.Max(0, total);
+        }
+
+        return Math.Max(0, total + (long)Math.Floor(elapsed.TotalSeconds));
+    }
+
+    private void TryRecordGrabSuccess(CoordinatorStatus status)
+    {
+        if (status.State != CoordinatorTaskState.Completed ||
+            status.Message != "已成功预约到目标座位。")
+        {
+            return;
+        }
+
+        var recordedAt = status.LastUpdatedAt ?? DateTimeOffset.Now;
+        if (_lastRecordedGrabSuccessAt == recordedAt)
+        {
+            return;
+        }
+
+        _lastRecordedGrabSuccessAt = recordedAt;
+        _ = RecordSuccessfulReservationAsync();
+    }
+
+    private void TryRecordOccupySuccess(DateTimeOffset timestamp)
+    {
+        if (_lastRecordedOccupySuccessAt == timestamp)
+        {
+            return;
+        }
+
+        _lastRecordedOccupySuccessAt = timestamp;
+        _ = RecordSuccessfulReservationAsync();
+    }
+
+    private async Task RecordSuccessfulReservationAsync()
+    {
+        _historicalSuccessCount++;
+        HomeHistoricalSuccessCount = _historicalSuccessCount;
+        await PersistDashboardMetricsAsync();
+    }
+
+    private async Task PersistDashboardMetricsAsync()
+    {
+        try
+        {
+            var current = await settingsService.LoadAsync();
+            var totalGuardSeconds = GetCurrentTotalGuardSeconds(DateTimeOffset.Now);
+
+            if (current.SuccessfulReservationCount == _historicalSuccessCount &&
+                current.TotalGuardSeconds == totalGuardSeconds)
+            {
+                return;
+            }
+
+            await settingsService.SaveAsync(current with
+            {
+                SuccessfulReservationCount = _historicalSuccessCount,
+                TotalGuardSeconds = totalGuardSeconds
+            });
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Dashboard", $"保存首页统计信息失败：{ex.Message}");
+        }
+    }
+
     private static string FormatElapsedClock(TimeSpan elapsed)
     {
         if (elapsed < TimeSpan.Zero)
@@ -1736,9 +2196,92 @@ public partial class MainWindowViewModel(
         return $"{Math.Max(0, (int)elapsed.TotalHours):D2}:{elapsed.Minutes:D2}:{elapsed.Seconds:D2}";
     }
 
+    private static string BuildGreetingTitleText(int hour)
+    {
+        return hour switch
+        {
+            < 5 => $"夜深了，{GetSystemUserDisplayName()}",
+            < 11 => $"早安，{GetSystemUserDisplayName()}",
+            < 14 => $"中午好，{GetSystemUserDisplayName()}",
+            < 18 => $"下午好，{GetSystemUserDisplayName()}",
+            < 23 => $"晚上好，{GetSystemUserDisplayName()}",
+            _ => $"夜深了，{GetSystemUserDisplayName()}"
+        };
+    }
+
+    private static string BuildGreetingMessageText(int hour)
+    {
+        return hour switch
+        {
+            < 5 => "也别忘了给自己留一点休息时间。",
+            < 11 => "准备好开始今天的学习了吗？",
+            < 14 => "给今天的计划加把劲吧。",
+            < 18 => "专注状态已经准备就绪。",
+            < 23 => "把今天最后一段时间好好度过吧。",
+            _ => "也别忘了给自己留一点休息时间。"
+        };
+    }
+
+    private static string GetSystemUserDisplayName()
+    {
+        return SystemUserDisplayNameResolver.GetCurrentDisplayName();
+    }
+
+    private static string FormatGuardDuration(long totalSeconds)
+    {
+        if (totalSeconds <= 0)
+        {
+            return "0 分钟";
+        }
+
+        var duration = TimeSpan.FromSeconds(totalSeconds);
+        if (duration.TotalHours >= 24)
+        {
+            return $"{Math.Max(1, (int)Math.Floor(duration.TotalHours))} 小时";
+        }
+
+        if (duration.TotalHours >= 1)
+        {
+            return $"{(int)duration.TotalHours} 小时 {duration.Minutes:D2} 分";
+        }
+
+        return $"{Math.Max(1, duration.Minutes)} 分钟";
+    }
+
+    private static string FormatReservationRemaining(TimeSpan remaining)
+    {
+        if (remaining.TotalHours >= 1)
+        {
+            return remaining.ToString(@"hh\:mm\:ss", DashboardCulture);
+        }
+
+        return remaining.ToString(@"mm\:ss", DashboardCulture);
+    }
+
+    private static string ExtractSeatNumberText(string seatName)
+    {
+        if (string.IsNullOrWhiteSpace(seatName))
+        {
+            return "--";
+        }
+
+        var digits = new string(seatName.Where(char.IsDigit).ToArray());
+        return string.IsNullOrWhiteSpace(digits) ? seatName : digits;
+    }
+
+    private static string MeasureMemoryUsageText()
+    {
+        using var process = Process.GetCurrentProcess();
+        var memory = process.WorkingSet64 / 1024d / 1024d;
+        return $"{memory:0.#} MB";
+    }
+
     private void UpdateReservationPresentation(ReservationInfo? info)
     {
         _currentReservation = info;
+        OnPropertyChanged(nameof(HasCurrentReservation));
+        OnPropertyChanged(nameof(HasNoCurrentReservation));
+        OnPropertyChanged(nameof(CanCancelCurrentReservation));
 
         if (info is null)
         {
@@ -1746,12 +2289,16 @@ public partial class MainWindowViewModel(
             ReservationHeroTitle = "暂无预约";
             ReservationExpiryText = "到期：--:--:--";
             ReservationCountdownText = "等待建立预约状态";
+            UpdateHomeReservationCardPresentation(DateTimeOffset.Now);
+            UpdateHomeSystemInfoPresentation();
             return;
         }
 
         ReservationSummary = $"{info.LibraryName} / {info.SeatName} / 到期 {info.ExpirationTime:HH:mm:ss}";
         ReservationHeroTitle = $"{info.LibraryName} · {info.SeatName}";
         UpdateReservationCountdown();
+        UpdateHomeReservationCardPresentation(DateTimeOffset.Now);
+        UpdateHomeSystemInfoPresentation();
     }
 
     private void UpdateReservationCountdown()

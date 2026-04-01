@@ -46,6 +46,23 @@
       <GradientStop Color="#F4F9FF" Offset="0.55" />
       <GradientStop Color="#EAF3FF" Offset="1" />
     </LinearGradientBrush>
+    <LinearGradientBrush x:Key="DashboardHeroBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#FFFFFF" Offset="0" />
+      <GradientStop Color="#F2F8FF" Offset="0.48" />
+      <GradientStop Color="#EDF5FF" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="DashboardTimeCardBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#FFFFFF" Offset="0" />
+      <GradientStop Color="#F8FBFF" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="DashboardTicketBrush" StartPoint="0,0" EndPoint="1,1">
+      <GradientStop Color="#FFFFFF" Offset="0" />
+      <GradientStop Color="#F9FBFF" Offset="0.54" />
+      <GradientStop Color="#F1F7FF" Offset="1" />
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="DashboardSurfaceBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="DashboardMutedSurfaceBrush" Color="#F7FAFC" />
+    <SolidColorBrush x:Key="DashboardDividerBrush" Color="#DCE6F2" />
   </Window.Resources>
 
   <Window.Styles>
@@ -123,6 +140,81 @@
       <Setter Property="FontSize" Value="28" />
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Border.dashboard-card">
+      <Setter Property="Background" Value="{StaticResource DashboardSurfaceBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="28" />
+      <Setter Property="Padding" Value="22" />
+    </Style>
+    <Style Selector="TextBlock.dashboard-eyebrow">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextTertiaryBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.dashboard-hero-title">
+      <Setter Property="FontSize" Value="30" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="LineHeight" Value="38" />
+    </Style>
+    <Style Selector="TextBlock.dashboard-hero-subtitle">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextSecondaryBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="LineHeight" Value="24" />
+    </Style>
+    <Style Selector="TextBlock.dashboard-clock-date">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.dashboard-clock-time">
+      <Setter Property="FontSize" Value="36" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.dashboard-card-title">
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.dashboard-stat-value">
+      <Setter Property="FontSize" Value="30" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.dashboard-detail">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextSecondaryBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="LineHeight" Value="20" />
+    </Style>
+    <Style Selector="TextBlock.dashboard-ticket-seat">
+      <Setter Property="FontSize" Value="60" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.dashboard-ticket-caption">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextTertiaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.dashboard-ticket-body">
+      <Setter Property="FontSize" Value="18" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="Border.dashboard-info-row">
+      <Setter Property="Background" Value="{StaticResource DashboardMutedSurfaceBrush}" />
+      <Setter Property="CornerRadius" Value="20" />
+      <Setter Property="Padding" Value="16" />
     </Style>
   </Window.Styles>
 
@@ -262,30 +354,259 @@
         
         <!-- Tab 0: Home -->
         <ScrollViewer>
-          <StackPanel Spacing="24" Margin="0,0,16,0">
-            <TextBlock Classes="page-title" Text="首页" />
-            
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
-              <Border Classes="card">
+          <StackPanel Spacing="18" Margin="0,0,16,0">
+            <Border Classes="dashboard-card Shadow"
+                    Background="{StaticResource DashboardHeroBrush}"
+                    Padding="22,20">
+              <Grid ColumnDefinitions="1.55*,0.95*" ColumnSpacing="22">
+                <StackPanel Spacing="14">
+                  <Border Background="#F7FBFF"
+                          BorderBrush="#D7E7FF"
+                          BorderThickness="1"
+                          CornerRadius="999"
+                          Padding="12,5"
+                          HorizontalAlignment="Left">
+                    <TextBlock Classes="dashboard-eyebrow"
+                               Foreground="{StaticResource SemiAccentBrush}"
+                               Text="个人专属仪表盘" />
+                  </Border>
+
+                  <StackPanel Spacing="6"
+                              MaxWidth="580">
+                    <TextBlock Classes="dashboard-hero-title"
+                               Text="{Binding HomeGreetingTitleText}" />
+                    <TextBlock Classes="dashboard-hero-subtitle"
+                               Text="{Binding HomeGreetingMessageText}" />
+                  </StackPanel>
+                </StackPanel>
+
+                <Border Grid.Column="1"
+                        Background="{StaticResource DashboardTimeCardBrush}"
+                        CornerRadius="24"
+                        Padding="18"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch">
+                  <StackPanel Spacing="10">
+                    <TextBlock Classes="dashboard-clock-date"
+                               Text="{Binding HomeDateText}" />
+                    <TextBlock Classes="dashboard-clock-time"
+                               Text="{Binding HomeTimeText}" />
+
+                    <Border Background="{Binding HomeHeroStatusBackgroundBrush}"
+                            CornerRadius="999"
+                            Padding="12,8"
+                            HorizontalAlignment="Left">
+                      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <Ellipse Width="10"
+                                 Height="10"
+                                 Fill="{Binding HomeHeroStatusBrush}" />
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding HomeHeroStatusText}"
+                                     FontSize="13"
+                                     FontWeight="SemiBold"
+                                     Foreground="{Binding HomeHeroStatusBrush}" />
+                          <TextBlock Text="{Binding HomeHeroStatusDetailText}"
+                                     FontSize="12"
+                                     Foreground="{StaticResource SemiTextSecondaryBrush}"
+                                     MaxWidth="240"
+                                     TextWrapping="Wrap" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </Border>
+
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="20">
+              <Border Classes="dashboard-card Shadow" Padding="20">
                 <StackPanel Spacing="12">
-                  <TextBlock Text="抢座引擎状态" Classes="section-title" Margin="0"/>
-                  <TextBlock Text="{Binding GrabStatusText}" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource SystemAccentColor}"/>
+                  <TextBlock Classes="dashboard-eyebrow" Text="当前锁定场馆" />
+                  <TextBlock Classes="dashboard-card-title"
+                             Text="{Binding HomeLockedVenueTitle}" />
+                  <Border Background="{Binding HomeLockedVenueStateBackgroundBrush}"
+                          CornerRadius="999"
+                          Padding="12,7"
+                          HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <Ellipse Width="8"
+                               Height="8"
+                               Fill="{Binding HomeLockedVenueStateBrush}" />
+                      <TextBlock Text="{Binding HomeLockedVenueStateText}"
+                                 FontSize="12"
+                                 FontWeight="SemiBold"
+                                 Foreground="{Binding HomeLockedVenueStateBrush}" />
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
               </Border>
-              <Border Classes="card" Grid.Column="1">
-                <StackPanel Spacing="12">
-                  <TextBlock Text="占座守护状态" Classes="section-title" Margin="0"/>
-                  <TextBlock Text="{Binding OccupyStatusText}" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource SystemAccentColor}"/>
-                </StackPanel>
+
+              <Border Grid.Column="1" Classes="dashboard-card Shadow" Padding="20">
+                <Grid RowDefinitions="Auto,*"
+                      RowSpacing="10"
+                      MinHeight="98">
+                  <TextBlock Classes="dashboard-eyebrow" Text="历史成功次数" />
+                  <TextBlock Classes="dashboard-stat-value"
+                             Grid.Row="1"
+                             VerticalAlignment="Center"
+                             Text="{Binding HomeHistoricalSuccessCount}" />
+                </Grid>
+              </Border>
+
+              <Border Grid.Column="2" Classes="dashboard-card Shadow" Padding="20">
+                <Grid RowDefinitions="Auto,*"
+                      RowSpacing="10"
+                      MinHeight="98">
+                  <TextBlock Classes="dashboard-eyebrow" Text="累计守护时长" />
+                  <TextBlock Classes="dashboard-stat-value"
+                             Grid.Row="1"
+                             VerticalAlignment="Center"
+                             Text="{Binding HomeTotalGuardDurationText}" />
+                </Grid>
               </Border>
             </Grid>
 
-            <Border Classes="card">
+            <Grid ColumnDefinitions="1.65*,1*" ColumnSpacing="24">
+              <Border Classes="dashboard-card Shadow"
+                      Background="{StaticResource DashboardTicketBrush}"
+                      MinHeight="242"
+                      Padding="22,20">
+                <Grid>
+                  <Grid IsVisible="{Binding HasCurrentReservation}"
+                        RowDefinitions="Auto,*,Auto"
+                        RowSpacing="18">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                      <TextBlock Classes="dashboard-eyebrow"
+                                 Text="当前预约"
+                                 VerticalAlignment="Center" />
+
+                      <Border Background="{Binding HomeReservationBadgeBackgroundBrush}"
+                              CornerRadius="999"
+                              Padding="12,6"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Top">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                          <Ellipse Width="8"
+                                   Height="8"
+                                   Fill="{Binding HomeReservationBadgeBrush}" />
+                          <TextBlock Text="{Binding HomeReservationBadgeText}"
+                                     FontSize="12"
+                                     FontWeight="SemiBold"
+                                     Foreground="{Binding HomeReservationBadgeBrush}" />
+                        </StackPanel>
+                      </Border>
+                    </Grid>
+
+                    <Grid Grid.Row="1"
+                          ColumnDefinitions="128,*"
+                          ColumnSpacing="20"
+                          VerticalAlignment="Stretch">
+                      <StackPanel Spacing="2"
+                                  VerticalAlignment="Stretch"
+                                  HorizontalAlignment="Left">
+                        <TextBlock Classes="dashboard-ticket-seat"
+                                   Text="{Binding HomeReservationSeatNumberText}" />
+                        <TextBlock Classes="dashboard-ticket-caption"
+                                   Text="座位号" />
+                      </StackPanel>
+
+                      <StackPanel Grid.Column="1"
+                                  Spacing="10"
+                                  VerticalAlignment="Center">
+                        <TextBlock FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource SemiTextPrimaryBrush}">
+                          <Run Text="场馆名称：" />
+                          <Run Text="{Binding HomeReservationVenueText}" />
+                        </TextBlock>
+
+                        <TextBlock FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource SemiTextPrimaryBrush}">
+                          <Run Text="当前有效至：" />
+                          <Run Text="{Binding HomeReservationExpirationTimeText}" />
+                        </TextBlock>
+
+                        <TextBlock FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource SemiTextPrimaryBrush}">
+                          <Run Text="剩余时间：" />
+                          <Run Text="{Binding HomeReservationRemainingText}" />
+                        </TextBlock>
+                      </StackPanel>
+                    </Grid>
+
+                    <Button Grid.Row="2"
+                            Content="取消当前预约"
+                            Classes="Danger"
+                            Command="{Binding CancelCurrentReservationCommand}"
+                            IsEnabled="{Binding CanCancelCurrentReservation}"
+                            HorizontalAlignment="Right"
+                            HorizontalContentAlignment="Center"
+                            MinWidth="152" />
+                  </Grid>
+
+                  <StackPanel IsVisible="{Binding HasNoCurrentReservation}"
+                              Spacing="12"
+                              VerticalAlignment="Center"
+                              HorizontalAlignment="Center">
+                    <Border Width="54"
+                            Height="54"
+                            CornerRadius="27"
+                            Background="#FFFFFF"
+                            BorderBrush="#E2EBF6"
+                            BorderThickness="1">
+                      <PathIcon Data="{StaticResource IconOccupy}"
+                                Width="28"
+                                Height="28"
+                                Foreground="{StaticResource SemiAccentBrush}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="当前暂无预约记录"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource SemiTextPrimaryBrush}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="去配置一个新任务吧，首页会在这里展示最新的预约状态与生效结果。"
+                               Classes="dashboard-detail"
+                               MaxWidth="380"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+
+              <Border Grid.Column="1"
+                      Classes="dashboard-card Shadow"
+                      MinHeight="242"
+                      Padding="20">
                 <StackPanel Spacing="12">
-                  <TextBlock Classes="section-title" Text="综合运行日志" />
-                <TextBox Text="{Binding AllLogsText}" MinHeight="320" AcceptsReturn="True" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="13" />
+                  <TextBlock Classes="dashboard-eyebrow" Text="系统信息" />
+
+                  <Border Classes="dashboard-info-row">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="dashboard-ticket-caption" Text="核心引擎" />
+                      <TextBlock FontSize="18"
+                                 FontWeight="SemiBold"
+                                 Foreground="{StaticResource SemiTextPrimaryBrush}"
+                                 Text="{Binding HomeEngineSummaryText}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="dashboard-info-row">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="dashboard-ticket-caption" Text="内存占用" />
+                      <TextBlock FontSize="18"
+                                 FontWeight="SemiBold"
+                                 Foreground="{StaticResource SemiTextPrimaryBrush}"
+                                 Text="{Binding HomeMemoryUsageText}" />
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
               </Border>
+            </Grid>
           </StackPanel>
         </ScrollViewer>
 

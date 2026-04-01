@@ -366,3 +366,5 @@ FodyWeavers.xsd
 # Local Codex/.NET workspace caches
 /.dotnet-cli/
 /.home/
+/IGoLibrary-Ex/.dotnet-cli/
+/IGoLibrary-Ex/.home/
