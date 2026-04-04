@@ -219,6 +219,12 @@
   </Window.Styles>
 
   <Window.DataTemplates>
+    <DataTemplate x:DataType="vm:SidebarNavigationItem">
+      <StackPanel Orientation="Horizontal" Spacing="16">
+        <PathIcon Data="{Binding IconPathData}" Width="18" Height="18" Opacity="0.8"/>
+        <TextBlock Text="{Binding Title}" FontSize="15" VerticalAlignment="Center"/>
+      </StackPanel>
+    </DataTemplate>
     <DataTemplate x:DataType="vm:SeatItemViewModel">
       <Grid Width="52"
             Height="52"
@@ -300,38 +306,13 @@
         <TextBlock Grid.Row="0" Text="IGoLibrary-Ex 端" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Margin="24,0,0,0" Opacity="0.7" IsHitTestVisible="False"/>
         
         <!-- Navigation Menu -->
-        <ListBox Grid.Row="1" Classes="sidebar" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,16,0,0" Background="Transparent" BorderThickness="0">
-          <ListBoxItem>
-            <StackPanel Orientation="Horizontal" Spacing="16">
-              <PathIcon Data="{StaticResource IconHome}" Width="18" Height="18" Opacity="0.8"/>
-              <TextBlock Text="首页" FontSize="15" VerticalAlignment="Center"/>
-            </StackPanel>
-          </ListBoxItem>
-          <ListBoxItem>
-            <StackPanel Orientation="Horizontal" Spacing="16">
-              <PathIcon Data="{StaticResource IconLogin}" Width="18" Height="18" Opacity="0.8"/>
-              <TextBlock Text="账户与场馆" FontSize="15" VerticalAlignment="Center"/>
-            </StackPanel>
-          </ListBoxItem>
-          <ListBoxItem>
-            <StackPanel Orientation="Horizontal" Spacing="16">
-              <PathIcon Data="{StaticResource IconGrab}" Width="18" Height="18" Opacity="0.8"/>
-              <TextBlock Text="抢座" FontSize="15" VerticalAlignment="Center"/>
-            </StackPanel>
-          </ListBoxItem>
-          <ListBoxItem>
-            <StackPanel Orientation="Horizontal" Spacing="16">
-              <PathIcon Data="{StaticResource IconOccupy}" Width="18" Height="18" Opacity="0.8"/>
-              <TextBlock Text="占座" FontSize="15" VerticalAlignment="Center"/>
-            </StackPanel>
-          </ListBoxItem>
-          <ListBoxItem>
-            <StackPanel Orientation="Horizontal" Spacing="16">
-              <PathIcon Data="{StaticResource IconSettings}" Width="18" Height="18" Opacity="0.8"/>
-              <TextBlock Text="系统设置" FontSize="15" VerticalAlignment="Center"/>
-            </StackPanel>
-          </ListBoxItem>
-        </ListBox>
+        <ListBox Grid.Row="1"
+                 Classes="sidebar"
+                 ItemsSource="{Binding SidebarItems}"
+                 SelectedItem="{Binding SelectedSidebarItem}"
+                 Margin="0,16,0,0"
+                 Background="Transparent"
+                 BorderThickness="0" />
         
         <!-- Bottom Info -->
         <StackPanel Grid.Row="2" Margin="24,24,24,32" Spacing="8">

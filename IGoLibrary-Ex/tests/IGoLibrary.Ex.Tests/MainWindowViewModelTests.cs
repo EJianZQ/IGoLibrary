@@ -40,6 +40,28 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void SidebarItems_OnlyExposeHomeAndAccount_WhenUnauthorized()
+    {
+        var viewModel = CreateViewModel();
+
+        var titles = viewModel.SidebarItems.Select(item => item.Title).ToArray();
+
+        Assert.Equal(["首页", "账户与场馆"], titles);
+    }
+
+    [Fact]
+    public void SidebarItems_ExposeRestrictedEntries_WhenAuthorized()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.IsAuthorized = true;
+
+        var titles = viewModel.SidebarItems.Select(item => item.Title).ToArray();
+
+        Assert.Equal(["首页", "账户与场馆", "抢座", "占座", "系统设置"], titles);
+    }
+
+    [Fact]
     public async Task SignOutAsync_ClearsStoredLastLibrarySelection()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default with
@@ -56,12 +78,14 @@ public sealed class MainWindowViewModelTests
             settingsService: settingsService);
 
         viewModel.IsAuthorized = true;
+        viewModel.SelectedTabIndex = 4;
         viewModel.SelectedLibrary = new LibrarySummary(1, "场馆A", "3层", true, 120, 20, 10);
 
         await viewModel.SignOutCommand.ExecuteAsync(null);
 
         Assert.Equal(1, sessionService.SignOutCalls);
         Assert.False(viewModel.IsAuthorized);
+        Assert.Equal(MainWindowViewModel.AccountAndVenueTabIndex, viewModel.SelectedTabIndex);
         Assert.Null(viewModel.SelectedLibrary);
         Assert.Null(settingsService.CurrentSettings.LastLibraryId);
         Assert.Null(settingsService.CurrentSettings.LastLibraryName);
