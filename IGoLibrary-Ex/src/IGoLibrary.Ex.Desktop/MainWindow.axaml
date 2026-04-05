@@ -216,6 +216,48 @@
       <Setter Property="CornerRadius" Value="20" />
       <Setter Property="Padding" Value="16" />
     </Style>
+    <Style Selector="Border.notify-toggle-card">
+      <Setter Property="Background" Value="{StaticResource DashboardMutedSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource SemiCardBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="22" />
+      <Setter Property="Padding" Value="18" />
+    </Style>
+    <Style Selector="Button.notification-segment">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Padding" Value="16,10" />
+      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Opacity" Value="0.92" />
+    </Style>
+    <Style Selector="Button.notification-segment:pointerover">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.notification-segment:pressed">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.notification-segment /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="999" />
+    </Style>
+    <Style Selector="Button.notification-segment:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#12FFFFFF" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.notification-segment:pressed /template/ ContentPresenter">
+      <Setter Property="Background" Value="#1CFFFFFF" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
   </Window.Styles>
 
   <Window.DataTemplates>
@@ -1262,7 +1304,262 @@
           </Grid>
         </Grid>
 
-        <!-- Tab 4: Settings -->
+        <!-- Tab 4: Notification Settings -->
+        <ScrollViewer>
+          <StackPanel Spacing="24"
+                      Margin="0,0,16,0"
+                      HorizontalAlignment="Stretch">
+            <TextBlock Classes="page-title" Text="通知设置" Margin="0" />
+            <Border Classes="semi-card Shadow">
+              <Grid RowDefinitions="Auto,Auto"
+                    RowSpacing="24">
+                <StackPanel Spacing="10">
+                  <Border Background="{StaticResource DashboardMutedSurfaceBrush}"
+                          BorderBrush="{StaticResource SemiCardBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="999"
+                          Padding="5"
+                          Width="{Binding NotificationSegmentControlWidth}"
+                          HorizontalAlignment="Center">
+                    <Grid ColumnDefinitions="*,*"
+                          ColumnSpacing="6"
+                          ClipToBounds="True">
+                      <Border Background="White"
+                              Width="{Binding NotificationSegmentSliderWidth}"
+                              CornerRadius="999"
+                              BoxShadow="0 2 10 0 #120F172A"
+                              HorizontalAlignment="Left"
+                              VerticalAlignment="Stretch"
+                              IsHitTestVisible="False">
+                        <Border.RenderTransform>
+                          <TranslateTransform X="{Binding NotificationSegmentSliderOffset}">
+                            <TranslateTransform.Transitions>
+                              <Transitions>
+                                <DoubleTransition Property="X"
+                                                  Duration="0:0:0.26"
+                                                  Easing="CircularEaseOut" />
+                              </Transitions>
+                            </TranslateTransform.Transitions>
+                          </TranslateTransform>
+                        </Border.RenderTransform>
+                      </Border>
+
+                      <Grid Grid.Column="0">
+                        <Button Classes="notification-segment"
+                                Background="Transparent"
+                                Foreground="{Binding EmailNotificationTabForegroundBrush}"
+                                BorderThickness="0"
+                                CornerRadius="999"
+                                Content="邮件提醒配置"
+                                Command="{Binding ShowEmailNotificationSettingsCommand}" />
+                      </Grid>
+
+                      <Grid Grid.Column="1">
+                        <Button Classes="notification-segment"
+                                Background="Transparent"
+                                Foreground="{Binding LocalNotificationTabForegroundBrush}"
+                                BorderThickness="0"
+                                CornerRadius="999"
+                                Content="本地弹窗提醒"
+                                Command="{Binding ShowLocalNotificationSettingsCommand}" />
+                      </Grid>
+                    </Grid>
+                  </Border>
+
+                  <TextBlock Classes="helper-text"
+                             HorizontalAlignment="Center"
+                             Text="{Binding NotificationSettingsStatusText}" />
+                </StackPanel>
+
+                <Carousel Grid.Row="1"
+                          SelectedIndex="{Binding SelectedNotificationSettingsTabIndex}"
+                          HorizontalAlignment="Stretch">
+                  <Carousel.PageTransition>
+                    <CrossFade Duration="0:0:0.25" />
+                  </Carousel.PageTransition>
+
+                  <Grid HorizontalAlignment="Stretch">
+                    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                          ColumnDefinitions="*,*"
+                          RowSpacing="18"
+                          ColumnSpacing="24"
+                          HorizontalAlignment="Stretch">
+                      <StackPanel Grid.Row="0"
+                                  Grid.ColumnSpan="2"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
+                                   Text="SMTP 服务器地址（主机名）" />
+                        <TextBox Text="{Binding CookieAlertSmtpHost}"
+                                 Watermark="smtp.example.com"
+                                 HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <StackPanel Grid.Row="1"
+                                  Grid.Column="0"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
+                                   Text="端口" />
+                        <NumericUpDown Minimum="1"
+                                       Maximum="65535"
+                                       Increment="1"
+                                       ClipValueToMinMax="True"
+                                       ParsingNumberStyle="Integer"
+                                       Value="{Binding CookieAlertSmtpPort}"
+                                       FormatString="0"
+                                       TextInput="OnUnsignedIntegerNumericUpDownTextInput"
+                                       KeyDown="OnUnsignedIntegerNumericUpDownKeyDown"
+                                       HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <StackPanel Grid.Row="1"
+                                  Grid.Column="1"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
+                                   Text="安全性" />
+                        <ComboBox ItemsSource="{Binding EmailSecurityModes}"
+                                  SelectedIndex="{Binding SelectedCookieAlertSecurityModeIndex}"
+                                  HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <StackPanel Grid.Row="2"
+                                  Grid.Column="0"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
+                                   Text="用户名" />
+                        <TextBox Text="{Binding CookieAlertUsername}"
+                                 Watermark="填写 SMTP 用户名"
+                                 HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <StackPanel Grid.Row="2"
+                                  Grid.Column="1"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
+                                   Text="邮箱授权码/密码" />
+                        <TextBox Text="{Binding CookieAlertPassword}"
+                                 PasswordChar="●"
+                                 Watermark="填写邮箱授权码或密码"
+                                 HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <StackPanel Grid.Row="3"
+                                  Grid.Column="0"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
+                                   Text="发信人邮箱地址" />
+                        <TextBox Text="{Binding CookieAlertFromAddress}"
+                                 Watermark="sender@example.com"
+                                 HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <StackPanel Grid.Row="3"
+                                  Grid.Column="1"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
+                                   Text="收信人邮箱地址" />
+                        <TextBox Text="{Binding CookieAlertToAddress}"
+                                 Watermark="receiver@example.com"
+                                 HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <Grid Grid.Row="4"
+                            Grid.ColumnSpan="2"
+                            ColumnDefinitions="*,Auto"
+                            ColumnSpacing="16"
+                            Margin="0,8,0,0">
+                        <Border Classes="notify-toggle-card">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                            <StackPanel Spacing="4">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="开启邮件提醒" />
+                              <TextBlock Classes="helper-text"
+                                         Text="Cookie 失效后，会自动按上方 SMTP 参数向目标邮箱发送提醒邮件" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          IsChecked="{Binding CookieEmailAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Button Grid.Column="1"
+                                Content="发送测试邮件"
+                                Command="{Binding SendTestEmailAlertCommand}"
+                                Background="{StaticResource SemiAccentBrush}"
+                                Foreground="White"
+                                MinWidth="160" />
+                      </Grid>
+                    </Grid>
+                  </Grid>
+
+                  <Grid HorizontalAlignment="Stretch">
+                    <StackPanel Spacing="18"
+                                HorizontalAlignment="Stretch">
+                      <Border Classes="notify-toggle-card">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                          <StackPanel Spacing="4">
+                            <TextBlock FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Text="开启屏幕右下角通知" />
+                            <TextBlock Classes="helper-text"
+                                       Text="当检测到 Cookie 已失效时，使用 Toast 弹窗形式，在屏幕右下角弹出提醒。即使你正在浏览其他网页，也能看到这一角的弹窗" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1"
+                                        IsChecked="{Binding CookieLocalToastEnabled}"
+                                        OnContent="开"
+                                        OffContent="关"
+                                        VerticalAlignment="Center" />
+                        </Grid>
+                      </Border>
+
+                      <Border Classes="notify-toggle-card">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                          <StackPanel Spacing="4">
+                            <TextBlock FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Text="开启提示音" />
+                            <TextBlock Classes="helper-text"
+                                       Text="开启后，Toast 弹窗在弹出时会同时播放提示音，用于在后台工作时更快感知授权失效。" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1"
+                                        IsChecked="{Binding CookieLocalSoundEnabled}"
+                                        OnContent="开"
+                                        OffContent="关"
+                                        VerticalAlignment="Center" />
+                        </Grid>
+                      </Border>
+
+                      <Grid ColumnDefinitions="*,Auto"
+                            ColumnSpacing="16"
+                            Margin="0,8,0,0">
+                        <Border Classes="notify-toggle-card">
+                          <StackPanel Spacing="6">
+                            <TextBlock FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Text="发送测试通知" />
+                            <TextBlock Classes="helper-text"
+                                       Text="点击后立即在屏幕右下角弹出自定义 Toast" />
+                          </StackPanel>
+                        </Border>
+
+                        <Button Grid.Column="1"
+                                Content="发送测试通知"
+                                Command="{Binding SendTestLocalAlertCommand}"
+                                Background="{StaticResource SemiAccentBrush}"
+                                Foreground="White"
+                                MinWidth="160" />
+                      </Grid>
+                    </StackPanel>
+                  </Grid>
+                </Carousel>
+              </Grid>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Tab 5: Settings -->
         <ScrollViewer>
           <StackPanel Spacing="24" Margin="0,0,16,0">
             <TextBlock Classes="page-title" Text="系统设置" />

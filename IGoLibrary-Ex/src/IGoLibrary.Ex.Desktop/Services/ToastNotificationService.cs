@@ -33,6 +33,13 @@ public sealed class ToastNotificationService(
     public Task ShowPreviewAsync(string title, string message, CancellationToken cancellationToken = default)
         => ShowCoreAsync(ToastVisualKind.Info, title, message, skipSettingsCheck: true, cancellationToken);
 
+    public Task ShowForcedAsync(
+        ToastVisualKind kind,
+        string title,
+        string message,
+        CancellationToken cancellationToken = default)
+        => ShowCoreAsync(kind, title, message, skipSettingsCheck: true, cancellationToken);
+
     private async Task ShowAsync(
         ToastVisualKind kind,
         string title,

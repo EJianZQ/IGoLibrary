@@ -10,6 +10,7 @@ public sealed class OccupySeatCoordinator(
     ITraceIntApiClient apiClient,
     ISettingsService settingsService,
     INotificationService notificationService,
+    ICookieExpiryAlertService cookieExpiryAlertService,
     IActivityLogService activityLogService,
     AppRuntimeState runtimeState) : IOccupySeatCoordinator
 {
@@ -138,6 +139,12 @@ public sealed class OccupySeatCoordinator(
         {
             Fail($"占座任务失败：{ex.Message}");
             activityLogService.Write(LogEntryKind.Error, "Occupy", ex.Message);
+            if (CookieExpiryDetector.IsExpired(ex))
+            {
+                await cookieExpiryAlertService.NotifyCookieExpiredAsync("占座轮询", ex.Message, CancellationToken.None);
+                return;
+            }
+
             await notificationService.ShowWarningAsync("占座失败", ex.Message, CancellationToken.None);
         }
     }

@@ -1,6 +1,7 @@
 using System.Net;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Infrastructure.Api;
+using IGoLibrary.Ex.Infrastructure.Notifications;
 using IGoLibrary.Ex.Infrastructure.Persistence;
 using IGoLibrary.Ex.Infrastructure.Protocol;
 using IGoLibrary.Ex.Infrastructure.Security;
@@ -18,6 +19,8 @@ public static class DependencyInjection
         services.AddSingleton<IFavoritesRepository, SqliteFavoritesRepository>();
         services.AddSingleton<IProtocolTemplateStore, DefaultProtocolTemplateStore>();
         services.AddSingleton<ICredentialStore>(_ => PlatformCredentialStore.CreateDefault());
+        services.AddSingleton<ISmtpTransportClientFactory, MailKitSmtpTransportClientFactory>();
+        services.AddSingleton<IEmailAlertSender, SmtpEmailAlertSender>();
 
         services.AddHttpClient<ITraceIntApiClient, TraceIntApiClient>(client =>
             {

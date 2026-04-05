@@ -24,8 +24,10 @@ public partial class MainWindowViewModel(
     IProtocolTemplateStore protocolTemplateStore,
     IGrabSeatCoordinator grabSeatCoordinator,
     IOccupySeatCoordinator occupySeatCoordinator,
+    ICookieExpiryAlertService cookieExpiryAlertService,
     IActivityLogService activityLogService,
     INotificationService notificationService,
+    IErrorDialogService errorDialogService,
     AppWindowService appWindowService) : ViewModelBase
 {
     private readonly ObservableCollection<SeatItemViewModel> _allSeats = [];
@@ -43,6 +45,8 @@ public partial class MainWindowViewModel(
     private string _lockedVenueOpenTimeText = "--";
     private string _lockedVenueCloseTimeText = "--";
     private static readonly CultureInfo DashboardCulture = CultureInfo.GetCultureInfo("zh-CN");
+    private const int NotificationSettingsTabIndex = 4;
+    private const int SystemSettingsTabIndex = 5;
     private static readonly SidebarNavigationItem HomeSidebarItem = new(
         0,
         "首页",
@@ -59,8 +63,12 @@ public partial class MainWindowViewModel(
         3,
         "占座",
         "M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z");
+    private static readonly SidebarNavigationItem NotificationSettingsSidebarItem = new(
+        NotificationSettingsTabIndex,
+        "通知设置",
+        "M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2z");
     private static readonly SidebarNavigationItem SettingsSidebarItem = new(
-        4,
+        SystemSettingsTabIndex,
         "系统设置",
         "M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z");
     private static readonly SidebarNavigationItem[] UnauthorizedSidebarItems =
@@ -74,6 +82,7 @@ public partial class MainWindowViewModel(
         AccountAndVenueSidebarItem,
         GrabSidebarItem,
         OccupySidebarItem,
+        NotificationSettingsSidebarItem,
         SettingsSidebarItem
     ];
     private static readonly IBrush GrabStateIdleBrush = new SolidColorBrush(Color.Parse("#86909C"));
@@ -85,6 +94,13 @@ public partial class MainWindowViewModel(
     private static readonly IBrush DashboardSuccessSoftBrush = new SolidColorBrush(Color.Parse("#E8FFF1"));
     private static readonly IBrush DashboardWarningSoftBrush = new SolidColorBrush(Color.Parse("#FFF5E7"));
     private static readonly IBrush DashboardNeutralSoftBrush = new SolidColorBrush(Color.Parse("#F1F5F9"));
+    private static readonly IBrush NotificationSegmentActiveBrush = Brushes.White;
+    private static readonly IBrush NotificationSegmentInactiveBrush = Brushes.Transparent;
+    private static readonly IBrush NotificationSegmentActiveTextBrush = new SolidColorBrush(Color.Parse("#1D2129"));
+    private static readonly IBrush NotificationSegmentInactiveTextBrush = new SolidColorBrush(Color.Parse("#86909C"));
+    private const double NotificationSegmentControlWidthValue = 396d;
+    private const double NotificationSegmentSliderWidthValue = 190d;
+    private const double NotificationSegmentSliderOffsetValue = 196d;
     private readonly HashSet<string> _committedSelectedSeatKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _draftSelectedSeatKeys = new(StringComparer.Ordinal);
     private bool _isSynchronizingSeatSelection;
@@ -97,6 +113,9 @@ public partial class MainWindowViewModel(
     private DateTimeOffset? _lastRecordedGrabSuccessAt;
     private DateTimeOffset? _lastRecordedOccupySuccessAt;
     private bool _isSynchronizingSidebarSelection;
+    private bool _isLoadingSettings;
+    private bool _notificationSettingsLoaded;
+    private CancellationTokenSource? _notificationSettingsAutoSaveCts;
 
     public ObservableCollection<LibrarySummary> AvailableLibraries { get; } = [];
 
@@ -117,6 +136,8 @@ public partial class MainWindowViewModel(
     public string[] RefreshModes { get; } = ["固定间隔 10 秒", "随机 10~20 秒"];
 
     public string[] GrabReservationStrategies { get; } = ["先获取列表判断状态", "直接发送预约请求"];
+
+    public string[] EmailSecurityModes { get; } = ["无", "TLS"];
 
     public const int AccountAndVenueTabIndex = 1;
 
@@ -388,6 +409,9 @@ public partial class MainWindowViewModel(
     private int selectedRefreshModeIndex;
 
     [ObservableProperty]
+    private int selectedNotificationSettingsTabIndex;
+
+    [ObservableProperty]
     private bool notificationsEnabled = true;
 
     [ObservableProperty]
@@ -401,6 +425,39 @@ public partial class MainWindowViewModel(
 
     [ObservableProperty]
     private int retryCount = 3;
+
+    [ObservableProperty]
+    private bool cookieEmailAlertsEnabled;
+
+    [ObservableProperty]
+    private string cookieAlertSmtpHost = string.Empty;
+
+    [ObservableProperty]
+    private int cookieAlertSmtpPort = 587;
+
+    [ObservableProperty]
+    private int selectedCookieAlertSecurityModeIndex = 1;
+
+    [ObservableProperty]
+    private string cookieAlertUsername = string.Empty;
+
+    [ObservableProperty]
+    private string cookieAlertPassword = string.Empty;
+
+    [ObservableProperty]
+    private string cookieAlertFromAddress = string.Empty;
+
+    [ObservableProperty]
+    private string cookieAlertToAddress = string.Empty;
+
+    [ObservableProperty]
+    private bool cookieLocalToastEnabled = true;
+
+    [ObservableProperty]
+    private bool cookieLocalSoundEnabled;
+
+    [ObservableProperty]
+    private string notificationSettingsStatusText = "更改后会自动保存。";
 
     [ObservableProperty]
     private string allLogsText = string.Empty;
@@ -456,6 +513,34 @@ public partial class MainWindowViewModel(
 
     public bool ShowSeatFilterEmptyState => HasSeatLayout && HasNoVisibleSeatResults;
 
+    public bool IsEmailNotificationTabActive => SelectedNotificationSettingsTabIndex == 0;
+
+    public bool IsLocalNotificationTabActive => SelectedNotificationSettingsTabIndex == 1;
+
+    public double NotificationSegmentControlWidth => NotificationSegmentControlWidthValue;
+
+    public double NotificationSegmentSliderWidth => NotificationSegmentSliderWidthValue;
+
+    public double NotificationSegmentSliderOffset => SelectedNotificationSettingsTabIndex == 1
+        ? NotificationSegmentSliderOffsetValue
+        : 0d;
+
+    public IBrush EmailNotificationTabBackgroundBrush => IsEmailNotificationTabActive
+        ? NotificationSegmentActiveBrush
+        : NotificationSegmentInactiveBrush;
+
+    public IBrush LocalNotificationTabBackgroundBrush => IsLocalNotificationTabActive
+        ? NotificationSegmentActiveBrush
+        : NotificationSegmentInactiveBrush;
+
+    public IBrush EmailNotificationTabForegroundBrush => IsEmailNotificationTabActive
+        ? NotificationSegmentActiveTextBrush
+        : NotificationSegmentInactiveTextBrush;
+
+    public IBrush LocalNotificationTabForegroundBrush => IsLocalNotificationTabActive
+        ? NotificationSegmentActiveTextBrush
+        : NotificationSegmentInactiveTextBrush;
+
     public string SelectedSeatSummaryText => HasSelectedSeats
         ? $"已选 {SelectedSeatCount} 个目标座位"
         : "尚未选择目标座位";
@@ -510,6 +595,17 @@ public partial class MainWindowViewModel(
         OnPropertyChanged(nameof(HasVisibleSeatResults));
         OnPropertyChanged(nameof(HasNoVisibleSeatResults));
         OnPropertyChanged(nameof(ShowSeatFilterEmptyState));
+    }
+
+    partial void OnSelectedNotificationSettingsTabIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsEmailNotificationTabActive));
+        OnPropertyChanged(nameof(IsLocalNotificationTabActive));
+        OnPropertyChanged(nameof(NotificationSegmentSliderOffset));
+        OnPropertyChanged(nameof(EmailNotificationTabBackgroundBrush));
+        OnPropertyChanged(nameof(LocalNotificationTabBackgroundBrush));
+        OnPropertyChanged(nameof(EmailNotificationTabForegroundBrush));
+        OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
     }
 
     partial void OnIsAuthorizedChanged(bool value)
@@ -623,6 +719,26 @@ public partial class MainWindowViewModel(
 
     partial void OnShowAvailableOnlyChanged(bool value) => _ = ApplySeatFilterAsync();
 
+    partial void OnCookieEmailAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnCookieAlertSmtpHostChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnCookieAlertSmtpPortChanged(int value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnSelectedCookieAlertSecurityModeIndexChanged(int value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnCookieAlertUsernameChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnCookieAlertPasswordChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnCookieAlertFromAddressChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnCookieAlertToAddressChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnCookieLocalToastEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnCookieLocalSoundEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+
     partial void OnSelectedLibraryChanged(LibrarySummary? value)
     {
         if (!IsVenuePickerOpen || value is null || !IsAuthorized)
@@ -637,6 +753,30 @@ public partial class MainWindowViewModel(
     private void OpenHome()
     {
         SelectedTabIndex = 0;
+    }
+
+    [RelayCommand]
+    private void OpenNotificationSettings()
+    {
+        SelectedTabIndex = NotificationSettingsTabIndex;
+    }
+
+    [RelayCommand]
+    private void OpenSystemSettings()
+    {
+        SelectedTabIndex = SystemSettingsTabIndex;
+    }
+
+    [RelayCommand]
+    private void ShowEmailNotificationSettings()
+    {
+        SelectedNotificationSettingsTabIndex = 0;
+    }
+
+    [RelayCommand]
+    private void ShowLocalNotificationSettings()
+    {
+        SelectedNotificationSettingsTabIndex = 1;
     }
 
     [RelayCommand]
@@ -1237,6 +1377,7 @@ public partial class MainWindowViewModel(
     [RelayCommand]
     private async Task SaveSettingsAsync()
     {
+        CancelPendingNotificationSettingsAutoSave();
         var current = await settingsService.LoadAsync();
         var settings = current with
         {
@@ -1249,6 +1390,7 @@ public partial class MainWindowViewModel(
                 SelectedGrabReservationStrategyIndex,
                 0,
                 GrabReservationStrategies.Length - 1),
+            CookieExpiryAlerts = BuildCookieExpiryAlertSettings(),
             LastLibraryId = SelectedLibrary?.LibraryId,
             LastLibraryName = SelectedLibrary?.Name,
             SuccessfulReservationCount = _historicalSuccessCount,
@@ -1268,6 +1410,43 @@ public partial class MainWindowViewModel(
         }
 
         await notificationService.ShowInfoAsync("测试通知", "这是一条用于测试界面动效与停留时间的 Toast 通知。");
+    }
+
+    [RelayCommand]
+    private async Task SendTestEmailAlertAsync()
+    {
+        try
+        {
+            CancelPendingNotificationSettingsAutoSave();
+            await PersistNotificationSettingsSnapshotAsync();
+            await cookieExpiryAlertService.SendTestEmailAsync(BuildCookieExpiryAlertSettings().Email);
+            NotificationSettingsStatusText = $"测试邮件已发送于 {DateTime.Now:HH:mm:ss}。";
+            await notificationService.ShowSuccessAsync("测试邮件已发送", "请检查收件箱，确认当前 SMTP 配置可用。");
+        }
+        catch (Exception ex)
+        {
+            NotificationSettingsStatusText = $"测试邮件发送失败：{ex.Message}";
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试邮件失败：{ex.Message}");
+            await errorDialogService.ShowErrorAsync("测试邮件发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
+        }
+    }
+
+    [RelayCommand]
+    private async Task SendTestLocalAlertAsync()
+    {
+        try
+        {
+            CancelPendingNotificationSettingsAutoSave();
+            await PersistNotificationSettingsSnapshotAsync();
+            await cookieExpiryAlertService.SendTestLocalAlertAsync(BuildCookieExpiryAlertSettings().Local);
+            NotificationSettingsStatusText = $"测试通知已触发于 {DateTime.Now:HH:mm:ss}。";
+        }
+        catch (Exception ex)
+        {
+            NotificationSettingsStatusText = $"测试通知发送失败：{ex.Message}";
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试通知失败：{ex.Message}");
+            await notificationService.ShowWarningAsync("测试通知发送失败", ex.Message);
+        }
     }
 
     [RelayCommand]
@@ -1314,17 +1493,40 @@ public partial class MainWindowViewModel(
 
     private async Task LoadSettingsAsync()
     {
+        _isLoadingSettings = true;
         var settings = await settingsService.LoadAsync();
-        NotificationsEnabled = settings.NotificationsEnabled;
-        MinimizeToTrayEnabled = settings.MinimizeToTray;
-        CustomApiOverridesEnabled = settings.CustomApiOverridesEnabled;
-        ApiTimeoutSeconds = settings.ApiTimeoutSeconds;
-        RetryCount = settings.RetryCount;
-        SelectedGrabReservationStrategyIndex = (int)settings.GrabReservationStrategy;
-        _historicalSuccessCount = Math.Max(0, settings.SuccessfulReservationCount);
-        _totalGuardSeconds = Math.Max(0, settings.TotalGuardSeconds);
-        HomeHistoricalSuccessCount = _historicalSuccessCount;
-        UpdateHomeDashboardPresentation();
+        try
+        {
+            NotificationsEnabled = settings.NotificationsEnabled;
+            MinimizeToTrayEnabled = settings.MinimizeToTray;
+            CustomApiOverridesEnabled = settings.CustomApiOverridesEnabled;
+            ApiTimeoutSeconds = settings.ApiTimeoutSeconds;
+            RetryCount = settings.RetryCount;
+            SelectedGrabReservationStrategyIndex = (int)settings.GrabReservationStrategy;
+
+            var cookieAlerts = settings.CookieExpiryAlerts ?? CookieExpiryAlertSettings.Default;
+            CookieEmailAlertsEnabled = cookieAlerts.Email.Enabled;
+            CookieAlertSmtpHost = cookieAlerts.Email.SmtpHost;
+            CookieAlertSmtpPort = cookieAlerts.Email.Port;
+            SelectedCookieAlertSecurityModeIndex = cookieAlerts.Email.SecurityMode == EmailSecurityMode.Tls ? 1 : 0;
+            CookieAlertUsername = cookieAlerts.Email.Username;
+            CookieAlertPassword = cookieAlerts.Email.Password;
+            CookieAlertFromAddress = cookieAlerts.Email.FromAddress;
+            CookieAlertToAddress = cookieAlerts.Email.ToAddress;
+            CookieLocalToastEnabled = cookieAlerts.Local.ToastEnabled;
+            CookieLocalSoundEnabled = cookieAlerts.Local.SoundEnabled;
+            NotificationSettingsStatusText = "更改后会自动保存。";
+
+            _historicalSuccessCount = Math.Max(0, settings.SuccessfulReservationCount);
+            _totalGuardSeconds = Math.Max(0, settings.TotalGuardSeconds);
+            HomeHistoricalSuccessCount = _historicalSuccessCount;
+            UpdateHomeDashboardPresentation();
+        }
+        finally
+        {
+            _isLoadingSettings = false;
+            _notificationSettingsLoaded = true;
+        }
     }
 
     private async Task LoadProtocolTemplatesAsync()
@@ -2480,6 +2682,101 @@ public partial class MainWindowViewModel(
         }
 
         return seatName.Contains(filterText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private CookieExpiryAlertSettings BuildCookieExpiryAlertSettings()
+    {
+        return new CookieExpiryAlertSettings(
+            new CookieExpiryEmailAlertSettings(
+                CookieEmailAlertsEnabled,
+                CookieAlertSmtpHost.Trim(),
+                Math.Clamp(CookieAlertSmtpPort, 1, 65535),
+                SelectedCookieAlertSecurityModeIndex == 1 ? EmailSecurityMode.Tls : EmailSecurityMode.None,
+                CookieAlertUsername.Trim(),
+                CookieAlertPassword,
+                CookieAlertFromAddress.Trim(),
+                CookieAlertToAddress.Trim()),
+            new CookieExpiryLocalAlertSettings(
+                CookieLocalToastEnabled,
+                CookieLocalSoundEnabled));
+    }
+
+    private static string BuildExceptionDetails(Exception exception)
+    {
+        var builder = new StringBuilder();
+        var current = exception;
+        var depth = 0;
+
+        while (current is not null)
+        {
+            if (depth == 0)
+            {
+                builder.Append(current.Message);
+            }
+            else
+            {
+                builder.AppendLine();
+                builder.AppendLine();
+                builder.Append($"内部异常 {depth}：{current.GetType().Name}: {current.Message}");
+            }
+
+            current = current.InnerException;
+            depth++;
+        }
+
+        return builder.ToString();
+    }
+
+    private void ScheduleNotificationSettingsAutoSave()
+    {
+        if (_isLoadingSettings || !_notificationSettingsLoaded || !IsInitializationComplete)
+        {
+            return;
+        }
+
+        CancelPendingNotificationSettingsAutoSave();
+        NotificationSettingsStatusText = "正在自动保存...";
+        _notificationSettingsAutoSaveCts = new CancellationTokenSource();
+        _ = AutoSaveNotificationSettingsAsync(_notificationSettingsAutoSaveCts.Token);
+    }
+
+    private async Task AutoSaveNotificationSettingsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(450), cancellationToken);
+            await PersistNotificationSettingsSnapshotAsync(cancellationToken);
+            NotificationSettingsStatusText = $"已自动保存于 {DateTime.Now:HH:mm:ss}。";
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            NotificationSettingsStatusText = $"自动保存失败：{ex.Message}";
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"自动保存通知设置失败：{ex.Message}");
+        }
+    }
+
+    private async Task PersistNotificationSettingsSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        var current = await settingsService.LoadAsync(cancellationToken);
+        await settingsService.SaveAsync(current with
+        {
+            CookieExpiryAlerts = BuildCookieExpiryAlertSettings()
+        }, cancellationToken);
+    }
+
+    private void CancelPendingNotificationSettingsAutoSave()
+    {
+        if (_notificationSettingsAutoSaveCts is null)
+        {
+            return;
+        }
+
+        _notificationSettingsAutoSaveCts.Cancel();
+        _notificationSettingsAutoSaveCts.Dispose();
+        _notificationSettingsAutoSaveCts = null;
     }
 
     private sealed record SeatFilterSnapshot(

@@ -22,7 +22,8 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connectionF
         if (result is string json && !string.IsNullOrWhiteSpace(json))
         {
             var migratedJson = MigrateLegacyAppSettingsJson(json);
-            return JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default) ?? AppSettings.Default;
+            var settings = JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default) ?? AppSettings.Default;
+            return Normalize(settings);
         }
 
         return AppSettings.Default;
@@ -76,5 +77,12 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connectionF
         writer.WriteEndObject();
         writer.Flush();
         return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static AppSettings Normalize(AppSettings settings)
+    {
+        return settings.CookieExpiryAlerts is null
+            ? settings with { CookieExpiryAlerts = CookieExpiryAlertSettings.Default }
+            : settings;
     }
 }

@@ -87,8 +87,10 @@ public sealed class MainWindowClipboardTests
             new FakeProtocolTemplateStore(new ProtocolTemplateSet("", "", "", "", "", "", "")),
             new FakeGrabSeatCoordinator(),
             new FakeOccupySeatCoordinator(),
+            new FakeCookieExpiryAlertService(),
             new ActivityLogService(),
             new FakeNotificationService(),
+            new FakeErrorDialogService(),
             new AppWindowService());
     }
 }

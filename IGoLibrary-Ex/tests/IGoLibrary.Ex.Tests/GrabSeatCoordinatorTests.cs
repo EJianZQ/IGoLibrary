@@ -1,3 +1,4 @@
+using System.Net;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Application.State;
@@ -44,6 +45,7 @@ public sealed class GrabSeatCoordinatorTests
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
             new FakeNotificationService(),
+            new FakeCookieExpiryAlertService(),
             new ActivityLogService(),
             runtimeState);
 
@@ -103,6 +105,7 @@ public sealed class GrabSeatCoordinatorTests
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
             new FakeNotificationService(),
+            new FakeCookieExpiryAlertService(),
             activityLogService,
             runtimeState);
 
@@ -159,6 +162,7 @@ public sealed class GrabSeatCoordinatorTests
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
             new FakeNotificationService(),
+            new FakeCookieExpiryAlertService(),
             activityLogService,
             runtimeState);
 
@@ -228,6 +232,7 @@ public sealed class GrabSeatCoordinatorTests
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.QueryThenReserve }),
             new FakeNotificationService(),
+            new FakeCookieExpiryAlertService(),
             new ActivityLogService(),
             runtimeState);
 
@@ -250,6 +255,45 @@ public sealed class GrabSeatCoordinatorTests
         Assert.Equal(1, reserveCallCount);
         Assert.NotNull(runtimeState.CurrentLayout);
         Assert.Equal(CoordinatorTaskState.Completed, coordinator.GetStatus().State);
+    }
+
+    [Fact]
+    public async Task StartAsync_NotifiesCookieExpiry_WhenPollingReceivesUnauthorized()
+    {
+        var notificationService = new FakeNotificationService();
+        var alertService = new FakeCookieExpiryAlertService();
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetLibraryLayoutAsync = (_, _, _) => Task.FromException<LibraryLayout>(
+                new HttpRequestException("Unauthorized", null, HttpStatusCode.Unauthorized))
+        };
+
+        var runtimeState = new AppRuntimeState
+        {
+            Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var coordinator = new GrabSeatCoordinator(
+            apiClient,
+            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.QueryThenReserve }),
+            notificationService,
+            alertService,
+            new ActivityLogService(),
+            runtimeState);
+
+        var plan = new GrabSeatPlan(
+            1,
+            "自科阅览区一",
+            [new TrackedSeat("seat-1", "1号座")],
+            GrabMode.Aggressive,
+            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            null);
+
+        await coordinator.StartAsync(plan);
+        await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
+
+        var alert = Assert.Single(alertService.CookieExpiredNotifications);
+        Assert.Equal("抢座轮询", alert.Source);
+        Assert.Empty(notificationService.Warnings);
     }
 
     private static async Task WaitForStatusAsync(IGrabSeatCoordinator coordinator, CoordinatorTaskState expectedState)

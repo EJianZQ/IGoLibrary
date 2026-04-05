@@ -9,6 +9,7 @@ public sealed class GrabSeatCoordinator(
     ITraceIntApiClient apiClient,
     ISettingsService settingsService,
     INotificationService notificationService,
+    ICookieExpiryAlertService cookieExpiryAlertService,
     IActivityLogService activityLogService,
     AppRuntimeState runtimeState) : IGrabSeatCoordinator
 {
@@ -168,6 +169,12 @@ public sealed class GrabSeatCoordinator(
         {
             Fail($"抢座任务失败：{ex.Message}");
             activityLogService.Write(LogEntryKind.Error, "Grab", ex.Message);
+            if (CookieExpiryDetector.IsExpired(ex))
+            {
+                await cookieExpiryAlertService.NotifyCookieExpiredAsync("抢座轮询", ex.Message, CancellationToken.None);
+                return;
+            }
+
             await notificationService.ShowWarningAsync("抢座失败", ex.Message, CancellationToken.None);
         }
     }

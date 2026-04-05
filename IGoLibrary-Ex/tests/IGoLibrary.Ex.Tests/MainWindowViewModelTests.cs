@@ -58,7 +58,78 @@ public sealed class MainWindowViewModelTests
 
         var titles = viewModel.SidebarItems.Select(item => item.Title).ToArray();
 
-        Assert.Equal(["首页", "账户与场馆", "抢座", "占座", "系统设置"], titles);
+        Assert.Equal(["首页", "账户与场馆", "抢座", "占座", "通知设置", "系统设置"], titles);
+    }
+
+    [Fact]
+    public async Task NotificationSettings_AutoSaveCookieExpiryAlerts_WhenFieldsChange()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.CookieAlertSmtpHost = "smtp.example.com";
+        viewModel.CookieAlertSmtpPort = 465;
+        viewModel.CookieEmailAlertsEnabled = true;
+
+        await WaitForAsync(() => settingsService.SaveCalls > 0 && settingsService.CurrentSettings.CookieExpiryAlerts?.Email.SmtpHost == "smtp.example.com");
+
+        var alerts = Assert.IsType<CookieExpiryAlertSettings>(settingsService.CurrentSettings.CookieExpiryAlerts);
+        Assert.True(alerts.Email.Enabled);
+        Assert.Equal("smtp.example.com", alerts.Email.SmtpHost);
+        Assert.Equal(465, alerts.Email.Port);
+    }
+
+    [Fact]
+    public async Task SendTestEmailAlertAsync_UsesCurrentNotificationSettingsSnapshot()
+    {
+        var alertService = new FakeCookieExpiryAlertService();
+        var viewModel = CreateViewModel(cookieExpiryAlertService: alertService);
+        await viewModel.InitializeAsync();
+
+        viewModel.CookieAlertSmtpHost = "smtp.example.com";
+        viewModel.CookieAlertSmtpPort = 587;
+        viewModel.SelectedCookieAlertSecurityModeIndex = 1;
+        viewModel.CookieAlertUsername = "tester";
+        viewModel.CookieAlertPassword = "secret";
+        viewModel.CookieAlertFromAddress = "from@example.com";
+        viewModel.CookieAlertToAddress = "to@example.com";
+
+        await viewModel.SendTestEmailAlertCommand.ExecuteAsync(null);
+
+        var request = Assert.Single(alertService.TestEmailRequests);
+        Assert.Equal("smtp.example.com", request.SmtpHost);
+        Assert.Equal(587, request.Port);
+        Assert.Equal(EmailSecurityMode.Tls, request.SecurityMode);
+        Assert.Equal("tester", request.Username);
+        Assert.Equal("secret", request.Password);
+        Assert.Equal("from@example.com", request.FromAddress);
+        Assert.Equal("to@example.com", request.ToAddress);
+    }
+
+    [Fact]
+    public async Task SendTestEmailAlertAsync_ShowsErrorDialog_WhenSendingFails()
+    {
+        var alertService = new FakeCookieExpiryAlertService
+        {
+            SendTestEmailException = new InvalidOperationException("smtp connect failed")
+        };
+        var errorDialogService = new FakeErrorDialogService();
+        var viewModel = CreateViewModel(
+            cookieExpiryAlertService: alertService,
+            errorDialogService: errorDialogService);
+        await viewModel.InitializeAsync();
+
+        viewModel.CookieAlertSmtpHost = "smtp.example.com";
+        viewModel.CookieAlertFromAddress = "from@example.com";
+        viewModel.CookieAlertToAddress = "to@example.com";
+
+        await viewModel.SendTestEmailAlertCommand.ExecuteAsync(null);
+
+        var error = Assert.Single(errorDialogService.Errors);
+        Assert.Equal("测试邮件发送失败", error.Title);
+        Assert.Equal(nameof(InvalidOperationException), error.ErrorType);
+        Assert.Equal("smtp connect failed", error.ErrorMessage);
     }
 
     [Fact]
@@ -238,7 +309,9 @@ public sealed class MainWindowViewModelTests
         FakeSettingsService? settingsService = null,
         FakeTraceIntApiClient? apiClient = null,
         FakeGrabSeatCoordinator? grabSeatCoordinator = null,
-        FakeNotificationService? notificationService = null)
+        FakeNotificationService? notificationService = null,
+        FakeCookieExpiryAlertService? cookieExpiryAlertService = null,
+        FakeErrorDialogService? errorDialogService = null)
     {
         return new MainWindowViewModel(
             sessionService ?? new FakeSessionService(),
@@ -248,8 +321,27 @@ public sealed class MainWindowViewModelTests
             new FakeProtocolTemplateStore(new ProtocolTemplateSet("", "", "", "", "", "", "")),
             grabSeatCoordinator ?? new FakeGrabSeatCoordinator(),
             new FakeOccupySeatCoordinator(),
+            cookieExpiryAlertService ?? new FakeCookieExpiryAlertService(),
             new ActivityLogService(),
             notificationService ?? new FakeNotificationService(),
+            errorDialogService ?? new FakeErrorDialogService(),
             new AppWindowService());
+    }
+
+    private static async Task WaitForAsync(Func<bool> predicate)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (predicate())
+            {
+                return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException("Condition was not met within the expected time.");
     }
 }

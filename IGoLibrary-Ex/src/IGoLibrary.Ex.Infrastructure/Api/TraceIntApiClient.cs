@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Domain.Models;
 using IGoLibrary.Ex.Domain.Helpers;
 
@@ -255,12 +256,9 @@ public sealed class TraceIntApiClient(
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         using var document = JsonDocument.Parse(raw);
 
-        if (document.RootElement.TryGetProperty("errors", out var errors) &&
-            errors.ValueKind == JsonValueKind.Array &&
-            errors.GetArrayLength() > 0)
+        if (TryFindErrorInfo(document.RootElement, out var errorInfo))
         {
-            var message = errors[0].GetProperty("msg").GetString() ?? string.Empty;
-            return message.Contains("成功", StringComparison.OrdinalIgnoreCase);
+            return errorInfo.Message.Contains("成功", StringComparison.OrdinalIgnoreCase);
         }
 
         if (document.RootElement.TryGetProperty("data", out var data) &&
@@ -373,18 +371,122 @@ public sealed class TraceIntApiClient(
 
     private static void ThrowIfGraphQlError(JsonElement root)
     {
-        if (root.TryGetProperty("errors", out var errors) &&
-            errors.ValueKind == JsonValueKind.Array &&
-            errors.GetArrayLength() > 0)
+        if (TryGetAuthorizationDeniedError(root, out var authError))
         {
-            var error = errors[0];
-            var message = error.GetProperty("msg").GetString() ?? "未知错误";
-            var code = error.TryGetProperty("code", out var codeElement) && codeElement.ValueKind == JsonValueKind.Number
-                ? codeElement.GetInt32().ToString()
-                : "n/a";
-            throw new InvalidOperationException($"GraphQL 错误(code={code}): {message}");
+            throw new TraceIntApiException(
+                authError.Message,
+                authError.Code,
+                authError.Message,
+                isAuthorizationDenied: true);
+        }
+
+        if (TryFindErrorInfo(root, out var errorInfo))
+        {
+            throw new TraceIntApiException(errorInfo.Message, errorInfo.Code, errorInfo.Message);
         }
     }
+
+    private static bool TryGetAuthorizationDeniedError(JsonElement root, out GraphQlErrorInfo errorInfo)
+    {
+        errorInfo = default;
+        if (root.ValueKind is not JsonValueKind.Object ||
+            !root.TryGetProperty("errors", out var errors) ||
+            errors.ValueKind is not JsonValueKind.Array ||
+            errors.GetArrayLength() == 0 ||
+            !TryReadErrorInfo(errors[0], out var candidate) ||
+            candidate.Code != 40001 ||
+            !IsAccessDeniedMessage(candidate.Message))
+        {
+            return false;
+        }
+
+        if (!root.TryGetProperty("data", out var data) || data.ValueKind is not JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        if (!data.TryGetProperty("userAuth", out var userAuth) || userAuth.ValueKind is not JsonValueKind.Null)
+        {
+            return false;
+        }
+
+        errorInfo = candidate;
+        return true;
+    }
+
+    private static bool TryFindErrorInfo(JsonElement element, out GraphQlErrorInfo errorInfo)
+    {
+        if (TryReadErrorInfo(element, out errorInfo))
+        {
+            return true;
+        }
+
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (TryFindErrorInfo(property.Value, out errorInfo))
+                    {
+                        return true;
+                    }
+                }
+
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                {
+                    if (TryFindErrorInfo(item, out errorInfo))
+                    {
+                        return true;
+                    }
+                }
+
+                break;
+        }
+
+        errorInfo = default;
+        return false;
+    }
+
+    private static bool TryReadErrorInfo(JsonElement element, out GraphQlErrorInfo errorInfo)
+    {
+        errorInfo = default;
+        if (element.ValueKind is not JsonValueKind.Object ||
+            !element.TryGetProperty("msg", out var messageElement) ||
+            messageElement.ValueKind is not JsonValueKind.String)
+        {
+            return false;
+        }
+
+        var message = messageElement.GetString();
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        int? code = null;
+        if (element.TryGetProperty("code", out var codeElement))
+        {
+            code = codeElement.ValueKind switch
+            {
+                JsonValueKind.Number when codeElement.TryGetInt32(out var intValue) => intValue,
+                JsonValueKind.String when int.TryParse(codeElement.GetString(), out var intValue) => intValue,
+                _ => null
+            };
+        }
+
+        errorInfo = new GraphQlErrorInfo(message, code);
+        return true;
+    }
+
+    private static bool IsAccessDeniedMessage(string message)
+    {
+        return string.Equals(message.Trim(), "access denied!", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(message.Trim(), "access denied", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private readonly record struct GraphQlErrorInfo(string Message, int? Code);
 
     private static bool ReadBooleanLike(JsonElement element, string fieldName)
     {

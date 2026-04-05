@@ -1,4 +1,5 @@
 using System.Net;
+using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Domain.Models;
 using IGoLibrary.Ex.Infrastructure.Api;
 
@@ -127,5 +128,45 @@ public sealed class TraceIntApiClientTests
         Assert.Equal("7:30", rule.OpenTimeText);
         Assert.Equal("22:00", rule.CloseTimeText);
         Assert.Equal(-1, rule.ValidateTime);
+    }
+
+    [Fact]
+    public async Task GetLibrariesAsync_ThrowsStructuredTraceIntApiException_ForExpiredCookieResponse()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            (_, _) => SequenceHttpMessageHandler.JsonResponseAsync("""
+                {
+                  "errors": [
+                    {
+                      "msg": "access denied!",
+                      "code": 40001
+                    }
+                  ],
+                  "data": {
+                    "userAuth": null
+                  }
+                }
+                """));
+
+        var client = new TraceIntApiClient(
+            new HttpClient(handler)
+            {
+                Timeout = Timeout.InfiniteTimeSpan
+            },
+            new FakeProtocolTemplateStore(new ProtocolTemplateSet(
+                "https://example.com/ReplaceMeByCode",
+                "{\"query\":\"libraries\"}",
+                "{\"query\":\"layout\"}",
+                "{\"query\":\"rule\"}",
+                "{\"query\":\"reservation\"}",
+                "{\"query\":\"reserve\"}",
+                "{\"query\":\"cancel\"}")),
+            new FakeSettingsService(AppSettings.Default));
+
+        var exception = await Assert.ThrowsAsync<TraceIntApiException>(() => client.GetLibrariesAsync("Authorization=a; SERVERID=b"));
+
+        Assert.Equal(40001, exception.ErrorCode);
+        Assert.Equal("access denied!", exception.RemoteMessage);
+        Assert.True(exception.IsAuthorizationDenied);
     }
 }

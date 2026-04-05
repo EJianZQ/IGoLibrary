@@ -11,6 +11,7 @@ public sealed record AppSettings(
     GrabReservationStrategy GrabReservationStrategy,
     int? LastLibraryId,
     string? LastLibraryName,
+    CookieExpiryAlertSettings? CookieExpiryAlerts = null,
     int SuccessfulReservationCount = 0,
     long TotalGuardSeconds = 0)
 {
@@ -23,6 +24,7 @@ public sealed record AppSettings(
         GrabReservationStrategy: GrabReservationStrategy.QueryThenReserve,
         LastLibraryId: null,
         LastLibraryName: null,
+        CookieExpiryAlerts: CookieExpiryAlertSettings.Default,
         SuccessfulReservationCount: 0,
         TotalGuardSeconds: 0);
 }

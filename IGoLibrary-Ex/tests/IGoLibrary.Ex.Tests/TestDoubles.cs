@@ -1,7 +1,11 @@
 using System.Net;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
+using IGoLibrary.Ex.Infrastructure.Notifications;
+using MailKit.Security;
+using MimeKit;
 
 namespace IGoLibrary.Ex.Tests;
 
@@ -110,18 +114,138 @@ internal sealed class FakeNotificationService : INotificationService
     }
 }
 
+internal sealed class FakeErrorDialogService : IErrorDialogService
+{
+    public List<(string Title, string ErrorType, string ErrorMessage)> Errors { get; } = [];
+
+    public Task ShowErrorAsync(string title, string errorType, string errorMessage, CancellationToken cancellationToken = default)
+    {
+        Errors.Add((title, errorType, errorMessage));
+        return Task.CompletedTask;
+    }
+}
+
 internal sealed class FakeSettingsService(AppSettings settings) : ISettingsService
 {
     public AppSettings CurrentSettings { get; private set; } = settings;
+
+    public int SaveCalls { get; private set; }
 
     public Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(CurrentSettings);
 
     public Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
+        SaveCalls++;
         CurrentSettings = settings;
         return Task.CompletedTask;
     }
+}
+
+internal sealed class FakeCookieExpiryAlertService : ICookieExpiryAlertService
+{
+    public List<(string Source, string Reason)> CookieExpiredNotifications { get; } = [];
+
+    public List<CookieExpiryEmailAlertSettings> TestEmailRequests { get; } = [];
+
+    public List<CookieExpiryLocalAlertSettings> TestLocalAlertRequests { get; } = [];
+
+    public Exception? SendTestEmailException { get; set; }
+
+    public Task NotifyCookieExpiredAsync(string source, string reason, CancellationToken cancellationToken = default)
+    {
+        CookieExpiredNotifications.Add((source, reason));
+        return Task.CompletedTask;
+    }
+
+    public Task SendTestEmailAsync(CookieExpiryEmailAlertSettings settings, CancellationToken cancellationToken = default)
+    {
+        if (SendTestEmailException is not null)
+        {
+            throw SendTestEmailException;
+        }
+
+        TestEmailRequests.Add(settings);
+        return Task.CompletedTask;
+    }
+
+    public Task SendTestLocalAlertAsync(CookieExpiryLocalAlertSettings settings, CancellationToken cancellationToken = default)
+    {
+        TestLocalAlertRequests.Add(settings);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeEmailAlertSender : IEmailAlertSender
+{
+    public List<(CookieExpiryEmailAlertSettings Settings, string Subject, string Body)> Requests { get; } = [];
+
+    public Exception? SendException { get; set; }
+
+    public Task SendAsync(
+        CookieExpiryEmailAlertSettings settings,
+        string subject,
+        string body,
+        CancellationToken cancellationToken = default)
+    {
+        if (SendException is not null)
+        {
+            throw SendException;
+        }
+
+        Requests.Add((settings, subject, body));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeSmtpTransportClient : ISmtpTransportClient
+{
+    public List<(string Host, int Port, SecureSocketOptions Options)> ConnectRequests { get; } = [];
+
+    public List<(string Username, string Password)> AuthenticationRequests { get; } = [];
+
+    public List<MimeMessage> SentMessages { get; } = [];
+
+    public int DisconnectCalls { get; private set; }
+
+    public bool Disposed { get; private set; }
+
+    public Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
+    {
+        ConnectRequests.Add((host, port, options));
+        return Task.CompletedTask;
+    }
+
+    public Task AuthenticateAsync(string username, string password, CancellationToken cancellationToken = default)
+    {
+        AuthenticationRequests.Add((username, password));
+        return Task.CompletedTask;
+    }
+
+    public Task SendAsync(MimeMessage message, CancellationToken cancellationToken = default)
+    {
+        SentMessages.Add(message);
+        return Task.CompletedTask;
+    }
+
+    public Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default)
+    {
+        DisconnectCalls++;
+        return Task.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Disposed = true;
+        return ValueTask.CompletedTask;
+    }
+}
+
+internal sealed class FakeSmtpTransportClientFactory(FakeSmtpTransportClient client) : ISmtpTransportClientFactory
+{
+    public FakeSmtpTransportClient Client { get; } = client;
+
+    public ISmtpTransportClient Create() => Client;
 }
 
 internal sealed class FakeSessionService : ISessionService
