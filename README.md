@@ -1,229 +1,143 @@
-# 我去图书馆小助手 - IGoLibraryHelper
+<p align="center">
+  <img src="docs/images/ex/软件图标-大.png" alt="IGoLibrary Icon" width="120" />
+</p>
 
-# 简介
+<h1 align="center">我去图书馆助手 - IGoLibrary 📖</h1>
 
-**我去图书馆小助手**(以下简称"小助手")由**E剑终情**根据"我去图书馆"这一智慧图书馆座位管理系统而编写。可实现**空座实时监控、秒抢座和占座**等功能。采用最新的**.NET 6**编写，目前可运行在Windows7~11所有系统版本上，未来预期将在Linux和Mac上实现跨平台运行。**本软件永远免费、开源、持续更新。**
+<p align="center">
+  <img src="https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white" alt=".NET 10" />
+  <img src="https://img.shields.io/badge/Avalonia-11-8B5CF6?logo=avaloniaui&logoColor=white" alt="Avalonia 11" />
+  <img src="https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white" alt="SQLite" />
+  <img src="https://img.shields.io/badge/xUnit-Test-5C2D91?logo=xunit&logoColor=white" alt="xUnit" />
+  <img src="https://img.shields.io/github/v/release/EJianZQ/IGoLibrary?logo=github" alt="Latest Release" />
+  <img src="https://img.shields.io/github/license/EJianZQ/IGoLibrary" alt="License" />
+</p>
 
----
+<p align="center">
+  IGoLibrary-Ex 是基于 <code>Avalonia</code> 重构的新一代跨平台桌面端实现。可运行在 <code>Windows 10 22H2</code> 及以上与 <code>macOS 15 Sequoia</code> 及以上。已实现 <strong>扫码获取 Cookie</strong>、<strong>座位实时监控并抢座</strong>、<strong>利用退座机制进行占座</strong> 和 <strong>Cookie 过期提醒</strong> 等实用功能
+</p>
 
-# 功能介绍
+<p align="center">
+  <img src="docs/images/ex/主页.png" alt="IGoLibrary-Ex 首页截图" width="960" />
+</p>
 
-### 绑定图书馆
+## ✨ 核心功能
 
-可自动获取账号绑定的学校的所有在"我去图书馆"系统下注册的场馆，后续将实现多场馆多线程监控(效果图可见上方的软件截图)
+- 🔐 基于微信扫码链接来获取 Cookie 完成登录，并支持恢复本地保存的会话
+- 🏛️ 自动加载账号下可用场馆，支持选择、预览并锁定当前作业场馆
+- ⚡ 支持多目标座位监控，实现退座监控秒抢、定时抢座
+- ♻️ 支持占座流程，在预约即将到期时自动取消并重新预约
+- ⭐ 支持收藏常用座位，并为每个场馆分别持久化座位收藏
+- 📊 首页面板展示当前场馆、预约状态、累计成功次数和守护时长
+- 🔔 支持 Cookie 失效提醒，可通过右下角 Toast 弹窗、提示音和 SMTP 邮件通知用户
+- 🧩 支持自定义 API 地址覆盖，便于在接口地址或 GraphQL 模板变化时快速调整
 
-### 抢座
+## 🧱 项目结构
 
-设置想要的座位后开启监控，每隔一段时间(可自由设置)会自动刷新并获取想要的座位状态，如果座位空出则预定该座位，否则将持续运行至抢到座位为止
-
-### 占座
-
-在已有预约的情况下在预约到期的前1分钟取消预约，然后等待1分钟的重新预约冷却过后再重新预约该座位。并循环此过程达到无需去签到、不会被举报即可占领该座位一整天
-
----
-
-# 使用教程
-
-### ⭐前置条件
-
-> 注意：此前置条件仅针对压缩包后有"Portable-DependencyFramework"的版本，正常版本正常运行即可
-
-由于软件采用最新的.NET 6编写来获取更新的语言特性和运行效率，部分系统上可能没有.NET 6运行时。在尝试运行软件时可能软件会报错，点击"是"即可跳转至下载链接，安装后即可运行软件。
-
-或者移步：[下载 .NET 6.0 运行时](https://dotnet.microsoft.com/zh-cn/download/dotnet/6.0/runtime?utm_source=getdotnetcore&utm_medium=referral "点此跳转去下载") 进行下载。下载时选择“运行桌面应用 - 下载x64/86(根据系统选择)”
-
-### 第一步：获取Cookie
-
-1.使用已经在"我去图书馆"绑定好学校等信息的**微信**扫软件内的二维码
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/03/aae004a9b120af82.png)​
-
-2.点击页面右上角的"..."，然后点击复制链接
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/03/685235796e285196.png)​
-
-3.将复制后的链接通过任意方式(QQ/微信等等等)发到电脑上然后复制粘贴到软件中，然后点击"获取并填写Cookie"按钮即可
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/03/868371bcfdd98fb6.png)​
-
-4.如果链接正确Cookie就会获取成功，右下角会弹出获取成功的提示并自动跳转到绑定图书馆的界面
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/11/8a25cd45b3747605.png)​
-
-> 注：扫码后拿到的链接无论是否成功获取Cookie都只能用一次，如果还要用需要再次扫码
-
-### 第二步：绑定图书馆
-
-1.在Cookie正确填写后点击"绑定"按钮
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/03/8f92883d55f7a879.png)​
-
-2.选择需要绑定的场馆(目前只能选择一个)
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/03/ae98896b0bf0fdbe.png)​
-
-3.选择完后点击确定即可完成绑定，右侧会显示绑定的场馆的信息
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/03/27dc5bf1cb6a5c84.png)​
-
-### 第三步：抢座
-
-1.绑定图书馆完成后切换到 "抢座 - 选择座位" 页面，并选择需要抢的座位，选择完成后点击"添加选中座位至抢座列表"
-
-> 注意：选择座位是点击列表最左侧空白的那一列进行选择，按住Ctrl可以多选，最大选择数不设上限
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/11/785d284bfae456ed.png)​
-
-2.在"抢座 - 抢座控制台"打开操作开关，如实时数据正常显示则表示已经开始抢座了
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/03/01be1bae50409cca.png)​
-
-定时抢座的用法：点击定时抢座的时间框即可设定时间，设定好时间后再打开操作开关到设定时间即可自动抢座
-
-> 如果不需要定时抢座只需要将时间设为00:00:00即可关闭定时功能
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/03/c03adaf4ec82af6a.png)​
-
-### Extra：占座
-
-> 使用此功能需要你已经预约好了座位！预约好了座位！预约好了座位！
-
-1.点击按钮"刷新预约状态"直到右上角的预约座位信息处正确显示了你的预约信息
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/03/2055cd6f3d2ea681.png)​
-
-2.打开占座的操作开关，如实时数据正常显示则表示已经开始占座了
-
-​![](http://img.xn--e-5g8az75bbi3a.com/imgs/2023/03/7b4ca7acbe973eea.png)​
-
----
-
-# 原理分析
-
-### 获取Cookie
-
-```mermaid
-sequenceDiagram
-    participant 用户
-    participant 软件
-    participant 服务器
-    用户->>软件: 提供扫码后获取的链接
-    软件-->>软件: 从链接中提取出code参数
-    软件->>服务器: 将code参数拼接至特定网址后发送Get请求
-    服务器-)软件: 返回带有Cookie的Response
-    软件-->>软件: 从Response中取出Cookie
+```text
+IGoLibrary-Ex/
+  src/
+    IGoLibrary.Ex.Domain/           领域模型
+    IGoLibrary.Ex.Application/      用例编排、任务协调器、应用服务
+    IGoLibrary.Ex.Infrastructure/   API、持久化、GraphQL模板、邮件通知
+    IGoLibrary.Ex.Desktop/          Avalonia UI、ViewModel、桌面交互
+  tests/
+    IGoLibrary.Ex.Tests/            单元测试与界面逻辑测试
+  build/                            发布脚本
 ```
 
-### 绑定图书馆
+## 🚀 使用说明
+> [!TIP]
+> 当前以 `IGoLibrary-Ex` 作为主项目说明，旧版 WinForm 项目的历史 README 已迁移至 [README_Winform.md](README_Winform.md)
+> `IGoLibrary-Ex` 目前仍处于测试阶段，可能会有未知BUG。旧版 WinForm 项目仍正常稳定工作，如需使用旧版请移步 [Winform -1.3版本](https://github.com/EJianZQ/IGoLibrary/releases/tag/Public1.3) 进行下载
 
-```mermaid
-sequenceDiagram
-    participant 用户
-    participant 软件
-    participant 服务器
-par 获取所有场馆信息
-    软件-->>软件: 添加Cookie到请求头中
-    软件-->>软件: 添加查询所有场馆信息的Json到Body中
-    软件->>服务器: 发送Post请求
-    服务器-)软件: 返回带有所有图书馆信息的Json
-    软件-->>软件: 解析返回的Json并映射为AllLibsSummary对象
-and 获取用户指定场馆信息并绑定
-    软件->>用户: 让用户选择想绑定的场馆
-    用户->>软件: 用户选择场馆完毕
-    软件-->>软件: 添加Cookie到请求头中
-    软件-->>软件: 添加查询指定场馆信息的Json到Body中
-    软件->>服务器: 发送Post请求
-    服务器-)软件: 返回带有指定场馆信息的Json
-    软件-->>软件: 解析返回的Json并映射为Library对象
-    软件-->软件: 根据Library对象属性更新窗口组建信息并更新座位列表
-end
+### 1️⃣ 获取 Cookie
+1. 在 `账户与场馆` 页面使用已经在微信绑定好"我去图书馆"学校等信息的**微信**扫描软件内的二维码
+2. 点击页面右上角的"..."，然后点击复制链接
+3. 将复制后的链接通过任意方式(手机QQ/微信等等)发到**电脑上**然后
+4. 在电脑上复制该链接，回到软件的 `账户与场馆` 页面，将会自动识别并填写好 Cookie
+
+### 2️⃣ 锁定场馆
+1. 在 `账户与场馆` 页面，如果 Cookie 正确获取了，会显示✅绿色对勾和**已授权**字样
+2. 在页面右半边，点击 `更换当前场馆...` 按钮即可选择场馆
+3. 选择好场馆后点击 `保存并锁定场馆` 按钮即可正式锁定该场馆
+
+### 3️⃣ 抢座
+1. 在 `抢座` 页面点击 `选择目标座位` 按钮，选择欲监控座位。座位以边框颜色区分是否已经被占，收藏座位会在该座位右上角添加⭐标
+2. 选择 `抢座执行策略`，默认直接发送预约请求，不懂可直接默认。`抢座模式` 分为极限速度、随机延迟和延迟 5 秒，区别如下：
+   - 极限速度：以最快速度抢，适合临时秒杀。例如 早上8点开始抢，`7:59:55` 的时候使用极限速度模式开始监控
+   - 随机延迟：每次监控一轮后，随机延迟 N 秒进入下一轮，适合想要的座位已经被人占了，挂着软件监控该座位
+   - 延迟 5 秒(默认)：每次监控一轮后，延迟 5 秒进入下一轮，最平衡的模式，推荐使用
+3. 点击 `开始监控` 按钮，确认任务开始后把软件挂在后台即可。若监控的座位空出会立即预约并在右下角弹出 Toast 弹窗提醒
+
+### 4️⃣ 占座
+> [!TIP]
+> 使用此功能，你必须要已经预约好了座位！
+1. 在 `页面` 你会看到当前的预约信息，如果没有则点击 `手动刷新` 按钮
+2. 设置 `重新预约间隔`。每个学校都不一样，需要你自己事先看一下。随便预约一个座位，然后取消。取消之后再立刻去预约座位，会提示**取消预约后 N 分钟不可再次预约**之类的文案，把 N 分钟折算成秒数填入软件
+3. 点击 `开始占座` 按钮，确认任务开始后把软件挂在后台即可
+
+### 5️⃣ Cookie 过期提醒
+####  邮件提醒配置
+参见（还未完成该文档）
+#### 本地弹窗提醒
+当监测到 Cookie 过期时，会在屏幕右下角弹出 Toast 弹窗提醒 Cookie 已过期。如果打开了提示音，还会有相应的提示音
+
+## 🛠️ 开发与构建
+
+### 环境要求
+
+- 建议使用 `IGoLibrary-Ex/global.json` 指定的 `.NET SDK 10.0.201`
+- Windows 开发环境可直接使用 Visual Studio 2022 或 `dotnet CLI`
+- 仓库已提供 Windows 与 macOS 的发布脚本
+
+### 本地运行
+
+```powershell
+cd .\IGoLibrary-Ex
+dotnet restore
+dotnet run --project .\src\IGoLibrary.Ex.Desktop\IGoLibrary.Ex.Desktop.csproj
 ```
 
-### 抢座
+### 运行测试
 
-```mermaid
-sequenceDiagram
-    participant 用户
-    participant 软件
-    participant 服务器
-    用户->>软件: 选择待抢座位
-loop 循环监控座位
-    软件-->>软件: 添加Cookie到请求头中
-    软件-->>软件: 添加查询指定场馆信息的Json到Body中
-    软件->>服务器: 发送Post请求
-    服务器-)软件: 返回带有指定场馆信息的Json
-    软件-->>软件: 解析返回的Json并映射为Library对象
-    软件-->>软件: 使用GetSelectedSeatsKeyData方法从Library对象中提取出座位信息集合
-    软件-->>软件:将提取出的座位信息集合与待选座位进行匹配验证
-    alt 选定座位有人
-    软件-->>软件: 继续循环上方内容
-    else 选定座位无人
-    软件-->>软件: 添加Cookie到请求头中
-    软件-->>软件: 添加带有座位坐标(Key)的预约指定座位的Json到Body中
-    软件->>服务器: 发送Post请求
-    服务器-)软件: 返回带有预约成功与否的Json
-    软件-->>软件: 解析返回的Json并映射为ReserveSeatRoot对象
-    软件->>用户: 通知用户是否成功预约到了座位
-    end
-end
+```powershell
+cd .\IGoLibrary-Ex
+dotnet test .\tests\IGoLibrary.Ex.Tests\IGoLibrary.Ex.Tests.csproj
 ```
 
-### 占座
+### 发布示例
 
-```mermaid
-sequenceDiagram
-    participant 软件
-    participant 服务器
-loop 循环刷新预约状态
-    软件-->>软件: 添加Cookie到请求头中
-    软件-->>软件: 添加查询预约信息的Json到Body中
-    软件->>服务器: 发送Post请求
-    服务器-)软件: 返回带有指定场馆信息的Json
-    软件-->>软件: 解析返回的Json并映射为ReserveInfo对象
-    par 预约过期时间>60秒
-        软件-->>软件: 继续循环刷新预约状态
-    and 预约即将过期
-    软件-->>软件: 添加Cookie到请求头中
-    软件-->>软件: 添加取消预约的Json到Body中
-    软件->>服务器: 发送Post请求
-    服务器-)软件: 返回指示是否取消预约成功的Json
-    软件-->>软件: 解析返回的Json并映射为CancelReserveRoot对象
-    alt 取消预约失败
-        软件-->>软件: 尝试重新取消至多三次
-    else 取消预约成功
-        软件-->>软件: 尝试重新取消至多三次
-    break 等待重新预约冷却
-        软件-->服务器: 延迟1分钟
-    end
-    opt 取消预约后重新预约座位
-    软件-->>软件: 添加Cookie到请求头中
-    软件-->>软件: 添加带有座位坐标(Key)的预约指定座位的Json到Body中
-    软件->>服务器: 发送Post请求
-    服务器-)软件: 返回带有预约成功与否的Json
-    软件-->>软件: 解析返回的Json并映射为ReserveSeatRoot对象
-alt 重新预约失败
-        软件-->>软件: 尝试重新取消至多三次
-    else 重新预约成功
-        软件-->>软件: 循环整个大过程
-    end
-    end
-    end
-end
-end
+Windows
+
+```powershell
+cd .\IGoLibrary-Ex
+.\build\publish-windows.ps1
 ```
 
----
+macOS
 
-# 更新日志
+```bash
+cd ./IGoLibrary-Ex
+./build/publish-macos.sh
+```
 
-更新日志请参见[项目页面](https://xn--e-5g8az75bbi3a.com/%E9%A1%B9%E7%9B%AE%E5%8F%91%E5%B8%83/14.html)
+## 💾 本地数据说明
 
----
+应用会在本地使用 `SQLite` 保存配置、收藏座位、自定义API接口以及必要的会话信息
 
-# 作者有话说
+- Windows 默认数据目录：`%LOCALAPPDATA%\IGoLibrary-Ex`
+- macOS 默认数据目录：`~/Library/Application Support/IGoLibrary-Ex`
+- 可通过环境变量 `IGOLIBRARY_EX_DATA_DIR` 覆盖默认数据目录
 
-此项目的开发初衷只是为了提升自己的编程技术、能力，丰富自己对协议方面的经验，所发布的软件也仅作学习之用，无其他任何用途
+## ⚠️ 免责声明
 
-* 本人无意侵犯任何组织或个人的权益, 并非针对"我去图书馆"系统和其公司，**仅作学习交流**
-* 本项目完全免费、开源，如果有BUG欢迎前往[Github](https://github.com/EJianZQ/IGoLibrary "前往GitHub")给我提Issue或者和我一起贡献源代码来维护更新此项目。如果喜欢此项目**请给我点一个小小的Star** :)
-* 尽管此项目遵循MIT开源许可证，您可以随意修改源代码、版权并自主选择是否闭源，**但衷心建议不要二次修改此项目用来收费盈利，这会背离开源项目的初衷**
+本项目以学习、研究与交流为目的，用于桌面应用架构、协议交互、任务调度与本地通知等方向的实践探索。
+
+- 本项目与“我去图书馆”系统及其所属组织不存在从属或官方合作关系
+- 请在遵守所在学校、场馆及相关平台规则的前提下了解和使用本项目
+- 如果你发现问题，欢迎提交 Issue 或继续完善 `IGoLibrary-Ex`
+
+## 📄 License
+
+本项目基于 [MIT License](LICENSE.txt) 开源。
