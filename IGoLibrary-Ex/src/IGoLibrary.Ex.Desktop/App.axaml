@@ -44,7 +44,7 @@
 
   <TrayIcon.Icons>
     <TrayIcons>
-      <TrayIcon Icon="/Assets/avalonia-logo.ico"
+      <TrayIcon Icon="/Assets/main.ico"
                 ToolTipText="IGoLibrary-Ex"
                 Command="{Binding ShowWindowCommand}">
         <TrayIcon.Menu>

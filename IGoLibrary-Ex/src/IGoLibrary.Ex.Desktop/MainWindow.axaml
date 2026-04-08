@@ -16,7 +16,7 @@
         ExtendClientAreaTitleBarHeightHint="40"
         TransparencyLevelHint="Mica, AcrylicBlur, None"
         Background="Transparent"
-        Icon="/Assets/avalonia-logo.ico">
+        Icon="/Assets/main.ico">
 
   <Window.Resources>
     <PathGeometry x:Key="IconHome">M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z</PathGeometry>
