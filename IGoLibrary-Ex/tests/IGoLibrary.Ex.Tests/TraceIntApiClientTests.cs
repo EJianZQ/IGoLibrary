@@ -169,4 +169,37 @@ public sealed class TraceIntApiClientTests
         Assert.Equal("access denied!", exception.RemoteMessage);
         Assert.True(exception.IsAuthorizationDenied);
     }
+
+    [Fact]
+    public void BuildCookieHeaderFromResponseCookies_MatchesWinformOrdering()
+    {
+        var cookies = TraceIntApiClient.BuildCookieHeaderFromResponseCookies(
+        [
+            "SERVERID=b9fc7bd86d2eed91b23d7347e0ee995e|1775746288|1775746288",
+            "Authorization=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9"
+        ]);
+
+        Assert.Equal(
+            "Authorization=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9; SERVERID=b9fc7bd86d2eed91b23d7347e0ee995e|1775746288|1775746288",
+            cookies);
+    }
+
+    [Fact]
+    public void BuildCookieHeaderFromResponseCookies_Throws_WhenCookieCollectionIsNull()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => TraceIntApiClient.BuildCookieHeaderFromResponseCookies(null));
+
+        Assert.Equal("响应报文返回的Cookie为空", exception.Message);
+    }
+
+    [Fact]
+    public void BuildCookieHeaderFromResponseCookies_Throws_WhenCookieCollectionHasFewerThanTwoItems()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => TraceIntApiClient.BuildCookieHeaderFromResponseCookies(
+        [
+            "Authorization=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9"
+        ]));
+
+        Assert.Equal("Cookie不包含关键身份信息，可能是code过期，重新填写含code的链接", exception.Message);
+    }
 }

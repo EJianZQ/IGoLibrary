@@ -5,13 +5,21 @@ using IGoLibrary.Ex.Infrastructure.Persistence;
 
 namespace IGoLibrary.Ex.Infrastructure.Protocol;
 
-public sealed class DefaultProtocolTemplateStore(SqliteConnectionFactory connectionFactory) : IProtocolTemplateStore
+public sealed class DefaultProtocolTemplateStore(
+    SqliteConnectionFactory connectionFactory,
+    ISettingsService settingsService) : IProtocolTemplateStore
 {
     private const string OverridesKey = "protocol-overrides";
 
     public async Task<ProtocolTemplateSet> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default)
     {
         var defaults = DefaultTemplates.Instance;
+        var settings = await settingsService.LoadAsync(cancellationToken);
+        if (!settings.CustomApiOverridesEnabled)
+        {
+            return defaults;
+        }
+
         var overrides = await LoadOverridesAsync(cancellationToken);
 
         return new ProtocolTemplateSet(

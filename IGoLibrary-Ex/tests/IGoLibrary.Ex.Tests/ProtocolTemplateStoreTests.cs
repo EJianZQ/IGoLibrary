@@ -21,7 +21,10 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     [Fact]
     public async Task SaveOverridesAsync_MergesOverridesWithDefaults()
     {
-        var store = await CreateStoreAsync();
+        var store = await CreateStoreAsync(AppSettings.Default with
+        {
+            CustomApiOverridesEnabled = true
+        });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
         await store.SaveOverridesAsync(new ProtocolTemplateOverrides(
@@ -40,7 +43,10 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     [Fact]
     public async Task ResetOverridesAsync_RestoresDefaults()
     {
-        var store = await CreateStoreAsync();
+        var store = await CreateStoreAsync(AppSettings.Default with
+        {
+            CustomApiOverridesEnabled = true
+        });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
         await store.SaveOverridesAsync(new ProtocolTemplateOverrides(QueryReservationInfoTemplate: "temporary"));
@@ -51,6 +57,25 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
         Assert.Equal(defaults.QueryReservationInfoTemplate, effective.QueryReservationInfoTemplate);
         Assert.Equal(defaults.QueryLibraryRuleTemplate, effective.QueryLibraryRuleTemplate);
         Assert.Contains("ReplaceMeByCode", effective.GetCookieUrlTemplate);
+    }
+
+    [Fact]
+    public async Task GetEffectiveTemplatesAsync_IgnoresSavedOverrides_WhenCustomApiOverridesAreDisabled()
+    {
+        var store = await CreateStoreAsync(AppSettings.Default with
+        {
+            CustomApiOverridesEnabled = false
+        });
+        var defaults = await store.GetEffectiveTemplatesAsync();
+
+        await store.SaveOverridesAsync(new ProtocolTemplateOverrides(
+            GetCookieUrlTemplate: "https://override.example.com/ReplaceMeByCode",
+            QueryLibrariesTemplate: "override-libraries"));
+
+        var effective = await store.GetEffectiveTemplatesAsync();
+
+        Assert.Equal(defaults.GetCookieUrlTemplate, effective.GetCookieUrlTemplate);
+        Assert.Equal(defaults.QueryLibrariesTemplate, effective.QueryLibrariesTemplate);
     }
 
     public void Dispose()
@@ -75,11 +100,12 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
         }
     }
 
-    private static async Task<DefaultProtocolTemplateStore> CreateStoreAsync()
+    private static async Task<DefaultProtocolTemplateStore> CreateStoreAsync(AppSettings? settings = null)
     {
         var connectionFactory = new SqliteConnectionFactory();
         var initializer = new SqliteAppDataInitializer(connectionFactory);
         await initializer.InitializeAsync();
-        return new DefaultProtocolTemplateStore(connectionFactory);
+        var settingsService = new FakeSettingsService(settings ?? AppSettings.Default);
+        return new DefaultProtocolTemplateStore(connectionFactory, settingsService);
     }
 }

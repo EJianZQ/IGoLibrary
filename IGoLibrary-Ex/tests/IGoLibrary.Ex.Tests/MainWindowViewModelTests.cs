@@ -1,3 +1,4 @@
+using System.Net;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Application.Services;
@@ -130,6 +131,66 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("测试邮件发送失败", error.Title);
         Assert.Equal(nameof(InvalidOperationException), error.ErrorType);
         Assert.Equal("smtp connect failed", error.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task TryAutoParseClipboardLinkAsync_DoesNotConsumeSameCodeTwice()
+    {
+        var notificationService = new FakeNotificationService();
+        var apiClient = new FakeTraceIntApiClient();
+        var getCookieCalls = 0;
+        apiClient.OnGetCookieFromCodeAsync = (code, _) =>
+        {
+            getCookieCalls++;
+            return Task.FromResult("Authorization=a; SERVERID=b");
+        };
+
+        var viewModel = CreateViewModel(
+            apiClient: apiClient,
+            notificationService: notificationService);
+
+        const string link = "https://example.com/callback?code=1234567890abcdef1234567890abcdef&state=1";
+
+        var firstResult = await viewModel.TryAutoParseClipboardLinkAsync(link);
+        var secondResult = await viewModel.TryAutoParseClipboardLinkAsync(link);
+
+        Assert.True(firstResult);
+        Assert.False(secondResult);
+        Assert.Equal(1, getCookieCalls);
+        Assert.Contains(notificationService.Successes, item => item.Title == "已成功获取 Cookie");
+    }
+
+    [Fact]
+    public async Task TryAutoParseClipboardLinkAsync_AllowsRetry_WhenFirstCookieFetchFailsBeforeCookieIsIssued()
+    {
+        var notificationService = new FakeNotificationService();
+        var apiClient = new FakeTraceIntApiClient();
+        var getCookieCalls = 0;
+        apiClient.OnGetCookieFromCodeAsync = (_, _) =>
+        {
+            getCookieCalls++;
+            if (getCookieCalls == 1)
+            {
+                throw new HttpRequestException("temporary network failure");
+            }
+
+            return Task.FromResult("Authorization=a; SERVERID=b");
+        };
+
+        var viewModel = CreateViewModel(
+            apiClient: apiClient,
+            notificationService: notificationService);
+
+        const string link = "https://example.com/callback?code=1234567890abcdef1234567890abcdef&state=1";
+
+        var firstResult = await viewModel.TryAutoParseClipboardLinkAsync(link);
+        var secondResult = await viewModel.TryAutoParseClipboardLinkAsync(link);
+
+        Assert.False(firstResult);
+        Assert.True(secondResult);
+        Assert.Equal(2, getCookieCalls);
+        Assert.Contains(notificationService.Warnings, item => item.Title == "获取 Cookie 失败");
+        Assert.Contains(notificationService.Successes, item => item.Title == "已成功获取 Cookie");
     }
 
     [Fact]

@@ -77,6 +77,16 @@ public sealed class MainWindowClipboardTests
         Assert.False(shouldSkip);
     }
 
+    [Fact]
+    public void ShouldSkipClipboardText_ReturnsTrue_WhenCodeMatchesButLinkTextDiffers()
+    {
+        var shouldSkip = MainWindow.ShouldSkipClipboardText(
+            "https://example.com/callback?code=1234567890abcdef1234567890abcdef&state=1",
+            "https://another.example.com/auth?foo=1&code=1234567890abcdef1234567890abcdef");
+
+        Assert.True(shouldSkip);
+    }
+
     private static MainWindowViewModel CreateViewModel()
     {
         return new MainWindowViewModel(

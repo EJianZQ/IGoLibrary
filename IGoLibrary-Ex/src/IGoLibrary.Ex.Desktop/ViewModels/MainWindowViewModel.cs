@@ -116,6 +116,9 @@ public partial class MainWindowViewModel(
     private bool _isLoadingSettings;
     private bool _notificationSettingsLoaded;
     private CancellationTokenSource? _notificationSettingsAutoSaveCts;
+    private readonly object _processedAuthCodesGate = new();
+    private readonly HashSet<string> _processedAuthCodes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _inFlightAuthCodes = new(StringComparer.OrdinalIgnoreCase);
 
     public ObservableCollection<LibrarySummary> AvailableLibraries { get; } = [];
 
@@ -823,6 +826,8 @@ public partial class MainWindowViewModel(
 
     private async Task<bool> ParseCookieFromLinkAsync(string? linkText, bool notifyOnInvalidLink)
     {
+        string? reservedCode = null;
+        var shouldMarkCodeAsProcessed = false;
         try
         {
             if (!CodeLinkParser.TryExtractCode(linkText, out var code))
@@ -835,7 +840,20 @@ public partial class MainWindowViewModel(
                 return false;
             }
 
+            if (!TryReserveAuthCode(code))
+            {
+                activityLogService.Write(LogEntryKind.Info, "Auth", $"授权 code 已处理，跳过重复解析：{code}");
+                if (notifyOnInvalidLink)
+                {
+                    await notificationService.ShowInfoAsync("链接已处理", "该授权链接已处理过一次。如需重试，请重新从微信获取新的授权链接。");
+                }
+
+                return false;
+            }
+
+            reservedCode = code;
             var cookie = await apiClient.GetCookieFromCodeAsync(code);
+            shouldMarkCodeAsProcessed = true;
             ManualCookieText = cookie;
             SessionSummary = "已获取 Cookie，等待验证";
             SelectedTabIndex = 1;
@@ -861,6 +879,13 @@ public partial class MainWindowViewModel(
             activityLogService.Write(LogEntryKind.Error, "Auth", $"通过链接获取 Cookie 失败：{ex.Message}");
             await notificationService.ShowWarningAsync("获取 Cookie 失败", ex.Message);
             return false;
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(reservedCode))
+            {
+                CompleteAuthCodeReservation(reservedCode, shouldMarkCodeAsProcessed);
+            }
         }
     }
 
@@ -1713,6 +1738,32 @@ public partial class MainWindowViewModel(
     private string GetUnboundVenueFloorText()
     {
         return IsAuthorized ? "等待绑定场馆后获取" : "等待授权并绑定场馆";
+    }
+
+    private bool TryReserveAuthCode(string code)
+    {
+        lock (_processedAuthCodesGate)
+        {
+            if (_processedAuthCodes.Contains(code) || _inFlightAuthCodes.Contains(code))
+            {
+                return false;
+            }
+
+            _inFlightAuthCodes.Add(code);
+            return true;
+        }
+    }
+
+    private void CompleteAuthCodeReservation(string code, bool markAsProcessed)
+    {
+        lock (_processedAuthCodesGate)
+        {
+            _inFlightAuthCodes.Remove(code);
+            if (markAsProcessed)
+            {
+                _processedAuthCodes.Add(code);
+            }
+        }
     }
 
     private async Task PopulateSeatsAsync(LibraryLayout layout, bool preserveSelection)

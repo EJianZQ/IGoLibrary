@@ -205,7 +205,14 @@ public partial class MainWindow : Window
 
     internal static bool ShouldSkipClipboardText(string clipboardText, string? lastProcessedClipboardText)
     {
-        return string.Equals(clipboardText, lastProcessedClipboardText, StringComparison.Ordinal);
+        if (string.Equals(clipboardText, lastProcessedClipboardText, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return CodeLinkParser.TryExtractCode(clipboardText, out var currentCode) &&
+               CodeLinkParser.TryExtractCode(lastProcessedClipboardText, out var lastCode) &&
+               string.Equals(currentCode, lastCode, StringComparison.OrdinalIgnoreCase);
     }
 
     private void OnOccupyLogLinesChanged(object? sender, NotifyCollectionChangedEventArgs e)

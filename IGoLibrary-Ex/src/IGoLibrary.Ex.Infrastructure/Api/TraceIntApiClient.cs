@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -8,6 +7,7 @@ using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Domain.Models;
 using IGoLibrary.Ex.Domain.Helpers;
+using RestSharp;
 
 namespace IGoLibrary.Ex.Infrastructure.Api;
 
@@ -18,58 +18,27 @@ public sealed class TraceIntApiClient(
 {
     private const string DesktopUserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36 NetType/WIFI MicroMessenger/7.0.20.1781(0x6700143B) WindowsWechat(0x63070626)";
     private const string AppVersion = "2.0.11";
+    private static readonly TimeSpan GetCookieTimeout = TimeSpan.FromSeconds(5);
     private static readonly Regex SeatNameRegex = new(@"^\d{1,3}$", RegexOptions.Compiled);
 
     public async Task<string> GetCookieFromCodeAsync(string code, CancellationToken cancellationToken = default)
     {
         var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
         var requestUrl = templates.GetCookieUrlTemplate.Replace("ReplaceMeByCode", code, StringComparison.Ordinal);
-        return await ExecuteWithRequestPolicyAsync(async requestToken =>
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(GetCookieTimeout);
+
+        var client = new RestClient(requestUrl);
+        var request = new RestRequest
         {
-            var cookieContainer = new CookieContainer();
+            Method = Method.Get
+        };
 
-            using var handler = new HttpClientHandler
-            {
-                AllowAutoRedirect = true,
-                AutomaticDecompression = DecompressionMethods.All,
-                CookieContainer = cookieContainer,
-                UseCookies = true
-            };
-            using var authClient = new HttpClient(handler)
-            {
-                Timeout = Timeout.InfiniteTimeSpan
-            };
-            authClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", DesktopUserAgent);
-            authClient.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "*/*");
-            authClient.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7");
-
-            using var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
-            using var response = await authClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken);
-            if ((int)response.StatusCode >= 400)
-            {
-                response.EnsureSuccessStatusCode();
-            }
-
-            var cookiesFromContainer = ExtractImportantCookies(EnumerateCookies(
-                cookieContainer,
-                new Uri("http://wechat.v2.traceint.com"),
-                new Uri("https://wechat.v2.traceint.com"),
-                new Uri("https://web.traceint.com")));
-            var cookiesFromHeaders = ExtractImportantCookies(response.Headers.TryGetValues("Set-Cookie", out var values)
-                ? values
-                : []);
-            var cookies = !string.IsNullOrWhiteSpace(cookiesFromContainer)
-                ? cookiesFromContainer
-                : cookiesFromHeaders;
-
-            if (!cookies.Contains("Authorization=", StringComparison.OrdinalIgnoreCase) ||
-                !cookies.Contains("SERVERID=", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new InvalidOperationException("响应中的 Cookie 缺少 Authorization 或 SERVERID。");
-            }
-
-            return cookies;
-        }, cancellationToken);
+        var response = await Task.Run(
+            () => client.ExecuteAsync(request, timeoutCts.Token).GetAwaiter().GetResult(),
+            timeoutCts.Token);
+        var responseCookies = response.Cookies?.Select(cookie => cookie.ToString()).ToArray();
+        return BuildCookieHeaderFromResponseCookies(responseCookies);
     }
 
     public async Task ValidateCookieAsync(string cookie, CancellationToken cancellationToken = default)
@@ -515,42 +484,18 @@ public sealed class TraceIntApiClient(
         };
     }
 
-    private static string ExtractImportantCookies(IEnumerable<string> setCookieHeaders)
+    internal static string BuildCookieHeaderFromResponseCookies(IReadOnlyList<string>? responseCookies)
     {
-        var allowedKeys = new[]
+        if (responseCookies is null)
         {
-            "FROM_TYPE", "FROM_CODE", "v", "wechatSESS_ID", "Authorization", "SERVERID"
-        };
-
-        var cookies = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var header in setCookieHeaders)
-        {
-            var nameValue = header.Split(';', 2)[0];
-            var index = nameValue.IndexOf('=', StringComparison.Ordinal);
-            if (index <= 0)
-            {
-                continue;
-            }
-
-            var name = nameValue[..index].Trim();
-            var value = nameValue[(index + 1)..].Trim();
-            if (allowedKeys.Contains(name, StringComparer.OrdinalIgnoreCase))
-            {
-                cookies[name] = value;
-            }
+            throw new InvalidOperationException("响应报文返回的Cookie为空");
         }
 
-        return string.Join("; ", allowedKeys.Where(cookies.ContainsKey).Select(key => $"{key}={cookies[key]}"));
-    }
-
-    private static IEnumerable<string> EnumerateCookies(CookieContainer cookieContainer, params Uri[] uris)
-    {
-        foreach (var uri in uris)
+        if (responseCookies.Count < 2)
         {
-            foreach (Cookie cookie in cookieContainer.GetCookies(uri))
-            {
-                yield return $"{cookie.Name}={cookie.Value}";
-            }
+            throw new InvalidOperationException("Cookie不包含关键身份信息，可能是code过期，重新填写含code的链接");
         }
+
+        return $"{responseCookies[1]}; {responseCookies[0]}";
     }
 }
