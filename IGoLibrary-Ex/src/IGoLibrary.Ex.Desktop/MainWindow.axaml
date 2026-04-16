@@ -191,7 +191,7 @@
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="CornerRadius" Value="16" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="Padding" Value="16,10" />
@@ -212,15 +212,29 @@
     <Style Selector="Button.notification-segment /template/ ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="BoxShadow" Value="0 0 0 0 #00000000" />
+      <Setter Property="CornerRadius" Value="16" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
     </Style>
     <Style Selector="Button.notification-segment:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource AppInteractiveHoverBrush}" />
       <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="BoxShadow" Value="0 0 0 0 #00000000" />
     </Style>
     <Style Selector="Button.notification-segment:pressed /template/ ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource AppInteractivePressedBrush}" />
       <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="BoxShadow" Value="0 0 0 0 #00000000" />
+    </Style>
+    <Style Selector="Button.notification-segment:focus /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AppInteractiveHoverBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SemiCardBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BoxShadow" Value="0 0 0 0 #00000000" />
     </Style>
   </Window.Styles>
 
@@ -1303,8 +1317,9 @@
                           ClipToBounds="True">
                       <Border Background="{DynamicResource AppNotificationSegmentThumbBrush}"
                               Width="{Binding NotificationSegmentSliderWidth}"
-                              CornerRadius="999"
-                              BoxShadow="0 2 10 0 #120F172A"
+                              CornerRadius="16"
+                              BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                              BorderThickness="1"
                               HorizontalAlignment="Left"
                               VerticalAlignment="Stretch"
                               IsHitTestVisible="False">
@@ -1326,7 +1341,7 @@
                                 Background="Transparent"
                                 Foreground="{Binding EmailNotificationTabForegroundBrush}"
                                 BorderThickness="0"
-                                CornerRadius="999"
+                                CornerRadius="16"
                                 Content="邮件提醒配置"
                                 Command="{Binding ShowEmailNotificationSettingsCommand}" />
                       </Grid>
@@ -1336,7 +1351,7 @@
                                 Background="Transparent"
                                 Foreground="{Binding LocalNotificationTabForegroundBrush}"
                                 BorderThickness="0"
-                                CornerRadius="999"
+                                CornerRadius="16"
                                 Content="本地弹窗提醒"
                                 Command="{Binding ShowLocalNotificationSettingsCommand}" />
                       </Grid>
