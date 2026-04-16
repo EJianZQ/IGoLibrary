@@ -1,14 +1,13 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
 
 namespace IGoLibrary.Ex.Desktop.ViewModels;
 
 public sealed partial class LogLineViewModel : ObservableObject
 {
-    private static readonly IBrush DefaultBrush = new SolidColorBrush(Color.Parse("#1D2129"));
-    private static readonly IBrush SuccessBrush = new SolidColorBrush(Color.Parse("#16A34A"));
-    private static readonly IBrush ErrorBrush = new SolidColorBrush(Color.Parse("#DC2626"));
+    private readonly IAppThemeService _themeService;
 
     public LogLineViewModel(
         string timestampText,
@@ -16,7 +15,8 @@ public sealed partial class LogLineViewModel : ObservableObject
         LogEntryKind kind,
         bool isLatest,
         bool hasSuccessSemantic,
-        bool hasFailureSemantic)
+        bool hasFailureSemantic,
+        IAppThemeService themeService)
     {
         TimestampText = timestampText;
         Message = message;
@@ -24,6 +24,7 @@ public sealed partial class LogLineViewModel : ObservableObject
         this.isLatest = isLatest;
         HasSuccessSemantic = hasSuccessSemantic;
         HasFailureSemantic = hasFailureSemantic;
+        _themeService = themeService;
     }
 
     public string TimestampText { get; }
@@ -39,11 +40,23 @@ public sealed partial class LogLineViewModel : ObservableObject
     [ObservableProperty]
     private bool isLatest;
 
-    public IBrush MessageBrush => HasSuccessSemantic
-        ? SuccessBrush
-        : HasFailureSemantic
-            ? ErrorBrush
-            : DefaultBrush;
+    public IBrush MessageBrush
+    {
+        get
+        {
+            var palette = _themeService.CurrentPalette;
+            return HasSuccessSemantic
+                ? palette.LogSuccessBrush
+                : HasFailureSemantic
+                    ? palette.LogErrorBrush
+                    : palette.LogDefaultBrush;
+        }
+    }
+
+    public void RefreshTheme()
+    {
+        OnPropertyChanged(nameof(MessageBrush));
+    }
 
     partial void OnIsLatestChanged(bool value)
     {

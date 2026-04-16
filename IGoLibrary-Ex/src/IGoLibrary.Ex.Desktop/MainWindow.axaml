@@ -24,65 +24,29 @@
     <PathGeometry x:Key="IconGrab">M7 2v11h3v9l7-12h-4l4-8z</PathGeometry>
     <PathGeometry x:Key="IconOccupy">M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z</PathGeometry>
     <PathGeometry x:Key="IconSettings">M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z</PathGeometry>
-    <SolidColorBrush x:Key="SemiPageBrush" Color="#F4F6FA" />
-    <SolidColorBrush x:Key="SemiCardBackgroundBrush" Color="#FFFFFF" />
-    <SolidColorBrush x:Key="SemiCardBorderBrush" Color="#E7EAEE" />
-    <SolidColorBrush x:Key="SemiColorText0" Color="#1D2129" />
-    <SolidColorBrush x:Key="SemiColorText2" Color="#86909C" />
-    <SolidColorBrush x:Key="SemiColorFill0" Color="#F7F8FA" />
-    <SolidColorBrush x:Key="SemiTextPrimaryBrush" Color="#1D2129" />
-    <SolidColorBrush x:Key="SemiTextSecondaryBrush" Color="#4E5969" />
-    <SolidColorBrush x:Key="SemiTextTertiaryBrush" Color="#86909C" />
-    <SolidColorBrush x:Key="SemiAccentBrush" Color="#0077FA" />
-    <SolidColorBrush x:Key="SemiAccentSoftBrush" Color="#E8F3FF" />
-    <SolidColorBrush x:Key="SemiAccentGlowBrush" Color="#F5F9FF" />
-    <SolidColorBrush x:Key="SemiSuccessSoftBrush" Color="#E8FFEA" />
-    <SolidColorBrush x:Key="SemiSuccessTextBrush" Color="#14804A" />
-    <SolidColorBrush x:Key="SemiWarningSoftBrush" Color="#FFF7E8" />
-    <SolidColorBrush x:Key="SemiWarningTextBrush" Color="#9A5D00" />
-    <SolidColorBrush x:Key="SemiLogSurfaceBrush" Color="#0F172A" />
-    <LinearGradientBrush x:Key="SemiHeroBackgroundBrush" StartPoint="0,0" EndPoint="1,1">
-      <GradientStop Color="#FFFFFF" Offset="0" />
-      <GradientStop Color="#F4F9FF" Offset="0.55" />
-      <GradientStop Color="#EAF3FF" Offset="1" />
-    </LinearGradientBrush>
-    <LinearGradientBrush x:Key="DashboardHeroBrush" StartPoint="0,0" EndPoint="1,1">
-      <GradientStop Color="#FFFFFF" Offset="0" />
-      <GradientStop Color="#F2F8FF" Offset="0.48" />
-      <GradientStop Color="#EDF5FF" Offset="1" />
-    </LinearGradientBrush>
-    <LinearGradientBrush x:Key="DashboardTimeCardBrush" StartPoint="0,0" EndPoint="1,1">
-      <GradientStop Color="#FFFFFF" Offset="0" />
-      <GradientStop Color="#F8FBFF" Offset="1" />
-    </LinearGradientBrush>
-    <LinearGradientBrush x:Key="DashboardTicketBrush" StartPoint="0,0" EndPoint="1,1">
-      <GradientStop Color="#FFFFFF" Offset="0" />
-      <GradientStop Color="#F9FBFF" Offset="0.54" />
-      <GradientStop Color="#F1F7FF" Offset="1" />
-    </LinearGradientBrush>
-    <SolidColorBrush x:Key="DashboardSurfaceBrush" Color="#FFFFFF" />
-    <SolidColorBrush x:Key="DashboardMutedSurfaceBrush" Color="#F7FAFC" />
-    <SolidColorBrush x:Key="DashboardDividerBrush" Color="#DCE6F2" />
+
   </Window.Resources>
 
   <Window.Styles>
     <Style Selector="TextBlock.page-title">
       <Setter Property="FontSize" Value="32" />
       <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
       <Setter Property="Margin" Value="0,0,0,24" />
     </Style>
     <Style Selector="TextBlock.section-title">
       <Setter Property="FontSize" Value="15" />
       <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
       <Setter Property="Opacity" Value="0.8" />
       <Setter Property="Margin" Value="0,0,0,12" />
     </Style>
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SemiCardBackgroundBrush}" />
       <Setter Property="CornerRadius" Value="12" />
       <Setter Property="Padding" Value="24" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SemiCardBorderBrush}" />
     </Style>
     <Style Selector="ListBox.sidebar ListBoxItem">
       <Setter Property="Padding" Value="16,12" />
@@ -90,8 +54,8 @@
       <Setter Property="CornerRadius" Value="8" />
     </Style>
     <Style Selector="Border.semi-card">
-      <Setter Property="Background" Value="{StaticResource SemiCardBackgroundBrush}" />
-      <Setter Property="BorderBrush" Value="{StaticResource SemiCardBorderBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SemiCardBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SemiCardBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="20" />
       <Setter Property="Padding" Value="24" />
@@ -99,34 +63,34 @@
     <Style Selector="TextBlock.semi-section-caption">
       <Setter Property="FontSize" Value="12" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextTertiaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextTertiaryBrush}" />
       <Setter Property="Margin" Value="0,0,0,10" />
     </Style>
     <Style Selector="TextBlock.hero-title">
       <Setter Property="FontSize" Value="24" />
       <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
       <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="TextBlock.hero-meta">
       <Setter Property="FontSize" Value="15" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiAccentBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiAccentBrush}" />
     </Style>
     <Style Selector="TextBlock.helper-text">
       <Setter Property="FontSize" Value="13" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextSecondaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextSecondaryBrush}" />
       <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="TextBlock.field-label">
       <Setter Property="FontSize" Value="13" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextSecondaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextSecondaryBrush}" />
       <Setter Property="Margin" Value="0,0,0,8" />
     </Style>
     <Style Selector="Border.grab-stat-card">
-      <Setter Property="Background" Value="{StaticResource SemiCardBackgroundBrush}" />
-      <Setter Property="BorderBrush" Value="{StaticResource SemiCardBorderBrush}" />
+      <Setter Property="Background" Value="{DynamicResource SemiCardBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SemiCardBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="18" />
       <Setter Property="Padding" Value="20" />
@@ -134,15 +98,15 @@
     <Style Selector="TextBlock.grab-stat-title">
       <Setter Property="FontSize" Value="12" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextTertiaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextTertiaryBrush}" />
     </Style>
     <Style Selector="TextBlock.grab-stat-value">
       <Setter Property="FontSize" Value="28" />
       <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
     </Style>
     <Style Selector="Border.dashboard-card">
-      <Setter Property="Background" Value="{StaticResource DashboardSurfaceBrush}" />
+      <Setter Property="Background" Value="{DynamicResource DashboardSurfaceBrush}" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="CornerRadius" Value="28" />
       <Setter Property="Padding" Value="22" />
@@ -150,75 +114,75 @@
     <Style Selector="TextBlock.dashboard-eyebrow">
       <Setter Property="FontSize" Value="12" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextTertiaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextTertiaryBrush}" />
       <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="TextBlock.dashboard-hero-title">
       <Setter Property="FontSize" Value="30" />
       <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="LineHeight" Value="38" />
     </Style>
     <Style Selector="TextBlock.dashboard-hero-subtitle">
       <Setter Property="FontSize" Value="15" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextSecondaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextSecondaryBrush}" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="LineHeight" Value="24" />
     </Style>
     <Style Selector="TextBlock.dashboard-clock-date">
       <Setter Property="FontSize" Value="14" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextSecondaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextSecondaryBrush}" />
     </Style>
     <Style Selector="TextBlock.dashboard-clock-time">
       <Setter Property="FontSize" Value="36" />
       <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
     </Style>
     <Style Selector="TextBlock.dashboard-card-title">
       <Setter Property="FontSize" Value="22" />
       <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
       <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="TextBlock.dashboard-stat-value">
       <Setter Property="FontSize" Value="30" />
       <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
       <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="TextBlock.dashboard-detail">
       <Setter Property="FontSize" Value="13" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextSecondaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextSecondaryBrush}" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="LineHeight" Value="20" />
     </Style>
     <Style Selector="TextBlock.dashboard-ticket-seat">
       <Setter Property="FontSize" Value="60" />
       <Setter Property="FontWeight" Value="Bold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
     </Style>
     <Style Selector="TextBlock.dashboard-ticket-caption">
       <Setter Property="FontSize" Value="12" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextTertiaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextTertiaryBrush}" />
     </Style>
     <Style Selector="TextBlock.dashboard-ticket-body">
       <Setter Property="FontSize" Value="18" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource SemiTextPrimaryBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
       <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="Border.dashboard-info-row">
-      <Setter Property="Background" Value="{StaticResource DashboardMutedSurfaceBrush}" />
+      <Setter Property="Background" Value="{DynamicResource DashboardMutedSurfaceBrush}" />
       <Setter Property="CornerRadius" Value="20" />
       <Setter Property="Padding" Value="16" />
     </Style>
     <Style Selector="Border.notify-toggle-card">
-      <Setter Property="Background" Value="{StaticResource DashboardMutedSurfaceBrush}" />
-      <Setter Property="BorderBrush" Value="{StaticResource SemiCardBorderBrush}" />
+      <Setter Property="Background" Value="{DynamicResource DashboardMutedSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SemiCardBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="22" />
       <Setter Property="Padding" Value="18" />
@@ -251,11 +215,11 @@
       <Setter Property="CornerRadius" Value="999" />
     </Style>
     <Style Selector="Button.notification-segment:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="#12FFFFFF" />
+      <Setter Property="Background" Value="{DynamicResource AppInteractiveHoverBrush}" />
       <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
     <Style Selector="Button.notification-segment:pressed /template/ ContentPresenter">
-      <Setter Property="Background" Value="#1CFFFFFF" />
+      <Setter Property="Background" Value="{DynamicResource AppInteractivePressedBrush}" />
       <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
   </Window.Styles>
@@ -282,21 +246,21 @@
         </ToolTip.Tip>
 
         <Border CornerRadius="12"
-                Background="{StaticResource SemiColorFill0}"
+                Background="{DynamicResource SemiColorFill0}"
                 BorderThickness="1.5"
-                BorderBrush="{StaticResource SemiSuccessTextBrush}"
+                BorderBrush="{DynamicResource SemiSuccessTextBrush}"
                 IsVisible="{Binding IsAvailable}" />
 
         <Border CornerRadius="12"
-                Background="{StaticResource SemiColorFill2}"
+                Background="{DynamicResource SemiColorFill2}"
                 BorderThickness="1"
-                BorderBrush="{StaticResource SemiCardBorderBrush}"
+                BorderBrush="{DynamicResource SemiCardBorderBrush}"
                 IsVisible="{Binding IsUnavailable}" />
 
         <Border CornerRadius="12"
-                Background="{StaticResource SemiAccentSoftBrush}"
+                Background="{DynamicResource SemiAccentSoftBrush}"
                 BorderThickness="2"
-                BorderBrush="{StaticResource SemiAccentBrush}"
+                BorderBrush="{DynamicResource SemiAccentBrush}"
                 IsVisible="{Binding IsSelected}" />
 
         <TextBlock Text="{Binding SeatName}"
@@ -304,15 +268,15 @@
                    VerticalAlignment="Center"
                    FontSize="15"
                    FontWeight="Bold"
-                   Foreground="{Binding IsUnavailable, Converter={x:Static BoolConverters.Not}, FallbackValue={StaticResource SemiColorText0}}" />
+                   Foreground="{Binding IsUnavailable, Converter={x:Static BoolConverters.Not}, FallbackValue={DynamicResource SemiColorText0}}" />
 
         <Path Width="18"
               Height="18"
               Margin="0,-4,-4,0"
               HorizontalAlignment="Right"
               VerticalAlignment="Top"
-              Fill="#FBBF24"
-              Stroke="#B7791F"
+              Fill="{DynamicResource AppFavoriteFillBrush}"
+              Stroke="{DynamicResource AppFavoriteStrokeBrush}"
               StrokeThickness="1"
               Stretch="Fill"
               IsVisible="{Binding IsFavorite}"
@@ -342,7 +306,10 @@
   <Grid ColumnDefinitions="232,*">
     
     <!-- Sidebar -->
-    <Border Grid.Column="0" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+    <Border Grid.Column="0"
+            Background="{DynamicResource AppSidebarBrush}"
+            BorderBrush="{DynamicResource AppSidebarBorderBrush}"
+            BorderThickness="0,0,1,0">
       <Grid RowDefinitions="40, *, Auto">
         <!-- Window Title / Drag Area -->
         <TextBlock Grid.Row="0" Text="IGoLibrary-Ex 端" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Margin="24,0,0,0" Opacity="0.7" IsHitTestVisible="False"/>
@@ -365,9 +332,15 @@
     </Border>
 
     <!-- Content Area -->
-    <Grid Grid.Column="1" RowDefinitions="40, *">
+    <Grid Grid.Column="1"
+          RowDefinitions="40, *">
       <!-- Top drag area for content pane -->
-      <Border Grid.Row="0" Background="Transparent" IsHitTestVisible="False" />
+      <Border Grid.Row="0"
+              Background="{DynamicResource SemiPageBrush}"
+              IsHitTestVisible="False" />
+      <Border Grid.Row="1"
+              Background="{DynamicResource SemiPageBrush}"
+              IsHitTestVisible="False" />
       
       <!-- Views -->
       <Carousel Grid.Row="1" SelectedIndex="{Binding SelectedTabIndex}" Margin="24,8,24,24">
@@ -379,18 +352,18 @@
         <ScrollViewer>
           <StackPanel Spacing="18" Margin="0,0,16,0">
             <Border Classes="dashboard-card Shadow"
-                    Background="{StaticResource DashboardHeroBrush}"
+                    Background="{DynamicResource DashboardHeroBrush}"
                     Padding="22,20">
               <Grid ColumnDefinitions="1.55*,0.95*" ColumnSpacing="22">
                 <StackPanel Spacing="14">
-                  <Border Background="#F7FBFF"
-                          BorderBrush="#D7E7FF"
+                  <Border Background="{DynamicResource AppAccentPanelBrush}"
+                          BorderBrush="{DynamicResource AppAccentPanelBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="999"
                           Padding="12,5"
                           HorizontalAlignment="Left">
                     <TextBlock Classes="dashboard-eyebrow"
-                               Foreground="{StaticResource SemiAccentBrush}"
+                               Foreground="{DynamicResource SemiAccentBrush}"
                                Text="个人专属仪表盘" />
                   </Border>
 
@@ -404,7 +377,7 @@
                 </StackPanel>
 
                 <Border Grid.Column="1"
-                        Background="{StaticResource DashboardTimeCardBrush}"
+                        Background="{DynamicResource DashboardTimeCardBrush}"
                         CornerRadius="24"
                         Padding="18"
                         HorizontalAlignment="Stretch"
@@ -430,7 +403,7 @@
                                      Foreground="{Binding HomeHeroStatusBrush}" />
                           <TextBlock Text="{Binding HomeHeroStatusDetailText}"
                                      FontSize="12"
-                                     Foreground="{StaticResource SemiTextSecondaryBrush}"
+                                     Foreground="{DynamicResource SemiTextSecondaryBrush}"
                                      MaxWidth="240"
                                      TextWrapping="Wrap" />
                         </StackPanel>
@@ -491,7 +464,7 @@
 
             <Grid ColumnDefinitions="1.65*,1*" ColumnSpacing="24">
               <Border Classes="dashboard-card Shadow"
-                      Background="{StaticResource DashboardTicketBrush}"
+                      Background="{DynamicResource DashboardTicketBrush}"
                       MinHeight="242"
                       Padding="22,20">
                 <Grid>
@@ -538,21 +511,21 @@
                                   VerticalAlignment="Center">
                         <TextBlock FontSize="16"
                                    FontWeight="SemiBold"
-                                   Foreground="{StaticResource SemiTextPrimaryBrush}">
+                                   Foreground="{DynamicResource SemiTextPrimaryBrush}">
                           <Run Text="场馆名称：" />
                           <Run Text="{Binding HomeReservationVenueText}" />
                         </TextBlock>
 
                         <TextBlock FontSize="16"
                                    FontWeight="SemiBold"
-                                   Foreground="{StaticResource SemiTextPrimaryBrush}">
+                                   Foreground="{DynamicResource SemiTextPrimaryBrush}">
                           <Run Text="当前有效至：" />
                           <Run Text="{Binding HomeReservationExpirationTimeText}" />
                         </TextBlock>
 
                         <TextBlock FontSize="16"
                                    FontWeight="SemiBold"
-                                   Foreground="{StaticResource SemiTextPrimaryBrush}">
+                                   Foreground="{DynamicResource SemiTextPrimaryBrush}">
                           <Run Text="剩余时间：" />
                           <Run Text="{Binding HomeReservationRemainingText}" />
                         </TextBlock>
@@ -576,20 +549,20 @@
                     <Border Width="54"
                             Height="54"
                             CornerRadius="27"
-                            Background="#FFFFFF"
-                            BorderBrush="#E2EBF6"
+                            Background="{DynamicResource AppNeutralIconSurfaceBrush}"
+                            BorderBrush="{DynamicResource AppNeutralIconBorderBrush}"
                             BorderThickness="1">
                       <PathIcon Data="{StaticResource IconOccupy}"
                                 Width="28"
                                 Height="28"
-                                Foreground="{StaticResource SemiAccentBrush}"
+                                Foreground="{DynamicResource SemiAccentBrush}"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center" />
                     </Border>
                     <TextBlock Text="当前暂无预约记录"
                                FontSize="20"
                                FontWeight="Bold"
-                               Foreground="{StaticResource SemiTextPrimaryBrush}"
+                               Foreground="{DynamicResource SemiTextPrimaryBrush}"
                                HorizontalAlignment="Center" />
                     <TextBlock Text="去配置一个新任务吧，首页会在这里展示最新的预约状态与生效结果。"
                                Classes="dashboard-detail"
@@ -612,7 +585,7 @@
                       <TextBlock Classes="dashboard-ticket-caption" Text="核心引擎" />
                       <TextBlock FontSize="18"
                                  FontWeight="SemiBold"
-                                 Foreground="{StaticResource SemiTextPrimaryBrush}"
+                                 Foreground="{DynamicResource SemiTextPrimaryBrush}"
                                  Text="{Binding HomeEngineSummaryText}"
                                  TextWrapping="Wrap" />
                     </StackPanel>
@@ -623,7 +596,7 @@
                       <TextBlock Classes="dashboard-ticket-caption" Text="内存占用" />
                       <TextBlock FontSize="18"
                                  FontWeight="SemiBold"
-                                 Foreground="{StaticResource SemiTextPrimaryBrush}"
+                                 Foreground="{DynamicResource SemiTextPrimaryBrush}"
                                  Text="{Binding HomeMemoryUsageText}" />
                     </StackPanel>
                   </Border>
@@ -665,8 +638,8 @@
                   <TextBlock Text="{Binding SessionSummary}" Classes="helper-text" />
 
                   <StackPanel Spacing="16" IsVisible="{Binding IsUnauthorized}">
-                    <Border Background="{StaticResource SemiColorFill0}"
-                            BorderBrush="{StaticResource SemiCardBorderBrush}"
+                    <Border Background="{DynamicResource SemiColorFill0}"
+                            BorderBrush="{DynamicResource SemiCardBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="16"
                             Padding="20">
@@ -695,8 +668,8 @@
                             Command="{Binding GetCookieFromLinkCommand}"
                             HorizontalAlignment="Stretch"
                             HorizontalContentAlignment="Center"
-                            Background="{DynamicResource SystemAccentColor}"
-                            Foreground="White"
+                            Background="{DynamicResource AppAccentBrush}"
+                            Foreground="{DynamicResource AppAccentForegroundBrush}"
                             FontWeight="Bold" />
                   </StackPanel>
 
@@ -706,7 +679,7 @@
                     <TextBlock Text="✓"
                               FontSize="56"
                               FontWeight="Bold"
-                              Foreground="#00B42A"
+                              Foreground="{DynamicResource SemiSuccessTextBrush}"
                               HorizontalAlignment="Center" />
                     <TextBlock Text="当前已成功授权"
                               FontSize="24"
@@ -759,8 +732,8 @@
 
                     <Border Padding="24,16,24,24"
                             CornerRadius="16"
-                            Background="{StaticResource SemiAccentGlowBrush}"
-                            BorderBrush="{StaticResource SemiCardBorderBrush}"
+                            Background="{DynamicResource SemiAccentGlowBrush}"
+                            BorderBrush="{DynamicResource SemiCardBorderBrush}"
                             BorderThickness="1">
                     <Grid ColumnDefinitions="*,Auto"
                             RowDefinitions="Auto,Auto"
@@ -772,41 +745,41 @@
                           <StackPanel Orientation="Horizontal" Spacing="8">
                             <Border Padding="10,4"
                                     CornerRadius="999"
-                                    Background="{StaticResource SemiSuccessSoftBrush}"
+                                    Background="{DynamicResource SemiSuccessSoftBrush}"
                                     IsVisible="{Binding ShowVenueOpenStatusTag}">
                               <TextBlock Text="{Binding VenueStatusText}"
                                          FontSize="12"
                                          FontWeight="SemiBold"
-                                         Foreground="{StaticResource SemiSuccessTextBrush}" />
+                                         Foreground="{DynamicResource SemiSuccessTextBrush}" />
                             </Border>
                             <Border Padding="10,4"
                                     CornerRadius="999"
-                                    Background="{StaticResource SemiColorFill0}"
+                                    Background="{DynamicResource SemiColorFill0}"
                                     IsVisible="{Binding ShowVenueClosedStatusTag}">
                               <TextBlock Text="{Binding VenueStatusText}"
                                          FontSize="12"
                                          FontWeight="SemiBold"
-                                         Foreground="{StaticResource SemiColorText2}" />
+                                         Foreground="{DynamicResource SemiColorText2}" />
                             </Border>
                             <Border Padding="10,4"
                                     CornerRadius="999"
-                                    Background="{StaticResource SemiSuccessSoftBrush}"
+                                    Background="{DynamicResource SemiSuccessSoftBrush}"
                                     IsVisible="{Binding IsCurrentLocked}">
                               <TextBlock Text="{Binding CurrentVenueLockStateText}"
                                          FontSize="12"
                                          FontWeight="SemiBold"
-                                         Foreground="{StaticResource SemiSuccessTextBrush}" />
+                                         Foreground="{DynamicResource SemiSuccessTextBrush}" />
                             </Border>
                             <Border Padding="10,4"
                                     CornerRadius="999"
                                     IsVisible="{Binding ShowVenuePreviewStateTag}"
-                                    Background="{StaticResource SemiWarningSoftBrush}"
-                                    BorderBrush="#FFDFA85B"
+                                    Background="{DynamicResource SemiWarningSoftBrush}"
+                                    BorderBrush="{DynamicResource AppWarningBorderBrush}"
                                     BorderThickness="1">
                               <TextBlock Text="{Binding CurrentVenueLockStateText}"
                                          FontSize="12"
                                          FontWeight="SemiBold"
-                                         Foreground="{StaticResource SemiWarningTextBrush}" />
+                                         Foreground="{DynamicResource SemiWarningTextBrush}" />
                             </Border>
                           </StackPanel>
                           <TextBlock Text="{Binding VenueName}"
@@ -817,12 +790,12 @@
                                      TextTrimming="CharacterEllipsis" />
                           <TextBlock Text="{Binding VenueFloor, StringFormat=楼层 · {0}}"
                                      FontSize="14"
-                                     Foreground="{StaticResource SemiColorText2}"
+                                     Foreground="{DynamicResource SemiColorText2}"
                                      Margin="0,8,0,0"
                                      TextWrapping="NoWrap"
                                      TextTrimming="CharacterEllipsis" />
                           <TextBlock FontSize="13"
-                                     Foreground="{StaticResource SemiColorText2}"
+                                     Foreground="{DynamicResource SemiColorText2}"
                                      Margin="0,8,0,0"
                                      TextWrapping="NoWrap"
                                      TextTrimming="CharacterEllipsis">
@@ -849,7 +822,7 @@
                                   Height="20"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center"
-                                  Foreground="{DynamicResource SystemAccentColor}" />
+                                  Foreground="{DynamicResource AppAccentBrush}" />
                       </Button>
 
                         <StackPanel Grid.Column="1"
@@ -860,12 +833,12 @@
                                     VerticalAlignment="Bottom">
                           <TextBlock Text="剩余座位"
                                     FontSize="12"
-                                    Foreground="{StaticResource SemiColorText2}"
+                                    Foreground="{DynamicResource SemiColorText2}"
                                     HorizontalAlignment="Right" />
                           <TextBlock Text="{Binding VenueAvailableSeatsText}"
                                     FontSize="56"
                                     FontWeight="Bold"
-                                    Foreground="{DynamicResource SystemAccentColor}"
+                                    Foreground="{DynamicResource AppAccentBrush}"
                                     HorizontalAlignment="Right" />
                         </StackPanel>
 
@@ -875,7 +848,11 @@
                                     HorizontalAlignment="Left">
                           <Button Content="更换当前场馆..."
                                   Command="{Binding OpenVenuePickerCommand}"
-                                  Classes="Secondary"
+                                  Background="{DynamicResource AppAccentSoftBrush}"
+                                  BorderBrush="{DynamicResource AppAccentPanelBorderBrush}"
+                                  BorderThickness="1"
+                                  Foreground="{DynamicResource AppAccentBrush}"
+                                  FontWeight="SemiBold"
                                   MinWidth="148"
                                   IsVisible="{Binding ShowVenueChangeButton}"
                                   HorizontalAlignment="Left"
@@ -898,8 +875,8 @@
                             IsVisible="{Binding IsCurrentPreview}"
                             HorizontalAlignment="Right"
                             HorizontalContentAlignment="Center"
-                            Background="{DynamicResource SystemAccentColor}"
-                            Foreground="White"
+                            Background="{DynamicResource AppAccentBrush}"
+                            Foreground="{DynamicResource AppAccentForegroundBrush}"
                             FontWeight="Bold" />
                     <Button Content="{Binding LockVenueButtonText}"
                             MinWidth="140"
@@ -907,10 +884,10 @@
                             IsEnabled="False"
                             HorizontalAlignment="Right"
                             HorizontalContentAlignment="Center"
-                            Background="{StaticResource SemiColorFill0}"
-                            BorderBrush="{StaticResource SemiCardBorderBrush}"
+                            Background="{DynamicResource SemiColorFill0}"
+                            BorderBrush="{DynamicResource SemiCardBorderBrush}"
                             BorderThickness="1"
-                            Foreground="{StaticResource SemiColorText2}"
+                            Foreground="{DynamicResource SemiColorText2}"
                             FontWeight="Bold" />
                   </StackPanel>
 
@@ -936,8 +913,8 @@
               <Border Grid.Column="1"
                       Padding="14,10"
                       CornerRadius="16"
-                      Background="{StaticResource SemiAccentGlowBrush}"
-                      BorderBrush="{StaticResource SemiCardBorderBrush}"
+                      Background="{DynamicResource SemiAccentGlowBrush}"
+                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
                       BorderThickness="1"
                       VerticalAlignment="Center">
                 <StackPanel Spacing="2">
@@ -946,7 +923,7 @@
                   <TextBlock Text="{Binding BoundLibraryTitle}"
                              FontSize="14"
                              FontWeight="SemiBold"
-                             Foreground="{StaticResource SemiTextPrimaryBrush}" />
+                             Foreground="{DynamicResource SemiTextPrimaryBrush}" />
                 </StackPanel>
               </Border>
             </Grid>
@@ -966,16 +943,16 @@
                       <Button Content="🎯 选择目标座位"
                               Command="{Binding OpenGrabSeatSelectionOverlayCommand}"
                               IsEnabled="{Binding CanEditGrabConfiguration}"
-                              Background="{DynamicResource SystemAccentColor}"
-                              Foreground="White"
+                              Background="{DynamicResource AppAccentBrush}"
+                              Foreground="{DynamicResource AppAccentForegroundBrush}"
                               FontWeight="Bold"
                               MinWidth="160"
                               HorizontalContentAlignment="Center"
                               VerticalAlignment="Top" />
 
                       <Border Grid.Column="1"
-                              Background="{StaticResource SemiColorFill0}"
-                              BorderBrush="{StaticResource SemiCardBorderBrush}"
+                              Background="{DynamicResource SemiColorFill0}"
+                              BorderBrush="{DynamicResource SemiCardBorderBrush}"
                               BorderThickness="1"
                               CornerRadius="16"
                               Padding="12">
@@ -992,15 +969,15 @@
                                 <Border Margin="0,0,8,8"
                                         Padding="10,6"
                                         CornerRadius="999"
-                                        Background="{StaticResource SemiAccentSoftBrush}"
-                                        BorderBrush="{StaticResource SemiCardBorderBrush}"
+                                        Background="{DynamicResource SemiAccentSoftBrush}"
+                                        BorderBrush="{DynamicResource SemiCardBorderBrush}"
                                         BorderThickness="1">
                                   <StackPanel Orientation="Horizontal"
                                               Spacing="8">
                                     <TextBlock Text="{Binding SeatName}"
                                                FontSize="12"
                                                FontWeight="SemiBold"
-                                               Foreground="{StaticResource SemiAccentBrush}" />
+                                               Foreground="{DynamicResource SemiAccentBrush}" />
                                     <Button Content="✕"
                                             Command="{Binding DataContext.RemoveSelectedSeatCommand, ElementName=MainWindowRoot}"
                                             CommandParameter="{Binding .}"
@@ -1008,7 +985,7 @@
                                             IsEnabled="{Binding DataContext.CanEditGrabConfiguration, ElementName=MainWindowRoot}"
                                             Background="Transparent"
                                             BorderThickness="0"
-                                            Foreground="{StaticResource SemiAccentBrush}"
+                                            Foreground="{DynamicResource SemiAccentBrush}"
                                             FontSize="11"
                                             FontWeight="Bold"
                                             VerticalAlignment="Center" />
@@ -1067,8 +1044,8 @@
                   <Button Content="开始监控"
                           Command="{Binding StartGrabCommand}"
                           IsEnabled="{Binding CanEditGrabConfiguration}"
-                          Background="{DynamicResource SystemAccentColor}"
-                          Foreground="White"
+                          Background="{DynamicResource AppAccentBrush}"
+                          Foreground="{DynamicResource AppAccentForegroundBrush}"
                           FontWeight="Bold"
                           HorizontalContentAlignment="Center" />
                   <Button Content="停止任务"
@@ -1141,8 +1118,8 @@
                     <Border Grid.Column="1"
                             Padding="10,6"
                             CornerRadius="999"
-                            Background="{StaticResource SemiColorFill0}"
-                            BorderBrush="{StaticResource SemiCardBorderBrush}"
+                            Background="{DynamicResource SemiColorFill0}"
+                            BorderBrush="{DynamicResource SemiCardBorderBrush}"
                             BorderThickness="1"
                             VerticalAlignment="Center">
                       <TextBlock Text="{Binding GrabDashboardStatusText}"
@@ -1154,7 +1131,7 @@
 
                   <Border Grid.Row="1"
                           Background="{DynamicResource SemiColorFill0}"
-                          BorderBrush="{StaticResource SemiCardBorderBrush}"
+                          BorderBrush="{DynamicResource SemiCardBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="18"
                           Padding="16">
@@ -1163,7 +1140,7 @@
                                   VerticalScrollBarVisibility="Auto">
                       <SelectableTextBlock Text="{Binding GrabLogsText}"
                                            TextWrapping="Wrap"
-                                           Foreground="{StaticResource SemiTextPrimaryBrush}"
+                                           Foreground="{DynamicResource SemiTextPrimaryBrush}"
                                            FontFamily="Consolas, Cascadia Mono, Monaco, monospace"
                                            FontSize="12.5" />
                     </ScrollViewer>
@@ -1179,7 +1156,7 @@
 
           <Border Grid.Row="1"
                   Classes="semi-card Shadow"
-                  Background="{StaticResource SemiCardBackgroundBrush}"
+                  Background="{DynamicResource SemiCardBackgroundBrush}"
                   Padding="28">
             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="32" RowSpacing="20">
               <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Top">
@@ -1215,8 +1192,8 @@
                         HorizontalContentAlignment="Center" />
                 <Button Content="开始占座"
                         Command="{Binding StartOccupyCommand}"
-                        Background="{DynamicResource SystemAccentColor}"
-                        Foreground="White"
+                        Background="{DynamicResource AppAccentBrush}"
+                        Foreground="{DynamicResource AppAccentForegroundBrush}"
                         FontWeight="Bold"
                         Margin="0,0,12,8"
                         HorizontalAlignment="Stretch"
@@ -1276,7 +1253,7 @@
                                  Text="秒"
                                  FontSize="13"
                                  FontWeight="SemiBold"
-                                 Foreground="{StaticResource SemiTextSecondaryBrush}"
+                                 Foreground="{DynamicResource SemiTextSecondaryBrush}"
                                  VerticalAlignment="Center" />
                     </Grid>
                   </StackPanel>
@@ -1290,7 +1267,7 @@
                 <Border Grid.Row="1"
                         Background="{DynamicResource SemiColorFill0}"
                         CornerRadius="16"
-                        BorderBrush="{StaticResource SemiCardBorderBrush}"
+                        BorderBrush="{DynamicResource SemiCardBorderBrush}"
                         BorderThickness="1"
                         Padding="16">
                   <ScrollViewer HorizontalScrollBarVisibility="Auto"
@@ -1314,8 +1291,8 @@
               <Grid RowDefinitions="Auto,Auto"
                     RowSpacing="24">
                 <StackPanel Spacing="10">
-                  <Border Background="{StaticResource DashboardMutedSurfaceBrush}"
-                          BorderBrush="{StaticResource SemiCardBorderBrush}"
+                  <Border Background="{DynamicResource DashboardMutedSurfaceBrush}"
+                          BorderBrush="{DynamicResource SemiCardBorderBrush}"
                           BorderThickness="1"
                           CornerRadius="999"
                           Padding="5"
@@ -1324,7 +1301,7 @@
                     <Grid ColumnDefinitions="*,*"
                           ColumnSpacing="6"
                           ClipToBounds="True">
-                      <Border Background="White"
+                      <Border Background="{DynamicResource AppNotificationSegmentThumbBrush}"
                               Width="{Binding NotificationSegmentSliderWidth}"
                               CornerRadius="999"
                               BoxShadow="0 2 10 0 #120F172A"
@@ -1487,8 +1464,8 @@
                         <Button Grid.Column="1"
                                 Content="发送测试邮件"
                                 Command="{Binding SendTestEmailAlertCommand}"
-                                Background="{StaticResource SemiAccentBrush}"
-                                Foreground="White"
+                                Background="{DynamicResource SemiAccentBrush}"
+                                Foreground="{DynamicResource AppAccentForegroundBrush}"
                                 MinWidth="160" />
                       </Grid>
                     </Grid>
@@ -1547,8 +1524,8 @@
                         <Button Grid.Column="1"
                                 Content="发送测试通知"
                                 Command="{Binding SendTestLocalAlertCommand}"
-                                Background="{StaticResource SemiAccentBrush}"
-                                Foreground="White"
+                                Background="{DynamicResource SemiAccentBrush}"
+                                Foreground="{DynamicResource AppAccentForegroundBrush}"
                                 MinWidth="160" />
                       </Grid>
                     </StackPanel>
@@ -1571,9 +1548,9 @@
                     <TextBlock Classes="section-title" Text="常规体验" />
                     <CheckBox Content="屏幕右下角展示应用横幅通知" IsChecked="{Binding NotificationsEnabled}" />
                     <CheckBox Content="当任务进行时，右上角关闭会最小化到托盘" IsChecked="{Binding MinimizeToTrayEnabled}" />
-                    <CheckBox Content="自定义接口地址和查询语法" IsChecked="{Binding CustomApiOverridesEnabled}" FontWeight="Bold" Foreground="#FF8000"/>
+                    <CheckBox Content="自定义接口地址和查询语法" IsChecked="{Binding CustomApiOverridesEnabled}" FontWeight="Bold" Foreground="{DynamicResource SemiWarningTextBrush}"/>
                     
-                    <Separator Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" Margin="0,8"/>
+                    <Separator Background="{DynamicResource AppSeparatorBrush}" Margin="0,8"/>
                     
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
                       <StackPanel Spacing="8">
@@ -1586,11 +1563,24 @@
                       </StackPanel>
                     </Grid>
 
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                      <StackPanel Spacing="8">
+                        <TextBlock Classes="field-label" Text="界面主题" />
+                        <ComboBox ItemsSource="{Binding ThemeModes}"
+                                  SelectedIndex="{Binding SelectedAppThemeModeIndex}" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Spacing="8">
+                        <TextBlock Classes="field-label" Text="强调色来源" />
+                        <CheckBox Content="跟随系统主题色"
+                                  IsChecked="{Binding UseSystemAccent}" />
+                      </StackPanel>
+                    </Grid>
+
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,16,0,0">
                       <Button Content="💾 保存设置"
                               Command="{Binding SaveSettingsCommand}"
-                              Background="{DynamicResource SystemAccentColor}"
-                              Foreground="White"
+                              Background="{DynamicResource AppAccentBrush}"
+                              Foreground="{DynamicResource AppAccentForegroundBrush}"
                               FontWeight="Bold"
                               HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Center" />
@@ -1605,9 +1595,9 @@
                 </Border>
               </StackPanel>
 
-              <Border Classes="card" Grid.Column="1" IsVisible="{Binding CustomApiOverridesEnabled}" BorderBrush="#88FF8000">
+              <Border Classes="card" Grid.Column="1" IsVisible="{Binding CustomApiOverridesEnabled}" BorderBrush="{DynamicResource AppWarningBorderBrush}">
                 <StackPanel Spacing="16">
-                  <TextBlock Classes="section-title" Text="⚠️ 自定义接口地址和查询语法" Foreground="#FF8000" />
+                  <TextBlock Classes="section-title" Text="⚠️ 自定义接口地址和查询语法" Foreground="{DynamicResource SemiWarningTextBrush}" />
                   <TextBlock Text="如果你使用的不是官方地址，如学校自建等，请自行抓包替换" FontSize="13" Opacity="0.7" TextWrapping="Wrap" />
                   
                   <ScrollViewer MaxHeight="400">
@@ -1636,7 +1626,7 @@
                   </ScrollViewer>
 
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
-                    <Button Content="✅ 应用至程序" Command="{Binding SaveProtocolOverridesCommand}" Background="#88FF8000" Foreground="White" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                    <Button Content="✅ 应用至程序" Command="{Binding SaveProtocolOverridesCommand}" Background="{DynamicResource SemiWarningSoftBrush}" Foreground="{DynamicResource SemiWarningTextBrush}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                     <Button Grid.Column="1" Content="🔄 恢复默认" Command="{Binding ResetProtocolOverridesCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
                   </Grid>
                 </StackPanel>
@@ -1649,7 +1639,7 @@
       <Border Grid.Row="1"
               ZIndex="30"
               IsVisible="{Binding IsGrabSeatSelectionOverlayOpen}"
-              Background="#7A0F172A"
+              Background="{DynamicResource AppModalOverlayBrush}"
               PointerPressed="OnGrabSeatOverlayPointerPressed">
         <Grid Margin="28,16,28,28">
           <Border Classes="semi-card Shadow"
@@ -1701,8 +1691,8 @@
               </Grid>
 
               <Border Grid.Row="2"
-                      Background="{StaticResource SemiColorFill0}"
-                      BorderBrush="{StaticResource SemiCardBorderBrush}"
+                      Background="{DynamicResource SemiColorFill0}"
+                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
                       BorderThickness="1"
                       CornerRadius="18"
                       Padding="16">
@@ -1719,7 +1709,7 @@
                     </ItemsControl>
                   </ScrollViewer>
 
-                  <Border Background="#CCFFFFFF"
+                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
                           CornerRadius="14"
                           Padding="24"
                           HorizontalAlignment="Center"
@@ -1731,7 +1721,7 @@
                                TextAlignment="Center" />
                   </Border>
 
-                  <Border Background="#CCFFFFFF"
+                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
                           CornerRadius="14"
                           Padding="24"
                           HorizontalAlignment="Center"
@@ -1743,7 +1733,7 @@
                                TextAlignment="Center" />
                   </Border>
 
-                  <Border Background="#88FFFFFF"
+                  <Border Background="{DynamicResource AppOverlaySurfaceSoftBrush}"
                           CornerRadius="16"
                           IsVisible="{Binding IsApplyingSeatFilter}">
                     <StackPanel Width="220"
@@ -1752,7 +1742,7 @@
                                 Spacing="10">
                       <ProgressBar IsIndeterminate="True"
                                    Height="4"
-                                   Foreground="{StaticResource SemiAccentBrush}" />
+                                   Foreground="{DynamicResource SemiAccentBrush}" />
                       <TextBlock Text="正在应用筛选并刷新座位工作区..."
                                  Classes="helper-text"
                                  HorizontalAlignment="Center"
@@ -1771,8 +1761,8 @@
                 <Button Grid.Column="1"
                         Content="确认完成"
                         Command="{Binding ConfirmGrabSeatSelectionCommand}"
-                        Background="{DynamicResource SystemAccentColor}"
-                        Foreground="White"
+                        Background="{DynamicResource AppAccentBrush}"
+                        Foreground="{DynamicResource AppAccentForegroundBrush}"
                         FontWeight="Bold"
                         HorizontalContentAlignment="Center" />
               </Grid>
@@ -1784,7 +1774,7 @@
       <Border Grid.Row="1"
               ZIndex="20"
               IsVisible="{Binding IsVenuePickerOpen}"
-              Background="#660F172A">
+              Background="{DynamicResource AppBackdropOverlayBrush}">
         <Grid HorizontalAlignment="Stretch"
               VerticalAlignment="Stretch"
               Margin="24,8,24,24">
@@ -1815,8 +1805,8 @@
               </Grid>
 
               <Border Grid.Row="1"
-                      Background="{StaticResource SemiColorFill0}"
-                      BorderBrush="{StaticResource SemiCardBorderBrush}"
+                      Background="{DynamicResource SemiColorFill0}"
+                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
                       BorderThickness="1"
                       CornerRadius="14"
                       Padding="8"
@@ -1837,9 +1827,9 @@
                           <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" />
                           <TextBlock Text="{Binding Floor}"
                                      FontSize="12"
-                                     Foreground="{StaticResource SemiColorText2}" />
+                                     Foreground="{DynamicResource SemiColorText2}" />
                           <TextBlock FontSize="12"
-                                     Foreground="{StaticResource SemiColorText2}">
+                                     Foreground="{DynamicResource SemiColorText2}">
                             <Run Text="总座 " />
                             <Run Text="{Binding SeatsTotal}" />
                             <Run Text=" · 已占用 " />
@@ -1868,3 +1858,6 @@
     </Grid>
   </Grid>
 </Window>
+
+
+

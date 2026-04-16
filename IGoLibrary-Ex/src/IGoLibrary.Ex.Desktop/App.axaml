@@ -4,6 +4,144 @@
              x:Class="IGoLibrary.Ex.Desktop.App"
              x:CompileBindings="False"
              RequestedThemeVariant="Default">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="SemiPageBrush" Color="#F4F6FA" />
+          <SolidColorBrush x:Key="SemiCardBackgroundBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="SemiCardBorderBrush" Color="#E7EAEE" />
+          <SolidColorBrush x:Key="SemiColorText0" Color="#1D2129" />
+          <SolidColorBrush x:Key="SemiColorText2" Color="#86909C" />
+          <SolidColorBrush x:Key="SemiColorFill0" Color="#F7F8FA" />
+          <SolidColorBrush x:Key="SemiColorFill2" Color="#EEF1F5" />
+          <SolidColorBrush x:Key="SemiTextPrimaryBrush" Color="#1D2129" />
+          <SolidColorBrush x:Key="SemiTextSecondaryBrush" Color="#4E5969" />
+          <SolidColorBrush x:Key="SemiTextTertiaryBrush" Color="#86909C" />
+          <SolidColorBrush x:Key="SemiSuccessSoftBrush" Color="#E8FFEA" />
+          <SolidColorBrush x:Key="SemiSuccessTextBrush" Color="#14804A" />
+          <SolidColorBrush x:Key="SemiWarningSoftBrush" Color="#FFF7E8" />
+          <SolidColorBrush x:Key="SemiWarningTextBrush" Color="#9A5D00" />
+          <SolidColorBrush x:Key="SemiLogSurfaceBrush" Color="#0F172A" />
+          <SolidColorBrush x:Key="AppSidebarBrush" Color="#F8FAFD" />
+          <SolidColorBrush x:Key="AppSidebarBorderBrush" Color="#E7EAEE" />
+          <SolidColorBrush x:Key="AppSeparatorBrush" Color="#E7EAEE" />
+          <SolidColorBrush x:Key="AppInteractiveHoverBrush" Color="#080F172A" />
+          <SolidColorBrush x:Key="AppInteractivePressedBrush" Color="#120F172A" />
+          <SolidColorBrush x:Key="AppNeutralIconSurfaceBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppNeutralIconBorderBrush" Color="#E2EBF6" />
+          <SolidColorBrush x:Key="AppFavoriteFillBrush" Color="#FBBF24" />
+          <SolidColorBrush x:Key="AppFavoriteStrokeBrush" Color="#B7791F" />
+          <SolidColorBrush x:Key="AppWarningBorderBrush" Color="#DFA85B" />
+          <LinearGradientBrush x:Key="DashboardHeroBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#FFFFFF" Offset="0" />
+            <GradientStop Color="#F2F8FF" Offset="0.48" />
+            <GradientStop Color="#EDF5FF" Offset="1" />
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="DashboardTimeCardBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#FFFFFF" Offset="0" />
+            <GradientStop Color="#F8FBFF" Offset="1" />
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="DashboardTicketBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#FFFFFF" Offset="0" />
+            <GradientStop Color="#F9FBFF" Offset="0.54" />
+            <GradientStop Color="#F1F7FF" Offset="1" />
+          </LinearGradientBrush>
+          <SolidColorBrush x:Key="DashboardSurfaceBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="DashboardMutedSurfaceBrush" Color="#F7FAFC" />
+          <SolidColorBrush x:Key="DashboardDividerBrush" Color="#DCE6F2" />
+          <SolidColorBrush x:Key="AppNotificationSegmentThumbBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppModalOverlayBrush" Color="#7A0F172A" />
+          <SolidColorBrush x:Key="AppBackdropOverlayBrush" Color="#660F172A" />
+          <SolidColorBrush x:Key="AppOverlaySurfaceStrongBrush" Color="#CCFFFFFF" />
+          <SolidColorBrush x:Key="AppOverlaySurfaceSoftBrush" Color="#88FFFFFF" />
+          <SolidColorBrush x:Key="AppErrorWindowBackgroundBrush" Color="#FFF7F8FA" />
+          <SolidColorBrush x:Key="AppErrorPanelBackgroundBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppErrorDetailBackgroundBrush" Color="#FFF8F2F2" />
+          <SolidColorBrush x:Key="AppErrorPrimaryTextBrush" Color="#FF1F2937" />
+          <SolidColorBrush x:Key="AppErrorSecondaryTextBrush" Color="#FF4B5563" />
+          <SolidColorBrush x:Key="AppErrorSelectionBrush" Color="#2B2563EB" />
+          <SolidColorBrush x:Key="AppErrorSelectionForegroundBrush" Color="#FF111827" />
+          <SolidColorBrush x:Key="AppToastSurfaceBrush" Color="#FDFDFE" />
+          <SolidColorBrush x:Key="AppToastBorderBrush" Color="#D8E0EA" />
+          <SolidColorBrush x:Key="AppToastTitleBrush" Color="#111827" />
+          <SolidColorBrush x:Key="AppToastMessageBrush" Color="#516072" />
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="SemiPageBrush" Color="#0F172A" />
+          <SolidColorBrush x:Key="SemiCardBackgroundBrush" Color="#111827" />
+          <SolidColorBrush x:Key="SemiCardBorderBrush" Color="#243244" />
+          <SolidColorBrush x:Key="SemiColorText0" Color="#F8FAFC" />
+          <SolidColorBrush x:Key="SemiColorText2" Color="#94A3B8" />
+          <SolidColorBrush x:Key="SemiColorFill0" Color="#0B1220" />
+          <SolidColorBrush x:Key="SemiColorFill2" Color="#1A2434" />
+          <SolidColorBrush x:Key="SemiTextPrimaryBrush" Color="#F8FAFC" />
+          <SolidColorBrush x:Key="SemiTextSecondaryBrush" Color="#CBD5E1" />
+          <SolidColorBrush x:Key="SemiTextTertiaryBrush" Color="#94A3B8" />
+          <SolidColorBrush x:Key="SemiSuccessSoftBrush" Color="#102A1E" />
+          <SolidColorBrush x:Key="SemiSuccessTextBrush" Color="#4ADE80" />
+          <SolidColorBrush x:Key="SemiWarningSoftBrush" Color="#35250A" />
+          <SolidColorBrush x:Key="SemiWarningTextBrush" Color="#FBBF24" />
+          <SolidColorBrush x:Key="SemiLogSurfaceBrush" Color="#050B16" />
+          <SolidColorBrush x:Key="AppSidebarBrush" Color="#0B1220" />
+          <SolidColorBrush x:Key="AppSidebarBorderBrush" Color="#243244" />
+          <SolidColorBrush x:Key="AppSeparatorBrush" Color="#243244" />
+          <SolidColorBrush x:Key="AppInteractiveHoverBrush" Color="#14FFFFFF" />
+          <SolidColorBrush x:Key="AppInteractivePressedBrush" Color="#22FFFFFF" />
+          <SolidColorBrush x:Key="AppNeutralIconSurfaceBrush" Color="#162132" />
+          <SolidColorBrush x:Key="AppNeutralIconBorderBrush" Color="#243244" />
+          <SolidColorBrush x:Key="AppFavoriteFillBrush" Color="#FACC15" />
+          <SolidColorBrush x:Key="AppFavoriteStrokeBrush" Color="#A16207" />
+          <SolidColorBrush x:Key="AppWarningBorderBrush" Color="#B8822E" />
+          <LinearGradientBrush x:Key="DashboardHeroBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#162132" Offset="0" />
+            <GradientStop Color="#101827" Offset="0.48" />
+            <GradientStop Color="#0B1320" Offset="1" />
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="DashboardTimeCardBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#182334" Offset="0" />
+            <GradientStop Color="#101827" Offset="1" />
+          </LinearGradientBrush>
+          <LinearGradientBrush x:Key="DashboardTicketBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#182334" Offset="0" />
+            <GradientStop Color="#111827" Offset="0.54" />
+            <GradientStop Color="#0D1523" Offset="1" />
+          </LinearGradientBrush>
+          <SolidColorBrush x:Key="DashboardSurfaceBrush" Color="#111827" />
+          <SolidColorBrush x:Key="DashboardMutedSurfaceBrush" Color="#0F172A" />
+          <SolidColorBrush x:Key="DashboardDividerBrush" Color="#243244" />
+          <SolidColorBrush x:Key="AppNotificationSegmentThumbBrush" Color="#1E293B" />
+          <SolidColorBrush x:Key="AppModalOverlayBrush" Color="#B3000000" />
+          <SolidColorBrush x:Key="AppBackdropOverlayBrush" Color="#99000000" />
+          <SolidColorBrush x:Key="AppOverlaySurfaceStrongBrush" Color="#CC101926" />
+          <SolidColorBrush x:Key="AppOverlaySurfaceSoftBrush" Color="#99101926" />
+          <SolidColorBrush x:Key="AppErrorWindowBackgroundBrush" Color="#0F172A" />
+          <SolidColorBrush x:Key="AppErrorPanelBackgroundBrush" Color="#111827" />
+          <SolidColorBrush x:Key="AppErrorDetailBackgroundBrush" Color="#1A2434" />
+          <SolidColorBrush x:Key="AppErrorPrimaryTextBrush" Color="#F8FAFC" />
+          <SolidColorBrush x:Key="AppErrorSecondaryTextBrush" Color="#CBD5E1" />
+          <SolidColorBrush x:Key="AppErrorSelectionBrush" Color="#334C7DFF" />
+          <SolidColorBrush x:Key="AppErrorSelectionForegroundBrush" Color="#FFF8FAFC" />
+          <SolidColorBrush x:Key="AppToastSurfaceBrush" Color="#0F172A" />
+          <SolidColorBrush x:Key="AppToastBorderBrush" Color="#243244" />
+          <SolidColorBrush x:Key="AppToastTitleBrush" Color="#F8FAFC" />
+          <SolidColorBrush x:Key="AppToastMessageBrush" Color="#CBD5E1" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+
+      <SolidColorBrush x:Key="AppAccentBrush" Color="#0077FA" />
+      <SolidColorBrush x:Key="SemiAccentBrush" Color="#0077FA" />
+      <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#E8F3FF" />
+      <SolidColorBrush x:Key="SemiAccentSoftBrush" Color="#E8F3FF" />
+      <SolidColorBrush x:Key="AppAccentGlowBrush" Color="#F5F9FF" />
+      <SolidColorBrush x:Key="SemiAccentGlowBrush" Color="#F5F9FF" />
+      <SolidColorBrush x:Key="AppAccentPanelBrush" Color="#F7FBFF" />
+      <SolidColorBrush x:Key="AppAccentPanelBorderBrush" Color="#D7E7FF" />
+      <SolidColorBrush x:Key="AppAccentForegroundBrush" Color="#FFFFFF" />
+    </ResourceDictionary>
+  </Application.Resources>
+
   <Application.Styles>
     <FluentTheme />
     <semi:SemiTheme Locale="zh-CN" />

@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using AvaloniaApplication = Avalonia.Application;
 
 namespace IGoLibrary.Ex.Desktop;
 
@@ -15,7 +16,7 @@ public sealed class ErrorDetailsWindow : Window
         Height = 320;
         MinWidth = 460;
         MinHeight = 260;
-        Background = new SolidColorBrush(Color.Parse("#FFF7F8FA"));
+        Background = ResolveBrush("AppErrorWindowBackgroundBrush", "#FFF7F8FA");
         CanResize = true;
         ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -33,10 +34,10 @@ public sealed class ErrorDetailsWindow : Window
             TextWrapping = TextWrapping.Wrap,
             FontFamily = FontFamily.Parse("Consolas, Cascadia Mono, Monaco, monospace"),
             FontSize = 13,
-            Foreground = new SolidColorBrush(Color.Parse("#FF1F2937")),
+            Foreground = ResolveBrush("AppErrorPrimaryTextBrush", "#FF1F2937"),
             Text = $"错误类型：{errorType}{Environment.NewLine}{Environment.NewLine}具体错误：{errorMessage}",
-            SelectionBrush = new SolidColorBrush(Color.Parse("#2B2563EB")),
-            SelectionForegroundBrush = Brushes.Black
+            SelectionBrush = ResolveBrush("AppErrorSelectionBrush", "#2B2563EB"),
+            SelectionForegroundBrush = ResolveBrush("AppErrorSelectionForegroundBrush", "#FF111827")
         };
 
         Content = new Border
@@ -44,7 +45,7 @@ public sealed class ErrorDetailsWindow : Window
             Margin = new Thickness(12),
             Padding = new Thickness(20),
             CornerRadius = new CornerRadius(18),
-            Background = Brushes.White,
+            Background = ResolveBrush("AppErrorPanelBackgroundBrush", "#FFFFFFFF"),
             BoxShadow = BoxShadows.Parse("0 10 28 0 #160F172A"),
             Child = new Grid
             {
@@ -57,18 +58,18 @@ public sealed class ErrorDetailsWindow : Window
                         Text = title,
                         FontSize = 20,
                         FontWeight = FontWeight.Bold,
-                        Foreground = Brushes.Black
+                        Foreground = ResolveBrush("AppErrorPrimaryTextBrush", "#FF1F2937")
                     },
                     new TextBlock
                     {
                         Text = "请根据下列信息检查 SMTP 配置、网络连通性和授权码。",
                         TextWrapping = TextWrapping.Wrap,
-                        Foreground = Brushes.DimGray,
+                        Foreground = ResolveBrush("AppErrorSecondaryTextBrush", "#FF4B5563"),
                         [Grid.RowProperty] = 1
                     },
                     new Border
                     {
-                        Background = new SolidColorBrush(Color.Parse("#FFF8F2F2")),
+                        Background = ResolveBrush("AppErrorDetailBackgroundBrush", "#FFF8F2F2"),
                         CornerRadius = new CornerRadius(10),
                         Padding = new Thickness(12,10),
                         Child = new ScrollViewer
@@ -92,5 +93,20 @@ public sealed class ErrorDetailsWindow : Window
                 }
             }
         };
+    }
+
+    private static IBrush ResolveBrush(string resourceKey, string fallbackColor)
+    {
+        var app = AvaloniaApplication.Current;
+        if (app?.TryGetResource(
+                resourceKey,
+                app.ActualThemeVariant,
+                out var resource) == true &&
+            resource is IBrush brush)
+        {
+            return brush;
+        }
+
+        return new SolidColorBrush(Color.Parse(fallbackColor));
     }
 }

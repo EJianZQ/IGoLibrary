@@ -1,4 +1,6 @@
 using System.Net;
+using Avalonia.Controls;
+using Avalonia.Media;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
@@ -122,6 +124,72 @@ internal sealed class FakeErrorDialogService : IErrorDialogService
     {
         Errors.Add((title, errorType, errorMessage));
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeAppThemeService : IAppThemeService
+{
+    private static readonly AppThemePalette LightPalette = new(
+        IdleBrush: new SolidColorBrush(Color.Parse("#86909C")),
+        RunningBrush: new SolidColorBrush(Color.Parse("#0077FA")),
+        SuccessBrush: new SolidColorBrush(Color.Parse("#14804A")),
+        WarningBrush: new SolidColorBrush(Color.Parse("#C27803")),
+        FailureBrush: new SolidColorBrush(Color.Parse("#C93C37")),
+        RunningSoftBrush: new SolidColorBrush(Color.Parse("#E8F3FF")),
+        SuccessSoftBrush: new SolidColorBrush(Color.Parse("#E8FFF1")),
+        WarningSoftBrush: new SolidColorBrush(Color.Parse("#FFF5E7")),
+        NeutralSoftBrush: new SolidColorBrush(Color.Parse("#F1F5F9")),
+        NotificationSegmentActiveTextBrush: new SolidColorBrush(Color.Parse("#1D2129")),
+        NotificationSegmentInactiveTextBrush: new SolidColorBrush(Color.Parse("#86909C")),
+        LogDefaultBrush: new SolidColorBrush(Color.Parse("#1D2129")),
+        LogSuccessBrush: new SolidColorBrush(Color.Parse("#16A34A")),
+        LogErrorBrush: new SolidColorBrush(Color.Parse("#DC2626")));
+
+    private static readonly AppThemePalette DarkPalette = new(
+        IdleBrush: new SolidColorBrush(Color.Parse("#94A3B8")),
+        RunningBrush: new SolidColorBrush(Color.Parse("#0077FA")),
+        SuccessBrush: new SolidColorBrush(Color.Parse("#4ADE80")),
+        WarningBrush: new SolidColorBrush(Color.Parse("#FBBF24")),
+        FailureBrush: new SolidColorBrush(Color.Parse("#FB7185")),
+        RunningSoftBrush: new SolidColorBrush(Color.Parse("#182C45")),
+        SuccessSoftBrush: new SolidColorBrush(Color.Parse("#123021")),
+        WarningSoftBrush: new SolidColorBrush(Color.Parse("#3A2A0E")),
+        NeutralSoftBrush: new SolidColorBrush(Color.Parse("#182230")),
+        NotificationSegmentActiveTextBrush: new SolidColorBrush(Color.Parse("#F8FAFC")),
+        NotificationSegmentInactiveTextBrush: new SolidColorBrush(Color.Parse("#94A3B8")),
+        LogDefaultBrush: new SolidColorBrush(Color.Parse("#E2E8F0")),
+        LogSuccessBrush: new SolidColorBrush(Color.Parse("#4ADE80")),
+        LogErrorBrush: new SolidColorBrush(Color.Parse("#F87171")));
+
+    public event EventHandler<AppThemePalette>? PaletteChanged;
+
+    public AppThemePalette CurrentPalette { get; private set; } = LightPalette;
+
+    public int InitializeCalls { get; private set; }
+
+    public int ApplySettingsCalls { get; private set; }
+
+    public AppSettings? LastAppliedSettings { get; private set; }
+
+    public Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        InitializeCalls++;
+        return Task.CompletedTask;
+    }
+
+    public Task ApplySettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    {
+        ApplySettingsCalls++;
+        LastAppliedSettings = settings;
+        CurrentPalette = settings.ThemeMode == AppThemeMode.Dark
+            ? DarkPalette
+            : LightPalette;
+        PaletteChanged?.Invoke(this, CurrentPalette);
+        return Task.CompletedTask;
+    }
+
+    public void AttachTopLevel(TopLevel topLevel)
+    {
     }
 }
 

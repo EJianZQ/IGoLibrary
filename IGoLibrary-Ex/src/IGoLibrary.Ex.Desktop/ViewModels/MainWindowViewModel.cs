@@ -28,8 +28,10 @@ public partial class MainWindowViewModel(
     IActivityLogService activityLogService,
     INotificationService notificationService,
     IErrorDialogService errorDialogService,
+    IAppThemeService appThemeService,
     AppWindowService appWindowService) : ViewModelBase
 {
+    private readonly IAppThemeService _appThemeService = appThemeService;
     private readonly ObservableCollection<SeatItemViewModel> _allSeats = [];
     private readonly object _filterGate = new();
     private readonly DispatcherTimer _reservationCountdownTimer = new() { Interval = TimeSpan.FromSeconds(1) };
@@ -85,19 +87,19 @@ public partial class MainWindowViewModel(
         NotificationSettingsSidebarItem,
         SettingsSidebarItem
     ];
-    private static readonly IBrush GrabStateIdleBrush = new SolidColorBrush(Color.Parse("#86909C"));
-    private static readonly IBrush GrabStateRunningBrush = new SolidColorBrush(Color.Parse("#0077FA"));
-    private static readonly IBrush GrabStateSuccessBrush = new SolidColorBrush(Color.Parse("#14804A"));
-    private static readonly IBrush GrabStateWarningBrush = new SolidColorBrush(Color.Parse("#C27803"));
-    private static readonly IBrush GrabStateFailureBrush = new SolidColorBrush(Color.Parse("#C93C37"));
-    private static readonly IBrush DashboardRunningSoftBrush = new SolidColorBrush(Color.Parse("#E8F3FF"));
-    private static readonly IBrush DashboardSuccessSoftBrush = new SolidColorBrush(Color.Parse("#E8FFF1"));
-    private static readonly IBrush DashboardWarningSoftBrush = new SolidColorBrush(Color.Parse("#FFF5E7"));
-    private static readonly IBrush DashboardNeutralSoftBrush = new SolidColorBrush(Color.Parse("#F1F5F9"));
+    private IBrush GrabStateIdleBrush = appThemeService.CurrentPalette.IdleBrush;
+    private IBrush GrabStateRunningBrush = appThemeService.CurrentPalette.RunningBrush;
+    private IBrush GrabStateSuccessBrush = appThemeService.CurrentPalette.SuccessBrush;
+    private IBrush GrabStateWarningBrush = appThemeService.CurrentPalette.WarningBrush;
+    private IBrush GrabStateFailureBrush = appThemeService.CurrentPalette.FailureBrush;
+    private IBrush DashboardRunningSoftBrush = appThemeService.CurrentPalette.RunningSoftBrush;
+    private IBrush DashboardSuccessSoftBrush = appThemeService.CurrentPalette.SuccessSoftBrush;
+    private IBrush DashboardWarningSoftBrush = appThemeService.CurrentPalette.WarningSoftBrush;
+    private IBrush DashboardNeutralSoftBrush = appThemeService.CurrentPalette.NeutralSoftBrush;
     private static readonly IBrush NotificationSegmentActiveBrush = Brushes.White;
     private static readonly IBrush NotificationSegmentInactiveBrush = Brushes.Transparent;
-    private static readonly IBrush NotificationSegmentActiveTextBrush = new SolidColorBrush(Color.Parse("#1D2129"));
-    private static readonly IBrush NotificationSegmentInactiveTextBrush = new SolidColorBrush(Color.Parse("#86909C"));
+    private IBrush NotificationSegmentActiveTextBrush = appThemeService.CurrentPalette.NotificationSegmentActiveTextBrush;
+    private IBrush NotificationSegmentInactiveTextBrush = appThemeService.CurrentPalette.NotificationSegmentInactiveTextBrush;
     private const double NotificationSegmentControlWidthValue = 396d;
     private const double NotificationSegmentSliderWidthValue = 190d;
     private const double NotificationSegmentSliderOffsetValue = 196d;
@@ -116,6 +118,7 @@ public partial class MainWindowViewModel(
     private bool _isLoadingSettings;
     private bool _notificationSettingsLoaded;
     private CancellationTokenSource? _notificationSettingsAutoSaveCts;
+    private bool _themePaletteSubscribed;
     private readonly object _processedAuthCodesGate = new();
     private readonly HashSet<string> _processedAuthCodes = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _inFlightAuthCodes = new(StringComparer.OrdinalIgnoreCase);
@@ -141,6 +144,8 @@ public partial class MainWindowViewModel(
     public string[] GrabReservationStrategies { get; } = ["先获取列表判断状态", "直接发送预约请求"];
 
     public string[] EmailSecurityModes { get; } = ["无", "TLS"];
+
+    public string[] ThemeModes { get; } = ["跟随系统", "浅色", "深色"];
 
     public const int AccountAndVenueTabIndex = 1;
 
@@ -214,10 +219,10 @@ public partial class MainWindowViewModel(
     private string homeHeroStatusDetailText = "完成登录与场馆绑定后即可启用全部引擎。";
 
     [ObservableProperty]
-    private IBrush homeHeroStatusBrush = GrabStateIdleBrush;
+    private IBrush homeHeroStatusBrush = appThemeService.CurrentPalette.IdleBrush;
 
     [ObservableProperty]
-    private IBrush homeHeroStatusBackgroundBrush = DashboardNeutralSoftBrush;
+    private IBrush homeHeroStatusBackgroundBrush = appThemeService.CurrentPalette.NeutralSoftBrush;
 
     [ObservableProperty]
     private string homeLockedVenueTitle = "尚未锁定场馆";
@@ -226,10 +231,10 @@ public partial class MainWindowViewModel(
     private string homeLockedVenueStateText = "待授权";
 
     [ObservableProperty]
-    private IBrush homeLockedVenueStateBrush = GrabStateWarningBrush;
+    private IBrush homeLockedVenueStateBrush = appThemeService.CurrentPalette.WarningBrush;
 
     [ObservableProperty]
-    private IBrush homeLockedVenueStateBackgroundBrush = DashboardWarningSoftBrush;
+    private IBrush homeLockedVenueStateBackgroundBrush = appThemeService.CurrentPalette.WarningSoftBrush;
 
     [ObservableProperty]
     private int homeHistoricalSuccessCount;
@@ -256,10 +261,10 @@ public partial class MainWindowViewModel(
     private string homeReservationBadgeText = "暂无预约";
 
     [ObservableProperty]
-    private IBrush homeReservationBadgeBrush = GrabStateIdleBrush;
+    private IBrush homeReservationBadgeBrush = appThemeService.CurrentPalette.IdleBrush;
 
     [ObservableProperty]
-    private IBrush homeReservationBadgeBackgroundBrush = DashboardNeutralSoftBrush;
+    private IBrush homeReservationBadgeBackgroundBrush = appThemeService.CurrentPalette.NeutralSoftBrush;
 
     [ObservableProperty]
     private string homeReservationRemainingText = "--";
@@ -428,6 +433,22 @@ public partial class MainWindowViewModel(
 
     [ObservableProperty]
     private int retryCount = 3;
+
+    [ObservableProperty]
+    private int selectedAppThemeModeIndex;
+
+    partial void OnSelectedAppThemeModeIndexChanged(int value)
+    {
+        PreviewThemeSettings();
+    }
+
+    [ObservableProperty]
+    private bool useSystemAccent = OperatingSystem.IsWindows();
+
+    partial void OnUseSystemAccentChanged(bool value)
+    {
+        PreviewThemeSettings();
+    }
 
     [ObservableProperty]
     private bool cookieEmailAlertsEnabled;
@@ -671,6 +692,13 @@ public partial class MainWindowViewModel(
 
     public async Task InitializeAsync()
     {
+        if (!_themePaletteSubscribed)
+        {
+            _themePaletteSubscribed = true;
+            _appThemeService.PaletteChanged += OnThemePaletteChanged;
+            ApplyThemePalette(_appThemeService.CurrentPalette);
+        }
+
         activityLogService.EntryWritten += OnLogEntryWritten;
         grabSeatCoordinator.StatusChanged += OnGrabStatusChanged;
         occupySeatCoordinator.StatusChanged += OnOccupyStatusChanged;
@@ -1411,6 +1439,8 @@ public partial class MainWindowViewModel(
             CustomApiOverridesEnabled = CustomApiOverridesEnabled,
             ApiTimeoutSeconds = Math.Max(3, ApiTimeoutSeconds),
             RetryCount = Math.Max(1, RetryCount),
+            ThemeMode = (AppThemeMode)Math.Clamp(SelectedAppThemeModeIndex, 0, ThemeModes.Length - 1),
+            UseSystemAccent = UseSystemAccent,
             GrabReservationStrategy = (GrabReservationStrategy)Math.Clamp(
                 SelectedGrabReservationStrategyIndex,
                 0,
@@ -1422,6 +1452,7 @@ public partial class MainWindowViewModel(
             TotalGuardSeconds = GetCurrentTotalGuardSeconds(DateTimeOffset.Now)
         };
         await settingsService.SaveAsync(settings);
+        await _appThemeService.ApplySettingsAsync(settings);
         await notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库。");
     }
 
@@ -1527,6 +1558,8 @@ public partial class MainWindowViewModel(
             CustomApiOverridesEnabled = settings.CustomApiOverridesEnabled;
             ApiTimeoutSeconds = settings.ApiTimeoutSeconds;
             RetryCount = settings.RetryCount;
+            SelectedAppThemeModeIndex = (int)settings.ThemeMode;
+            UseSystemAccent = settings.UseSystemAccent;
             SelectedGrabReservationStrategyIndex = (int)settings.GrabReservationStrategy;
 
             var cookieAlerts = settings.CookieExpiryAlerts ?? CookieExpiryAlertSettings.Default;
@@ -1551,6 +1584,32 @@ public partial class MainWindowViewModel(
         {
             _isLoadingSettings = false;
             _notificationSettingsLoaded = true;
+        }
+    }
+
+    private void PreviewThemeSettings()
+    {
+        if (_isLoadingSettings)
+        {
+            return;
+        }
+
+        _ = PreviewThemeSettingsAsync();
+    }
+
+    private async Task PreviewThemeSettingsAsync()
+    {
+        try
+        {
+            await _appThemeService.ApplySettingsAsync(AppSettings.Default with
+            {
+                ThemeMode = (AppThemeMode)Math.Clamp(SelectedAppThemeModeIndex, 0, ThemeModes.Length - 1),
+                UseSystemAccent = UseSystemAccent
+            });
+        }
+        catch
+        {
+            // Theme preview should never block the rest of the settings workflow.
         }
     }
 
@@ -2087,7 +2146,8 @@ public partial class MainWindowViewModel(
                     entry.Kind,
                     true,
                     hasSuccessSemantic,
-                    hasFailureSemantic));
+                    hasFailureSemantic,
+                    _appThemeService));
 
                 if (entry.Category == "Occupy" &&
                     entry.Message.EndsWith("已重新预约成功。", StringComparison.Ordinal))
@@ -2828,6 +2888,42 @@ public partial class MainWindowViewModel(
         _notificationSettingsAutoSaveCts.Cancel();
         _notificationSettingsAutoSaveCts.Dispose();
         _notificationSettingsAutoSaveCts = null;
+    }
+
+    private void OnThemePaletteChanged(object? sender, AppThemePalette palette)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            ApplyThemePalette(palette);
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() => ApplyThemePalette(palette));
+    }
+
+    private void ApplyThemePalette(AppThemePalette palette)
+    {
+        GrabStateIdleBrush = palette.IdleBrush;
+        GrabStateRunningBrush = palette.RunningBrush;
+        GrabStateSuccessBrush = palette.SuccessBrush;
+        GrabStateWarningBrush = palette.WarningBrush;
+        GrabStateFailureBrush = palette.FailureBrush;
+        DashboardRunningSoftBrush = palette.RunningSoftBrush;
+        DashboardSuccessSoftBrush = palette.SuccessSoftBrush;
+        DashboardWarningSoftBrush = palette.WarningSoftBrush;
+        DashboardNeutralSoftBrush = palette.NeutralSoftBrush;
+        NotificationSegmentActiveTextBrush = palette.NotificationSegmentActiveTextBrush;
+        NotificationSegmentInactiveTextBrush = palette.NotificationSegmentInactiveTextBrush;
+
+        foreach (var logLine in OccupyLogLines)
+        {
+            logLine.RefreshTheme();
+        }
+
+        OnPropertyChanged(nameof(EmailNotificationTabForegroundBrush));
+        OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
+        OnPropertyChanged(nameof(GrabDashboardStatusBrush));
+        UpdateHomeDashboardPresentation();
     }
 
     private sealed record SeatFilterSnapshot(

@@ -29,6 +29,7 @@ internal static class HostBuilderFactory
             {
                 services.AddApplication();
                 services.AddInfrastructure();
+                services.AddSingleton<IAppThemeService, AppThemeService>();
                 services.AddSingleton<AppWindowService>();
                 services.AddSingleton<IErrorDialogService, ErrorDialogService>();
                 services.AddSingleton<ToastNotificationService>();

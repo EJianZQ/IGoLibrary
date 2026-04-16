@@ -333,6 +333,53 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SaveSettingsAsync_PersistsThemePreferences()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var themeService = new FakeAppThemeService();
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            appThemeService: themeService);
+        await viewModel.InitializeAsync();
+
+        viewModel.SelectedAppThemeModeIndex = 2;
+        viewModel.UseSystemAccent = false;
+
+        await WaitForAsync(() => themeService.ApplySettingsCalls == 2);
+
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        Assert.Equal(AppThemeMode.Dark, settingsService.CurrentSettings.ThemeMode);
+        Assert.False(settingsService.CurrentSettings.UseSystemAccent);
+        Assert.Equal(3, themeService.ApplySettingsCalls);
+        Assert.Equal(AppThemeMode.Dark, themeService.LastAppliedSettings?.ThemeMode);
+        Assert.False(themeService.LastAppliedSettings?.UseSystemAccent);
+    }
+
+    [Fact]
+    public async Task ThemePreview_UpdatesImmediately_WithoutSavingSettings()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var themeService = new FakeAppThemeService();
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            appThemeService: themeService);
+        await viewModel.InitializeAsync();
+
+        viewModel.SelectedAppThemeModeIndex = 2;
+        viewModel.UseSystemAccent = false;
+
+        await WaitForAsync(() =>
+            themeService.ApplySettingsCalls == 2 &&
+            themeService.LastAppliedSettings?.ThemeMode == AppThemeMode.Dark &&
+            themeService.LastAppliedSettings?.UseSystemAccent == false);
+
+        Assert.Equal(0, settingsService.SaveCalls);
+        Assert.Equal(AppThemeMode.FollowSystem, settingsService.CurrentSettings.ThemeMode);
+        Assert.True(settingsService.CurrentSettings.UseSystemAccent);
+    }
+
+    [Fact]
     public async Task CancelCurrentReservationAsync_ClearsHomeReservationCard_WhenApiSucceeds()
     {
         var sessionService = new FakeSessionService
@@ -372,7 +419,8 @@ public sealed class MainWindowViewModelTests
         FakeGrabSeatCoordinator? grabSeatCoordinator = null,
         FakeNotificationService? notificationService = null,
         FakeCookieExpiryAlertService? cookieExpiryAlertService = null,
-        FakeErrorDialogService? errorDialogService = null)
+        FakeErrorDialogService? errorDialogService = null,
+        FakeAppThemeService? appThemeService = null)
     {
         return new MainWindowViewModel(
             sessionService ?? new FakeSessionService(),
@@ -386,6 +434,7 @@ public sealed class MainWindowViewModelTests
             new ActivityLogService(),
             notificationService ?? new FakeNotificationService(),
             errorDialogService ?? new FakeErrorDialogService(),
+            appThemeService ?? new FakeAppThemeService(),
             new AppWindowService());
     }
 

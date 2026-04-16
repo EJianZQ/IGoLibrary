@@ -23,6 +23,7 @@ public partial class App : Avalonia.Application
         {
             var services = Program.Host.Services;
             services.GetRequiredService<IAppDataInitializer>().InitializeAsync().GetAwaiter().GetResult();
+            services.GetRequiredService<IAppThemeService>().InitializeAsync().GetAwaiter().GetResult();
 
             var mainWindow = services.GetRequiredService<MainWindow>();
             var viewModel = services.GetRequiredService<MainWindowViewModel>();
@@ -31,6 +32,7 @@ public partial class App : Avalonia.Application
             mainWindow.DataContext = viewModel;
             desktop.MainWindow = mainWindow;
             services.GetRequiredService<AppWindowService>().Attach(mainWindow);
+            services.GetRequiredService<IAppThemeService>().AttachTopLevel(mainWindow);
 
             Dispatcher.UIThread.Post(async () =>
             {

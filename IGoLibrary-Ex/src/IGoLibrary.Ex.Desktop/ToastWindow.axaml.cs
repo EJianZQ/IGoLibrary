@@ -5,6 +5,7 @@ using Avalonia.Media;
 using IGoLibrary.Ex.Desktop.Services;
 using Avalonia.Threading;
 using System.Diagnostics;
+using AvaloniaApplication = Avalonia.Application;
 
 namespace IGoLibrary.Ex.Desktop;
 
@@ -16,16 +17,6 @@ public partial class ToastWindow : Window
     private static readonly TimeSpan ProgressAnimationFrameInterval = TimeSpan.FromMilliseconds(16);
     private const int EnterOvershootX = 24;
     private const int ExitOffsetY = 14;
-    private static readonly IBrush InfoAccentBrush = new SolidColorBrush(Color.Parse("#0F6FFF"));
-    private static readonly IBrush InfoSoftBrush = new SolidColorBrush(Color.Parse("#EAF2FF"));
-    private static readonly IBrush WarningAccentBrush = new SolidColorBrush(Color.Parse("#C27803"));
-    private static readonly IBrush WarningSoftBrush = new SolidColorBrush(Color.Parse("#FFF4D6"));
-    private static readonly IBrush SuccessAccentBrush = new SolidColorBrush(Color.Parse("#14804A"));
-    private static readonly IBrush SuccessSoftBrush = new SolidColorBrush(Color.Parse("#E6F8EE"));
-    private static readonly IBrush SurfaceBrushValue = new SolidColorBrush(Color.Parse("#FDFDFE"));
-    private static readonly IBrush BorderBrushValue = new SolidColorBrush(Color.Parse("#D8E0EA"));
-    private static readonly IBrush TitleBrushValue = new SolidColorBrush(Color.Parse("#111827"));
-    private static readonly IBrush MessageBrushValue = new SolidColorBrush(Color.Parse("#516072"));
     private CancellationTokenSource? _movementAnimationCts;
     private CancellationTokenSource? _lifecycleAnimationCts;
     private CancellationTokenSource? _progressAnimationCts;
@@ -67,27 +58,17 @@ public partial class ToastWindow : Window
 
     public IBrush AccentBrush => Kind switch
     {
-        ToastVisualKind.Warning => WarningAccentBrush,
-        ToastVisualKind.Success => SuccessAccentBrush,
-        _ => InfoAccentBrush
+        ToastVisualKind.Warning => ResolveBrush("SemiWarningTextBrush", "#C27803"),
+        ToastVisualKind.Success => ResolveBrush("SemiSuccessTextBrush", "#14804A"),
+        _ => ResolveBrush("AppAccentBrush", "#0F6FFF")
     };
 
     public IBrush AccentSoftBrush => Kind switch
     {
-        ToastVisualKind.Warning => WarningSoftBrush,
-        ToastVisualKind.Success => SuccessSoftBrush,
-        _ => InfoSoftBrush
+        ToastVisualKind.Warning => ResolveBrush("SemiWarningSoftBrush", "#FFF4D6"),
+        ToastVisualKind.Success => ResolveBrush("SemiSuccessSoftBrush", "#E6F8EE"),
+        _ => ResolveBrush("AppAccentSoftBrush", "#EAF2FF")
     };
-
-    public IBrush SurfaceBrush => SurfaceBrushValue;
-
-    public IBrush ToastBorderBrush => BorderBrushValue;
-
-    public IBrush TitleBrush => TitleBrushValue;
-
-    public IBrush MessageBrush => MessageBrushValue;
-
-    public IBrush ProgressTrackBrush => AccentSoftBrush;
 
     private void OnToastPointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -430,5 +411,20 @@ public partial class ToastWindow : Window
     private static double EaseInCubic(double progress)
     {
         return progress * progress * progress;
+    }
+
+    private static IBrush ResolveBrush(string resourceKey, string fallbackColor)
+    {
+        var app = AvaloniaApplication.Current;
+        if (app?.TryGetResource(
+                resourceKey,
+                app.ActualThemeVariant,
+                out var resource) == true &&
+            resource is IBrush brush)
+        {
+            return brush;
+        }
+
+        return new SolidColorBrush(Color.Parse(fallbackColor));
     }
 }

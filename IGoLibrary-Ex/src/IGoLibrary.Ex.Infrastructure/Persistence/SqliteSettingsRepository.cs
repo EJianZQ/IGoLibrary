@@ -51,9 +51,18 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connectionF
     private static string MigrateLegacyAppSettingsJson(string json)
     {
         using var document = JsonDocument.Parse(json);
-        if (document.RootElement.ValueKind != JsonValueKind.Object ||
-            document.RootElement.TryGetProperty("customApiOverridesEnabled", out _) ||
-            !document.RootElement.TryGetProperty("advancedMode", out _))
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        {
+            return json;
+        }
+
+        var needsAdvancedModeMigration =
+            !document.RootElement.TryGetProperty("customApiOverridesEnabled", out _) &&
+            document.RootElement.TryGetProperty("advancedMode", out _);
+        var needsThemeModeMigration = !document.RootElement.TryGetProperty("themeMode", out _);
+        var needsSystemAccentMigration = !document.RootElement.TryGetProperty("useSystemAccent", out _);
+
+        if (!needsAdvancedModeMigration && !needsThemeModeMigration && !needsSystemAccentMigration)
         {
             return json;
         }
@@ -72,6 +81,16 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connectionF
             }
 
             property.WriteTo(writer);
+        }
+
+        if (needsThemeModeMigration)
+        {
+            writer.WriteNumber("themeMode", 0);
+        }
+
+        if (needsSystemAccentMigration)
+        {
+            writer.WriteBoolean("useSystemAccent", OperatingSystem.IsWindows());
         }
 
         writer.WriteEndObject();

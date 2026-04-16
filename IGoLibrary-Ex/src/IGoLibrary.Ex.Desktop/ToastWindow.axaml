@@ -19,8 +19,8 @@
         ExtendClientAreaToDecorationsHint="False">
   <Border Margin="10"
           CornerRadius="18"
-          Background="{Binding SurfaceBrush}"
-          BorderBrush="{Binding ToastBorderBrush}"
+          Background="{DynamicResource AppToastSurfaceBrush}"
+          BorderBrush="{DynamicResource AppToastBorderBrush}"
           BorderThickness="1"
           BoxShadow="0 12 32 0 #220F172A"
           ClipToBounds="True"
@@ -48,11 +48,11 @@
           <TextBlock Text="{Binding TitleText}"
                      FontSize="16"
                      FontWeight="Bold"
-                     Foreground="{Binding TitleBrush}"
+                     Foreground="{DynamicResource AppToastTitleBrush}"
                      TextWrapping="Wrap" />
           <TextBlock Text="{Binding MessageText}"
                      FontSize="13"
-                     Foreground="{Binding MessageBrush}"
+                     Foreground="{DynamicResource AppToastMessageBrush}"
                      TextWrapping="Wrap" />
         </StackPanel>
       </Grid>
@@ -68,7 +68,7 @@
                    ShowProgressText="False"
                    IsHitTestVisible="False"
                    Foreground="{Binding AccentBrush}"
-                   Background="{Binding ProgressTrackBrush}" />
+                   Background="{Binding AccentSoftBrush}" />
     </Grid>
   </Border>
 </Window>
