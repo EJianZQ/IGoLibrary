@@ -8,8 +8,7 @@ namespace IGoLibrary.Ex.Application.Services;
 public sealed class GrabSeatCoordinator(
     ITraceIntApiClient apiClient,
     ISettingsService settingsService,
-    INotificationService notificationService,
-    ICookieExpiryAlertService cookieExpiryAlertService,
+    ITaskAlertService taskAlertService,
     IActivityLogService activityLogService,
     AppRuntimeState runtimeState) : IGrabSeatCoordinator
 {
@@ -127,7 +126,7 @@ public sealed class GrabSeatCoordinator(
                 if (reservationResult.ReservedSeat is not null)
                 {
                     activityLogService.Write(LogEntryKind.Success, "Grab", $"{reservationResult.ReservedSeat.SeatName} 预约成功。");
-                    await notificationService.ShowSuccessAsync("抢座成功", $"{reservationResult.ReservedSeat.SeatName} 预约成功。", cancellationToken);
+                    await taskAlertService.NotifyGrabSucceededAsync(plan.LibraryName, reservationResult.ReservedSeat.SeatName, cancellationToken);
                     Complete("已成功预约到目标座位。");
                     return;
                 }
@@ -171,11 +170,11 @@ public sealed class GrabSeatCoordinator(
             activityLogService.Write(LogEntryKind.Error, "Grab", ex.Message);
             if (CookieExpiryDetector.IsExpired(ex))
             {
-                await cookieExpiryAlertService.NotifyCookieExpiredAsync("抢座轮询", ex.Message, CancellationToken.None);
+                await taskAlertService.NotifyCookieExpiredAsync("抢座轮询", ex.Message, CancellationToken.None);
                 return;
             }
 
-            await notificationService.ShowWarningAsync("抢座失败", ex.Message, CancellationToken.None);
+            await taskAlertService.NotifyTaskFailedAsync("抢座", ex.Message, CancellationToken.None);
         }
     }
 

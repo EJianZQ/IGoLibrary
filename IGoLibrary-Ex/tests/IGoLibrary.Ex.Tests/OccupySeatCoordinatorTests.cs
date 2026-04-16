@@ -50,7 +50,7 @@ public sealed class OccupySeatCoordinatorTests
             apiClient,
             settingsService,
             notificationService,
-            new FakeCookieExpiryAlertService(),
+            new FakeTaskAlertService(),
             activityLogService,
             runtimeState);
 
@@ -71,7 +71,7 @@ public sealed class OccupySeatCoordinatorTests
     public async Task StartAsync_NotifiesCookieExpiry_WhenReservationRefreshReturnsUnauthorized()
     {
         var notificationService = new FakeNotificationService();
-        var alertService = new FakeCookieExpiryAlertService();
+        var alertService = new FakeTaskAlertService();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetReservationInfoAsync = (_, _) => Task.FromException<ReservationInfo?>(
@@ -95,6 +95,38 @@ public sealed class OccupySeatCoordinatorTests
 
         var alert = Assert.Single(alertService.CookieExpiredNotifications);
         Assert.Equal("占座轮询", alert.Source);
+        Assert.Empty(notificationService.Warnings);
+    }
+
+    [Fact]
+    public async Task StartAsync_NotifiesTaskFailure_WhenReservationRefreshFailsWithoutCookieExpiry()
+    {
+        var notificationService = new FakeNotificationService();
+        var alertService = new FakeTaskAlertService();
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) => Task.FromException<ReservationInfo?>(
+                new InvalidOperationException("预约状态获取失败"))
+        };
+
+        var runtimeState = new AppRuntimeState
+        {
+            Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var coordinator = new OccupySeatCoordinator(
+            apiClient,
+            new FakeSettingsService(AppSettings.Default),
+            notificationService,
+            alertService,
+            new ActivityLogService(),
+            runtimeState);
+
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, RefreshMode.FixedTenSeconds));
+        await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
+
+        var failure = Assert.Single(alertService.TaskFailedNotifications);
+        Assert.Equal("占座", failure.TaskName);
+        Assert.Equal("预约状态获取失败", failure.Reason);
         Assert.Empty(notificationService.Warnings);
     }
 

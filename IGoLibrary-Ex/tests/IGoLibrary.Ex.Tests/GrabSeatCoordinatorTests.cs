@@ -16,6 +16,7 @@ public sealed class GrabSeatCoordinatorTests
         var layoutCallCount = 0;
         var reserveCallCount = 0;
         var reserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var alertService = new FakeTaskAlertService();
 
         var apiClient = new FakeTraceIntApiClient
         {
@@ -44,8 +45,7 @@ public sealed class GrabSeatCoordinatorTests
         var coordinator = new GrabSeatCoordinator(
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
-            new FakeNotificationService(),
-            new FakeCookieExpiryAlertService(),
+            alertService,
             new ActivityLogService(),
             runtimeState);
 
@@ -67,6 +67,7 @@ public sealed class GrabSeatCoordinatorTests
         Assert.Equal(0, layoutCallCount);
         Assert.Equal(2, reserveCallCount);
         Assert.Equal(CoordinatorTaskState.Completed, coordinator.GetStatus().State);
+        Assert.Contains(alertService.GrabSucceededNotifications, item => item.LibraryName == "自科阅览区一" && item.SeatName == "2号座");
     }
 
     [Fact]
@@ -104,8 +105,7 @@ public sealed class GrabSeatCoordinatorTests
         var coordinator = new GrabSeatCoordinator(
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
-            new FakeNotificationService(),
-            new FakeCookieExpiryAlertService(),
+            new FakeTaskAlertService(),
             activityLogService,
             runtimeState);
 
@@ -161,8 +161,7 @@ public sealed class GrabSeatCoordinatorTests
         var coordinator = new GrabSeatCoordinator(
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
-            new FakeNotificationService(),
-            new FakeCookieExpiryAlertService(),
+            new FakeTaskAlertService(),
             activityLogService,
             runtimeState);
 
@@ -231,8 +230,7 @@ public sealed class GrabSeatCoordinatorTests
         var coordinator = new GrabSeatCoordinator(
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.QueryThenReserve }),
-            new FakeNotificationService(),
-            new FakeCookieExpiryAlertService(),
+            new FakeTaskAlertService(),
             new ActivityLogService(),
             runtimeState);
 
@@ -261,7 +259,7 @@ public sealed class GrabSeatCoordinatorTests
     public async Task StartAsync_NotifiesCookieExpiry_WhenPollingReceivesUnauthorized()
     {
         var notificationService = new FakeNotificationService();
-        var alertService = new FakeCookieExpiryAlertService();
+        var alertService = new FakeTaskAlertService();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetLibraryLayoutAsync = (_, _, _) => Task.FromException<LibraryLayout>(
@@ -275,7 +273,6 @@ public sealed class GrabSeatCoordinatorTests
         var coordinator = new GrabSeatCoordinator(
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.QueryThenReserve }),
-            notificationService,
             alertService,
             new ActivityLogService(),
             runtimeState);
@@ -293,6 +290,45 @@ public sealed class GrabSeatCoordinatorTests
 
         var alert = Assert.Single(alertService.CookieExpiredNotifications);
         Assert.Equal("抢座轮询", alert.Source);
+        Assert.Empty(notificationService.Warnings);
+    }
+
+    [Fact]
+    public async Task StartAsync_NotifiesTaskFailure_WhenPollingFailsWithoutCookieExpiry()
+    {
+        var notificationService = new FakeNotificationService();
+        var alertService = new FakeTaskAlertService();
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetLibraryLayoutAsync = (_, _, _) => Task.FromException<LibraryLayout>(
+                new InvalidOperationException("场馆接口暂时不可用"))
+        };
+
+        var runtimeState = new AppRuntimeState
+        {
+            Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var coordinator = new GrabSeatCoordinator(
+            apiClient,
+            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.QueryThenReserve }),
+            alertService,
+            new ActivityLogService(),
+            runtimeState);
+
+        var plan = new GrabSeatPlan(
+            1,
+            "自科阅览区一",
+            [new TrackedSeat("seat-1", "1号座")],
+            GrabMode.Aggressive,
+            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            null);
+
+        await coordinator.StartAsync(plan);
+        await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
+
+        var failure = Assert.Single(alertService.TaskFailedNotifications);
+        Assert.Equal("抢座", failure.TaskName);
+        Assert.Equal("场馆接口暂时不可用", failure.Reason);
         Assert.Empty(notificationService.Warnings);
     }
 

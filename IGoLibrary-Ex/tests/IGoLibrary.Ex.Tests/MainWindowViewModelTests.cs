@@ -84,8 +84,8 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SendTestEmailAlertAsync_UsesCurrentNotificationSettingsSnapshot()
     {
-        var alertService = new FakeCookieExpiryAlertService();
-        var viewModel = CreateViewModel(cookieExpiryAlertService: alertService);
+        var alertService = new FakeTaskAlertService();
+        var viewModel = CreateViewModel(taskAlertService: alertService);
         await viewModel.InitializeAsync();
 
         viewModel.CookieAlertSmtpHost = "smtp.example.com";
@@ -111,13 +111,13 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SendTestEmailAlertAsync_ShowsErrorDialog_WhenSendingFails()
     {
-        var alertService = new FakeCookieExpiryAlertService
+        var alertService = new FakeTaskAlertService
         {
             SendTestEmailException = new InvalidOperationException("smtp connect failed")
         };
         var errorDialogService = new FakeErrorDialogService();
         var viewModel = CreateViewModel(
-            cookieExpiryAlertService: alertService,
+            taskAlertService: alertService,
             errorDialogService: errorDialogService);
         await viewModel.InitializeAsync();
 
@@ -418,7 +418,7 @@ public sealed class MainWindowViewModelTests
         FakeTraceIntApiClient? apiClient = null,
         FakeGrabSeatCoordinator? grabSeatCoordinator = null,
         FakeNotificationService? notificationService = null,
-        FakeCookieExpiryAlertService? cookieExpiryAlertService = null,
+        FakeTaskAlertService? taskAlertService = null,
         FakeErrorDialogService? errorDialogService = null,
         FakeAppThemeService? appThemeService = null)
     {
@@ -430,7 +430,7 @@ public sealed class MainWindowViewModelTests
             new FakeProtocolTemplateStore(new ProtocolTemplateSet("", "", "", "", "", "", "")),
             grabSeatCoordinator ?? new FakeGrabSeatCoordinator(),
             new FakeOccupySeatCoordinator(),
-            cookieExpiryAlertService ?? new FakeCookieExpiryAlertService(),
+            taskAlertService ?? new FakeTaskAlertService(),
             new ActivityLogService(),
             notificationService ?? new FakeNotificationService(),
             errorDialogService ?? new FakeErrorDialogService(),

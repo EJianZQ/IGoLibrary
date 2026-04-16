@@ -97,7 +97,7 @@ public sealed class MainWindowClipboardTests
             new FakeProtocolTemplateStore(new ProtocolTemplateSet("", "", "", "", "", "", "")),
             new FakeGrabSeatCoordinator(),
             new FakeOccupySeatCoordinator(),
-            new FakeCookieExpiryAlertService(),
+            new FakeTaskAlertService(),
             new ActivityLogService(),
             new FakeNotificationService(),
             new FakeErrorDialogService(),

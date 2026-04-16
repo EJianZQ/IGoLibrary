@@ -24,7 +24,7 @@ public partial class MainWindowViewModel(
     IProtocolTemplateStore protocolTemplateStore,
     IGrabSeatCoordinator grabSeatCoordinator,
     IOccupySeatCoordinator occupySeatCoordinator,
-    ICookieExpiryAlertService cookieExpiryAlertService,
+    ITaskAlertService taskAlertService,
     IActivityLogService activityLogService,
     INotificationService notificationService,
     IErrorDialogService errorDialogService,
@@ -1445,7 +1445,7 @@ public partial class MainWindowViewModel(
                 SelectedGrabReservationStrategyIndex,
                 0,
                 GrabReservationStrategies.Length - 1),
-            CookieExpiryAlerts = BuildCookieExpiryAlertSettings(),
+            CookieExpiryAlerts = BuildAlertSettingsSnapshot(),
             LastLibraryId = SelectedLibrary?.LibraryId,
             LastLibraryName = SelectedLibrary?.Name,
             SuccessfulReservationCount = _historicalSuccessCount,
@@ -1475,7 +1475,7 @@ public partial class MainWindowViewModel(
         {
             CancelPendingNotificationSettingsAutoSave();
             await PersistNotificationSettingsSnapshotAsync();
-            await cookieExpiryAlertService.SendTestEmailAsync(BuildCookieExpiryAlertSettings().Email);
+            await taskAlertService.SendTestEmailAsync(BuildAlertSettingsSnapshot().Email);
             NotificationSettingsStatusText = $"测试邮件已发送于 {DateTime.Now:HH:mm:ss}。";
             await notificationService.ShowSuccessAsync("测试邮件已发送", "请检查收件箱，确认当前 SMTP 配置可用。");
         }
@@ -1494,7 +1494,7 @@ public partial class MainWindowViewModel(
         {
             CancelPendingNotificationSettingsAutoSave();
             await PersistNotificationSettingsSnapshotAsync();
-            await cookieExpiryAlertService.SendTestLocalAlertAsync(BuildCookieExpiryAlertSettings().Local);
+            await taskAlertService.SendTestLocalAlertAsync(BuildAlertSettingsSnapshot().Local);
             NotificationSettingsStatusText = $"测试通知已触发于 {DateTime.Now:HH:mm:ss}。";
         }
         catch (Exception ex)
@@ -2795,7 +2795,7 @@ public partial class MainWindowViewModel(
         return seatName.Contains(filterText, StringComparison.OrdinalIgnoreCase);
     }
 
-    private CookieExpiryAlertSettings BuildCookieExpiryAlertSettings()
+    private CookieExpiryAlertSettings BuildAlertSettingsSnapshot()
     {
         return new CookieExpiryAlertSettings(
             new CookieExpiryEmailAlertSettings(
@@ -2874,7 +2874,7 @@ public partial class MainWindowViewModel(
         var current = await settingsService.LoadAsync(cancellationToken);
         await settingsService.SaveAsync(current with
         {
-            CookieExpiryAlerts = BuildCookieExpiryAlertSettings()
+            CookieExpiryAlerts = BuildAlertSettingsSnapshot()
         }, cancellationToken);
     }
 

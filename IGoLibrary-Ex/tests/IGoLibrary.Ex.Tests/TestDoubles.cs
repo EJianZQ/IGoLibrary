@@ -210,9 +210,13 @@ internal sealed class FakeSettingsService(AppSettings settings) : ISettingsServi
     }
 }
 
-internal sealed class FakeCookieExpiryAlertService : ICookieExpiryAlertService
+internal sealed class FakeTaskAlertService : ITaskAlertService
 {
     public List<(string Source, string Reason)> CookieExpiredNotifications { get; } = [];
+
+    public List<(string LibraryName, string SeatName)> GrabSucceededNotifications { get; } = [];
+
+    public List<(string TaskName, string Reason)> TaskFailedNotifications { get; } = [];
 
     public List<CookieExpiryEmailAlertSettings> TestEmailRequests { get; } = [];
 
@@ -223,6 +227,18 @@ internal sealed class FakeCookieExpiryAlertService : ICookieExpiryAlertService
     public Task NotifyCookieExpiredAsync(string source, string reason, CancellationToken cancellationToken = default)
     {
         CookieExpiredNotifications.Add((source, reason));
+        return Task.CompletedTask;
+    }
+
+    public Task NotifyGrabSucceededAsync(string libraryName, string seatName, CancellationToken cancellationToken = default)
+    {
+        GrabSucceededNotifications.Add((libraryName, seatName));
+        return Task.CompletedTask;
+    }
+
+    public Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default)
+    {
+        TaskFailedNotifications.Add((taskName, reason));
         return Task.CompletedTask;
     }
 
