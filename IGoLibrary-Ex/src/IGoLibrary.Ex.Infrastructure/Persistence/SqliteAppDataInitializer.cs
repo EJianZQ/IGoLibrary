@@ -8,6 +8,7 @@ public sealed class SqliteAppDataInitializer(SqliteConnectionFactory connectionF
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(AppDataPaths.RootDirectory);
+        Directory.CreateDirectory(AppDataPaths.LogsDirectory);
 
         await using var connection = connectionFactory.Create();
         await connection.OpenAsync(cancellationToken);

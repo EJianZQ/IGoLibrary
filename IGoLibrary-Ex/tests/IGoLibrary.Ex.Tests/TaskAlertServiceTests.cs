@@ -24,7 +24,7 @@ public sealed class TaskAlertServiceTests
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.SendTestEmailAsync(settings));
 
-        Assert.Equal("SMTP 用户名和邮箱授权码/密码需要同时填写，或同时留空。", exception.Message);
+        Assert.Equal("SMTP 用户名和邮箱授权码/密码需要同时填写，或同时留空", exception.Message);
     }
 
     [Fact]

@@ -1,11 +1,13 @@
 using System.Net;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Infrastructure.Api;
+using IGoLibrary.Ex.Infrastructure.Logging;
 using IGoLibrary.Ex.Infrastructure.Notifications;
 using IGoLibrary.Ex.Infrastructure.Persistence;
 using IGoLibrary.Ex.Infrastructure.Protocol;
 using IGoLibrary.Ex.Infrastructure.Security;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace IGoLibrary.Ex.Infrastructure;
 
@@ -15,6 +17,9 @@ public static class DependencyInjection
     {
         services.AddSingleton<SqliteConnectionFactory>();
         services.AddSingleton<IAppDataInitializer, SqliteAppDataInitializer>();
+        services.TryAddSingleton<IAppLogWriter, AppLogFileWriter>();
+        services.AddSingleton<AppTraceListener>();
+        services.AddSingleton<TraceListenerRegistrar>();
         services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
         services.AddSingleton<IFavoritesRepository, SqliteFavoritesRepository>();
         services.AddSingleton<IProtocolTemplateStore, DefaultProtocolTemplateStore>();

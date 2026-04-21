@@ -5,12 +5,14 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using IGoLibrary.Ex.Application.Abstractions;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
 public sealed class ToastNotificationService(
     ISettingsService settingsService,
-    AppWindowService appWindowService) : INotificationService
+    AppWindowService appWindowService,
+    IAppLogWriter? logWriter = null) : INotificationService
 {
     private const int MaxVisibleToasts = 5;
     private const int ToastMargin = 20;
@@ -99,6 +101,7 @@ public sealed class ToastNotificationService(
                     CleanupToastState(toast);
                 }
 
+                logWriter?.Write(LogLevel.Warning, nameof(ToastNotificationService), "Toast notification failed to show.", ex);
                 Debug.WriteLine($"Toast notification failed to show: {ex}");
             }
         });

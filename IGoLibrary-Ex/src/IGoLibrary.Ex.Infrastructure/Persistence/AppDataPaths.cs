@@ -30,4 +30,6 @@ internal static class AppDataPaths
     }
 
     public static string DatabasePath => Path.Combine(RootDirectory, "igolibrary-ex.db");
+
+    public static string LogsDirectory => Path.Combine(RootDirectory, "logs");
 }
