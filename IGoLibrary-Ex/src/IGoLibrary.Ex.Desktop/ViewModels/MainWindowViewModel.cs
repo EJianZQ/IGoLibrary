@@ -8,6 +8,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Desktop.Platform;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
@@ -37,6 +38,7 @@ public partial class MainWindowViewModel(
     private readonly DispatcherTimer _reservationCountdownTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private CancellationTokenSource? _filteringCts;
     private ReservationInfo? _currentReservation;
+    private DateTimeOffset? _sidebarCookieExpirationTime;
     private bool _reservationCountdownTimerInitialized;
     private LibrarySummary? _lockedLibrarySummary;
     private string _lockedVenueStatusText = "未绑定";
@@ -186,6 +188,15 @@ public partial class MainWindowViewModel(
 
     [ObservableProperty]
     private bool isAuthorized;
+
+    [ObservableProperty]
+    private bool hasSidebarCookieExpiry;
+
+    [ObservableProperty]
+    private string sidebarCookieExpiryText = string.Empty;
+
+    [ObservableProperty]
+    private IBrush sidebarCookieExpiryBrush = appThemeService.CurrentPalette.LogDefaultBrush;
 
     public string AuthorizationStatusText => IsAuthorized ? "已授权" : "未授权";
 
@@ -727,6 +738,8 @@ public partial class MainWindowViewModel(
                     IsAuthorized = true;
                     SessionSummary = $"已恢复会话：{restored.Source} / {restored.SavedAt:yyyy-MM-dd HH:mm:ss}";
                     ManualCookieText = restored.Cookie;
+                    UpdateSidebarCookieExpiry(restored.Cookie);
+                    await NotifySessionRestoredAsync(restored.Cookie);
                     await LoadLibrariesAsync(restorePreferredSelection: true);
                     if (SelectedLibrary is not null)
                     {
@@ -885,13 +898,14 @@ public partial class MainWindowViewModel(
             ManualCookieText = cookie;
             SessionSummary = "已获取 Cookie，等待验证";
             SelectedTabIndex = 1;
-            await notificationService.ShowSuccessAsync("已成功获取 Cookie", "授权链接解析成功，Cookie 已填入。");
+            await notificationService.ShowSuccessAsync("已成功获取 Cookie", BuildCookieFetchedMessage(cookie));
 
             try
             {
                 var session = await sessionService.AuthenticateFromCookieAsync(cookie, RememberSession);
                 IsAuthorized = true;
                 SessionSummary = $"登录成功：{session.Source} / {session.SavedAt:yyyy-MM-dd HH:mm:ss}";
+                UpdateSidebarCookieExpiry(session.Cookie);
                 await LoadLibrariesAsync(restorePreferredSelection: false);
             }
             catch (Exception ex)
@@ -931,6 +945,7 @@ public partial class MainWindowViewModel(
             var session = await sessionService.AuthenticateFromCookieAsync(ManualCookieText, RememberSession);
             IsAuthorized = true;
             SessionSummary = $"登录成功：{session.Source} / {session.SavedAt:yyyy-MM-dd HH:mm:ss}";
+            UpdateSidebarCookieExpiry(session.Cookie);
             await LoadLibrariesAsync(restorePreferredSelection: false);
             SelectedTabIndex = 1;
         }
@@ -956,6 +971,8 @@ public partial class MainWindowViewModel(
             IsAuthorized = true;
             SessionSummary = $"已恢复会话：{session.Source} / {session.SavedAt:yyyy-MM-dd HH:mm:ss}";
             ManualCookieText = session.Cookie;
+            UpdateSidebarCookieExpiry(session.Cookie);
+            await NotifySessionRestoredAsync(session.Cookie);
             await LoadLibrariesAsync(restorePreferredSelection: false);
         }
         catch (Exception ex)
@@ -986,6 +1003,7 @@ public partial class MainWindowViewModel(
         SelectedLibrary = null;
         IsAuthorized = false;
         SessionSummary = "未登录";
+        ClearSidebarCookieExpiry();
         LibrarySummary = "未绑定场馆";
         BoundLibraryTitle = "当前绑定：未锁定目标场馆";
         BoundAvailableSeatsText = "--";
@@ -2208,6 +2226,7 @@ public partial class MainWindowViewModel(
         UpdateReservationCountdown();
         UpdateGrabLastRequestText();
         UpdateGrabRuntimeClock();
+        RefreshSidebarCookieExpiryPresentation(DateTimeOffset.Now);
         UpdateHomeDashboardClock();
     }
 
@@ -2656,6 +2675,73 @@ public partial class MainWindowViewModel(
         return string.IsNullOrWhiteSpace(digits) ? seatName : digits;
     }
 
+    private static string BuildCookieFetchedMessage(string cookie)
+    {
+        if (!CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime))
+        {
+            return "授权链接解析成功，Cookie 已填入。";
+        }
+
+        return $"授权链接解析成功，Cookie 已填入。{Environment.NewLine}Cookie 到期时间：{expirationTime:M月d日 HH:mm}";
+    }
+
+    private async Task NotifySessionRestoredAsync(string cookie)
+    {
+        if (!CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime))
+        {
+            await notificationService.ShowSuccessAsync("已成功恢复上次的 Cookie", "本地会话已恢复。");
+            return;
+        }
+
+        var message = $"Cookie 到期时间：{expirationTime:M月d日 HH:mm}";
+        if (expirationTime - DateTimeOffset.Now < TimeSpan.FromMinutes(30))
+        {
+            await notificationService.ShowWarningAsync("已成功恢复上次的 Cookie，注意到期时间", message);
+            return;
+        }
+
+        await notificationService.ShowSuccessAsync("已成功恢复上次的 Cookie", message);
+    }
+
+    private void UpdateSidebarCookieExpiry(string cookie)
+    {
+        if (!CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime))
+        {
+            ClearSidebarCookieExpiry();
+            return;
+        }
+
+        _sidebarCookieExpirationTime = expirationTime;
+        HasSidebarCookieExpiry = true;
+        RefreshSidebarCookieExpiryPresentation(DateTimeOffset.Now);
+    }
+
+    private void RefreshSidebarCookieExpiryPresentation(DateTimeOffset timestamp)
+    {
+        if (_sidebarCookieExpirationTime is null || !HasSidebarCookieExpiry)
+        {
+            return;
+        }
+
+        var expirationTime = _sidebarCookieExpirationTime.Value;
+        SidebarCookieExpiryText = expirationTime.ToString("M月d日 HH:mm", DashboardCulture);
+
+        var remaining = expirationTime - timestamp;
+        SidebarCookieExpiryBrush = remaining <= TimeSpan.FromMinutes(10)
+            ? GrabStateFailureBrush
+            : remaining <= TimeSpan.FromMinutes(30)
+                ? GrabStateWarningBrush
+                : _appThemeService.CurrentPalette.LogDefaultBrush;
+    }
+
+    private void ClearSidebarCookieExpiry()
+    {
+        _sidebarCookieExpirationTime = null;
+        SidebarCookieExpiryText = string.Empty;
+        SidebarCookieExpiryBrush = _appThemeService.CurrentPalette.LogDefaultBrush;
+        HasSidebarCookieExpiry = false;
+    }
+
     private static string MeasureMemoryUsageText()
     {
         using var process = Process.GetCurrentProcess();
@@ -2923,6 +3009,7 @@ public partial class MainWindowViewModel(
         OnPropertyChanged(nameof(EmailNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(GrabDashboardStatusBrush));
+        RefreshSidebarCookieExpiryPresentation(DateTimeOffset.Now);
         UpdateHomeDashboardPresentation();
     }
 

@@ -17,7 +17,7 @@ public sealed class SessionService(
     public async Task<SessionCredentials> AuthenticateFromCodeAsync(string code, CancellationToken cancellationToken = default)
     {
         var cookie = await apiClient.GetCookieFromCodeAsync(code, cancellationToken);
-        await apiClient.ValidateCookieAsync(cookie, cancellationToken);
+        await ValidateCookieForSessionAsync(cookie, cancellationToken);
 
         var session = new SessionCredentials(cookie, SessionSource.QrCodeLink, DateTimeOffset.Now, true);
         runtimeState.Session = session;
@@ -28,7 +28,7 @@ public sealed class SessionService(
 
     public async Task<SessionCredentials> AuthenticateFromCookieAsync(string cookie, bool remember, CancellationToken cancellationToken = default)
     {
-        await apiClient.ValidateCookieAsync(cookie, cancellationToken);
+        await ValidateCookieForSessionAsync(cookie, cancellationToken);
 
         var session = new SessionCredentials(cookie, SessionSource.ManualCookie, DateTimeOffset.Now, remember);
         runtimeState.Session = session;
@@ -66,7 +66,7 @@ public sealed class SessionService(
 
         try
         {
-            await apiClient.ValidateCookieAsync(stored.Cookie, cancellationToken);
+            await ValidateCookieForSessionAsync(stored.Cookie, cancellationToken);
         }
         catch (InvalidOperationException ex)
         {
@@ -90,6 +90,21 @@ public sealed class SessionService(
         runtimeState.Libraries = [];
         await credentialStore.ClearSessionAsync(cancellationToken);
         activityLogService.Write(LogEntryKind.Info, "Auth", "已清除当前会话。");
+    }
+
+    private async Task ValidateCookieForSessionAsync(string cookie, CancellationToken cancellationToken)
+    {
+        if (CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime))
+        {
+            if (expirationTime <= DateTimeOffset.Now)
+            {
+                throw new InvalidOperationException(CookieExpiryDetector.BuildExpiredMessage(expirationTime));
+            }
+
+            activityLogService.Write(LogEntryKind.Info, "Auth", $"Cookie JWT 未过期，到期时间：{expirationTime:yyyy-MM-dd HH:mm:ss}。");
+        }
+
+        await apiClient.ValidateCookieAsync(cookie, cancellationToken);
     }
 
     private async Task ClearStoredSessionSafelyAsync(string message, CancellationToken cancellationToken)

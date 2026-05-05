@@ -338,9 +338,9 @@
                  BorderThickness="0" />
         
         <!-- Bottom Info -->
-        <StackPanel Grid.Row="2" Margin="24,24,24,32" Spacing="8">
-          <TextBlock Text="当前状态" FontSize="12" Opacity="0.5" FontWeight="Bold"/>
-          <TextBlock Text="{Binding SessionSummary}" FontSize="13" TextWrapping="Wrap" Opacity="0.8"/>
+        <StackPanel Grid.Row="2" Margin="24,24,24,32" Spacing="8" IsVisible="{Binding HasSidebarCookieExpiry}">
+          <TextBlock Text="Cookie 到期时间" FontSize="12" Opacity="0.5" FontWeight="Bold"/>
+          <TextBlock Text="{Binding SidebarCookieExpiryText}" FontSize="13" TextWrapping="Wrap" Foreground="{Binding SidebarCookieExpiryBrush}" Opacity="0.9"/>
         </StackPanel>
       </Grid>
     </Border>

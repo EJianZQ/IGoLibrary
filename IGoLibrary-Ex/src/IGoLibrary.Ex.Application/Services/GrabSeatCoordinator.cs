@@ -110,7 +110,7 @@ public sealed class GrabSeatCoordinator(
             {
                 cycle++;
                 UpdateRunningMetrics("抢座任务运行中。", cycle, requestCount, lastRequestAt);
-                var cookie = runtimeState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
+                var cookie = GetCurrentCookieOrThrow();
                 void MarkRequestSent()
                 {
                     requestCount++;
@@ -168,7 +168,7 @@ public sealed class GrabSeatCoordinator(
         {
             Fail($"抢座任务失败：{ex.Message}");
             activityLogService.Write(LogEntryKind.Error, "Grab", ex.Message);
-            if (CookieExpiryDetector.IsExpired(ex))
+            if (CookieExpiryDetector.IsKnownExpiredCookieException(ex, runtimeState.Session?.Cookie))
             {
                 await taskAlertService.NotifyCookieExpiredAsync("抢座轮询", ex.Message, CancellationToken.None);
                 return;
@@ -276,6 +276,18 @@ public sealed class GrabSeatCoordinator(
     private void NotifyStatusChanged()
     {
         StatusChanged?.Invoke(this, GetStatus());
+    }
+
+    private string GetCurrentCookieOrThrow()
+    {
+        var cookie = runtimeState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
+        if (CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime) &&
+            expirationTime <= DateTimeOffset.Now)
+        {
+            throw new InvalidOperationException(CookieExpiryDetector.BuildExpiredMessage(expirationTime));
+        }
+
+        return cookie;
     }
 
     private async Task<GrabReservationAttemptResult> TryReserveAfterAvailabilityCheckAsync(

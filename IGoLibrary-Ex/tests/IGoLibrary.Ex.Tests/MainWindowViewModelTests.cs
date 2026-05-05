@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Application.Services;
@@ -161,6 +162,30 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task TryAutoParseClipboardLinkAsync_ShowsCookieExpirationTime_WhenJwtCookieHasExpireAt()
+    {
+        var notificationService = new FakeNotificationService();
+        var expiresAt = new DateTimeOffset(2026, 5, 5, 16, 56, 0, DateTimeOffset.Now.Offset);
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetCookieFromCodeAsync = (_, _) => Task.FromResult(BuildAuthorizationCookie(expiresAt))
+        };
+        var viewModel = CreateViewModel(
+            apiClient: apiClient,
+            notificationService: notificationService);
+
+        const string link = "https://example.com/callback?code=1234567890abcdef1234567890abcdef&state=1";
+
+        var result = await viewModel.TryAutoParseClipboardLinkAsync(link);
+
+        Assert.True(result);
+        var success = Assert.Single(notificationService.Successes, item => item.Title == "已成功获取 Cookie");
+        Assert.Equal(
+            $"授权链接解析成功，Cookie 已填入。{Environment.NewLine}Cookie 到期时间：5月5日 16:56",
+            success.Message);
+    }
+
+    [Fact]
     public async Task TryAutoParseClipboardLinkAsync_AllowsRetry_WhenFirstCookieFetchFailsBeforeCookieIsIssued()
     {
         var notificationService = new FakeNotificationService();
@@ -191,6 +216,101 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(2, getCookieCalls);
         Assert.Contains(notificationService.Warnings, item => item.Title == "获取 Cookie 失败");
         Assert.Contains(notificationService.Successes, item => item.Title == "已成功获取 Cookie");
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShowsSuccessToast_WhenStoredJwtCookieIsRestored()
+    {
+        var notificationService = new FakeNotificationService();
+        var expiresAt = DateTimeOffset.Now.AddHours(2);
+        var sessionService = new FakeSessionService
+        {
+            RestoreResult = new SessionCredentials(
+                BuildAuthorizationCookie(expiresAt),
+                SessionSource.ManualCookie,
+                DateTimeOffset.Now,
+                true)
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            notificationService: notificationService);
+
+        await viewModel.InitializeAsync();
+
+        var success = Assert.Single(notificationService.Successes, item => item.Title == "已成功恢复上次的 Cookie");
+        Assert.Equal($"Cookie 到期时间：{expiresAt:M月d日 HH:mm}", success.Message);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_ShowsWarningToast_WhenRestoredJwtCookieExpiresSoon()
+    {
+        var notificationService = new FakeNotificationService();
+        var expiresAt = DateTimeOffset.Now.AddMinutes(20);
+        var sessionService = new FakeSessionService
+        {
+            RestoreResult = new SessionCredentials(
+                BuildAuthorizationCookie(expiresAt),
+                SessionSource.ManualCookie,
+                DateTimeOffset.Now,
+                true)
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            notificationService: notificationService);
+
+        await viewModel.InitializeAsync();
+
+        var warning = Assert.Single(notificationService.Warnings, item => item.Title == "已成功恢复上次的 Cookie，注意到期时间");
+        Assert.Equal($"Cookie 到期时间：{expiresAt:M月d日 HH:mm}", warning.Message);
+    }
+
+    [Fact]
+    public async Task ValidateManualCookieAsync_ShowsSidebarCookieExpiration_WhenJwtCookieHasExpireAt()
+    {
+        var expiresAt = new DateTimeOffset(2026, 5, 5, 16, 56, 0, DateTimeOffset.Now.Offset);
+        var viewModel = CreateViewModel();
+        viewModel.ManualCookieText = BuildAuthorizationCookie(expiresAt);
+
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.HasSidebarCookieExpiry);
+        Assert.Equal("5月5日 16:56", viewModel.SidebarCookieExpiryText);
+    }
+
+    [Fact]
+    public async Task ValidateManualCookieAsync_UsesWarningBrush_WhenCookieExpiresWithinThirtyMinutes()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.ManualCookieText = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(20));
+
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        Assert.Equal("#FFC27803", GetBrushColor(viewModel.SidebarCookieExpiryBrush).ToString(), ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task ValidateManualCookieAsync_UsesFailureBrush_WhenCookieExpiresWithinTenMinutes()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.ManualCookieText = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(5));
+
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        Assert.Equal("#FFC93C37", GetBrushColor(viewModel.SidebarCookieExpiryBrush).ToString(), ignoreCase: true);
+    }
+
+    [Fact]
+    public async Task SignOutAsync_HidesSidebarCookieExpiration()
+    {
+        var expiresAt = DateTimeOffset.Now.AddHours(2);
+        var viewModel = CreateViewModel();
+        viewModel.ManualCookieText = BuildAuthorizationCookie(expiresAt);
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        await viewModel.SignOutCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.HasSidebarCookieExpiry);
+        Assert.Equal(string.Empty, viewModel.SidebarCookieExpiryText);
     }
 
     [Fact]
@@ -436,6 +556,26 @@ public sealed class MainWindowViewModelTests
             errorDialogService ?? new FakeErrorDialogService(),
             appThemeService ?? new FakeAppThemeService(),
             new AppWindowService());
+    }
+
+    private static string BuildAuthorizationCookie(DateTimeOffset expiresAt)
+    {
+        var header = Base64Url("""{"typ":"JWT","alg":"RS256"}""");
+        var payload = Base64Url($$"""{"userId":37580434,"schId":20175,"expireAt":{{expiresAt.ToUnixTimeSeconds()}},"tag":"cookie-test"}""");
+        return $"Authorization={header}.{payload}.signature; SERVERID=d3936289adfff6c3874a2579058ac651|1777956374|1777956374";
+    }
+
+    private static string Base64Url(string value)
+    {
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
+
+    private static Color GetBrushColor(IBrush brush)
+    {
+        return Assert.IsType<SolidColorBrush>(brush).Color;
     }
 
     private static async Task WaitForAsync(Func<bool> predicate)

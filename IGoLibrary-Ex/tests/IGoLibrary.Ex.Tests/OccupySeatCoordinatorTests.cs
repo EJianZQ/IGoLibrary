@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Application.State;
@@ -99,6 +100,45 @@ public sealed class OccupySeatCoordinatorTests
     }
 
     [Fact]
+    public async Task StartAsync_NotifiesCookieExpiry_FromExpiredJwt_WithoutRefreshingReservation()
+    {
+        var reservationInfoCallCount = 0;
+        var alertService = new FakeTaskAlertService();
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) =>
+            {
+                reservationInfoCallCount++;
+                throw new InvalidOperationException("过期 JWT 不应继续刷新预约状态。");
+            }
+        };
+
+        var runtimeState = new AppRuntimeState
+        {
+            Session = new SessionCredentials(
+                BuildAuthorizationCookie(DateTimeOffset.Now.AddSeconds(-1)),
+                SessionSource.ManualCookie,
+                DateTimeOffset.Now,
+                true)
+        };
+        var coordinator = new OccupySeatCoordinator(
+            apiClient,
+            new FakeSettingsService(AppSettings.Default),
+            new FakeNotificationService(),
+            alertService,
+            new ActivityLogService(),
+            runtimeState);
+
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, RefreshMode.FixedTenSeconds));
+        await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
+
+        Assert.Equal(0, reservationInfoCallCount);
+        var alert = Assert.Single(alertService.CookieExpiredNotifications);
+        Assert.Equal("占座轮询", alert.Source);
+        Assert.Contains("Cookie 已过期", alert.Reason);
+    }
+
+    [Fact]
     public async Task StartAsync_NotifiesTaskFailure_WhenReservationRefreshFailsWithoutCookieExpiry()
     {
         var notificationService = new FakeNotificationService();
@@ -145,5 +185,20 @@ public sealed class OccupySeatCoordinatorTests
         }
 
         throw new TimeoutException($"Expected status {expectedState} was not observed.");
+    }
+
+    private static string BuildAuthorizationCookie(DateTimeOffset expiresAt)
+    {
+        var header = Base64Url("""{"typ":"JWT","alg":"RS256"}""");
+        var payload = Base64Url($$"""{"userId":37580434,"schId":20175,"expireAt":{{expiresAt.ToUnixTimeSeconds()}},"tag":"cookie-test"}""");
+        return $"Authorization={header}.{payload}.signature; SERVERID=d3936289adfff6c3874a2579058ac651|1777956374|1777956374";
+    }
+
+    private static string Base64Url(string value)
+    {
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
     }
 }

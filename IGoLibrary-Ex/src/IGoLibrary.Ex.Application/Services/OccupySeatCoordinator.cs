@@ -94,7 +94,7 @@ public sealed class OccupySeatCoordinator(
             var random = new Random();
             while (!cancellationToken.IsCancellationRequested)
             {
-                var cookie = runtimeState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
+                var cookie = GetCurrentCookieOrThrow();
                 var info = await apiClient.GetReservationInfoAsync(cookie, cancellationToken);
                 if (info is null)
                 {
@@ -139,7 +139,7 @@ public sealed class OccupySeatCoordinator(
         {
             Fail($"占座任务失败：{ex.Message}");
             activityLogService.Write(LogEntryKind.Error, "Occupy", ex.Message);
-            if (CookieExpiryDetector.IsExpired(ex))
+            if (CookieExpiryDetector.IsKnownExpiredCookieException(ex, runtimeState.Session?.Cookie))
             {
                 await taskAlertService.NotifyCookieExpiredAsync("占座轮询", ex.Message, CancellationToken.None);
                 return;
@@ -201,6 +201,18 @@ public sealed class OccupySeatCoordinator(
     private void NotifyStatusChanged()
     {
         StatusChanged?.Invoke(this, GetStatus());
+    }
+
+    private string GetCurrentCookieOrThrow()
+    {
+        var cookie = runtimeState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
+        if (CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime) &&
+            expirationTime <= DateTimeOffset.Now)
+        {
+            throw new InvalidOperationException(CookieExpiryDetector.BuildExpiredMessage(expirationTime));
+        }
+
+        return cookie;
     }
 
     private async Task<bool> TryReserveAgainAsync(string cookie, ReservationInfo info, CancellationToken cancellationToken)

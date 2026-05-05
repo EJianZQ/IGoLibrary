@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Application.State;
@@ -294,6 +295,52 @@ public sealed class GrabSeatCoordinatorTests
     }
 
     [Fact]
+    public async Task StartAsync_NotifiesCookieExpiry_FromExpiredJwt_WithoutPollingApi()
+    {
+        var layoutCallCount = 0;
+        var alertService = new FakeTaskAlertService();
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetLibraryLayoutAsync = (_, _, _) =>
+            {
+                layoutCallCount++;
+                throw new InvalidOperationException("过期 JWT 不应继续请求场馆布局。");
+            }
+        };
+
+        var runtimeState = new AppRuntimeState
+        {
+            Session = new SessionCredentials(
+                BuildAuthorizationCookie(DateTimeOffset.Now.AddSeconds(-1)),
+                SessionSource.ManualCookie,
+                DateTimeOffset.Now,
+                true)
+        };
+        var coordinator = new GrabSeatCoordinator(
+            apiClient,
+            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.QueryThenReserve }),
+            alertService,
+            new ActivityLogService(),
+            runtimeState);
+
+        var plan = new GrabSeatPlan(
+            1,
+            "自科阅览区一",
+            [new TrackedSeat("seat-1", "1号座")],
+            GrabMode.Aggressive,
+            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            null);
+
+        await coordinator.StartAsync(plan);
+        await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
+
+        Assert.Equal(0, layoutCallCount);
+        var alert = Assert.Single(alertService.CookieExpiredNotifications);
+        Assert.Equal("抢座轮询", alert.Source);
+        Assert.Contains("Cookie 已过期", alert.Reason);
+    }
+
+    [Fact]
     public async Task StartAsync_NotifiesTaskFailure_WhenPollingFailsWithoutCookieExpiry()
     {
         var notificationService = new FakeNotificationService();
@@ -345,5 +392,20 @@ public sealed class GrabSeatCoordinatorTests
 
             await Task.Delay(25, timeout.Token);
         }
+    }
+
+    private static string BuildAuthorizationCookie(DateTimeOffset expiresAt)
+    {
+        var header = Base64Url("""{"typ":"JWT","alg":"RS256"}""");
+        var payload = Base64Url($$"""{"userId":37580434,"schId":20175,"expireAt":{{expiresAt.ToUnixTimeSeconds()}},"tag":"cookie-test"}""");
+        return $"Authorization={header}.{payload}.signature; SERVERID=d3936289adfff6c3874a2579058ac651|1777956374|1777956374";
+    }
+
+    private static string Base64Url(string value)
+    {
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
     }
 }
