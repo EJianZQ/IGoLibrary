@@ -180,18 +180,33 @@ public sealed class GrabSeatCoordinator(
 
     private async Task WaitUntilScheduledStartAsync(TimeOnly scheduledStart, CancellationToken cancellationToken)
     {
+        var targetStart = ResolveNextScheduledStart(scheduledStart, DateTimeOffset.Now);
         while (!cancellationToken.IsCancellationRequested)
         {
-            var now = TimeOnly.FromDateTime(DateTime.Now);
-            if (now >= scheduledStart)
+            var now = DateTimeOffset.Now;
+            var remaining = targetStart - now;
+            if (remaining <= TimeSpan.Zero)
             {
                 return;
             }
 
-            var remaining = scheduledStart.ToTimeSpan() - now.ToTimeSpan();
-            activityLogService.Write(LogEntryKind.Info, "Grab", $"定时抢座等待中，还剩 {remaining:hh\\:mm\\:ss}。");
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            activityLogService.Write(
+                LogEntryKind.Info,
+                "Grab",
+                $"定时抢座等待中，目标启动时间 {targetStart:yyyy-MM-dd HH:mm:ss}，还剩 {remaining:hh\\:mm\\:ss}。");
+            await Task.Delay(remaining < TimeSpan.FromSeconds(1) ? remaining : TimeSpan.FromSeconds(1), cancellationToken);
         }
+    }
+
+    internal static DateTimeOffset ResolveNextScheduledStart(TimeOnly scheduledStart, DateTimeOffset now)
+    {
+        var todayScheduledStart = new DateTimeOffset(
+            now.Date.Add(scheduledStart.ToTimeSpan()),
+            now.Offset);
+
+        return todayScheduledStart < now
+            ? todayScheduledStart.AddDays(1)
+            : todayScheduledStart;
     }
 
     private static TimeSpan RandomBetween(TimeSpan minimum, TimeSpan maximum, Random random)

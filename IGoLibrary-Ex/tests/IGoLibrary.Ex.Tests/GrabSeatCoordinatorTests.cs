@@ -379,6 +379,36 @@ public sealed class GrabSeatCoordinatorTests
         Assert.Empty(notificationService.Warnings);
     }
 
+    [Fact]
+    public void ResolveNextScheduledStart_ReturnsToday_WhenScheduledTimeIsLater()
+    {
+        var now = new DateTimeOffset(2026, 5, 8, 21, 30, 15, TimeSpan.FromHours(8));
+
+        var target = GrabSeatCoordinator.ResolveNextScheduledStart(new TimeOnly(22, 0, 0), now);
+
+        Assert.Equal(new DateTimeOffset(2026, 5, 8, 22, 0, 0, TimeSpan.FromHours(8)), target);
+    }
+
+    [Fact]
+    public void ResolveNextScheduledStart_ReturnsTomorrow_WhenScheduledTimeAlreadyPassed()
+    {
+        var now = new DateTimeOffset(2026, 5, 8, 21, 30, 15, TimeSpan.FromHours(8));
+
+        var target = GrabSeatCoordinator.ResolveNextScheduledStart(new TimeOnly(20, 0, 0), now);
+
+        Assert.Equal(new DateTimeOffset(2026, 5, 9, 20, 0, 0, TimeSpan.FromHours(8)), target);
+    }
+
+    [Fact]
+    public void ResolveNextScheduledStart_ReturnsNow_WhenScheduledTimeMatchesCurrentInstant()
+    {
+        var now = new DateTimeOffset(2026, 5, 8, 21, 30, 0, TimeSpan.FromHours(8));
+
+        var target = GrabSeatCoordinator.ResolveNextScheduledStart(new TimeOnly(21, 30, 0), now);
+
+        Assert.Equal(now, target);
+    }
+
     private static async Task WaitForStatusAsync(IGrabSeatCoordinator coordinator, CoordinatorTaskState expectedState)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
