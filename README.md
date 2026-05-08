@@ -84,6 +84,26 @@ IGoLibrary-Ex/
 #### 本地弹窗提醒
 当监测到 Cookie 过期时，会在屏幕右下角弹出 Toast 弹窗提醒 Cookie 已过期。如果打开了提示音，还会有相应的提示音
 
+### 🍎 macOS 首次运行方法
+
+macOS 用户请先按自己的电脑芯片选择对应压缩包，下载后按下面步骤运行：
+
+1. 双击 zip 解压
+2. 解压后会看到 `IGoLibrary-Ex.app`、`macOS首次运行说明.txt` 和 `首次运行.command`
+3. 优先尝试右键点击 `IGoLibrary-Ex.app`，选择“打开”
+4. 如果系统提示“已损坏，无法打开”，双击同目录下的 `首次运行.command`
+5. 如果 `首次运行.command` 被系统拦截，打开“终端”，输入下面命令后再按一次空格：
+
+```bash
+xattr -dr com.apple.quarantine
+```
+
+然后把 `IGoLibrary-Ex.app` 拖入终端窗口，按回车执行。执行完成后，再双击或右键打开 `IGoLibrary-Ex.app`。
+
+> [!IMPORTANT]
+> 请打开 `IGoLibrary-Ex.app`，不要进入应用包内部，也不要直接双击 `Contents/MacOS/IGoLibrary.Ex.Desktop`。
+> 当前 macOS 版本未签名、未公证，因此首次运行可能需要解除系统隔离标记。这不代表压缩包损坏。
+
 ## 🛠️ 开发与构建
 
 ### 环境要求
@@ -118,10 +138,37 @@ cd .\IGoLibrary-Ex
 
 macOS
 
+如果在 Windows 上同时构建并打包 Apple Silicon 与 Intel 两个 macOS 版本，使用 PowerShell 脚本：
+
+```powershell
+cd .\IGoLibrary-Ex
+.\build\publish-macos-all.ps1 -Configuration Release -AppVersion 0.2.0
+```
+
+脚本会分别生成 `artifacts\publish\osx-arm64\` 与 `artifacts\publish\osx-x64\` 原始发布目录，然后组装为标准 macOS 应用包并输出两个最终 zip：
+
+```text
+artifacts\macos\osx-arm64\IGoLibrary-Ex-macOS-Apple-Silicon-arm64.zip
+artifacts\macos\osx-x64\IGoLibrary-Ex-macOS-Intel-x64.zip
+```
+
+发布给 M 芯片用户时发送 `IGoLibrary-Ex-macOS-Apple-Silicon-arm64.zip`，发布给 Intel 芯片用户时发送 `IGoLibrary-Ex-macOS-Intel-x64.zip`。用户解压后打开 `IGoLibrary-Ex.app`，不要直接双击应用包内部的 `IGoLibrary.Ex.Desktop` 可执行文件。
+
+如果只想单独发布某一个架构，也可以直接调用单架构脚本：
+
+```powershell
+.\build\publish-macos.ps1 -Configuration Release -Runtime osx-arm64 -AppVersion 0.2.0
+.\build\publish-macos.ps1 -Configuration Release -Runtime osx-x64 -AppVersion 0.2.0
+```
+
+如果在 macOS 发布机上构建，也可以使用 Bash 脚本：
+
 ```bash
 cd ./IGoLibrary-Ex
 ./build/publish-macos.sh
 ```
+
+未签名、未公证的 macOS 包首次运行时，系统可能会拦截并提示“已损坏，无法打开”。zip 内已包含 `macOS首次运行说明.txt` 和 `首次运行.command`，用户可按说明解除隔离标记后再打开 `IGoLibrary-Ex.app`。
 
 ## 💾 本地数据说明
 
