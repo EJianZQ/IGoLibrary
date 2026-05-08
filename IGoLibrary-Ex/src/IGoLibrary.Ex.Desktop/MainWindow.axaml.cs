@@ -84,15 +84,18 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnActivated(object? sender, EventArgs e)
+    private void OnActivated(object? sender, EventArgs e)
     {
         if (DataContext is MainWindowViewModel viewModel)
         {
-            await TryAutoParseClipboardAsync(viewModel, isWindowInteractionReady: true);
+            _ = RunUiEventHandlerAsync(
+                () => TryAutoParseClipboardAsync(viewModel, isWindowInteractionReady: true),
+                _notificationService,
+                "自动读取剪贴板失败");
         }
     }
 
-    private async void OnObservedViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnObservedViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (sender is not MainWindowViewModel viewModel)
         {
@@ -112,18 +115,24 @@ public partial class MainWindow : Window
         if (e.PropertyName == nameof(MainWindowViewModel.IsInitializationComplete) &&
             viewModel.IsInitializationComplete)
         {
-            await TryAutoParseClipboardAsync(viewModel, isWindowInteractionReady: true);
+            _ = RunUiEventHandlerAsync(
+                () => TryAutoParseClipboardAsync(viewModel, isWindowInteractionReady: true),
+                _notificationService,
+                "自动读取剪贴板失败");
             return;
         }
 
         if (e.PropertyName == nameof(MainWindowViewModel.SelectedTabIndex) &&
             viewModel.IsAccountAndVenuePageActive)
         {
-            await TryAutoParseClipboardAsync(viewModel, isWindowInteractionReady: true);
+            _ = RunUiEventHandlerAsync(
+                () => TryAutoParseClipboardAsync(viewModel, isWindowInteractionReady: true),
+                _notificationService,
+                "自动读取剪贴板失败");
         }
     }
 
-    private async void OnVenuePickerItemPointerReleased(object? sender, PointerReleasedEventArgs e)
+    private void OnVenuePickerItemPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (sender is not Control { DataContext: LibrarySummary library } ||
             DataContext is not MainWindowViewModel viewModel)
@@ -131,7 +140,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        await viewModel.HandleVenuePickerLibraryClickAsync(library);
+        _ = RunUiEventHandlerAsync(
+            () => viewModel.HandleVenuePickerLibraryClickAsync(library),
+            _notificationService,
+            "处理场馆选择失败");
     }
 
     private void OnGrabSeatOverlayPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -180,7 +192,8 @@ public partial class MainWindow : Window
 
             _isAutoParsingClipboard = true;
             _lastProcessedClipboardText = clipboardText;
-            await _notificationService.ShowInfoAsync("已从剪贴板读取", "检测到授权链接，已自动填入并开始解析。");
+            await TryShowNotificationAsync(
+                () => _notificationService.ShowInfoAsync("已从剪贴板读取", "检测到授权链接，已自动填入并开始解析。"));
             await viewModel.TryAutoParseClipboardLinkAsync(clipboardText);
         }
         finally
@@ -213,6 +226,38 @@ public partial class MainWindow : Window
         return CodeLinkParser.TryExtractCode(clipboardText, out var currentCode) &&
                CodeLinkParser.TryExtractCode(lastProcessedClipboardText, out var lastCode) &&
                string.Equals(currentCode, lastCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static async Task RunUiEventHandlerAsync(
+        Func<Task> action,
+        INotificationService notificationService,
+        string failureTitle)
+    {
+        try
+        {
+            await action();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            var message = string.IsNullOrWhiteSpace(ex.Message)
+                ? "界面操作失败，请稍后重试。"
+                : ex.Message;
+            await TryShowNotificationAsync(() => notificationService.ShowWarningAsync(failureTitle, message));
+        }
+    }
+
+    private static async Task TryShowNotificationAsync(Func<Task> showNotificationAsync)
+    {
+        try
+        {
+            await showNotificationAsync();
+        }
+        catch
+        {
+        }
     }
 
     private void OnOccupyLogLinesChanged(object? sender, NotifyCollectionChangedEventArgs e)

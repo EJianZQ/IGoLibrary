@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Desktop;
 using IGoLibrary.Ex.Desktop.Services;
@@ -87,6 +88,47 @@ public sealed class MainWindowClipboardTests
         Assert.True(shouldSkip);
     }
 
+    [Fact]
+    public async Task RunUiEventHandlerAsync_ShowsWarning_WhenHandlerThrows()
+    {
+        var notificationService = new FakeNotificationService();
+
+        await MainWindow.RunUiEventHandlerAsync(
+            () => throw new InvalidOperationException("boom"),
+            notificationService,
+            "界面操作失败");
+
+        var warning = Assert.Single(notificationService.Warnings);
+        Assert.Equal("界面操作失败", warning.Title);
+        Assert.Equal("boom", warning.Message);
+    }
+
+    [Fact]
+    public async Task RunUiEventHandlerAsync_IgnoresCancellation()
+    {
+        var notificationService = new FakeNotificationService();
+
+        await MainWindow.RunUiEventHandlerAsync(
+            () => throw new OperationCanceledException(),
+            notificationService,
+            "界面操作失败");
+
+        Assert.Empty(notificationService.Warnings);
+    }
+
+    [Fact]
+    public async Task RunUiEventHandlerAsync_DoesNotThrow_WhenWarningNotificationFails()
+    {
+        var notificationService = new ThrowingNotificationService();
+
+        await MainWindow.RunUiEventHandlerAsync(
+            () => throw new InvalidOperationException("boom"),
+            notificationService,
+            "界面操作失败");
+
+        Assert.True(notificationService.WarningAttempted);
+    }
+
     private static MainWindowViewModel CreateViewModel()
     {
         return new MainWindowViewModel(
@@ -103,5 +145,22 @@ public sealed class MainWindowClipboardTests
             new FakeErrorDialogService(),
             new FakeAppThemeService(),
             new AppWindowService());
+    }
+
+    private sealed class ThrowingNotificationService : INotificationService
+    {
+        public bool WarningAttempted { get; private set; }
+
+        public Task ShowInfoAsync(string title, string message, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task ShowWarningAsync(string title, string message, CancellationToken cancellationToken = default)
+        {
+            WarningAttempted = true;
+            throw new InvalidOperationException("toast failed");
+        }
+
+        public Task ShowSuccessAsync(string title, string message, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 }
