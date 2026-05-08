@@ -132,6 +132,68 @@ public sealed class TraceIntApiClientTests
     }
 
     [Fact]
+    public async Task GetLibraryLayoutAsync_KeepsSeatsWithNonNumericNames_AndSkipsMissingSeatKey()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            (_, _) => SequenceHttpMessageHandler.JsonResponseAsync("""
+                {
+                  "data": {
+                    "userAuth": {
+                      "reserve": {
+                        "libs": [
+                          {
+                            "lib_id": 117580,
+                            "lib_name": "自科阅览区一",
+                            "lib_floor": "3",
+                            "is_open": true,
+                            "lib_layout": {
+                              "seats_total": 6,
+                              "seats_booking": 0,
+                              "seats_used": 1,
+                              "seats": [
+                                { "x": 0, "y": 0, "key": "seat-12", "name": "12", "status": false },
+                                { "x": 1, "y": 0, "key": "seat-a12", "name": "A12", "status": false },
+                                { "x": 2, "y": 0, "key": "seat-room-1", "name": "研修间1", "status": true },
+                                { "x": 3, "y": 0, "key": "seat-fallback", "name": "", "status": false },
+                                { "x": 4, "y": 0, "key": "", "name": "无效座位", "status": false },
+                                { "key": "layout-label", "name": "区域标签" }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                """));
+
+        var client = new TraceIntApiClient(
+            new HttpClient(handler)
+            {
+                Timeout = Timeout.InfiniteTimeSpan
+            },
+            new FakeProtocolTemplateStore(new ProtocolTemplateSet(
+                "https://example.com/ReplaceMeByCode",
+                "{\"query\":\"libraries\"}",
+                "{\"query\":\"layout\"}",
+                "{\"query\":\"rule\"}",
+                "{\"query\":\"reservation\"}",
+                "{\"query\":\"reserve\"}",
+                "{\"query\":\"cancel\"}")),
+            new FakeSettingsService(AppSettings.Default));
+
+        var layout = await client.GetLibraryLayoutAsync("Authorization=a; SERVERID=b", 117580);
+
+        Assert.Equal(4, layout.Seats.Count);
+        Assert.Contains(layout.Seats, seat => seat.SeatKey == "seat-12" && seat.SeatName == "12");
+        Assert.Contains(layout.Seats, seat => seat.SeatKey == "seat-a12" && seat.SeatName == "A12");
+        Assert.Contains(layout.Seats, seat => seat.SeatKey == "seat-room-1" && seat.SeatName == "研修间1" && seat.IsOccupied);
+        Assert.Contains(layout.Seats, seat => seat.SeatKey == "seat-fallback" && seat.SeatName == "seat-fallback");
+        Assert.DoesNotContain(layout.Seats, seat => seat.SeatName == "无效座位");
+        Assert.DoesNotContain(layout.Seats, seat => seat.SeatKey == "layout-label");
+    }
+
+    [Fact]
     public async Task GetLibrariesAsync_ThrowsStructuredTraceIntApiException_ForExpiredCookieResponse()
     {
         var handler = new SequenceHttpMessageHandler(

@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Domain.Models;
@@ -19,7 +18,6 @@ public sealed class TraceIntApiClient(
     private const string DesktopUserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36 NetType/WIFI MicroMessenger/7.0.20.1781(0x6700143B) WindowsWechat(0x63070626)";
     private const string AppVersion = "2.0.11";
     private static readonly TimeSpan GetCookieTimeout = TimeSpan.FromSeconds(5);
-    private static readonly Regex SeatNameRegex = new(@"^\d{1,3}$", RegexOptions.Compiled);
 
     public async Task<string> GetCookieFromCodeAsync(string code, CancellationToken cancellationToken = default)
     {
@@ -117,18 +115,31 @@ public sealed class TraceIntApiClient(
         var seats = new List<SeatSnapshot>();
         foreach (var seat in layout.GetProperty("seats").EnumerateArray())
         {
-            var name = seat.GetProperty("name").GetString() ?? string.Empty;
-            if (!SeatNameRegex.IsMatch(name))
+            var key = ReadOptionalStringProperty(seat, "key").Trim();
+            if (string.IsNullOrWhiteSpace(key))
             {
                 continue;
             }
 
+            if (!TryReadBooleanLikeProperty(seat, "status", out var isOccupied) ||
+                !TryReadRequiredIntProperty(seat, "x", out var x) ||
+                !TryReadRequiredIntProperty(seat, "y", out var y))
+            {
+                continue;
+            }
+
+            var name = ReadOptionalStringProperty(seat, "name").Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = key;
+            }
+
             seats.Add(new SeatSnapshot(
-                seat.GetProperty("key").GetString() ?? string.Empty,
+                key,
                 name,
-                seat.GetProperty("status").GetBoolean(),
-                seat.GetProperty("x").GetInt32(),
-                seat.GetProperty("y").GetInt32()));
+                isOccupied,
+                x,
+                y));
         }
 
         return new LibraryLayout(
@@ -479,6 +490,55 @@ public sealed class TraceIntApiClient(
             JsonValueKind.Number when element.TryGetInt32(out var intValue) => intValue != 0,
             _ => throw new InvalidOperationException($"字段 {fieldName} 的返回类型不受支持: {element.ValueKind}")
         };
+    }
+
+    private static bool TryReadBooleanLikeProperty(JsonElement element, string propertyName, out bool value)
+    {
+        value = default;
+        if (element.ValueKind is not JsonValueKind.Object || !element.TryGetProperty(propertyName, out var property))
+        {
+            return false;
+        }
+
+        try
+        {
+            value = ReadBooleanLike(property, propertyName);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryReadRequiredIntProperty(JsonElement element, string propertyName, out int value)
+    {
+        value = default;
+        if (element.ValueKind is not JsonValueKind.Object || !element.TryGetProperty(propertyName, out var property))
+        {
+            return false;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.Number when property.TryGetInt32(out value) => true,
+            JsonValueKind.String when int.TryParse(property.GetString(), out value) => true,
+            _ => false
+        };
+    }
+
+    private static string ReadOptionalStringProperty(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind is not JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind is JsonValueKind.Null)
+        {
+            return string.Empty;
+        }
+
+        return property.ValueKind is JsonValueKind.String
+            ? property.GetString() ?? string.Empty
+            : property.ToString();
     }
 
     private static int ReadOptionalIntProperty(JsonElement element, string propertyName)
