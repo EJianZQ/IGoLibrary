@@ -66,6 +66,11 @@ public static class CookieExpiryDetector
 
     public static bool IsKnownExpiredCookieException(Exception exception, string? cookie)
     {
+        if (IsExplicitAuthorizationFailure(exception))
+        {
+            return true;
+        }
+
         if (TryGetExpirationTime(cookie, out _))
         {
             return IsExpired(cookie);
@@ -75,6 +80,16 @@ public static class CookieExpiryDetector
     }
 
     public static bool IsExpired(Exception exception)
+    {
+        if (IsExplicitAuthorizationFailure(exception))
+        {
+            return true;
+        }
+
+        return HasExpiredCookieMessage(exception);
+    }
+
+    private static bool IsExplicitAuthorizationFailure(Exception exception)
     {
         for (var current = exception; current is not null; current = current.InnerException!)
         {
@@ -89,7 +104,15 @@ public static class CookieExpiryDetector
             {
                 return true;
             }
+        }
 
+        return false;
+    }
+
+    private static bool HasExpiredCookieMessage(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException!)
+        {
             var message = current.Message;
             if (string.IsNullOrWhiteSpace(message))
             {

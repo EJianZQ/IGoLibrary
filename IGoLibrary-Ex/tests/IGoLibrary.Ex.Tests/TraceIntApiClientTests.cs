@@ -2,6 +2,7 @@ using System.Net;
 using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Domain.Models;
 using IGoLibrary.Ex.Infrastructure.Api;
+using RestSharp;
 
 namespace IGoLibrary.Ex.Tests;
 
@@ -201,5 +202,38 @@ public sealed class TraceIntApiClientTests
         ]));
 
         Assert.Equal("Cookie不包含关键身份信息，可能是code过期，重新填写含code的链接", exception.Message);
+    }
+
+    [Fact]
+    public void ThrowIfCookieResponseFailed_ThrowsHttpRequestException_WhenStatusFailedWithoutCookies()
+    {
+        var response = new RestResponse
+        {
+            StatusCode = HttpStatusCode.Forbidden,
+            StatusDescription = "Forbidden",
+            ResponseStatus = ResponseStatus.Completed
+        };
+
+        var exception = Assert.Throws<HttpRequestException>(() => TraceIntApiClient.ThrowIfCookieResponseFailed(response, []));
+
+        Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
+        Assert.Contains("HTTP 403 Forbidden", exception.Message);
+    }
+
+    [Fact]
+    public void ThrowIfCookieResponseFailed_AllowsCookieExtraction_WhenFailedResponseAlreadyContainsCookies()
+    {
+        var response = new RestResponse
+        {
+            StatusCode = HttpStatusCode.Found,
+            StatusDescription = "Found",
+            ResponseStatus = ResponseStatus.Completed
+        };
+
+        TraceIntApiClient.ThrowIfCookieResponseFailed(response,
+        [
+            "SERVERID=b",
+            "Authorization=a"
+        ]);
     }
 }

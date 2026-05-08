@@ -42,10 +42,32 @@ public sealed class CookieExpiryDetectorTests
     }
 
     [Fact]
-    public void IsKnownExpiredCookieException_IgnoresUnauthorizedException_WhenJwtIsStillValid()
+    public void IsKnownExpiredCookieException_ReturnsTrue_ForUnauthorizedException_WhenJwtIsStillValid()
     {
         var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(5));
         var exception = new HttpRequestException("Unauthorized", null, HttpStatusCode.Unauthorized);
+
+        var isExpired = CookieExpiryDetector.IsKnownExpiredCookieException(exception, cookie);
+
+        Assert.True(isExpired);
+    }
+
+    [Fact]
+    public void IsKnownExpiredCookieException_ReturnsTrue_ForAccessDeniedApiError_WhenJwtIsStillValid()
+    {
+        var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(5));
+        var exception = new TraceIntApiException("access denied!", 40001, "access denied!", isAuthorizationDenied: true);
+
+        var isExpired = CookieExpiryDetector.IsKnownExpiredCookieException(exception, cookie);
+
+        Assert.True(isExpired);
+    }
+
+    [Fact]
+    public void IsKnownExpiredCookieException_IgnoresAmbiguousCookieMessage_WhenJwtIsStillValid()
+    {
+        var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(5));
+        var exception = new InvalidOperationException("cookie refresh failed");
 
         var isExpired = CookieExpiryDetector.IsKnownExpiredCookieException(exception, cookie);
 

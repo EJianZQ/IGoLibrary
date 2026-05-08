@@ -28,16 +28,28 @@ public sealed class TraceIntApiClient(
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(GetCookieTimeout);
 
-        var client = new RestClient(requestUrl);
+        using var client = new RestClient(requestUrl);
         var request = new RestRequest
         {
             Method = Method.Get
         };
 
-        var response = await Task.Run(
-            () => client.ExecuteAsync(request, timeoutCts.Token).GetAwaiter().GetResult(),
-            timeoutCts.Token);
+        RestResponse response;
+        try
+        {
+            response = await client.ExecuteAsync(request, timeoutCts.Token);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
+        {
+            throw new TimeoutException($"获取 Cookie 超时（{GetCookieTimeout.TotalSeconds:0} 秒），请检查网络或稍后重试。", ex);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new InvalidOperationException("获取 Cookie 请求失败，请检查网络连接或授权链接是否可访问。", ex);
+        }
+
         var responseCookies = response.Cookies?.Select(cookie => cookie.ToString()).ToArray();
+        ThrowIfCookieResponseFailed(response, responseCookies);
         return BuildCookieHeaderFromResponseCookies(responseCookies);
     }
 
@@ -497,5 +509,39 @@ public sealed class TraceIntApiClient(
         }
 
         return $"{responseCookies[1]}; {responseCookies[0]}";
+    }
+
+    internal static void ThrowIfCookieResponseFailed(RestResponse response, IReadOnlyList<string>? responseCookies)
+    {
+        if (response.IsSuccessful || responseCookies?.Count >= 2)
+        {
+            return;
+        }
+
+        var reason = response.ErrorMessage;
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            reason = response.StatusDescription;
+        }
+
+        if (string.IsNullOrWhiteSpace(reason) && response.ResponseStatus != ResponseStatus.Completed)
+        {
+            reason = response.ResponseStatus.ToString();
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            reason = "请检查授权链接是否过期或网络是否可用";
+        }
+
+        if (response.StatusCode is not 0)
+        {
+            throw new HttpRequestException(
+                $"获取 Cookie 请求失败，HTTP {(int)response.StatusCode} {response.StatusCode}：{reason}",
+                response.ErrorException,
+                response.StatusCode);
+        }
+
+        throw new InvalidOperationException($"获取 Cookie 请求失败：{reason}", response.ErrorException);
     }
 }
