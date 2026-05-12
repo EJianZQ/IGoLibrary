@@ -115,6 +115,11 @@ public sealed class TraceIntApiClient(
         var seats = new List<SeatSnapshot>();
         foreach (var seat in layout.GetProperty("seats").EnumerateArray())
         {
+            if (!IsSeatLayoutItem(seat))
+            {
+                continue;
+            }
+
             var key = ReadOptionalStringProperty(seat, "key").Trim();
             if (string.IsNullOrWhiteSpace(key))
             {
@@ -490,6 +495,21 @@ public sealed class TraceIntApiClient(
             JsonValueKind.Number when element.TryGetInt32(out var intValue) => intValue != 0,
             _ => throw new InvalidOperationException($"字段 {fieldName} 的返回类型不受支持: {element.ValueKind}")
         };
+    }
+
+    private static bool IsSeatLayoutItem(JsonElement element)
+    {
+        if (element.ValueKind is not JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        if (!element.TryGetProperty("type", out _))
+        {
+            return true;
+        }
+
+        return TryReadRequiredIntProperty(element, "type", out var type) && type == 1;
     }
 
     private static bool TryReadBooleanLikeProperty(JsonElement element, string propertyName, out bool value)

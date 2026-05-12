@@ -132,7 +132,7 @@ public sealed class TraceIntApiClientTests
     }
 
     [Fact]
-    public async Task GetLibraryLayoutAsync_KeepsSeatsWithNonNumericNames_AndSkipsMissingSeatKey()
+    public async Task GetLibraryLayoutAsync_KeepsTypeOneSeatsWithNonNumericNames_AndSkipsLayoutObjects()
     {
         var handler = new SequenceHttpMessageHandler(
             (_, _) => SequenceHttpMessageHandler.JsonResponseAsync("""
@@ -147,15 +147,18 @@ public sealed class TraceIntApiClientTests
                             "lib_floor": "3",
                             "is_open": true,
                             "lib_layout": {
-                              "seats_total": 6,
+                              "seats_total": 4,
                               "seats_booking": 0,
                               "seats_used": 1,
                               "seats": [
-                                { "x": 0, "y": 0, "key": "seat-12", "name": "12", "status": false },
-                                { "x": 1, "y": 0, "key": "seat-a12", "name": "A12", "status": false },
-                                { "x": 2, "y": 0, "key": "seat-room-1", "name": "研修间1", "status": true },
-                                { "x": 3, "y": 0, "key": "seat-fallback", "name": "", "status": false },
-                                { "x": 4, "y": 0, "key": "", "name": "无效座位", "status": false },
+                                { "x": 0, "y": 0, "key": "seat-12", "type": 1, "name": "12", "seat_status": 1, "status": false },
+                                { "x": 1, "y": 0, "key": "seat-a12", "type": 1, "name": "A12", "seat_status": 1, "status": false },
+                                { "x": 2, "y": 0, "key": "seat-room-1", "type": 1, "name": "研修间1", "seat_status": 1, "status": true },
+                                { "x": 3, "y": 0, "key": "seat-fallback", "type": 1, "name": "", "seat_status": 1, "status": false },
+                                { "x": 4, "y": 0, "key": "", "type": 1, "name": "无效座位", "seat_status": 1, "status": false },
+                                { "x": 5, "y": 0, "key": "pillar", "type": 8, "name": "柱", "seat_status": 0, "status": false },
+                                { "x": 6, "y": 0, "key": "west-label", "type": 8, "name": "西", "seat_status": 0, "status": false },
+                                { "x": 7, "y": 0, "key": "desk", "type": 6, "name": null, "seat_status": 0, "status": false },
                                 { "key": "layout-label", "name": "区域标签" }
                               ]
                             }
@@ -190,6 +193,9 @@ public sealed class TraceIntApiClientTests
         Assert.Contains(layout.Seats, seat => seat.SeatKey == "seat-room-1" && seat.SeatName == "研修间1" && seat.IsOccupied);
         Assert.Contains(layout.Seats, seat => seat.SeatKey == "seat-fallback" && seat.SeatName == "seat-fallback");
         Assert.DoesNotContain(layout.Seats, seat => seat.SeatName == "无效座位");
+        Assert.DoesNotContain(layout.Seats, seat => seat.SeatName == "柱");
+        Assert.DoesNotContain(layout.Seats, seat => seat.SeatName == "西");
+        Assert.DoesNotContain(layout.Seats, seat => seat.SeatKey == "desk");
         Assert.DoesNotContain(layout.Seats, seat => seat.SeatKey == "layout-label");
     }
 
