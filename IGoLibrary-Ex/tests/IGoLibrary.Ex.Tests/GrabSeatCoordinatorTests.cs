@@ -17,7 +17,7 @@ public sealed class GrabSeatCoordinatorTests
         var layoutCallCount = 0;
         var reserveCallCount = 0;
         var reserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var alertService = new FakeTaskEventAlertService();
+        var eventPublisher = new FakeCoordinatorEventPublisher();
 
         var apiClient = new FakeTraceIntApiClient
         {
@@ -43,12 +43,11 @@ public sealed class GrabSeatCoordinatorTests
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
         };
-        var coordinator = new GrabSeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) }),
-            alertService,
-            new ActivityLogService(),
-            runtimeState);
+            AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) },
+            eventPublisher: eventPublisher,
+            runtimeState: runtimeState);
 
         var plan = new GrabSeatPlan(
             1,
@@ -68,14 +67,16 @@ public sealed class GrabSeatCoordinatorTests
         Assert.Equal(0, layoutCallCount);
         Assert.Equal(2, reserveCallCount);
         Assert.Equal(CoordinatorTaskState.Completed, coordinator.GetStatus().State);
-        Assert.Contains(alertService.GrabSucceededNotifications, item => item.LibraryName == "自科阅览区一" && item.SeatName == "2号座");
+        Assert.Contains(
+            eventPublisher.EventsOf<GrabSucceededCoordinatorEvent>(),
+            item => item.LibraryName == "自科阅览区一" && item.SeatName == "2号座");
     }
 
     [Fact]
     public async Task StartAsync_MarksCompletedBeforeSlowSuccessAlertFinishes()
     {
         var alertCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var alertService = new FakeTaskEventAlertService
+        var eventPublisher = new FakeCoordinatorEventPublisher
         {
             GrabSucceededCompletion = alertCompletion
         };
@@ -87,12 +88,11 @@ public sealed class GrabSeatCoordinatorTests
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
         };
-        var coordinator = new GrabSeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) }),
-            alertService,
-            new ActivityLogService(),
-            runtimeState);
+            AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) },
+            eventPublisher: eventPublisher,
+            runtimeState: runtimeState);
         var plan = new GrabSeatPlan(
             1,
             "自科阅览区一",
@@ -104,7 +104,7 @@ public sealed class GrabSeatCoordinatorTests
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Completed);
 
-        Assert.Single(alertService.GrabSucceededNotifications);
+        Assert.Single(eventPublisher.EventsOf<GrabSucceededCoordinatorEvent>());
         alertCompletion.SetResult();
     }
 
@@ -140,12 +140,11 @@ public sealed class GrabSeatCoordinatorTests
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
         };
-        var coordinator = new GrabSeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) }),
-            new FakeTaskEventAlertService(),
-            activityLogService,
-            runtimeState);
+            AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) },
+            activityLogService: activityLogService,
+            runtimeState: runtimeState);
 
         var plan = new GrabSeatPlan(
             1,
@@ -196,12 +195,11 @@ public sealed class GrabSeatCoordinatorTests
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
         };
-        var coordinator = new GrabSeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) }),
-            new FakeTaskEventAlertService(),
-            activityLogService,
-            runtimeState);
+            AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) },
+            activityLogService: activityLogService,
+            runtimeState: runtimeState);
 
         var plan = new GrabSeatPlan(
             1,
@@ -265,12 +263,10 @@ public sealed class GrabSeatCoordinatorTests
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
         };
-        var coordinator = new GrabSeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) }),
-            new FakeTaskEventAlertService(),
-            new ActivityLogService(),
-            runtimeState);
+            AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) },
+            runtimeState: runtimeState);
 
         var plan = new GrabSeatPlan(
             1,
@@ -296,8 +292,7 @@ public sealed class GrabSeatCoordinatorTests
     [Fact]
     public async Task StartAsync_NotifiesSessionInvalid_WhenPollingReceivesUnauthorized()
     {
-        var notificationService = new FakeNotificationService();
-        var alertService = new FakeTaskEventAlertService();
+        var eventPublisher = new FakeCoordinatorEventPublisher();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetLibraryLayoutAsync = (_, _, _) => Task.FromException<LibraryLayout>(
@@ -308,12 +303,11 @@ public sealed class GrabSeatCoordinatorTests
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
         };
-        var coordinator = new GrabSeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) }),
-            alertService,
-            new ActivityLogService(),
-            runtimeState);
+            AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) },
+            eventPublisher: eventPublisher,
+            runtimeState: runtimeState);
 
         var plan = new GrabSeatPlan(
             1,
@@ -326,16 +320,15 @@ public sealed class GrabSeatCoordinatorTests
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
-        var alert = Assert.Single(alertService.SessionInvalidNotifications);
+        var alert = Assert.Single(eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>());
         Assert.Equal("抢座轮询", alert.Source);
-        Assert.Empty(notificationService.Warnings);
     }
 
     [Fact]
     public async Task StartAsync_NotifiesSessionInvalid_FromExpiredJwt_WithoutPollingApi()
     {
         var layoutCallCount = 0;
-        var alertService = new FakeTaskEventAlertService();
+        var eventPublisher = new FakeCoordinatorEventPublisher();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetLibraryLayoutAsync = (_, _, _) =>
@@ -353,12 +346,11 @@ public sealed class GrabSeatCoordinatorTests
                 DateTimeOffset.Now,
                 true)
         };
-        var coordinator = new GrabSeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) }),
-            alertService,
-            new ActivityLogService(),
-            runtimeState);
+            AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) },
+            eventPublisher: eventPublisher,
+            runtimeState: runtimeState);
 
         var plan = new GrabSeatPlan(
             1,
@@ -372,7 +364,7 @@ public sealed class GrabSeatCoordinatorTests
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
         Assert.Equal(0, layoutCallCount);
-        var alert = Assert.Single(alertService.SessionInvalidNotifications);
+        var alert = Assert.Single(eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>());
         Assert.Equal("抢座轮询", alert.Source);
         Assert.Contains("Cookie 已过期", alert.Reason);
     }
@@ -380,8 +372,7 @@ public sealed class GrabSeatCoordinatorTests
     [Fact]
     public async Task StartAsync_NotifiesTaskFailure_WhenPollingFailsWithoutSessionInvalid()
     {
-        var notificationService = new FakeNotificationService();
-        var alertService = new FakeTaskEventAlertService();
+        var eventPublisher = new FakeCoordinatorEventPublisher();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetLibraryLayoutAsync = (_, _, _) => Task.FromException<LibraryLayout>(
@@ -392,12 +383,11 @@ public sealed class GrabSeatCoordinatorTests
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
         };
-        var coordinator = new GrabSeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) }),
-            alertService,
-            new ActivityLogService(),
-            runtimeState);
+            AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) },
+            eventPublisher: eventPublisher,
+            runtimeState: runtimeState);
 
         var plan = new GrabSeatPlan(
             1,
@@ -410,10 +400,9 @@ public sealed class GrabSeatCoordinatorTests
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
-        var failure = Assert.Single(alertService.TaskFailedNotifications);
+        var failure = Assert.Single(eventPublisher.EventsOf<TaskFailedCoordinatorEvent>());
         Assert.Equal("抢座", failure.TaskName);
         Assert.Equal("场馆接口暂时不可用", failure.Reason);
-        Assert.Empty(notificationService.Warnings);
     }
 
     [Fact]
@@ -444,6 +433,32 @@ public sealed class GrabSeatCoordinatorTests
         var target = GrabSeatCoordinator.ResolveNextScheduledStart(new TimeOnly(21, 30, 0), now);
 
         Assert.Equal(now, target);
+    }
+
+    private static GrabSeatCoordinator CreateCoordinator(
+        FakeTraceIntApiClient apiClient,
+        AppSettings settings,
+        FakeCoordinatorEventPublisher? eventPublisher = null,
+        ActivityLogService? activityLogService = null,
+        AppRuntimeState? runtimeState = null)
+    {
+        activityLogService ??= new ActivityLogService();
+        runtimeState ??= new AppRuntimeState
+        {
+            Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var strategySelector = new GrabReservationStrategySelector(
+            [
+                new QueryThenReserveGrabReservationStrategy(apiClient, activityLogService, runtimeState),
+                new DirectReserveGrabReservationStrategy(apiClient, activityLogService)
+            ]);
+
+        return new GrabSeatCoordinator(
+            new FakeSettingsService(settings),
+            strategySelector,
+            eventPublisher ?? new FakeCoordinatorEventPublisher(),
+            activityLogService,
+            runtimeState);
     }
 
     private static async Task WaitForStatusAsync(IGrabSeatCoordinator coordinator, CoordinatorTaskState expectedState)

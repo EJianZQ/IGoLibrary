@@ -14,6 +14,10 @@ public static class DependencyInjection
         services.AddSingleton<ISessionService, SessionService>();
         services.AddSingleton<ILibraryService, LibraryService>();
         services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IGrabReservationAttemptStrategy, QueryThenReserveGrabReservationStrategy>();
+        services.AddSingleton<IGrabReservationAttemptStrategy, DirectReserveGrabReservationStrategy>();
+        services.AddSingleton<GrabReservationStrategySelector>();
+        services.AddSingleton<IOccupyReReservationExecutor, OccupyReReservationExecutor>();
         services.AddSingleton<IGrabSeatCoordinator, GrabSeatCoordinator>();
         services.AddSingleton<IOccupySeatCoordinator, OccupySeatCoordinator>();
         return services;

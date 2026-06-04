@@ -6,11 +6,10 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Application.Services;
 
-public sealed class OccupySeatCoordinator(
+internal sealed class OccupySeatCoordinator(
     ITraceIntApiClient apiClient,
-    ISettingsService settingsService,
-    INotificationService notificationService,
-    ITaskEventAlertService taskAlertService,
+    IOccupyReReservationExecutor reReservationExecutor,
+    ICoordinatorEventPublisher coordinatorEventPublisher,
     IActivityLogService activityLogService,
     AppRuntimeState runtimeState) : IOccupySeatCoordinator
 {
@@ -113,21 +112,16 @@ public sealed class OccupySeatCoordinator(
                 }
 
                 activityLogService.Write(LogEntryKind.Warning, "Occupy", "预约即将过期，开始取消并重新预约。");
-                var cancelled = await apiClient.CancelReservationAsync(cookie, info.ReservationToken, cancellationToken);
-                if (!cancelled)
-                {
-                    throw new InvalidOperationException("取消预约失败。");
-                }
-
-                await Task.Delay(plan.ReReserveDelay, cancellationToken);
-                var reserved = await TryReserveAgainAsync(cookie, info, cancellationToken);
-                if (!reserved)
+                var reservationResult = await reReservationExecutor.ExecuteAsync(cookie, info, plan, cancellationToken);
+                if (!reservationResult.Succeeded)
                 {
                     throw new InvalidOperationException("重新预约失败，已达到重试上限。");
                 }
 
                 activityLogService.Write(LogEntryKind.Success, "Occupy", $"{info.SeatName} 已重新预约成功。");
-                await notificationService.ShowSuccessAsync("占座成功", $"{info.SeatName} 已重新预约。", cancellationToken);
+                await PublishCoordinatorEventSafelyAsync(
+                    new OccupyReReserveSucceededCoordinatorEvent(info.SeatName),
+                    "发送占座成功提醒失败");
                 await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
             }
         }
@@ -141,11 +135,15 @@ public sealed class OccupySeatCoordinator(
             activityLogService.Write(LogEntryKind.Error, "Occupy", ex.Message);
             if (SessionAuthFailureDetector.IsSessionInvalidException(ex, runtimeState.Session?.Cookie))
             {
-                await taskAlertService.NotifySessionInvalidAsync("占座轮询", ex.Message, CancellationToken.None);
+                await PublishCoordinatorEventSafelyAsync(
+                    new SessionInvalidCoordinatorEvent("占座轮询", ex.Message),
+                    "发送会话失效提醒失败");
                 return;
             }
 
-            await taskAlertService.NotifyTaskFailedAsync("占座", ex.Message, CancellationToken.None);
+            await PublishCoordinatorEventSafelyAsync(
+                new TaskFailedCoordinatorEvent("占座", ex.Message),
+                "发送任务失败提醒失败");
         }
     }
 
@@ -203,6 +201,18 @@ public sealed class OccupySeatCoordinator(
         StatusChanged?.Invoke(this, GetStatus());
     }
 
+    private async Task PublishCoordinatorEventSafelyAsync(CoordinatorEvent @event, string failureMessage)
+    {
+        try
+        {
+            await coordinatorEventPublisher.PublishAsync(@event, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"{failureMessage}：{ex.Message}");
+        }
+    }
+
     private string GetCurrentCookieOrThrow()
     {
         var cookie = runtimeState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
@@ -213,35 +223,5 @@ public sealed class OccupySeatCoordinator(
         }
 
         return cookie;
-    }
-
-    private async Task<bool> TryReserveAgainAsync(string cookie, ReservationInfo info, CancellationToken cancellationToken)
-    {
-        var settings = await settingsService.LoadAsync(cancellationToken);
-        var maxAttempts = Math.Max(1, settings.RequestPolicy.RetryCount + 1);
-
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            var reserved = await apiClient.ReserveSeatAsync(cookie, info.LibraryId, info.SeatKey, cancellationToken);
-            if (reserved)
-            {
-                if (attempt > 1)
-                {
-                    activityLogService.Write(LogEntryKind.Success, "Occupy", $"第 {attempt} 次重新预约尝试成功。");
-                }
-
-                return true;
-            }
-
-            if (attempt >= maxAttempts)
-            {
-                break;
-            }
-
-            activityLogService.Write(LogEntryKind.Warning, "Occupy", $"第 {attempt} 次重新预约失败，1 秒后继续重试。");
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-        }
-
-        return false;
     }
 }

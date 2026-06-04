@@ -45,6 +45,12 @@ internal sealed class FakeTaskEventAlertService : ITaskEventAlertService
 
     public TaskCompletionSource? GrabSucceededCompletion { get; set; }
 
+    public Exception? NotifySessionInvalidException { get; set; }
+
+    public Exception? NotifyGrabSucceededException { get; set; }
+
+    public Exception? NotifyTaskFailedException { get; set; }
+
     public List<EmailAlertChannelSettings> TestEmailRequests { get; } = [];
 
     public List<TelegramAlertChannelSettings> TestTelegramRequests { get; } = [];
@@ -57,18 +63,33 @@ internal sealed class FakeTaskEventAlertService : ITaskEventAlertService
 
     public Task NotifySessionInvalidAsync(string source, string reason, CancellationToken cancellationToken = default)
     {
+        if (NotifySessionInvalidException is not null)
+        {
+            throw NotifySessionInvalidException;
+        }
+
         SessionInvalidNotifications.Add((source, reason));
         return Task.CompletedTask;
     }
 
     public Task NotifyGrabSucceededAsync(string libraryName, string seatName, CancellationToken cancellationToken = default)
     {
+        if (NotifyGrabSucceededException is not null)
+        {
+            throw NotifyGrabSucceededException;
+        }
+
         GrabSucceededNotifications.Add((libraryName, seatName));
         return GrabSucceededCompletion?.Task ?? Task.CompletedTask;
     }
 
     public Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default)
     {
+        if (NotifyTaskFailedException is not null)
+        {
+            throw NotifyTaskFailedException;
+        }
+
         TaskFailedNotifications.Add((taskName, reason));
         return Task.CompletedTask;
     }
@@ -99,6 +120,37 @@ internal sealed class FakeTaskEventAlertService : ITaskEventAlertService
     {
         TestLocalAlertRequests.Add(settings);
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeCoordinatorEventPublisher : ICoordinatorEventPublisher
+{
+    public List<CoordinatorEvent> Events { get; } = [];
+
+    public TaskCompletionSource? GrabSucceededCompletion { get; set; }
+
+    public Exception? PublishException { get; set; }
+
+    public Task PublishAsync(CoordinatorEvent @event, CancellationToken cancellationToken = default)
+    {
+        if (PublishException is not null)
+        {
+            throw PublishException;
+        }
+
+        Events.Add(@event);
+        if (@event is GrabSucceededCoordinatorEvent && GrabSucceededCompletion is not null)
+        {
+            return GrabSucceededCompletion.Task;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public IReadOnlyList<TEvent> EventsOf<TEvent>()
+        where TEvent : CoordinatorEvent
+    {
+        return Events.OfType<TEvent>().ToArray();
     }
 }
 

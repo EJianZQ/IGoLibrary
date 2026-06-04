@@ -5,14 +5,13 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Application.Services;
 
-public sealed class GrabSeatCoordinator(
-    ITraceIntApiClient apiClient,
+internal sealed class GrabSeatCoordinator(
     ISettingsService settingsService,
-    ITaskEventAlertService taskAlertService,
+    GrabReservationStrategySelector strategySelector,
+    ICoordinatorEventPublisher coordinatorEventPublisher,
     IActivityLogService activityLogService,
     AppRuntimeState runtimeState) : IGrabSeatCoordinator
 {
-    private static readonly TimeSpan DirectReserveAttemptInterval = TimeSpan.FromMilliseconds(2000);
     private static readonly TimeSpan DirectReserveRateLimitCycleDelay = TimeSpan.FromSeconds(3);
     private readonly object _gate = new();
     private CancellationTokenSource? _cts;
@@ -103,6 +102,7 @@ public sealed class GrabSeatCoordinator(
             var random = new Random();
             var settings = await settingsService.LoadAsync(cancellationToken);
             var reservationStrategy = settings.Tasks.GrabReservationStrategy;
+            var reservationAttemptStrategy = strategySelector.Select(reservationStrategy);
             var directReservationStartIndex = 0;
             activityLogService.Write(LogEntryKind.Info, "Grab", $"当前执行策略：{GetReservationStrategyText(reservationStrategy)}。");
 
@@ -118,9 +118,9 @@ public sealed class GrabSeatCoordinator(
                     UpdateRunningMetrics("抢座任务运行中。", cycle, requestCount, lastRequestAt);
                 }
 
-                var reservationResult = reservationStrategy == GrabReservationStrategy.ReserveDirectly
-                    ? await TryReserveDirectlyAsync(cookie, plan, directReservationStartIndex, MarkRequestSent, cancellationToken)
-                    : await TryReserveAfterAvailabilityCheckAsync(cookie, plan, MarkRequestSent, cancellationToken);
+                var reservationResult = await reservationAttemptStrategy.TryReserveAsync(
+                    new GrabReservationAttemptContext(cookie, plan, directReservationStartIndex, MarkRequestSent),
+                    cancellationToken);
                 directReservationStartIndex = reservationResult.NextSeatStartIndex;
 
                 if (reservationResult.ReservedSeat is not null)
@@ -128,7 +128,9 @@ public sealed class GrabSeatCoordinator(
                     var reservedSeatName = reservationResult.ReservedSeat.SeatName;
                     activityLogService.Write(LogEntryKind.Success, "Grab", $"{reservedSeatName} 预约成功。");
                     Complete("已成功预约到目标座位。");
-                    _ = NotifyGrabSucceededSafelyAsync(plan.LibraryName, reservedSeatName);
+                    _ = PublishCoordinatorEventSafelyAsync(
+                        new GrabSucceededCoordinatorEvent(plan.LibraryName, reservedSeatName),
+                        "发送抢座成功提醒失败");
                     return;
                 }
 
@@ -171,11 +173,15 @@ public sealed class GrabSeatCoordinator(
             activityLogService.Write(LogEntryKind.Error, "Grab", ex.Message);
             if (SessionAuthFailureDetector.IsSessionInvalidException(ex, runtimeState.Session?.Cookie))
             {
-                await taskAlertService.NotifySessionInvalidAsync("抢座轮询", ex.Message, CancellationToken.None);
+                await PublishCoordinatorEventSafelyAsync(
+                    new SessionInvalidCoordinatorEvent("抢座轮询", ex.Message),
+                    "发送会话失效提醒失败");
                 return;
             }
 
-            await taskAlertService.NotifyTaskFailedAsync("抢座", ex.Message, CancellationToken.None);
+            await PublishCoordinatorEventSafelyAsync(
+                new TaskFailedCoordinatorEvent("抢座", ex.Message),
+                "发送任务失败提醒失败");
         }
     }
 
@@ -294,15 +300,15 @@ public sealed class GrabSeatCoordinator(
         StatusChanged?.Invoke(this, GetStatus());
     }
 
-    private async Task NotifyGrabSucceededSafelyAsync(string libraryName, string seatName)
+    private async Task PublishCoordinatorEventSafelyAsync(CoordinatorEvent @event, string failureMessage)
     {
         try
         {
-            await taskAlertService.NotifyGrabSucceededAsync(libraryName, seatName, CancellationToken.None);
+            await coordinatorEventPublisher.PublishAsync(@event, CancellationToken.None);
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送抢座成功提醒失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"{failureMessage}：{ex.Message}");
         }
     }
 
@@ -318,78 +324,6 @@ public sealed class GrabSeatCoordinator(
         return cookie;
     }
 
-    private async Task<GrabReservationAttemptResult> TryReserveAfterAvailabilityCheckAsync(
-        string cookie,
-        GrabSeatPlan plan,
-        Action markRequestSent,
-        CancellationToken cancellationToken)
-    {
-        markRequestSent();
-        var layout = await apiClient.GetLibraryLayoutAsync(cookie, plan.LibraryId, cancellationToken);
-        runtimeState.CurrentLayout = layout;
-
-        var availableSeat = layout.Seats
-            .Where(seat => plan.Seats.Any(target => target.SeatKey == seat.SeatKey))
-            .FirstOrDefault(seat => seat.IsAvailable);
-
-        if (availableSeat is null)
-        {
-            return new GrabReservationAttemptResult(null, false, false, 0);
-        }
-
-        activityLogService.Write(LogEntryKind.Success, "Grab", $"{availableSeat.SeatName} 空闲，正在尝试预约。");
-        markRequestSent();
-        var reserved = await apiClient.ReserveSeatAsync(cookie, plan.LibraryId, availableSeat.SeatKey, cancellationToken);
-        return reserved
-            ? new GrabReservationAttemptResult(new TrackedSeat(availableSeat.SeatKey, availableSeat.SeatName), true, false, 0)
-            : new GrabReservationAttemptResult(null, true, false, 0);
-    }
-
-    private async Task<GrabReservationAttemptResult> TryReserveDirectlyAsync(
-        string cookie,
-        GrabSeatPlan plan,
-        int startIndex,
-        Action markRequestSent,
-        CancellationToken cancellationToken)
-    {
-        if (plan.Seats.Count == 0)
-        {
-            return new GrabReservationAttemptResult(null, false, false, 0);
-        }
-
-        for (var offset = 0; offset < plan.Seats.Count; offset++)
-        {
-            var index = (startIndex + offset) % plan.Seats.Count;
-            var seat = plan.Seats[index];
-            bool reserved;
-            try
-            {
-                markRequestSent();
-                reserved = await apiClient.ReserveSeatAsync(cookie, plan.LibraryId, seat.SeatKey, cancellationToken);
-            }
-            catch (Exception ex) when (TryGetExpectedDirectReservationMiss(ex, out var missKind))
-            {
-                activityLogService.Write(LogEntryKind.Info, "Grab", GetDirectReservationMissMessage(missKind, seat));
-                if (missKind == DirectReservationMissKind.RetryRequested)
-                {
-                    return new GrabReservationAttemptResult(null, true, true, (index + 1) % plan.Seats.Count);
-                }
-
-                await DelayBeforeNextDirectReserveAttemptAsync(offset, plan.Seats.Count, DirectReserveAttemptInterval, cancellationToken);
-                continue;
-            }
-
-            if (reserved)
-            {
-                return new GrabReservationAttemptResult(seat, true, false, (index + 1) % plan.Seats.Count);
-            }
-
-            await DelayBeforeNextDirectReserveAttemptAsync(offset, plan.Seats.Count, DirectReserveAttemptInterval, cancellationToken);
-        }
-
-        return new GrabReservationAttemptResult(null, false, false, startIndex);
-    }
-
     private static string GetReservationStrategyText(GrabReservationStrategy strategy)
     {
         return strategy switch
@@ -397,66 +331,6 @@ public sealed class GrabSeatCoordinator(
             GrabReservationStrategy.ReserveDirectly => "直接预约看返回值",
             _ => "先查列表再预约"
         };
-    }
-
-    private static bool TryGetExpectedDirectReservationMiss(
-        Exception exception,
-        out DirectReservationMissKind missKind)
-    {
-        missKind = DirectReservationMissKind.None;
-        if (exception is not InvalidOperationException)
-        {
-            return false;
-        }
-
-        var message = exception.Message;
-        if (!message.Contains("GraphQL 错误(code=1)", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        if (message.Contains("请重新尝试", StringComparison.OrdinalIgnoreCase))
-        {
-            missKind = DirectReservationMissKind.RetryRequested;
-            return true;
-        }
-
-        if (message.Contains("座位", StringComparison.OrdinalIgnoreCase) &&
-            (message.Contains("预定", StringComparison.OrdinalIgnoreCase) ||
-             message.Contains("预约", StringComparison.OrdinalIgnoreCase) ||
-             message.Contains("不可预约", StringComparison.OrdinalIgnoreCase)))
-        {
-            missKind = DirectReservationMissKind.Occupied;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static string GetDirectReservationMissMessage(DirectReservationMissKind missKind, TrackedSeat seat)
-    {
-        return missKind switch
-        {
-            DirectReservationMissKind.RetryRequested =>
-                $"{seat.SeatName} 返回“请重新尝试”，触发短暂退避后继续。",
-            DirectReservationMissKind.Occupied =>
-                $"{seat.SeatName} 已被占用，继续尝试下一个目标座位。",
-            _ => $"{seat.SeatName} 预约未命中。"
-        };
-    }
-
-    private static async Task DelayBeforeNextDirectReserveAttemptAsync(
-        int currentOffset,
-        int seatCount,
-        TimeSpan delay,
-        CancellationToken cancellationToken)
-    {
-        if (currentOffset >= seatCount - 1 || delay <= TimeSpan.Zero)
-        {
-            return;
-        }
-
-        await Task.Delay(delay, cancellationToken);
     }
 
     private static TimeSpan GetDelayAfterRateLimit(GrabSeatPollingStrategy pollingStrategy)
@@ -471,18 +345,5 @@ public sealed class GrabSeatCoordinator(
         return pollingStrategy.MaximumDelay > DirectReserveRateLimitCycleDelay
             ? pollingStrategy.MaximumDelay
             : DirectReserveRateLimitCycleDelay;
-    }
-
-    private sealed record GrabReservationAttemptResult(
-        TrackedSeat? ReservedSeat,
-        bool HadReservationAttempt,
-        bool RateLimitTriggered,
-        int NextSeatStartIndex);
-
-    private enum DirectReservationMissKind
-    {
-        None = 0,
-        Occupied = 1,
-        RetryRequested = 2
     }
 }

@@ -44,6 +44,7 @@ internal static class HostBuilderFactory
                 services.AddSingleton<INotificationService>(serviceProvider => serviceProvider.GetRequiredService<ToastNotificationService>());
                 services.AddSingleton<AlertSoundService>();
                 services.AddSingleton<ITaskEventAlertService, TaskEventAlertService>();
+                services.AddSingleton<ICoordinatorEventPublisher, DesktopCoordinatorEventPublisher>();
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<MainWindowViewModel>();
             });

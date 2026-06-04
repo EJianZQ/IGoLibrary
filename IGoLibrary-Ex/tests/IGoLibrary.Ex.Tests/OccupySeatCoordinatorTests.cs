@@ -40,23 +40,21 @@ public sealed class OccupySeatCoordinatorTests
             }
         };
 
-        var notificationService = new FakeNotificationService();
+        var eventPublisher = new FakeCoordinatorEventPublisher();
         var activityLogService = new ActivityLogService();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            RequestPolicy = AppSettings.Default.RequestPolicy with { RetryCount = 2 }
-        });
         var runtimeState = new AppRuntimeState
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
         };
-        var coordinator = new OccupySeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            settingsService,
-            notificationService,
-            new FakeTaskEventAlertService(),
-            activityLogService,
-            runtimeState);
+            AppSettings.Default with
+            {
+                RequestPolicy = AppSettings.Default.RequestPolicy with { RetryCount = 2 }
+            },
+            eventPublisher: eventPublisher,
+            activityLogService: activityLogService,
+            runtimeState: runtimeState);
 
         using var cts = new CancellationTokenSource();
         await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds), cts.Token);
@@ -67,15 +65,14 @@ public sealed class OccupySeatCoordinatorTests
 
         Assert.Equal(2, reserveAttempts);
         Assert.Contains(activityLogService.Entries, entry => entry.Category == "Occupy" && entry.Message.Contains("重新预约尝试成功"));
-        Assert.Contains(notificationService.Successes, x => x.Title == "占座成功");
+        Assert.Contains(eventPublisher.EventsOf<OccupyReReserveSucceededCoordinatorEvent>(), x => x.SeatName == "1号座");
         Assert.NotEqual(CoordinatorTaskState.Failed, coordinator.GetStatus().State);
     }
 
     [Fact]
     public async Task StartAsync_NotifiesSessionInvalid_WhenReservationRefreshReturnsUnauthorized()
     {
-        var notificationService = new FakeNotificationService();
-        var alertService = new FakeTaskEventAlertService();
+        var eventPublisher = new FakeCoordinatorEventPublisher();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetReservationInfoAsync = (_, _) => Task.FromException<ReservationInfo?>(
@@ -86,27 +83,24 @@ public sealed class OccupySeatCoordinatorTests
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
         };
-        var coordinator = new OccupySeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default),
-            notificationService,
-            alertService,
-            new ActivityLogService(),
-            runtimeState);
+            AppSettings.Default,
+            eventPublisher: eventPublisher,
+            runtimeState: runtimeState);
 
         await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
-        var alert = Assert.Single(alertService.SessionInvalidNotifications);
+        var alert = Assert.Single(eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>());
         Assert.Equal("占座轮询", alert.Source);
-        Assert.Empty(notificationService.Warnings);
     }
 
     [Fact]
     public async Task StartAsync_NotifiesSessionInvalid_FromExpiredJwt_WithoutRefreshingReservation()
     {
         var reservationInfoCallCount = 0;
-        var alertService = new FakeTaskEventAlertService();
+        var eventPublisher = new FakeCoordinatorEventPublisher();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetReservationInfoAsync = (_, _) =>
@@ -124,19 +118,17 @@ public sealed class OccupySeatCoordinatorTests
                 DateTimeOffset.Now,
                 true)
         };
-        var coordinator = new OccupySeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default),
-            new FakeNotificationService(),
-            alertService,
-            new ActivityLogService(),
-            runtimeState);
+            AppSettings.Default,
+            eventPublisher: eventPublisher,
+            runtimeState: runtimeState);
 
         await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
         Assert.Equal(0, reservationInfoCallCount);
-        var alert = Assert.Single(alertService.SessionInvalidNotifications);
+        var alert = Assert.Single(eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>());
         Assert.Equal("占座轮询", alert.Source);
         Assert.Contains("Cookie 已过期", alert.Reason);
     }
@@ -144,8 +136,7 @@ public sealed class OccupySeatCoordinatorTests
     [Fact]
     public async Task StartAsync_NotifiesTaskFailure_WhenReservationRefreshFailsWithoutSessionInvalid()
     {
-        var notificationService = new FakeNotificationService();
-        var alertService = new FakeTaskEventAlertService();
+        var eventPublisher = new FakeCoordinatorEventPublisher();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetReservationInfoAsync = (_, _) => Task.FromException<ReservationInfo?>(
@@ -156,21 +147,43 @@ public sealed class OccupySeatCoordinatorTests
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
         };
-        var coordinator = new OccupySeatCoordinator(
+        var coordinator = CreateCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default),
-            notificationService,
-            alertService,
-            new ActivityLogService(),
-            runtimeState);
+            AppSettings.Default,
+            eventPublisher: eventPublisher,
+            runtimeState: runtimeState);
 
         await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
-        var failure = Assert.Single(alertService.TaskFailedNotifications);
+        var failure = Assert.Single(eventPublisher.EventsOf<TaskFailedCoordinatorEvent>());
         Assert.Equal("占座", failure.TaskName);
         Assert.Equal("预约状态获取失败", failure.Reason);
-        Assert.Empty(notificationService.Warnings);
+    }
+
+    private static OccupySeatCoordinator CreateCoordinator(
+        FakeTraceIntApiClient apiClient,
+        AppSettings settings,
+        FakeCoordinatorEventPublisher? eventPublisher = null,
+        ActivityLogService? activityLogService = null,
+        AppRuntimeState? runtimeState = null)
+    {
+        activityLogService ??= new ActivityLogService();
+        runtimeState ??= new AppRuntimeState
+        {
+            Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var reReservationExecutor = new OccupyReReservationExecutor(
+            apiClient,
+            new FakeSettingsService(settings),
+            activityLogService);
+
+        return new OccupySeatCoordinator(
+            apiClient,
+            reReservationExecutor,
+            eventPublisher ?? new FakeCoordinatorEventPublisher(),
+            activityLogService,
+            runtimeState);
     }
 
     private static async Task WaitForStatusAsync(IOccupySeatCoordinator coordinator, CoordinatorTaskState expectedState)
