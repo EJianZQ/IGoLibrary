@@ -87,13 +87,13 @@ public sealed class SmtpEmailAlertSenderTests
         Assert.Contains("=?utf-8?", rawMessage, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static CookieExpiryEmailAlertSettings CreateSettings(
+    private static EmailAlertChannelSettings CreateSettings(
         int port,
         EmailSecurityMode securityMode,
         string username = "",
         string password = "")
     {
-        return new CookieExpiryEmailAlertSettings(
+        return new EmailAlertChannelSettings(
             Enabled: true,
             SmtpHost: "smtp.example.com",
             Port: port,

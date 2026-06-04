@@ -1033,8 +1033,8 @@
                                 Spacing="0">
                       <TextBlock Text="抢座模式"
                                  Classes="field-label" />
-                      <ComboBox SelectedIndex="{Binding SelectedGrabModeIndex}"
-                                ItemsSource="{Binding GrabModes}"
+                      <ComboBox SelectedIndex="{Binding SelectedGrabPollingModeIndex}"
+                                ItemsSource="{Binding GrabPollingModes}"
                                 IsEnabled="{Binding CanEditGrabConfiguration}"
                                 HorizontalAlignment="Stretch" />
                     </StackPanel>
@@ -1244,8 +1244,8 @@
                 <StackPanel Grid.Row="1" Spacing="20">
                   <StackPanel Spacing="0">
                     <TextBlock Classes="field-label" Text="轮询刷新频率" />
-                    <ComboBox SelectedIndex="{Binding SelectedRefreshModeIndex}"
-                              ItemsSource="{Binding RefreshModes}"
+                    <ComboBox SelectedIndex="{Binding SelectedOccupyRefreshModeIndex}"
+                              ItemsSource="{Binding OccupyRefreshModes}"
                               HorizontalAlignment="Stretch" />
                   </StackPanel>
 
@@ -1391,7 +1391,7 @@
                                   Spacing="0">
                         <TextBlock Classes="field-label"
                                    Text="SMTP 服务器地址（主机名）" />
-                        <TextBox Text="{Binding CookieAlertSmtpHost}"
+                        <TextBox Text="{Binding EmailAlertSmtpHost}"
                                  Watermark="smtp.example.com"
                                  HorizontalAlignment="Stretch" />
                       </StackPanel>
@@ -1406,7 +1406,7 @@
                                        Increment="1"
                                        ClipValueToMinMax="True"
                                        ParsingNumberStyle="Integer"
-                                       Value="{Binding CookieAlertSmtpPort}"
+                                       Value="{Binding EmailAlertSmtpPort}"
                                        FormatString="0"
                                        TextInput="OnUnsignedIntegerNumericUpDownTextInput"
                                        KeyDown="OnUnsignedIntegerNumericUpDownKeyDown"
@@ -1419,7 +1419,7 @@
                         <TextBlock Classes="field-label"
                                    Text="安全性" />
                         <ComboBox ItemsSource="{Binding EmailSecurityModes}"
-                                  SelectedIndex="{Binding SelectedCookieAlertSecurityModeIndex}"
+                                  SelectedIndex="{Binding SelectedEmailAlertSecurityModeIndex}"
                                   HorizontalAlignment="Stretch" />
                       </StackPanel>
 
@@ -1428,7 +1428,7 @@
                                   Spacing="0">
                         <TextBlock Classes="field-label"
                                    Text="用户名" />
-                        <TextBox Text="{Binding CookieAlertUsername}"
+                        <TextBox Text="{Binding EmailAlertUsername}"
                                  Watermark="填写 SMTP 用户名"
                                  HorizontalAlignment="Stretch" />
                       </StackPanel>
@@ -1438,7 +1438,7 @@
                                   Spacing="0">
                         <TextBlock Classes="field-label"
                                    Text="邮箱授权码/密码" />
-                        <TextBox Text="{Binding CookieAlertPassword}"
+                        <TextBox Text="{Binding EmailAlertPassword}"
                                  PasswordChar="●"
                                  Watermark="填写邮箱授权码或密码"
                                  HorizontalAlignment="Stretch" />
@@ -1449,7 +1449,7 @@
                                   Spacing="0">
                         <TextBlock Classes="field-label"
                                    Text="发信人邮箱地址" />
-                        <TextBox Text="{Binding CookieAlertFromAddress}"
+                        <TextBox Text="{Binding EmailAlertFromAddress}"
                                  Watermark="sender@example.com"
                                  HorizontalAlignment="Stretch" />
                       </StackPanel>
@@ -1459,7 +1459,7 @@
                                   Spacing="0">
                         <TextBlock Classes="field-label"
                                    Text="收信人邮箱地址" />
-                        <TextBox Text="{Binding CookieAlertToAddress}"
+                        <TextBox Text="{Binding EmailAlertToAddress}"
                                  Watermark="receiver@example.com"
                                  HorizontalAlignment="Stretch" />
                       </StackPanel>
@@ -1479,7 +1479,7 @@
                                          Text="Cookie 失效、抢座成功或任务失败时，会自动按上方 SMTP 参数向目标邮箱发送提醒邮件" />
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1"
-                                          IsChecked="{Binding CookieEmailAlertsEnabled}"
+                                          IsChecked="{Binding EmailAlertsEnabled}"
                                           OnContent="开"
                                           OffContent="关"
                                           VerticalAlignment="Center" />
@@ -1504,7 +1504,7 @@
                                   Spacing="0">
                         <TextBlock Classes="field-label"
                                    Text="Telegram API 基础地址" />
-                        <TextBox Text="{Binding CookieAlertTelegramApiBaseUrl}"
+                        <TextBox Text="{Binding TelegramAlertApiBaseUrl}"
                                  Watermark="https://api.telegram.org"
                                  HorizontalAlignment="Stretch" />
                       </StackPanel>
@@ -1516,7 +1516,7 @@
                                     Spacing="0">
                           <TextBlock Classes="field-label"
                                      Text="Bot Token" />
-                          <TextBox Text="{Binding CookieAlertTelegramBotToken}"
+                          <TextBox Text="{Binding TelegramAlertBotToken}"
                                    PasswordChar="●"
                                    Watermark="123456:ABC-DEF..."
                                    HorizontalAlignment="Stretch" />
@@ -1526,7 +1526,7 @@
                                     Spacing="0">
                           <TextBlock Classes="field-label"
                                      Text="Chat ID" />
-                          <TextBox Text="{Binding CookieAlertTelegramChatId}"
+                          <TextBox Text="{Binding TelegramAlertChatId}"
                                    Watermark="123456789 或 @channel"
                                    HorizontalAlignment="Stretch" />
                         </StackPanel>
@@ -1546,7 +1546,7 @@
                                          Text="Cookie 失效、抢座成功或任务失败时，会通过 Telegram Bot 向指定 Chat ID 发送文本提醒" />
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1"
-                                          IsChecked="{Binding CookieTelegramAlertsEnabled}"
+                                          IsChecked="{Binding TelegramAlertsEnabled}"
                                           OnContent="开"
                                           OffContent="关"
                                           VerticalAlignment="Center" />
@@ -1576,7 +1576,7 @@
                                        Text="当检测到 Cookie 已失效、抢座成功或任务失败时，使用 Toast 弹窗形式，在屏幕右下角弹出提醒。即使你正在浏览其他网页，也能看到这一角的弹窗" />
                           </StackPanel>
                           <ToggleSwitch Grid.Column="1"
-                                        IsChecked="{Binding CookieLocalToastEnabled}"
+                                        IsChecked="{Binding LocalToastAlertsEnabled}"
                                         OnContent="开"
                                         OffContent="关"
                                         VerticalAlignment="Center" />
@@ -1593,7 +1593,7 @@
                                        Text="开启后，Toast 弹窗在弹出时会同时播放提示音，用于在后台工作时更快感知抢座结果、任务失败或 Cookie 失效" />
                           </StackPanel>
                           <ToggleSwitch Grid.Column="1"
-                                        IsChecked="{Binding CookieLocalSoundEnabled}"
+                                        IsChecked="{Binding LocalSoundAlertsEnabled}"
                                         OnContent="开"
                                         OffContent="关"
                                         VerticalAlignment="Center" />
@@ -1640,7 +1640,7 @@
                     <TextBlock Classes="section-title" Text="常规体验" />
                     <CheckBox Content="屏幕右下角展示应用横幅通知" IsChecked="{Binding NotificationsEnabled}" />
                     <CheckBox Content="当任务进行时，右上角关闭会最小化到托盘" IsChecked="{Binding MinimizeToTrayEnabled}" />
-                    <CheckBox Content="自定义接口地址和查询语法" IsChecked="{Binding CustomApiOverridesEnabled}" FontWeight="Bold" Foreground="{DynamicResource SemiWarningTextBrush}"/>
+                    <CheckBox Content="自定义接口地址和查询语法" IsChecked="{Binding ProtocolTemplateOverridesEnabled}" FontWeight="Bold" Foreground="{DynamicResource SemiWarningTextBrush}"/>
                     
                     <Separator Background="{DynamicResource AppSeparatorBrush}" Margin="0,8"/>
                     
@@ -1687,7 +1687,7 @@
                 </Border>
               </StackPanel>
 
-              <Border Classes="card" Grid.Column="1" IsVisible="{Binding CustomApiOverridesEnabled}" BorderBrush="{DynamicResource AppWarningBorderBrush}">
+              <Border Classes="card" Grid.Column="1" IsVisible="{Binding ProtocolTemplateOverridesEnabled}" BorderBrush="{DynamicResource AppWarningBorderBrush}">
                 <StackPanel Spacing="16">
                   <TextBlock Classes="section-title" Text="⚠️ 自定义接口地址和查询语法" Foreground="{DynamicResource SemiWarningTextBrush}" />
                   <TextBlock Text="如果你使用的不是官方地址，如学校自建等，请自行抓包替换" FontSize="13" Opacity="0.7" TextWrapping="Wrap" />
@@ -1923,11 +1923,11 @@
                           <TextBlock FontSize="12"
                                      Foreground="{DynamicResource SemiColorText2}">
                             <Run Text="总座 " />
-                            <Run Text="{Binding SeatsTotal}" />
+                            <Run Text="{Binding TotalSeats}" />
                             <Run Text=" · 已占用 " />
-                            <Run Text="{Binding SeatsUsed}" />
+                            <Run Text="{Binding UsedSeats}" />
                             <Run Text=" · 已预定 " />
-                            <Run Text="{Binding SeatsBooking}" />
+                            <Run Text="{Binding BookedSeats}" />
                           </TextBlock>
                         </StackPanel>
                         <Border Grid.Column="1"

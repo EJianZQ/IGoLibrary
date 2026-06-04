@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using IGoLibrary.Ex.Domain.Enums;
 
 namespace IGoLibrary.Ex.Domain.Models;
@@ -5,7 +6,8 @@ namespace IGoLibrary.Ex.Domain.Models;
 public sealed record AppSettings(
     bool NotificationsEnabled,
     bool MinimizeToTray,
-    bool CustomApiOverridesEnabled,
+    [property: JsonPropertyName("customApiOverridesEnabled")]
+    bool ProtocolTemplateOverridesEnabled,
     int ApiTimeoutSeconds,
     int RetryCount,
     AppThemeMode ThemeMode,
@@ -13,14 +15,15 @@ public sealed record AppSettings(
     GrabReservationStrategy GrabReservationStrategy,
     int? LastLibraryId,
     string? LastLibraryName,
-    CookieExpiryAlertSettings? CookieExpiryAlerts = null,
+    [property: JsonPropertyName("cookieExpiryAlerts")]
+    TaskEventAlertSettings? TaskEventAlerts = null,
     int SuccessfulReservationCount = 0,
     long TotalGuardSeconds = 0)
 {
     public static AppSettings Default { get; } = new(
         NotificationsEnabled: true,
         MinimizeToTray: true,
-        CustomApiOverridesEnabled: false,
+        ProtocolTemplateOverridesEnabled: false,
         ApiTimeoutSeconds: 5,
         RetryCount: 3,
         ThemeMode: AppThemeMode.FollowSystem,
@@ -28,7 +31,7 @@ public sealed record AppSettings(
         GrabReservationStrategy: GrabReservationStrategy.QueryThenReserve,
         LastLibraryId: null,
         LastLibraryName: null,
-        CookieExpiryAlerts: CookieExpiryAlertSettings.Default,
+        TaskEventAlerts: TaskEventAlertSettings.Default,
         SuccessfulReservationCount: 0,
         TotalGuardSeconds: 0);
 }

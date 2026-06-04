@@ -5,6 +5,6 @@ public sealed record LibrarySummary(
     string Name,
     string Floor,
     bool IsOpen,
-    int SeatsTotal = 0,
-    int SeatsUsed = 0,
-    int SeatsBooking = 0);
+    int TotalSeats = 0,
+    int UsedSeats = 0,
+    int BookedSeats = 0);

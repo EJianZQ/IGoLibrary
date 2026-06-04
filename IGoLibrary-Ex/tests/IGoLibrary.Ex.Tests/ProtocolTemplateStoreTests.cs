@@ -23,11 +23,11 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     {
         var store = await CreateStoreAsync(AppSettings.Default with
         {
-            CustomApiOverridesEnabled = true
+            ProtocolTemplateOverridesEnabled = true
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
-        await store.SaveOverridesAsync(new ProtocolTemplateOverrides(
+        await store.SaveOverridesAsync(new TraceIntGraphQlTemplateOverrides(
             QueryLibrariesTemplate: "override-libraries",
             ReserveSeatTemplate: "override-reserve"));
 
@@ -45,11 +45,11 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     {
         var store = await CreateStoreAsync(AppSettings.Default with
         {
-            CustomApiOverridesEnabled = true
+            ProtocolTemplateOverridesEnabled = true
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
-        await store.SaveOverridesAsync(new ProtocolTemplateOverrides(QueryReservationInfoTemplate: "temporary"));
+        await store.SaveOverridesAsync(new TraceIntGraphQlTemplateOverrides(QueryReservationInfoTemplate: "temporary"));
         await store.ResetOverridesAsync();
 
         var effective = await store.GetEffectiveTemplatesAsync();
@@ -64,11 +64,11 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     {
         var store = await CreateStoreAsync(AppSettings.Default with
         {
-            CustomApiOverridesEnabled = false
+            ProtocolTemplateOverridesEnabled = false
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
-        await store.SaveOverridesAsync(new ProtocolTemplateOverrides(
+        await store.SaveOverridesAsync(new TraceIntGraphQlTemplateOverrides(
             GetCookieUrlTemplate: "https://override.example.com/ReplaceMeByCode",
             QueryLibrariesTemplate: "override-libraries"));
 

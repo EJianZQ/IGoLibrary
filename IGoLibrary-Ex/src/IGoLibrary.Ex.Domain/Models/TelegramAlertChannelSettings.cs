@@ -1,6 +1,6 @@
 namespace IGoLibrary.Ex.Domain.Models;
 
-public sealed record TelegramAlertSettings(
+public sealed record TelegramAlertChannelSettings(
     bool Enabled,
     string ApiBaseUrl,
     string BotToken,
@@ -8,7 +8,7 @@ public sealed record TelegramAlertSettings(
 {
     public const string DefaultApiBaseUrl = "https://api.telegram.org";
 
-    public static TelegramAlertSettings Default { get; } = new(
+    public static TelegramAlertChannelSettings Default { get; } = new(
         Enabled: false,
         ApiBaseUrl: DefaultApiBaseUrl,
         BotToken: string.Empty,

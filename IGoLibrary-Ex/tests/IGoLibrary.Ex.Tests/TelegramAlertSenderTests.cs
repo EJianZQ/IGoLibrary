@@ -26,7 +26,7 @@ public sealed class TelegramAlertSenderTests
         var sender = CreateSender(handler);
 
         await sender.SendAsync(
-            new TelegramAlertSettings(true, "https://api.telegram.org/", "123:ABC", "456"),
+            new TelegramAlertChannelSettings(true, "https://api.telegram.org/", "123:ABC", "456"),
             "测试消息");
 
         Assert.NotNull(capturedRequest);
@@ -48,7 +48,7 @@ public sealed class TelegramAlertSenderTests
         var sender = CreateSender(handler);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => sender.SendAsync(
-            new TelegramAlertSettings(true, "https://api.telegram.org", "123:ABC", "456"),
+            new TelegramAlertChannelSettings(true, "https://api.telegram.org", "123:ABC", "456"),
             "测试消息"));
 
         Assert.Contains("error_code=400", exception.Message);
@@ -70,7 +70,7 @@ public sealed class TelegramAlertSenderTests
         var sender = CreateSender(handler, AppSettings.Default with { ApiTimeoutSeconds = 1, RetryCount = 1 });
 
         await sender.SendAsync(
-            new TelegramAlertSettings(true, "https://api.telegram.org", "123:ABC", "456"),
+            new TelegramAlertChannelSettings(true, "https://api.telegram.org", "123:ABC", "456"),
             "测试消息");
 
         Assert.Equal(2, handler.CallCount);
@@ -88,7 +88,7 @@ public sealed class TelegramAlertSenderTests
     public void Normalize_ValidatesRequiredSettings(string? apiBaseUrl, string? botToken, string? chatId, string expectedMessage)
     {
         var exception = Assert.Throws<InvalidOperationException>(() => TelegramAlertSender.Normalize(
-            new TelegramAlertSettings(true, apiBaseUrl!, botToken!, chatId!)));
+            new TelegramAlertChannelSettings(true, apiBaseUrl!, botToken!, chatId!)));
 
         Assert.Equal(expectedMessage, exception.Message);
     }

@@ -2,9 +2,9 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Infrastructure.Protocol;
 
-internal static class DefaultTemplates
+internal static class DefaultTraceIntGraphQlTemplates
 {
-    public static ProtocolTemplateSet Instance { get; } = new(
+    public static TraceIntGraphQlTemplateSet Instance { get; } = new(
         GetCookieUrlTemplate: "http://wechat.v2.traceint.com/index.php/urlNew/auth.html?r=https%3A%2F%2Fweb.traceint.com%2Fweb%2Findex.html&code=ReplaceMeByCode&state=1",
         QueryLibrariesTemplate: """{"operationName":"list","query":"query list {\n userAuth {\n reserve {\n libs(libType: -1) {\n lib_id\n lib_floor\n is_open\n lib_name\n lib_type\n lib_group_id\n lib_comment\n lib_rt {\n seats_total\n seats_used\n seats_booking\n seats_has\n reserve_ttl\n open_time\n open_time_str\n close_time\n close_time_str\n advance_booking\n }\n }\n libGroups {\n id\n group_name\n }\n reserve {\n isRecordUser\n }\n }\n record {\n libs {\n lib_id\n lib_floor\n is_open\n lib_name\n lib_type\n lib_group_id\n lib_comment\n lib_color_name\n lib_rt {\n seats_total\n seats_used\n seats_booking\n seats_has\n reserve_ttl\n open_time\n open_time_str\n close_time\n close_time_str\n advance_booking\n }\n }\n }\n rule {\n signRule\n }\n }\n}"}""",
         QueryLibraryLayoutTemplate: """{"operationName":"libLayout","query":"query libLayout($libId: Int, $libType: Int) {\n userAuth {\n reserve {\n libs(libType: $libType, libId: $libId) {\n lib_id\n is_open\n lib_floor\n lib_name\n lib_type\n lib_layout {\n seats_total\n seats_booking\n seats_used\n max_x\n max_y\n seats {\n x\n y\n key\n type\n name\n seat_status\n status\n }\n }\n }\n }\n }\n}","variables":{"libId":ReplaceMe}}""",

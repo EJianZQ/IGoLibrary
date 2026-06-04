@@ -4,9 +4,9 @@ namespace IGoLibrary.Ex.Application.Abstractions;
 
 public interface IProtocolTemplateStore
 {
-    Task<ProtocolTemplateSet> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default);
+    Task<TraceIntGraphQlTemplateSet> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default);
 
-    Task SaveOverridesAsync(ProtocolTemplateOverrides overrides, CancellationToken cancellationToken = default);
+    Task SaveOverridesAsync(TraceIntGraphQlTemplateOverrides overrides, CancellationToken cancellationToken = default);
 
     Task ResetOverridesAsync(CancellationToken cancellationToken = default);
 }

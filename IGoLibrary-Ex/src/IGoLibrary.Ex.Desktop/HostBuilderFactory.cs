@@ -43,7 +43,7 @@ internal static class HostBuilderFactory
                 services.AddSingleton<ToastNotificationService>();
                 services.AddSingleton<INotificationService>(serviceProvider => serviceProvider.GetRequiredService<ToastNotificationService>());
                 services.AddSingleton<AlertSoundService>();
-                services.AddSingleton<ITaskAlertService, TaskAlertService>();
+                services.AddSingleton<ITaskEventAlertService, TaskEventAlertService>();
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<MainWindowViewModel>();
             });

@@ -94,11 +94,11 @@ public sealed class SessionService(
 
     private async Task ValidateCookieForSessionAsync(string cookie, CancellationToken cancellationToken)
     {
-        if (CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime))
+        if (SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime))
         {
             if (expirationTime <= DateTimeOffset.Now)
             {
-                throw new InvalidOperationException(CookieExpiryDetector.BuildExpiredMessage(expirationTime));
+                throw new InvalidOperationException(SessionAuthFailureDetector.BuildCookieExpiredMessage(expirationTime));
             }
 
             activityLogService.Write(LogEntryKind.Info, "Auth", $"Cookie JWT 未过期，到期时间：{expirationTime:yyyy-MM-dd HH:mm:ss}。");

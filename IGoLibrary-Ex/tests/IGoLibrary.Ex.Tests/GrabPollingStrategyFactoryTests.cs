@@ -3,15 +3,15 @@ using IGoLibrary.Ex.Domain.Helpers;
 
 namespace IGoLibrary.Ex.Tests;
 
-public sealed class GrabStrategyFactoryTests
+public sealed class GrabPollingStrategyFactoryTests
 {
     [Theory]
-    [InlineData(GrabMode.Aggressive, 1, 1)]
-    [InlineData(GrabMode.Randomized, 4, 8)]
-    [InlineData(GrabMode.Relaxed, 5, 5)]
-    public void FromMode_ReturnsExpectedDelayWindow(GrabMode mode, int minDelaySeconds, int maxDelaySeconds)
+    [InlineData(GrabPollingMode.Aggressive, 1, 1)]
+    [InlineData(GrabPollingMode.Randomized, 4, 8)]
+    [InlineData(GrabPollingMode.Relaxed, 5, 5)]
+    public void FromMode_ReturnsExpectedDelayWindow(GrabPollingMode mode, int minDelaySeconds, int maxDelaySeconds)
     {
-        var strategy = GrabStrategyFactory.FromMode(mode);
+        var strategy = GrabPollingStrategyFactory.FromMode(mode);
 
         Assert.Equal(TimeSpan.FromSeconds(minDelaySeconds), strategy.MinimumDelay);
         Assert.Equal(TimeSpan.FromSeconds(maxDelaySeconds), strategy.MaximumDelay);

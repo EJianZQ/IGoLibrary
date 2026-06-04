@@ -14,7 +14,7 @@ internal sealed class TelegramAlertSender(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task SendAsync(
-        TelegramAlertSettings settings,
+        TelegramAlertChannelSettings settings,
         string message,
         CancellationToken cancellationToken = default)
     {
@@ -31,7 +31,7 @@ internal sealed class TelegramAlertSender(
         ThrowIfTelegramResponseFailed(response, raw);
     }
 
-    internal static TelegramAlertSettings Normalize(TelegramAlertSettings settings)
+    internal static TelegramAlertChannelSettings Normalize(TelegramAlertChannelSettings settings)
     {
         var apiBaseUrl = (settings.ApiBaseUrl ?? string.Empty).Trim().TrimEnd('/');
         if (string.IsNullOrWhiteSpace(apiBaseUrl))
@@ -66,7 +66,7 @@ internal sealed class TelegramAlertSender(
     }
 
     private async Task<HttpResponseMessage> SendOnceAsync(
-        TelegramAlertSettings settings,
+        TelegramAlertChannelSettings settings,
         string message,
         CancellationToken cancellationToken)
     {
@@ -80,7 +80,7 @@ internal sealed class TelegramAlertSender(
         return await httpClient.SendAsync(request, cancellationToken);
     }
 
-    internal static Uri BuildSendMessageUri(TelegramAlertSettings settings)
+    internal static Uri BuildSendMessageUri(TelegramAlertChannelSettings settings)
     {
         var normalized = Normalize(settings);
         return new Uri($"{normalized.ApiBaseUrl}/bot{normalized.BotToken}/sendMessage");

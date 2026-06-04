@@ -4,4 +4,4 @@ namespace IGoLibrary.Ex.Domain.Models;
 
 public sealed record OccupySeatPlan(
     TimeSpan ReReserveDelay,
-    RefreshMode RefreshMode);
+    OccupyRefreshMode OccupyRefreshMode);

@@ -10,7 +10,7 @@ namespace IGoLibrary.Ex.Infrastructure.Notifications;
 internal sealed class SmtpEmailAlertSender(ISmtpTransportClientFactory transportClientFactory) : IEmailAlertSender
 {
     public async Task SendAsync(
-        CookieExpiryEmailAlertSettings settings,
+        EmailAlertChannelSettings settings,
         string subject,
         string body,
         CancellationToken cancellationToken = default)
@@ -33,7 +33,7 @@ internal sealed class SmtpEmailAlertSender(ISmtpTransportClientFactory transport
         await client.DisconnectAsync(quit: true, cancellationToken);
     }
 
-    internal static SecureSocketOptions ResolveSocketOptions(CookieExpiryEmailAlertSettings settings)
+    internal static SecureSocketOptions ResolveSocketOptions(EmailAlertChannelSettings settings)
     {
         return settings.SecurityMode switch
         {
@@ -44,7 +44,7 @@ internal sealed class SmtpEmailAlertSender(ISmtpTransportClientFactory transport
         };
     }
 
-    internal static MimeMessage CreateMessage(CookieExpiryEmailAlertSettings settings, string subject, string body)
+    internal static MimeMessage CreateMessage(EmailAlertChannelSettings settings, string subject, string body)
     {
         var message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse(settings.FromAddress));
@@ -57,7 +57,7 @@ internal sealed class SmtpEmailAlertSender(ISmtpTransportClientFactory transport
         return message;
     }
 
-    internal static bool ShouldAuthenticate(CookieExpiryEmailAlertSettings settings)
+    internal static bool ShouldAuthenticate(EmailAlertChannelSettings settings)
     {
         return !string.IsNullOrWhiteSpace(settings.Username)
             && !string.IsNullOrWhiteSpace(settings.Password);

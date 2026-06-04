@@ -17,7 +17,7 @@ public sealed class GrabSeatCoordinatorTests
         var layoutCallCount = 0;
         var reserveCallCount = 0;
         var reserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var alertService = new FakeTaskAlertService();
+        var alertService = new FakeTaskEventAlertService();
 
         var apiClient = new FakeTraceIntApiClient
         {
@@ -57,8 +57,8 @@ public sealed class GrabSeatCoordinatorTests
                 new TrackedSeat("seat-1", "1号座"),
                 new TrackedSeat("seat-2", "2号座")
             ],
-            GrabMode.Aggressive,
-            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            GrabPollingMode.Aggressive,
+            GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
 
         await coordinator.StartAsync(plan);
@@ -75,7 +75,7 @@ public sealed class GrabSeatCoordinatorTests
     public async Task StartAsync_MarksCompletedBeforeSlowSuccessAlertFinishes()
     {
         var alertCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var alertService = new FakeTaskAlertService
+        var alertService = new FakeTaskEventAlertService
         {
             GrabSucceededCompletion = alertCompletion
         };
@@ -97,8 +97,8 @@ public sealed class GrabSeatCoordinatorTests
             1,
             "自科阅览区一",
             [new TrackedSeat("seat-1", "1号座")],
-            GrabMode.Aggressive,
-            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            GrabPollingMode.Aggressive,
+            GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
 
         await coordinator.StartAsync(plan);
@@ -143,7 +143,7 @@ public sealed class GrabSeatCoordinatorTests
         var coordinator = new GrabSeatCoordinator(
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
-            new FakeTaskAlertService(),
+            new FakeTaskEventAlertService(),
             activityLogService,
             runtimeState);
 
@@ -154,8 +154,8 @@ public sealed class GrabSeatCoordinatorTests
                 new TrackedSeat("seat-1", "1号座"),
                 new TrackedSeat("seat-2", "2号座")
             ],
-            GrabMode.Aggressive,
-            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            GrabPollingMode.Aggressive,
+            GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
 
         await coordinator.StartAsync(plan);
@@ -199,7 +199,7 @@ public sealed class GrabSeatCoordinatorTests
         var coordinator = new GrabSeatCoordinator(
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
-            new FakeTaskAlertService(),
+            new FakeTaskEventAlertService(),
             activityLogService,
             runtimeState);
 
@@ -210,8 +210,8 @@ public sealed class GrabSeatCoordinatorTests
                 new TrackedSeat("seat-1", "12"),
                 new TrackedSeat("seat-2", "18")
             ],
-            GrabMode.Aggressive,
-            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            GrabPollingMode.Aggressive,
+            GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
 
         await coordinator.StartAsync(plan);
@@ -268,7 +268,7 @@ public sealed class GrabSeatCoordinatorTests
         var coordinator = new GrabSeatCoordinator(
             apiClient,
             new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.QueryThenReserve }),
-            new FakeTaskAlertService(),
+            new FakeTaskEventAlertService(),
             new ActivityLogService(),
             runtimeState);
 
@@ -279,8 +279,8 @@ public sealed class GrabSeatCoordinatorTests
                 new TrackedSeat("seat-1", "1号座"),
                 new TrackedSeat("seat-2", "2号座")
             ],
-            GrabMode.Aggressive,
-            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            GrabPollingMode.Aggressive,
+            GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
 
         await coordinator.StartAsync(plan);
@@ -294,10 +294,10 @@ public sealed class GrabSeatCoordinatorTests
     }
 
     [Fact]
-    public async Task StartAsync_NotifiesCookieExpiry_WhenPollingReceivesUnauthorized()
+    public async Task StartAsync_NotifiesSessionInvalid_WhenPollingReceivesUnauthorized()
     {
         var notificationService = new FakeNotificationService();
-        var alertService = new FakeTaskAlertService();
+        var alertService = new FakeTaskEventAlertService();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetLibraryLayoutAsync = (_, _, _) => Task.FromException<LibraryLayout>(
@@ -319,23 +319,23 @@ public sealed class GrabSeatCoordinatorTests
             1,
             "自科阅览区一",
             [new TrackedSeat("seat-1", "1号座")],
-            GrabMode.Aggressive,
-            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            GrabPollingMode.Aggressive,
+            GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
 
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
-        var alert = Assert.Single(alertService.CookieExpiredNotifications);
+        var alert = Assert.Single(alertService.SessionInvalidNotifications);
         Assert.Equal("抢座轮询", alert.Source);
         Assert.Empty(notificationService.Warnings);
     }
 
     [Fact]
-    public async Task StartAsync_NotifiesCookieExpiry_FromExpiredJwt_WithoutPollingApi()
+    public async Task StartAsync_NotifiesSessionInvalid_FromExpiredJwt_WithoutPollingApi()
     {
         var layoutCallCount = 0;
-        var alertService = new FakeTaskAlertService();
+        var alertService = new FakeTaskEventAlertService();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetLibraryLayoutAsync = (_, _, _) =>
@@ -364,24 +364,24 @@ public sealed class GrabSeatCoordinatorTests
             1,
             "自科阅览区一",
             [new TrackedSeat("seat-1", "1号座")],
-            GrabMode.Aggressive,
-            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            GrabPollingMode.Aggressive,
+            GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
 
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
         Assert.Equal(0, layoutCallCount);
-        var alert = Assert.Single(alertService.CookieExpiredNotifications);
+        var alert = Assert.Single(alertService.SessionInvalidNotifications);
         Assert.Equal("抢座轮询", alert.Source);
         Assert.Contains("Cookie 已过期", alert.Reason);
     }
 
     [Fact]
-    public async Task StartAsync_NotifiesTaskFailure_WhenPollingFailsWithoutCookieExpiry()
+    public async Task StartAsync_NotifiesTaskFailure_WhenPollingFailsWithoutSessionInvalid()
     {
         var notificationService = new FakeNotificationService();
-        var alertService = new FakeTaskAlertService();
+        var alertService = new FakeTaskEventAlertService();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetLibraryLayoutAsync = (_, _, _) => Task.FromException<LibraryLayout>(
@@ -403,8 +403,8 @@ public sealed class GrabSeatCoordinatorTests
             1,
             "自科阅览区一",
             [new TrackedSeat("seat-1", "1号座")],
-            GrabMode.Aggressive,
-            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            GrabPollingMode.Aggressive,
+            GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
 
         await coordinator.StartAsync(plan);

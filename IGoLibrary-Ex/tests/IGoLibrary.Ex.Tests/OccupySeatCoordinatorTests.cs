@@ -51,12 +51,12 @@ public sealed class OccupySeatCoordinatorTests
             apiClient,
             settingsService,
             notificationService,
-            new FakeTaskAlertService(),
+            new FakeTaskEventAlertService(),
             activityLogService,
             runtimeState);
 
         using var cts = new CancellationTokenSource();
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, RefreshMode.FixedTenSeconds), cts.Token);
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds), cts.Token);
 
         await reserveSucceeded.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
@@ -69,10 +69,10 @@ public sealed class OccupySeatCoordinatorTests
     }
 
     [Fact]
-    public async Task StartAsync_NotifiesCookieExpiry_WhenReservationRefreshReturnsUnauthorized()
+    public async Task StartAsync_NotifiesSessionInvalid_WhenReservationRefreshReturnsUnauthorized()
     {
         var notificationService = new FakeNotificationService();
-        var alertService = new FakeTaskAlertService();
+        var alertService = new FakeTaskEventAlertService();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetReservationInfoAsync = (_, _) => Task.FromException<ReservationInfo?>(
@@ -91,19 +91,19 @@ public sealed class OccupySeatCoordinatorTests
             new ActivityLogService(),
             runtimeState);
 
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, RefreshMode.FixedTenSeconds));
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
-        var alert = Assert.Single(alertService.CookieExpiredNotifications);
+        var alert = Assert.Single(alertService.SessionInvalidNotifications);
         Assert.Equal("占座轮询", alert.Source);
         Assert.Empty(notificationService.Warnings);
     }
 
     [Fact]
-    public async Task StartAsync_NotifiesCookieExpiry_FromExpiredJwt_WithoutRefreshingReservation()
+    public async Task StartAsync_NotifiesSessionInvalid_FromExpiredJwt_WithoutRefreshingReservation()
     {
         var reservationInfoCallCount = 0;
-        var alertService = new FakeTaskAlertService();
+        var alertService = new FakeTaskEventAlertService();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetReservationInfoAsync = (_, _) =>
@@ -129,20 +129,20 @@ public sealed class OccupySeatCoordinatorTests
             new ActivityLogService(),
             runtimeState);
 
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, RefreshMode.FixedTenSeconds));
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
         Assert.Equal(0, reservationInfoCallCount);
-        var alert = Assert.Single(alertService.CookieExpiredNotifications);
+        var alert = Assert.Single(alertService.SessionInvalidNotifications);
         Assert.Equal("占座轮询", alert.Source);
         Assert.Contains("Cookie 已过期", alert.Reason);
     }
 
     [Fact]
-    public async Task StartAsync_NotifiesTaskFailure_WhenReservationRefreshFailsWithoutCookieExpiry()
+    public async Task StartAsync_NotifiesTaskFailure_WhenReservationRefreshFailsWithoutSessionInvalid()
     {
         var notificationService = new FakeNotificationService();
-        var alertService = new FakeTaskAlertService();
+        var alertService = new FakeTaskEventAlertService();
         var apiClient = new FakeTraceIntApiClient
         {
             OnGetReservationInfoAsync = (_, _) => Task.FromException<ReservationInfo?>(
@@ -161,7 +161,7 @@ public sealed class OccupySeatCoordinatorTests
             new ActivityLogService(),
             runtimeState);
 
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, RefreshMode.FixedTenSeconds));
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
         var failure = Assert.Single(alertService.TaskFailedNotifications);

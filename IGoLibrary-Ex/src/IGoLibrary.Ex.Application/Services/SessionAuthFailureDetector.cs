@@ -4,7 +4,7 @@ using IGoLibrary.Ex.Application.Exceptions;
 
 namespace IGoLibrary.Ex.Application.Services;
 
-public static class CookieExpiryDetector
+public static class SessionAuthFailureDetector
 {
     private static readonly string[] Keywords =
     [
@@ -20,13 +20,13 @@ public static class CookieExpiryDetector
         "expired"
     ];
 
-    public static bool IsExpired(string? cookie, DateTimeOffset? now = null)
+    public static bool IsCookieExpired(string? cookie, DateTimeOffset? now = null)
     {
-        return TryGetExpirationTime(cookie, out var expirationTime) &&
+        return TryGetCookieExpirationTime(cookie, out var expirationTime) &&
                expirationTime <= (now ?? DateTimeOffset.Now);
     }
 
-    public static bool TryGetExpirationTime(string? cookie, out DateTimeOffset expirationTime)
+    public static bool TryGetCookieExpirationTime(string? cookie, out DateTimeOffset expirationTime)
     {
         expirationTime = default;
         if (!TryExtractAuthorizationToken(cookie, out var token))
@@ -59,27 +59,27 @@ public static class CookieExpiryDetector
         return false;
     }
 
-    public static string BuildExpiredMessage(DateTimeOffset expirationTime)
+    public static string BuildCookieExpiredMessage(DateTimeOffset expirationTime)
     {
         return $"Cookie 已过期，到期时间：{expirationTime:yyyy-MM-dd HH:mm:ss}";
     }
 
-    public static bool IsKnownExpiredCookieException(Exception exception, string? cookie)
+    public static bool IsSessionInvalidException(Exception exception, string? cookie)
     {
         if (IsExplicitAuthorizationFailure(exception))
         {
             return true;
         }
 
-        if (TryGetExpirationTime(cookie, out _))
+        if (TryGetCookieExpirationTime(cookie, out _))
         {
-            return IsExpired(cookie);
+            return IsCookieExpired(cookie);
         }
 
-        return IsExpired(exception);
+        return IsSessionInvalidException(exception);
     }
 
-    public static bool IsExpired(Exception exception)
+    public static bool IsSessionInvalidException(Exception exception)
     {
         if (IsExplicitAuthorizationFailure(exception))
         {

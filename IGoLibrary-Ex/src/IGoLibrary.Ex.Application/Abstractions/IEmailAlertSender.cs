@@ -5,7 +5,7 @@ namespace IGoLibrary.Ex.Application.Abstractions;
 public interface IEmailAlertSender
 {
     Task SendAsync(
-        CookieExpiryEmailAlertSettings settings,
+        EmailAlertChannelSettings settings,
         string subject,
         string body,
         CancellationToken cancellationToken = default);

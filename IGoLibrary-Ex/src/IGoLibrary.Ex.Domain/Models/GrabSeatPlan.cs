@@ -6,6 +6,6 @@ public sealed record GrabSeatPlan(
     int LibraryId,
     string LibraryName,
     IReadOnlyList<TrackedSeat> Seats,
-    GrabMode Mode,
+    GrabPollingMode PollingMode,
     GrabSeatPollingStrategy PollingStrategy,
     TimeOnly? ScheduledStart);

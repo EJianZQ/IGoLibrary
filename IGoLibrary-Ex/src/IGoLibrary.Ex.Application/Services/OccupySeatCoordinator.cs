@@ -10,7 +10,7 @@ public sealed class OccupySeatCoordinator(
     ITraceIntApiClient apiClient,
     ISettingsService settingsService,
     INotificationService notificationService,
-    ITaskAlertService taskAlertService,
+    ITaskEventAlertService taskAlertService,
     IActivityLogService activityLogService,
     AppRuntimeState runtimeState) : IOccupySeatCoordinator
 {
@@ -104,7 +104,7 @@ public sealed class OccupySeatCoordinator(
                 runtimeState.CurrentReservation = info;
                 if (!ReservationTimeHelper.ShouldReReserve(info.ExpirationTime, DateTimeOffset.Now))
                 {
-                    var delay = plan.RefreshMode == RefreshMode.FixedTenSeconds
+                    var delay = plan.OccupyRefreshMode == OccupyRefreshMode.FixedTenSeconds
                         ? TimeSpan.FromSeconds(10)
                         : TimeSpan.FromSeconds(random.Next(10, 21));
                     activityLogService.Write(LogEntryKind.Info, "Occupy", $"距离过期还有 {(info.ExpirationTime - DateTimeOffset.Now).TotalSeconds:0} 秒，{delay.TotalSeconds:0} 秒后继续检测。");
@@ -139,9 +139,9 @@ public sealed class OccupySeatCoordinator(
         {
             Fail($"占座任务失败：{ex.Message}");
             activityLogService.Write(LogEntryKind.Error, "Occupy", ex.Message);
-            if (CookieExpiryDetector.IsKnownExpiredCookieException(ex, runtimeState.Session?.Cookie))
+            if (SessionAuthFailureDetector.IsSessionInvalidException(ex, runtimeState.Session?.Cookie))
             {
-                await taskAlertService.NotifyCookieExpiredAsync("占座轮询", ex.Message, CancellationToken.None);
+                await taskAlertService.NotifySessionInvalidAsync("占座轮询", ex.Message, CancellationToken.None);
                 return;
             }
 
@@ -206,10 +206,10 @@ public sealed class OccupySeatCoordinator(
     private string GetCurrentCookieOrThrow()
     {
         var cookie = runtimeState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
-        if (CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime) &&
+        if (SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime) &&
             expirationTime <= DateTimeOffset.Now)
         {
-            throw new InvalidOperationException(CookieExpiryDetector.BuildExpiredMessage(expirationTime));
+            throw new InvalidOperationException(SessionAuthFailureDetector.BuildCookieExpiredMessage(expirationTime));
         }
 
         return cookie;

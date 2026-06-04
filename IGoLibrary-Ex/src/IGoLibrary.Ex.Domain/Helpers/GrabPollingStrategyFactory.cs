@@ -3,19 +3,19 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Domain.Helpers;
 
-public static class GrabStrategyFactory
+public static class GrabPollingStrategyFactory
 {
-    public static GrabSeatPollingStrategy FromMode(GrabMode mode)
+    public static GrabSeatPollingStrategy FromMode(GrabPollingMode mode)
     {
         return mode switch
         {
-            GrabMode.Aggressive => new GrabSeatPollingStrategy(
+            GrabPollingMode.Aggressive => new GrabSeatPollingStrategy(
                 TimeSpan.FromSeconds(1),
                 TimeSpan.FromSeconds(1),
                 50,
                 TimeSpan.FromSeconds(5),
                 TimeSpan.FromSeconds(10)),
-            GrabMode.Randomized => new GrabSeatPollingStrategy(
+            GrabPollingMode.Randomized => new GrabSeatPollingStrategy(
                 TimeSpan.FromSeconds(4),
                 TimeSpan.FromSeconds(8),
                 50,

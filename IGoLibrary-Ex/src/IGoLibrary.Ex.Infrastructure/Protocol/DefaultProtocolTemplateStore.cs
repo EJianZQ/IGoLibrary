@@ -11,18 +11,18 @@ public sealed class DefaultProtocolTemplateStore(
 {
     private const string OverridesKey = "protocol-overrides";
 
-    public async Task<ProtocolTemplateSet> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default)
+    public async Task<TraceIntGraphQlTemplateSet> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default)
     {
-        var defaults = DefaultTemplates.Instance;
+        var defaults = DefaultTraceIntGraphQlTemplates.Instance;
         var settings = await settingsService.LoadAsync(cancellationToken);
-        if (!settings.CustomApiOverridesEnabled)
+        if (!settings.ProtocolTemplateOverridesEnabled)
         {
             return defaults;
         }
 
         var overrides = await LoadOverridesAsync(cancellationToken);
 
-        return new ProtocolTemplateSet(
+        return new TraceIntGraphQlTemplateSet(
             overrides.GetCookieUrlTemplate ?? defaults.GetCookieUrlTemplate,
             overrides.QueryLibrariesTemplate ?? defaults.QueryLibrariesTemplate,
             overrides.QueryLibraryLayoutTemplate ?? defaults.QueryLibraryLayoutTemplate,
@@ -32,7 +32,7 @@ public sealed class DefaultProtocolTemplateStore(
             overrides.CancelReservationTemplate ?? defaults.CancelReservationTemplate);
     }
 
-    public async Task SaveOverridesAsync(ProtocolTemplateOverrides overrides, CancellationToken cancellationToken = default)
+    public async Task SaveOverridesAsync(TraceIntGraphQlTemplateOverrides overrides, CancellationToken cancellationToken = default)
     {
         var json = JsonSerializer.Serialize(overrides, AppJson.Default);
 
@@ -62,7 +62,7 @@ public sealed class DefaultProtocolTemplateStore(
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private async Task<ProtocolTemplateOverrides> LoadOverridesAsync(CancellationToken cancellationToken)
+    private async Task<TraceIntGraphQlTemplateOverrides> LoadOverridesAsync(CancellationToken cancellationToken)
     {
         await using var connection = connectionFactory.Create();
         await connection.OpenAsync(cancellationToken);
@@ -74,9 +74,9 @@ public sealed class DefaultProtocolTemplateStore(
         var result = await command.ExecuteScalarAsync(cancellationToken);
         if (result is string json && !string.IsNullOrWhiteSpace(json))
         {
-            return JsonSerializer.Deserialize<ProtocolTemplateOverrides>(json, AppJson.Default) ?? new ProtocolTemplateOverrides();
+            return JsonSerializer.Deserialize<TraceIntGraphQlTemplateOverrides>(json, AppJson.Default) ?? new TraceIntGraphQlTemplateOverrides();
         }
 
-        return new ProtocolTemplateOverrides();
+        return new TraceIntGraphQlTemplateOverrides();
     }
 }

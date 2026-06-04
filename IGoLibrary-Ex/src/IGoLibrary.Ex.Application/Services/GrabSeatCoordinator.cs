@@ -8,7 +8,7 @@ namespace IGoLibrary.Ex.Application.Services;
 public sealed class GrabSeatCoordinator(
     ITraceIntApiClient apiClient,
     ISettingsService settingsService,
-    ITaskAlertService taskAlertService,
+    ITaskEventAlertService taskAlertService,
     IActivityLogService activityLogService,
     AppRuntimeState runtimeState) : IGrabSeatCoordinator
 {
@@ -169,9 +169,9 @@ public sealed class GrabSeatCoordinator(
         {
             Fail($"抢座任务失败：{ex.Message}");
             activityLogService.Write(LogEntryKind.Error, "Grab", ex.Message);
-            if (CookieExpiryDetector.IsKnownExpiredCookieException(ex, runtimeState.Session?.Cookie))
+            if (SessionAuthFailureDetector.IsSessionInvalidException(ex, runtimeState.Session?.Cookie))
             {
-                await taskAlertService.NotifyCookieExpiredAsync("抢座轮询", ex.Message, CancellationToken.None);
+                await taskAlertService.NotifySessionInvalidAsync("抢座轮询", ex.Message, CancellationToken.None);
                 return;
             }
 
@@ -309,10 +309,10 @@ public sealed class GrabSeatCoordinator(
     private string GetCurrentCookieOrThrow()
     {
         var cookie = runtimeState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
-        if (CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime) &&
+        if (SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime) &&
             expirationTime <= DateTimeOffset.Now)
         {
-            throw new InvalidOperationException(CookieExpiryDetector.BuildExpiredMessage(expirationTime));
+            throw new InvalidOperationException(SessionAuthFailureDetector.BuildCookieExpiredMessage(expirationTime));
         }
 
         return cookie;

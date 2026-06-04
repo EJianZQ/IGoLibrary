@@ -2,7 +2,7 @@ using IGoLibrary.Ex.Domain.Enums;
 
 namespace IGoLibrary.Ex.Domain.Models;
 
-public sealed record CookieExpiryEmailAlertSettings(
+public sealed record EmailAlertChannelSettings(
     bool Enabled,
     string SmtpHost,
     int Port,
@@ -12,7 +12,7 @@ public sealed record CookieExpiryEmailAlertSettings(
     string FromAddress,
     string ToAddress)
 {
-    public static CookieExpiryEmailAlertSettings Default { get; } = new(
+    public static EmailAlertChannelSettings Default { get; } = new(
         Enabled: false,
         SmtpHost: string.Empty,
         Port: 587,

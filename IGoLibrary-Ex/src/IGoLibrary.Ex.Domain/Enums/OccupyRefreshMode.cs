@@ -1,6 +1,6 @@
 namespace IGoLibrary.Ex.Domain.Enums;
 
-public enum RefreshMode
+public enum OccupyRefreshMode
 {
     FixedTenSeconds = 0,
     RandomTenToTwentySeconds = 1

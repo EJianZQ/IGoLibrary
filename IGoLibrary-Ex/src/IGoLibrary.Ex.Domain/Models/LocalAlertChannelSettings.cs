@@ -1,10 +1,10 @@
 namespace IGoLibrary.Ex.Domain.Models;
 
-public sealed record CookieExpiryLocalAlertSettings(
+public sealed record LocalAlertChannelSettings(
     bool ToastEnabled,
     bool SoundEnabled)
 {
-    public static CookieExpiryLocalAlertSettings Default { get; } = new(
+    public static LocalAlertChannelSettings Default { get; } = new(
         ToastEnabled: true,
         SoundEnabled: false);
 }

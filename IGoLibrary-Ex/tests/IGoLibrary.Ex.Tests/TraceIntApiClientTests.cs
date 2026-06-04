@@ -23,7 +23,7 @@ public sealed class TraceIntApiClientTests
             {
                 Timeout = Timeout.InfiniteTimeSpan
             },
-            new FakeProtocolTemplateStore(new ProtocolTemplateSet(
+            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet(
                 "https://example.com/ReplaceMeByCode",
                 "{\"query\":\"libraries\"}",
                 "{\"query\":\"layout\"}",
@@ -58,7 +58,7 @@ public sealed class TraceIntApiClientTests
             {
                 Timeout = Timeout.InfiniteTimeSpan
             },
-            new FakeProtocolTemplateStore(new ProtocolTemplateSet(
+            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet(
                 "https://example.com/ReplaceMeByCode",
                 "{\"query\":\"libraries\"}",
                 "{\"query\":\"layout\"}",
@@ -109,7 +109,7 @@ public sealed class TraceIntApiClientTests
             {
                 Timeout = Timeout.InfiniteTimeSpan
             },
-            new FakeProtocolTemplateStore(new ProtocolTemplateSet(
+            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet(
                 "https://example.com/ReplaceMeByCode",
                 "{\"query\":\"libraries\"}",
                 "{\"query\":\"layout\"}",
@@ -175,7 +175,7 @@ public sealed class TraceIntApiClientTests
             {
                 Timeout = Timeout.InfiniteTimeSpan
             },
-            new FakeProtocolTemplateStore(new ProtocolTemplateSet(
+            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet(
                 "https://example.com/ReplaceMeByCode",
                 "{\"query\":\"libraries\"}",
                 "{\"query\":\"layout\"}",
@@ -222,7 +222,7 @@ public sealed class TraceIntApiClientTests
             {
                 Timeout = Timeout.InfiniteTimeSpan
             },
-            new FakeProtocolTemplateStore(new ProtocolTemplateSet(
+            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet(
                 "https://example.com/ReplaceMeByCode",
                 "{\"query\":\"libraries\"}",
                 "{\"query\":\"layout\"}",

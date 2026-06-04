@@ -25,7 +25,7 @@ public partial class MainWindowViewModel(
     IProtocolTemplateStore protocolTemplateStore,
     IGrabSeatCoordinator grabSeatCoordinator,
     IOccupySeatCoordinator occupySeatCoordinator,
-    ITaskAlertService taskAlertService,
+    ITaskEventAlertService taskAlertService,
     IActivityLogService activityLogService,
     INotificationService notificationService,
     IErrorDialogService errorDialogService,
@@ -139,9 +139,9 @@ public partial class MainWindowViewModel(
 
     public ObservableCollection<LogLineViewModel> OccupyLogLines { get; } = [];
 
-    public string[] GrabModes { get; } = ["极限速度", "随机延迟", "延迟 5 秒"];
+    public string[] GrabPollingModes { get; } = ["极限速度", "随机延迟", "延迟 5 秒"];
 
-    public string[] RefreshModes { get; } = ["固定间隔 10 秒", "随机 10~20 秒"];
+    public string[] OccupyRefreshModes { get; } = ["固定间隔 10 秒", "随机 10~20 秒"];
 
     public string[] GrabReservationStrategies { get; } = ["先获取列表判断状态", "直接发送预约请求"];
 
@@ -387,7 +387,7 @@ public partial class MainWindowViewModel(
     private int visibleSeatResultCount;
 
     [ObservableProperty]
-    private int selectedGrabModeIndex = 2;
+    private int selectedGrabPollingModeIndex = 2;
 
     [ObservableProperty]
     private int selectedGrabReservationStrategyIndex;
@@ -425,7 +425,7 @@ public partial class MainWindowViewModel(
     private int reReserveDelaySeconds = 60;
 
     [ObservableProperty]
-    private int selectedRefreshModeIndex;
+    private int selectedOccupyRefreshModeIndex;
 
     [ObservableProperty]
     private int selectedNotificationSettingsTabIndex;
@@ -437,7 +437,7 @@ public partial class MainWindowViewModel(
     private bool minimizeToTrayEnabled = true;
 
     [ObservableProperty]
-    private bool customApiOverridesEnabled;
+    private bool protocolTemplateOverridesEnabled;
 
     [ObservableProperty]
     private int apiTimeoutSeconds = 5;
@@ -462,46 +462,46 @@ public partial class MainWindowViewModel(
     }
 
     [ObservableProperty]
-    private bool cookieEmailAlertsEnabled;
+    private bool emailAlertsEnabled;
 
     [ObservableProperty]
-    private string cookieAlertSmtpHost = string.Empty;
+    private string emailAlertSmtpHost = string.Empty;
 
     [ObservableProperty]
-    private int cookieAlertSmtpPort = 587;
+    private int emailAlertSmtpPort = 587;
 
     [ObservableProperty]
-    private int selectedCookieAlertSecurityModeIndex = 1;
+    private int selectedEmailAlertSecurityModeIndex = 1;
 
     [ObservableProperty]
-    private string cookieAlertUsername = string.Empty;
+    private string emailAlertUsername = string.Empty;
 
     [ObservableProperty]
-    private string cookieAlertPassword = string.Empty;
+    private string emailAlertPassword = string.Empty;
 
     [ObservableProperty]
-    private string cookieAlertFromAddress = string.Empty;
+    private string emailAlertFromAddress = string.Empty;
 
     [ObservableProperty]
-    private string cookieAlertToAddress = string.Empty;
+    private string emailAlertToAddress = string.Empty;
 
     [ObservableProperty]
-    private bool cookieTelegramAlertsEnabled;
+    private bool telegramAlertsEnabled;
 
     [ObservableProperty]
-    private string cookieAlertTelegramApiBaseUrl = TelegramAlertSettings.DefaultApiBaseUrl;
+    private string telegramAlertApiBaseUrl = TelegramAlertChannelSettings.DefaultApiBaseUrl;
 
     [ObservableProperty]
-    private string cookieAlertTelegramBotToken = string.Empty;
+    private string telegramAlertBotToken = string.Empty;
 
     [ObservableProperty]
-    private string cookieAlertTelegramChatId = string.Empty;
+    private string telegramAlertChatId = string.Empty;
 
     [ObservableProperty]
-    private bool cookieLocalToastEnabled = true;
+    private bool localToastAlertsEnabled = true;
 
     [ObservableProperty]
-    private bool cookieLocalSoundEnabled;
+    private bool localSoundAlertsEnabled;
 
     [ObservableProperty]
     private string notificationSettingsStatusText = "更改后会自动保存。";
@@ -782,33 +782,33 @@ public partial class MainWindowViewModel(
 
     partial void OnShowAvailableOnlyChanged(bool value) => _ = ApplySeatFilterAsync();
 
-    partial void OnCookieEmailAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieAlertSmtpHostChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertSmtpHostChanged(string value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieAlertSmtpPortChanged(int value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertSmtpPortChanged(int value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnSelectedCookieAlertSecurityModeIndexChanged(int value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnSelectedEmailAlertSecurityModeIndexChanged(int value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieAlertUsernameChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertUsernameChanged(string value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieAlertPasswordChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertPasswordChanged(string value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieAlertFromAddressChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertFromAddressChanged(string value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieAlertToAddressChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertToAddressChanged(string value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieTelegramAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnTelegramAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieAlertTelegramApiBaseUrlChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnTelegramAlertApiBaseUrlChanged(string value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieAlertTelegramBotTokenChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnTelegramAlertBotTokenChanged(string value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieAlertTelegramChatIdChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnTelegramAlertChatIdChanged(string value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieLocalToastEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnLocalToastAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
 
-    partial void OnCookieLocalSoundEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnLocalSoundAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
 
     partial void OnSelectedLibraryChanged(LibrarySummary? value)
     {
@@ -1329,7 +1329,7 @@ public partial class MainWindowViewModel(
 
         try
         {
-            var mode = (GrabMode)SelectedGrabModeIndex;
+            var mode = (GrabPollingMode)SelectedGrabPollingModeIndex;
             var scheduledStart = ParseScheduledTime();
             await PersistGrabReservationStrategyAsync();
             var plan = new GrabSeatPlan(
@@ -1337,7 +1337,7 @@ public partial class MainWindowViewModel(
                 SelectedLibrary.Name,
                 selectedSeats,
                 mode,
-                GrabStrategyFactory.FromMode(mode),
+                GrabPollingStrategyFactory.FromMode(mode),
                 scheduledStart);
             await grabSeatCoordinator.StartAsync(plan);
         }
@@ -1454,7 +1454,7 @@ public partial class MainWindowViewModel(
         {
             var plan = new OccupySeatPlan(
                 TimeSpan.FromSeconds(Math.Max(1, ReReserveDelaySeconds)),
-                (RefreshMode)SelectedRefreshModeIndex);
+                (OccupyRefreshMode)SelectedOccupyRefreshModeIndex);
             await occupySeatCoordinator.StartAsync(plan);
         }
         catch (Exception ex)
@@ -1487,7 +1487,7 @@ public partial class MainWindowViewModel(
         {
             NotificationsEnabled = NotificationsEnabled,
             MinimizeToTray = MinimizeToTrayEnabled,
-            CustomApiOverridesEnabled = CustomApiOverridesEnabled,
+            ProtocolTemplateOverridesEnabled = ProtocolTemplateOverridesEnabled,
             ApiTimeoutSeconds = Math.Max(3, ApiTimeoutSeconds),
             RetryCount = Math.Max(1, RetryCount),
             ThemeMode = (AppThemeMode)Math.Clamp(SelectedAppThemeModeIndex, 0, ThemeModes.Length - 1),
@@ -1496,7 +1496,7 @@ public partial class MainWindowViewModel(
                 SelectedGrabReservationStrategyIndex,
                 0,
                 GrabReservationStrategies.Length - 1),
-            CookieExpiryAlerts = BuildAlertSettingsSnapshot(),
+            TaskEventAlerts = BuildTaskEventAlertSettingsSnapshot(),
             LastLibraryId = SelectedLibrary?.LibraryId,
             LastLibraryName = SelectedLibrary?.Name,
             SuccessfulReservationCount = _historicalSuccessCount,
@@ -1526,7 +1526,7 @@ public partial class MainWindowViewModel(
         {
             CancelPendingNotificationSettingsAutoSave();
             await PersistNotificationSettingsSnapshotAsync();
-            await taskAlertService.SendTestEmailAsync(BuildAlertSettingsSnapshot().Email);
+            await taskAlertService.SendTestEmailAsync(BuildTaskEventAlertSettingsSnapshot().Email);
             NotificationSettingsStatusText = $"测试邮件已发送于 {DateTime.Now:HH:mm:ss}。";
             await notificationService.ShowSuccessAsync("测试邮件已发送", "请检查收件箱，确认当前 SMTP 配置可用。");
         }
@@ -1545,7 +1545,7 @@ public partial class MainWindowViewModel(
         {
             CancelPendingNotificationSettingsAutoSave();
             await PersistNotificationSettingsSnapshotAsync();
-            await taskAlertService.SendTestTelegramAsync(BuildAlertSettingsSnapshot().Telegram);
+            await taskAlertService.SendTestTelegramAsync(BuildTaskEventAlertSettingsSnapshot().Telegram);
             NotificationSettingsStatusText = $"测试 Telegram 已发送于 {DateTime.Now:HH:mm:ss}。";
             await notificationService.ShowSuccessAsync("测试 Telegram 已发送", "请检查 Telegram，确认当前 Bot 配置可用。");
         }
@@ -1564,7 +1564,7 @@ public partial class MainWindowViewModel(
         {
             CancelPendingNotificationSettingsAutoSave();
             await PersistNotificationSettingsSnapshotAsync();
-            await taskAlertService.SendTestLocalAlertAsync(BuildAlertSettingsSnapshot().Local);
+            await taskAlertService.SendTestLocalAlertAsync(BuildTaskEventAlertSettingsSnapshot().Local);
             NotificationSettingsStatusText = $"测试通知已触发于 {DateTime.Now:HH:mm:ss}。";
         }
         catch (Exception ex)
@@ -1578,7 +1578,7 @@ public partial class MainWindowViewModel(
     [RelayCommand]
     private async Task SaveProtocolOverridesAsync()
     {
-        var overrides = new ProtocolTemplateOverrides(
+        var overrides = new TraceIntGraphQlTemplateOverrides(
             GetCookieTemplateText,
             QueryLibrariesTemplateText,
             QueryLibraryLayoutTemplateText,
@@ -1625,30 +1625,30 @@ public partial class MainWindowViewModel(
         {
             NotificationsEnabled = settings.NotificationsEnabled;
             MinimizeToTrayEnabled = settings.MinimizeToTray;
-            CustomApiOverridesEnabled = settings.CustomApiOverridesEnabled;
+            ProtocolTemplateOverridesEnabled = settings.ProtocolTemplateOverridesEnabled;
             ApiTimeoutSeconds = settings.ApiTimeoutSeconds;
             RetryCount = settings.RetryCount;
             SelectedAppThemeModeIndex = (int)settings.ThemeMode;
             UseSystemAccent = settings.UseSystemAccent;
             SelectedGrabReservationStrategyIndex = (int)settings.GrabReservationStrategy;
 
-            var cookieAlerts = settings.CookieExpiryAlerts ?? CookieExpiryAlertSettings.Default;
-            CookieEmailAlertsEnabled = cookieAlerts.Email.Enabled;
-            CookieAlertSmtpHost = cookieAlerts.Email.SmtpHost;
-            CookieAlertSmtpPort = cookieAlerts.Email.Port;
-            SelectedCookieAlertSecurityModeIndex = cookieAlerts.Email.SecurityMode == EmailSecurityMode.Tls ? 1 : 0;
-            CookieAlertUsername = cookieAlerts.Email.Username;
-            CookieAlertPassword = cookieAlerts.Email.Password;
-            CookieAlertFromAddress = cookieAlerts.Email.FromAddress;
-            CookieAlertToAddress = cookieAlerts.Email.ToAddress;
-            CookieTelegramAlertsEnabled = cookieAlerts.Telegram.Enabled;
-            CookieAlertTelegramApiBaseUrl = string.IsNullOrWhiteSpace(cookieAlerts.Telegram.ApiBaseUrl)
-                ? TelegramAlertSettings.DefaultApiBaseUrl
+            var cookieAlerts = settings.TaskEventAlerts ?? TaskEventAlertSettings.Default;
+            EmailAlertsEnabled = cookieAlerts.Email.Enabled;
+            EmailAlertSmtpHost = cookieAlerts.Email.SmtpHost;
+            EmailAlertSmtpPort = cookieAlerts.Email.Port;
+            SelectedEmailAlertSecurityModeIndex = cookieAlerts.Email.SecurityMode == EmailSecurityMode.Tls ? 1 : 0;
+            EmailAlertUsername = cookieAlerts.Email.Username;
+            EmailAlertPassword = cookieAlerts.Email.Password;
+            EmailAlertFromAddress = cookieAlerts.Email.FromAddress;
+            EmailAlertToAddress = cookieAlerts.Email.ToAddress;
+            TelegramAlertsEnabled = cookieAlerts.Telegram.Enabled;
+            TelegramAlertApiBaseUrl = string.IsNullOrWhiteSpace(cookieAlerts.Telegram.ApiBaseUrl)
+                ? TelegramAlertChannelSettings.DefaultApiBaseUrl
                 : cookieAlerts.Telegram.ApiBaseUrl;
-            CookieAlertTelegramBotToken = cookieAlerts.Telegram.BotToken ?? string.Empty;
-            CookieAlertTelegramChatId = cookieAlerts.Telegram.ChatId ?? string.Empty;
-            CookieLocalToastEnabled = cookieAlerts.Local.ToastEnabled;
-            CookieLocalSoundEnabled = cookieAlerts.Local.SoundEnabled;
+            TelegramAlertBotToken = cookieAlerts.Telegram.BotToken ?? string.Empty;
+            TelegramAlertChatId = cookieAlerts.Telegram.ChatId ?? string.Empty;
+            LocalToastAlertsEnabled = cookieAlerts.Local.ToastEnabled;
+            LocalSoundAlertsEnabled = cookieAlerts.Local.SoundEnabled;
             NotificationSettingsStatusText = "更改后会自动保存。";
 
             _historicalSuccessCount = Math.Max(0, settings.SuccessfulReservationCount);
@@ -2735,7 +2735,7 @@ public partial class MainWindowViewModel(
 
     private static string BuildCookieFetchedMessage(string cookie)
     {
-        if (!CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime))
+        if (!SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime))
         {
             return "授权链接解析成功，Cookie 已填入。";
         }
@@ -2745,7 +2745,7 @@ public partial class MainWindowViewModel(
 
     private async Task NotifySessionRestoredAsync(string cookie)
     {
-        if (!CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime))
+        if (!SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime))
         {
             await notificationService.ShowSuccessAsync("已成功恢复上次的 Cookie", "本地会话已恢复。");
             return;
@@ -2763,7 +2763,7 @@ public partial class MainWindowViewModel(
 
     private void UpdateSidebarCookieExpiry(string cookie)
     {
-        if (!CookieExpiryDetector.TryGetExpirationTime(cookie, out var expirationTime))
+        if (!SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime))
         {
             ClearSidebarCookieExpiry();
             return;
@@ -2939,33 +2939,33 @@ public partial class MainWindowViewModel(
         return seatName.Contains(filterText, StringComparison.OrdinalIgnoreCase);
     }
 
-    private CookieExpiryAlertSettings BuildAlertSettingsSnapshot()
+    private TaskEventAlertSettings BuildTaskEventAlertSettingsSnapshot()
     {
-        return new CookieExpiryAlertSettings(
-            new CookieExpiryEmailAlertSettings(
-                CookieEmailAlertsEnabled,
-                CookieAlertSmtpHost.Trim(),
-                Math.Clamp(CookieAlertSmtpPort, 1, 65535),
-                SelectedCookieAlertSecurityModeIndex == 1 ? EmailSecurityMode.Tls : EmailSecurityMode.None,
-                CookieAlertUsername.Trim(),
-                CookieAlertPassword,
-                CookieAlertFromAddress.Trim(),
-                CookieAlertToAddress.Trim()),
-            new CookieExpiryLocalAlertSettings(
-                CookieLocalToastEnabled,
-                CookieLocalSoundEnabled),
-            new TelegramAlertSettings(
-                CookieTelegramAlertsEnabled,
-                NormalizeTelegramApiBaseUrlForSnapshot(CookieAlertTelegramApiBaseUrl),
-                (CookieAlertTelegramBotToken ?? string.Empty).Trim(),
-                (CookieAlertTelegramChatId ?? string.Empty).Trim()));
+        return new TaskEventAlertSettings(
+            new EmailAlertChannelSettings(
+                EmailAlertsEnabled,
+                EmailAlertSmtpHost.Trim(),
+                Math.Clamp(EmailAlertSmtpPort, 1, 65535),
+                SelectedEmailAlertSecurityModeIndex == 1 ? EmailSecurityMode.Tls : EmailSecurityMode.None,
+                EmailAlertUsername.Trim(),
+                EmailAlertPassword,
+                EmailAlertFromAddress.Trim(),
+                EmailAlertToAddress.Trim()),
+            new LocalAlertChannelSettings(
+                LocalToastAlertsEnabled,
+                LocalSoundAlertsEnabled),
+            new TelegramAlertChannelSettings(
+                TelegramAlertsEnabled,
+                NormalizeTelegramApiBaseUrlForSnapshot(TelegramAlertApiBaseUrl),
+                (TelegramAlertBotToken ?? string.Empty).Trim(),
+                (TelegramAlertChatId ?? string.Empty).Trim()));
     }
 
     private static string NormalizeTelegramApiBaseUrlForSnapshot(string? value)
     {
         var trimmed = (value ?? string.Empty).Trim().TrimEnd('/');
         return string.IsNullOrWhiteSpace(trimmed)
-            ? TelegramAlertSettings.DefaultApiBaseUrl
+            ? TelegramAlertChannelSettings.DefaultApiBaseUrl
             : trimmed;
     }
 
@@ -3031,7 +3031,7 @@ public partial class MainWindowViewModel(
         var current = await settingsService.LoadAsync(cancellationToken);
         await settingsService.SaveAsync(current with
         {
-            CookieExpiryAlerts = BuildAlertSettingsSnapshot()
+            TaskEventAlerts = BuildTaskEventAlertSettingsSnapshot()
         }, cancellationToken);
     }
 

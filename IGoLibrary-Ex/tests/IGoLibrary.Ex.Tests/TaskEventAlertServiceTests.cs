@@ -6,13 +6,13 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Tests;
 
-public sealed class TaskAlertServiceTests
+public sealed class TaskEventAlertServiceTests
 {
     [Fact]
     public async Task SendTestEmailAsync_ThrowsWhenOnlyUsernameIsProvided()
     {
         var service = CreateService();
-        var settings = new CookieExpiryEmailAlertSettings(
+        var settings = new EmailAlertChannelSettings(
             Enabled: true,
             SmtpHost: "smtp.example.com",
             Port: 587,
@@ -28,13 +28,13 @@ public sealed class TaskAlertServiceTests
     }
 
     [Fact]
-    public async Task NotifyCookieExpiredAsync_SendsEmailUsingPersistedSettings()
+    public async Task NotifySessionInvalidAsync_SendsEmailUsingPersistedSettings()
     {
         var emailSender = new FakeEmailAlertSender();
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                new CookieExpiryEmailAlertSettings(
+            TaskEventAlerts = new TaskEventAlertSettings(
+                new EmailAlertChannelSettings(
                     Enabled: true,
                     SmtpHost: "smtp.example.com",
                     Port: 587,
@@ -43,12 +43,12 @@ public sealed class TaskAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new CookieExpiryLocalAlertSettings(false, false))
+                new LocalAlertChannelSettings(false, false))
         });
 
         var service = CreateService(settingsService, emailSender);
 
-        await service.NotifyCookieExpiredAsync("抢座轮询", "Cookie 无效");
+        await service.NotifySessionInvalidAsync("抢座轮询", "Cookie 无效");
 
         var request = Assert.Single(emailSender.Requests);
         Assert.Equal("IGoLibrary-Ex Cookie 失效提醒", request.Subject);
@@ -57,7 +57,7 @@ public sealed class TaskAlertServiceTests
     }
 
     [Fact]
-    public async Task NotifyCookieExpiredAsync_LogsWarningWhenEmailSendFails()
+    public async Task NotifySessionInvalidAsync_LogsWarningWhenEmailSendFails()
     {
         var emailSender = new FakeEmailAlertSender
         {
@@ -66,8 +66,8 @@ public sealed class TaskAlertServiceTests
         var activityLog = new ActivityLogService();
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                new CookieExpiryEmailAlertSettings(
+            TaskEventAlerts = new TaskEventAlertSettings(
+                new EmailAlertChannelSettings(
                     Enabled: true,
                     SmtpHost: "smtp.example.com",
                     Port: 587,
@@ -76,12 +76,12 @@ public sealed class TaskAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new CookieExpiryLocalAlertSettings(false, false))
+                new LocalAlertChannelSettings(false, false))
         });
 
         var service = CreateService(settingsService, emailSender, activityLog);
 
-        await service.NotifyCookieExpiredAsync("占座轮询", "cookie expired");
+        await service.NotifySessionInvalidAsync("占座轮询", "cookie expired");
 
         Assert.Contains(
             activityLog.Entries,
@@ -96,8 +96,8 @@ public sealed class TaskAlertServiceTests
         var emailSender = new FakeEmailAlertSender();
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                new CookieExpiryEmailAlertSettings(
+            TaskEventAlerts = new TaskEventAlertSettings(
+                new EmailAlertChannelSettings(
                     Enabled: true,
                     SmtpHost: "smtp.example.com",
                     Port: 587,
@@ -106,7 +106,7 @@ public sealed class TaskAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new CookieExpiryLocalAlertSettings(false, false))
+                new LocalAlertChannelSettings(false, false))
         });
 
         var service = CreateService(settingsService, emailSender);
@@ -125,8 +125,8 @@ public sealed class TaskAlertServiceTests
         var emailSender = new FakeEmailAlertSender();
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                new CookieExpiryEmailAlertSettings(
+            TaskEventAlerts = new TaskEventAlertSettings(
+                new EmailAlertChannelSettings(
                     Enabled: true,
                     SmtpHost: "smtp.example.com",
                     Port: 587,
@@ -135,7 +135,7 @@ public sealed class TaskAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new CookieExpiryLocalAlertSettings(false, false))
+                new LocalAlertChannelSettings(false, false))
         });
 
         var service = CreateService(settingsService, emailSender);
@@ -154,9 +154,9 @@ public sealed class TaskAlertServiceTests
         var notificationService = new FakeNotificationService();
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
-                new CookieExpiryLocalAlertSettings(false, false))
+            TaskEventAlerts = new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalAlertChannelSettings(false, false))
         });
 
         var service = CreateService(settingsService: settingsService, notificationService: notificationService);
@@ -174,9 +174,9 @@ public sealed class TaskAlertServiceTests
         var notificationService = new FakeNotificationService();
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
-                new CookieExpiryLocalAlertSettings(false, false))
+            TaskEventAlerts = new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalAlertChannelSettings(false, false))
         });
 
         var service = CreateService(settingsService: settingsService, notificationService: notificationService);
@@ -188,20 +188,20 @@ public sealed class TaskAlertServiceTests
     }
 
     [Fact]
-    public async Task NotifyCookieExpiredAsync_SendsTelegramUsingPersistedSettings()
+    public async Task NotifySessionInvalidAsync_SendsTelegramUsingPersistedSettings()
     {
         var telegramSender = new FakeTelegramAlertSender();
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
-                new CookieExpiryLocalAlertSettings(false, false),
-                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+            TaskEventAlerts = new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalAlertChannelSettings(false, false),
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
         });
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
 
-        await service.NotifyCookieExpiredAsync("抢座轮询", "Cookie 无效");
+        await service.NotifySessionInvalidAsync("抢座轮询", "Cookie 无效");
 
         var request = Assert.Single(telegramSender.Requests);
         Assert.Equal("chat-1", request.Settings.ChatId);
@@ -216,10 +216,10 @@ public sealed class TaskAlertServiceTests
         var telegramSender = new FakeTelegramAlertSender();
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
-                new CookieExpiryLocalAlertSettings(false, false),
-                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+            TaskEventAlerts = new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalAlertChannelSettings(false, false),
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
         });
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
@@ -238,10 +238,10 @@ public sealed class TaskAlertServiceTests
         var telegramSender = new FakeTelegramAlertSender();
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
-                new CookieExpiryLocalAlertSettings(false, false),
-                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+            TaskEventAlerts = new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalAlertChannelSettings(false, false),
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
         });
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
@@ -265,8 +265,8 @@ public sealed class TaskAlertServiceTests
         var activityLog = new ActivityLogService();
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                new CookieExpiryEmailAlertSettings(
+            TaskEventAlerts = new TaskEventAlertSettings(
+                new EmailAlertChannelSettings(
                     Enabled: true,
                     SmtpHost: "smtp.example.com",
                     Port: 587,
@@ -275,8 +275,8 @@ public sealed class TaskAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new CookieExpiryLocalAlertSettings(false, false),
-                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+                new LocalAlertChannelSettings(false, false),
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
         });
 
         var service = CreateService(settingsService, emailSender, activityLog, telegramSender: telegramSender);
@@ -297,10 +297,10 @@ public sealed class TaskAlertServiceTests
         var telegramSender = new FakeTelegramAlertSender();
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
-                new CookieExpiryLocalAlertSettings(false, false),
-                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+            TaskEventAlerts = new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalAlertChannelSettings(false, false),
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
         });
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
@@ -322,10 +322,10 @@ public sealed class TaskAlertServiceTests
         };
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
-                new CookieExpiryLocalAlertSettings(false, false),
-                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+            TaskEventAlerts = new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalAlertChannelSettings(false, false),
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
         });
         var service = CreateService(
             settingsService: settingsService,
@@ -340,7 +340,7 @@ public sealed class TaskAlertServiceTests
         await notifyTask;
     }
 
-    private static TaskAlertService CreateService(
+    private static TaskEventAlertService CreateService(
         FakeSettingsService? settingsService = null,
         FakeEmailAlertSender? emailSender = null,
         ActivityLogService? activityLogService = null,
@@ -350,7 +350,7 @@ public sealed class TaskAlertServiceTests
         settingsService ??= new FakeSettingsService(AppSettings.Default);
         var toastService = new ToastNotificationService(settingsService, new AppWindowService());
 
-        return new TaskAlertService(
+        return new TaskEventAlertService(
             settingsService,
             emailSender ?? new FakeEmailAlertSender(),
             telegramSender ?? new FakeTelegramAlertSender(),

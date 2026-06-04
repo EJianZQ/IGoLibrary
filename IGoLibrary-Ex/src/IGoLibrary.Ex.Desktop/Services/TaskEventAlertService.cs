@@ -6,22 +6,22 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
-public sealed class TaskAlertService(
+public sealed class TaskEventAlertService(
     ISettingsService settingsService,
     IEmailAlertSender emailAlertSender,
     ITelegramAlertSender telegramAlertSender,
     ToastNotificationService toastNotificationService,
     INotificationService notificationService,
     AlertSoundService alertSoundService,
-    IActivityLogService activityLogService) : ITaskAlertService
+    IActivityLogService activityLogService) : ITaskEventAlertService
 {
     private readonly object _gate = new();
     private string? _lastAlertKey;
     private DateTimeOffset _lastAlertAt = DateTimeOffset.MinValue;
 
-    public async Task NotifyCookieExpiredAsync(string source, string reason, CancellationToken cancellationToken = default)
+    public async Task NotifySessionInvalidAsync(string source, string reason, CancellationToken cancellationToken = default)
     {
-        if (ShouldSuppress($"cookie-expired|{source}|{reason}"))
+        if (ShouldSuppress($"session-invalid|{source}|{reason}"))
         {
             return;
         }
@@ -35,8 +35,8 @@ public sealed class TaskAlertService(
             telegramLabel: "Cookie 过期提醒",
             localLabel: "Cookie 过期提醒",
             emailSubject: "IGoLibrary-Ex Cookie 失效提醒",
-            emailBody: BuildCookieExpiredEmailBody(source, reason),
-            telegramMessage: BuildCookieExpiredTelegramMessage(source, reason),
+            emailBody: BuildSessionInvalidEmailBody(source, reason),
+            telegramMessage: BuildSessionInvalidTelegramMessage(source, reason),
             toastKind: ToastVisualKind.Warning,
             toastTitle: title,
             toastMessage: detailMessage,
@@ -104,7 +104,7 @@ public sealed class TaskAlertService(
         CancellationToken cancellationToken)
     {
         var settings = await settingsService.LoadAsync(cancellationToken);
-        var alertSettings = settings.CookieExpiryAlerts ?? CookieExpiryAlertSettings.Default;
+        var alertSettings = settings.TaskEventAlerts ?? TaskEventAlertSettings.Default;
         var localAlertShown = false;
 
         if (alertSettings.Local.ToastEnabled)
@@ -161,7 +161,7 @@ public sealed class TaskAlertService(
     }
 
     private async Task SendEmailAlertSafelyAsync(
-        CookieExpiryEmailAlertSettings settings,
+        EmailAlertChannelSettings settings,
         string emailLabel,
         string emailSubject,
         string emailBody,
@@ -183,7 +183,7 @@ public sealed class TaskAlertService(
     }
 
     private async Task SendTelegramAlertSafelyAsync(
-        TelegramAlertSettings settings,
+        TelegramAlertChannelSettings settings,
         string telegramLabel,
         string telegramMessage,
         CancellationToken cancellationToken)
@@ -201,7 +201,7 @@ public sealed class TaskAlertService(
         }
     }
 
-    public async Task SendTestEmailAsync(CookieExpiryEmailAlertSettings settings, CancellationToken cancellationToken = default)
+    public async Task SendTestEmailAsync(EmailAlertChannelSettings settings, CancellationToken cancellationToken = default)
     {
         ValidateEmailSettings(settings);
         await emailAlertSender.SendAsync(
@@ -211,7 +211,7 @@ public sealed class TaskAlertService(
             cancellationToken);
     }
 
-    public async Task SendTestTelegramAsync(TelegramAlertSettings settings, CancellationToken cancellationToken = default)
+    public async Task SendTestTelegramAsync(TelegramAlertChannelSettings settings, CancellationToken cancellationToken = default)
     {
         await telegramAlertSender.SendAsync(
             settings,
@@ -219,7 +219,7 @@ public sealed class TaskAlertService(
             cancellationToken);
     }
 
-    public async Task SendTestLocalAlertAsync(CookieExpiryLocalAlertSettings settings, CancellationToken cancellationToken = default)
+    public async Task SendTestLocalAlertAsync(LocalAlertChannelSettings settings, CancellationToken cancellationToken = default)
     {
         await toastNotificationService.ShowForcedAsync(
             ToastVisualKind.Info,
@@ -250,7 +250,7 @@ public sealed class TaskAlertService(
         }
     }
 
-    private static void ValidateEmailSettings(CookieExpiryEmailAlertSettings settings)
+    private static void ValidateEmailSettings(EmailAlertChannelSettings settings)
     {
         if (string.IsNullOrWhiteSpace(settings.SmtpHost))
         {
@@ -283,7 +283,7 @@ public sealed class TaskAlertService(
         _ = new MailAddress(settings.ToAddress);
     }
 
-    private static string BuildCookieExpiredEmailBody(string source, string reason)
+    private static string BuildSessionInvalidEmailBody(string source, string reason)
     {
         var builder = new StringBuilder();
         builder.AppendLine("IGoLibrary-Ex 检测到 Cookie 已失效");
@@ -330,7 +330,7 @@ public sealed class TaskAlertService(
         return builder.ToString();
     }
 
-    private static string BuildCookieExpiredTelegramMessage(string source, string reason)
+    private static string BuildSessionInvalidTelegramMessage(string source, string reason)
     {
         var builder = new StringBuilder();
         builder.AppendLine("IGoLibrary-Ex Cookie 已失效");

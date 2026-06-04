@@ -1,6 +1,6 @@
 namespace IGoLibrary.Ex.Domain.Enums;
 
-public enum GrabMode
+public enum GrabPollingMode
 {
     Aggressive = 0,
     Randomized = 1,

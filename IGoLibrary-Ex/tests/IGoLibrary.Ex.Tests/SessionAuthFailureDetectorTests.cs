@@ -5,93 +5,93 @@ using IGoLibrary.Ex.Application.Services;
 
 namespace IGoLibrary.Ex.Tests;
 
-public sealed class CookieExpiryDetectorTests
+public sealed class SessionAuthFailureDetectorTests
 {
     [Fact]
-    public void TryGetExpirationTime_ReturnsExpireAt_FromAuthorizationJwtCookie()
+    public void TryGetCookieExpirationTime_ReturnsExpireAt_FromAuthorizationJwtCookie()
     {
         var expiresAt = DateTimeOffset.Now.AddHours(2);
         var cookie = BuildAuthorizationCookie(expiresAt);
 
-        var parsed = CookieExpiryDetector.TryGetExpirationTime(cookie, out var parsedExpirationTime);
+        var parsed = SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var parsedExpirationTime);
 
         Assert.True(parsed);
         Assert.Equal(expiresAt.ToUnixTimeSeconds(), parsedExpirationTime.ToUnixTimeSeconds());
     }
 
     [Fact]
-    public void IsExpired_ReturnsTrue_WhenAuthorizationJwtExpireAtIsPast()
+    public void IsCookieExpired_ReturnsTrue_WhenAuthorizationJwtExpireAtIsPast()
     {
         var now = DateTimeOffset.Now;
         var cookie = BuildAuthorizationCookie(now.AddSeconds(-1));
 
-        var isExpired = CookieExpiryDetector.IsExpired(cookie, now);
+        var isCookieExpired = SessionAuthFailureDetector.IsCookieExpired(cookie, now);
 
-        Assert.True(isExpired);
+        Assert.True(isCookieExpired);
     }
 
     [Fact]
-    public void IsExpired_ReturnsFalse_WhenAuthorizationJwtExpireAtIsFuture()
+    public void IsCookieExpired_ReturnsFalse_WhenAuthorizationJwtExpireAtIsFuture()
     {
         var now = DateTimeOffset.Now;
         var cookie = BuildAuthorizationCookie(now.AddMinutes(5));
 
-        var isExpired = CookieExpiryDetector.IsExpired(cookie, now);
+        var isCookieExpired = SessionAuthFailureDetector.IsCookieExpired(cookie, now);
 
-        Assert.False(isExpired);
+        Assert.False(isCookieExpired);
     }
 
     [Fact]
-    public void IsKnownExpiredCookieException_ReturnsTrue_ForUnauthorizedException_WhenJwtIsStillValid()
+    public void IsSessionInvalidException_ReturnsTrue_ForUnauthorizedException_WhenJwtIsStillValid()
     {
         var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(5));
         var exception = new HttpRequestException("Unauthorized", null, HttpStatusCode.Unauthorized);
 
-        var isExpired = CookieExpiryDetector.IsKnownExpiredCookieException(exception, cookie);
+        var isSessionInvalid = SessionAuthFailureDetector.IsSessionInvalidException(exception, cookie);
 
-        Assert.True(isExpired);
+        Assert.True(isSessionInvalid);
     }
 
     [Fact]
-    public void IsKnownExpiredCookieException_ReturnsTrue_ForAccessDeniedApiError_WhenJwtIsStillValid()
+    public void IsSessionInvalidException_ReturnsTrue_ForAccessDeniedApiError_WhenJwtIsStillValid()
     {
         var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(5));
         var exception = new TraceIntApiException("access denied!", 40001, "access denied!", isAuthorizationDenied: true);
 
-        var isExpired = CookieExpiryDetector.IsKnownExpiredCookieException(exception, cookie);
+        var isSessionInvalid = SessionAuthFailureDetector.IsSessionInvalidException(exception, cookie);
 
-        Assert.True(isExpired);
+        Assert.True(isSessionInvalid);
     }
 
     [Fact]
-    public void IsKnownExpiredCookieException_IgnoresAmbiguousCookieMessage_WhenJwtIsStillValid()
+    public void IsSessionInvalidException_IgnoresAmbiguousCookieMessage_WhenJwtIsStillValid()
     {
         var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(5));
         var exception = new InvalidOperationException("cookie refresh failed");
 
-        var isExpired = CookieExpiryDetector.IsKnownExpiredCookieException(exception, cookie);
+        var isSessionInvalid = SessionAuthFailureDetector.IsSessionInvalidException(exception, cookie);
 
-        Assert.False(isExpired);
+        Assert.False(isSessionInvalid);
     }
 
     [Fact]
-    public void IsExpired_ReturnsTrue_ForAccessDenied40001ApiError()
+    public void IsSessionInvalidException_ReturnsTrue_ForAccessDenied40001ApiError()
     {
         var exception = new TraceIntApiException("access denied!", 40001, "access denied!", isAuthorizationDenied: true);
 
-        var isExpired = CookieExpiryDetector.IsExpired(exception);
+        var isSessionInvalid = SessionAuthFailureDetector.IsSessionInvalidException(exception);
 
-        Assert.True(isExpired);
+        Assert.True(isSessionInvalid);
     }
 
     [Fact]
-    public void IsExpired_ReturnsFalse_ForOtherStructuredApiError()
+    public void IsSessionInvalidException_ReturnsFalse_ForOtherStructuredApiError()
     {
         var exception = new TraceIntApiException("Too Many Requests", 42900, "Too Many Requests");
 
-        var isExpired = CookieExpiryDetector.IsExpired(exception);
+        var isSessionInvalid = SessionAuthFailureDetector.IsSessionInvalidException(exception);
 
-        Assert.False(isExpired);
+        Assert.False(isSessionInvalid);
     }
 
     private static string BuildAuthorizationCookie(DateTimeOffset expiresAt)

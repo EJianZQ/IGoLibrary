@@ -64,19 +64,19 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task NotificationSettings_AutoSaveCookieExpiryAlerts_WhenFieldsChange()
+    public async Task NotificationSettings_AutoSaveTaskEventAlerts_WhenFieldsChange()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);
         var viewModel = CreateViewModel(settingsService: settingsService);
         await viewModel.InitializeAsync();
 
-        viewModel.CookieAlertSmtpHost = "smtp.example.com";
-        viewModel.CookieAlertSmtpPort = 465;
-        viewModel.CookieEmailAlertsEnabled = true;
+        viewModel.EmailAlertSmtpHost = "smtp.example.com";
+        viewModel.EmailAlertSmtpPort = 465;
+        viewModel.EmailAlertsEnabled = true;
 
-        await WaitForAsync(() => settingsService.SaveCalls > 0 && settingsService.CurrentSettings.CookieExpiryAlerts?.Email.SmtpHost == "smtp.example.com");
+        await WaitForAsync(() => settingsService.SaveCalls > 0 && settingsService.CurrentSettings.TaskEventAlerts?.Email.SmtpHost == "smtp.example.com");
 
-        var alerts = Assert.IsType<CookieExpiryAlertSettings>(settingsService.CurrentSettings.CookieExpiryAlerts);
+        var alerts = Assert.IsType<TaskEventAlertSettings>(settingsService.CurrentSettings.TaskEventAlerts);
         Assert.True(alerts.Email.Enabled);
         Assert.Equal("smtp.example.com", alerts.Email.SmtpHost);
         Assert.Equal(465, alerts.Email.Port);
@@ -85,17 +85,17 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SendTestEmailAlertAsync_UsesCurrentNotificationSettingsSnapshot()
     {
-        var alertService = new FakeTaskAlertService();
+        var alertService = new FakeTaskEventAlertService();
         var viewModel = CreateViewModel(taskAlertService: alertService);
         await viewModel.InitializeAsync();
 
-        viewModel.CookieAlertSmtpHost = "smtp.example.com";
-        viewModel.CookieAlertSmtpPort = 587;
-        viewModel.SelectedCookieAlertSecurityModeIndex = 1;
-        viewModel.CookieAlertUsername = "tester";
-        viewModel.CookieAlertPassword = "secret";
-        viewModel.CookieAlertFromAddress = "from@example.com";
-        viewModel.CookieAlertToAddress = "to@example.com";
+        viewModel.EmailAlertSmtpHost = "smtp.example.com";
+        viewModel.EmailAlertSmtpPort = 587;
+        viewModel.SelectedEmailAlertSecurityModeIndex = 1;
+        viewModel.EmailAlertUsername = "tester";
+        viewModel.EmailAlertPassword = "secret";
+        viewModel.EmailAlertFromAddress = "from@example.com";
+        viewModel.EmailAlertToAddress = "to@example.com";
 
         await viewModel.SendTestEmailAlertCommand.ExecuteAsync(null);
 
@@ -112,7 +112,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SendTestEmailAlertAsync_ShowsErrorDialog_WhenSendingFails()
     {
-        var alertService = new FakeTaskAlertService
+        var alertService = new FakeTaskEventAlertService
         {
             SendTestEmailException = new InvalidOperationException("smtp connect failed")
         };
@@ -122,9 +122,9 @@ public sealed class MainWindowViewModelTests
             errorDialogService: errorDialogService);
         await viewModel.InitializeAsync();
 
-        viewModel.CookieAlertSmtpHost = "smtp.example.com";
-        viewModel.CookieAlertFromAddress = "from@example.com";
-        viewModel.CookieAlertToAddress = "to@example.com";
+        viewModel.EmailAlertSmtpHost = "smtp.example.com";
+        viewModel.EmailAlertFromAddress = "from@example.com";
+        viewModel.EmailAlertToAddress = "to@example.com";
 
         await viewModel.SendTestEmailAlertCommand.ExecuteAsync(null);
 
@@ -139,19 +139,19 @@ public sealed class MainWindowViewModelTests
     {
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                CookieExpiryEmailAlertSettings.Default,
-                CookieExpiryLocalAlertSettings.Default,
-                new TelegramAlertSettings(true, "https://telegram.example.com", "token-1", "chat-1"))
+            TaskEventAlerts = new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default,
+                LocalAlertChannelSettings.Default,
+                new TelegramAlertChannelSettings(true, "https://telegram.example.com", "token-1", "chat-1"))
         });
         var viewModel = CreateViewModel(settingsService: settingsService);
 
         await viewModel.InitializeAsync();
 
-        Assert.True(viewModel.CookieTelegramAlertsEnabled);
-        Assert.Equal("https://telegram.example.com", viewModel.CookieAlertTelegramApiBaseUrl);
-        Assert.Equal("token-1", viewModel.CookieAlertTelegramBotToken);
-        Assert.Equal("chat-1", viewModel.CookieAlertTelegramChatId);
+        Assert.True(viewModel.TelegramAlertsEnabled);
+        Assert.Equal("https://telegram.example.com", viewModel.TelegramAlertApiBaseUrl);
+        Assert.Equal("token-1", viewModel.TelegramAlertBotToken);
+        Assert.Equal("chat-1", viewModel.TelegramAlertChatId);
     }
 
     [Fact]
@@ -159,19 +159,19 @@ public sealed class MainWindowViewModelTests
     {
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
-            CookieExpiryAlerts = new CookieExpiryAlertSettings(
-                CookieExpiryEmailAlertSettings.Default,
-                CookieExpiryLocalAlertSettings.Default,
-                new TelegramAlertSettings(true, null!, null!, null!))
+            TaskEventAlerts = new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default,
+                LocalAlertChannelSettings.Default,
+                new TelegramAlertChannelSettings(true, null!, null!, null!))
         });
         var viewModel = CreateViewModel(settingsService: settingsService);
 
         await viewModel.InitializeAsync();
 
-        Assert.True(viewModel.CookieTelegramAlertsEnabled);
-        Assert.Equal(TelegramAlertSettings.DefaultApiBaseUrl, viewModel.CookieAlertTelegramApiBaseUrl);
-        Assert.Equal(string.Empty, viewModel.CookieAlertTelegramBotToken);
-        Assert.Equal(string.Empty, viewModel.CookieAlertTelegramChatId);
+        Assert.True(viewModel.TelegramAlertsEnabled);
+        Assert.Equal(TelegramAlertChannelSettings.DefaultApiBaseUrl, viewModel.TelegramAlertApiBaseUrl);
+        Assert.Equal(string.Empty, viewModel.TelegramAlertBotToken);
+        Assert.Equal(string.Empty, viewModel.TelegramAlertChatId);
     }
 
     [Fact]
@@ -181,16 +181,16 @@ public sealed class MainWindowViewModelTests
         var viewModel = CreateViewModel(settingsService: settingsService);
         await viewModel.InitializeAsync();
 
-        viewModel.CookieTelegramAlertsEnabled = true;
-        viewModel.CookieAlertTelegramApiBaseUrl = "https://telegram.example.com/";
-        viewModel.CookieAlertTelegramBotToken = " token-1 ";
-        viewModel.CookieAlertTelegramChatId = " chat-1 ";
+        viewModel.TelegramAlertsEnabled = true;
+        viewModel.TelegramAlertApiBaseUrl = "https://telegram.example.com/";
+        viewModel.TelegramAlertBotToken = " token-1 ";
+        viewModel.TelegramAlertChatId = " chat-1 ";
 
         await WaitForAsync(() =>
             settingsService.SaveCalls > 0 &&
-            settingsService.CurrentSettings.CookieExpiryAlerts?.Telegram.BotToken == "token-1");
+            settingsService.CurrentSettings.TaskEventAlerts?.Telegram.BotToken == "token-1");
 
-        var telegram = Assert.IsType<TelegramAlertSettings>(settingsService.CurrentSettings.CookieExpiryAlerts?.Telegram);
+        var telegram = Assert.IsType<TelegramAlertChannelSettings>(settingsService.CurrentSettings.TaskEventAlerts?.Telegram);
         Assert.True(telegram.Enabled);
         Assert.Equal("https://telegram.example.com", telegram.ApiBaseUrl);
         Assert.Equal("token-1", telegram.BotToken);
@@ -200,14 +200,14 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SendTestTelegramAlertAsync_UsesCurrentNotificationSettingsSnapshot()
     {
-        var alertService = new FakeTaskAlertService();
+        var alertService = new FakeTaskEventAlertService();
         var viewModel = CreateViewModel(taskAlertService: alertService);
         await viewModel.InitializeAsync();
 
-        viewModel.CookieTelegramAlertsEnabled = true;
-        viewModel.CookieAlertTelegramApiBaseUrl = "https://telegram.example.com/";
-        viewModel.CookieAlertTelegramBotToken = " token-1 ";
-        viewModel.CookieAlertTelegramChatId = " chat-1 ";
+        viewModel.TelegramAlertsEnabled = true;
+        viewModel.TelegramAlertApiBaseUrl = "https://telegram.example.com/";
+        viewModel.TelegramAlertBotToken = " token-1 ";
+        viewModel.TelegramAlertChatId = " chat-1 ";
 
         await viewModel.SendTestTelegramAlertCommand.ExecuteAsync(null);
 
@@ -221,7 +221,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SendTestTelegramAlertAsync_ShowsErrorDialog_WhenSendingFails()
     {
-        var alertService = new FakeTaskAlertService
+        var alertService = new FakeTaskEventAlertService
         {
             SendTestTelegramException = new InvalidOperationException("telegram send failed")
         };
@@ -231,9 +231,9 @@ public sealed class MainWindowViewModelTests
             errorDialogService: errorDialogService);
         await viewModel.InitializeAsync();
 
-        viewModel.CookieAlertTelegramApiBaseUrl = "https://telegram.example.com";
-        viewModel.CookieAlertTelegramBotToken = "token-1";
-        viewModel.CookieAlertTelegramChatId = "chat-1";
+        viewModel.TelegramAlertApiBaseUrl = "https://telegram.example.com";
+        viewModel.TelegramAlertBotToken = "token-1";
+        viewModel.TelegramAlertChatId = "chat-1";
 
         await viewModel.SendTestTelegramAlertCommand.ExecuteAsync(null);
 
@@ -568,14 +568,14 @@ public sealed class MainWindowViewModelTests
         var viewModel = CreateViewModel(settingsService: settingsService);
         await viewModel.InitializeAsync();
 
-        viewModel.CookieTelegramAlertsEnabled = true;
-        viewModel.CookieAlertTelegramApiBaseUrl = "https://telegram.example.com/";
-        viewModel.CookieAlertTelegramBotToken = " token-1 ";
-        viewModel.CookieAlertTelegramChatId = " chat-1 ";
+        viewModel.TelegramAlertsEnabled = true;
+        viewModel.TelegramAlertApiBaseUrl = "https://telegram.example.com/";
+        viewModel.TelegramAlertBotToken = " token-1 ";
+        viewModel.TelegramAlertChatId = " chat-1 ";
 
         await viewModel.SaveSettingsCommand.ExecuteAsync(null);
 
-        var telegram = Assert.IsType<TelegramAlertSettings>(settingsService.CurrentSettings.CookieExpiryAlerts?.Telegram);
+        var telegram = Assert.IsType<TelegramAlertChannelSettings>(settingsService.CurrentSettings.TaskEventAlerts?.Telegram);
         Assert.True(telegram.Enabled);
         Assert.Equal("https://telegram.example.com", telegram.ApiBaseUrl);
         Assert.Equal("token-1", telegram.BotToken);
@@ -668,7 +668,7 @@ public sealed class MainWindowViewModelTests
         FakeTraceIntApiClient? apiClient = null,
         FakeGrabSeatCoordinator? grabSeatCoordinator = null,
         FakeNotificationService? notificationService = null,
-        FakeTaskAlertService? taskAlertService = null,
+        FakeTaskEventAlertService? taskAlertService = null,
         FakeErrorDialogService? errorDialogService = null,
         FakeAppThemeService? appThemeService = null)
     {
@@ -677,10 +677,10 @@ public sealed class MainWindowViewModelTests
             libraryService ?? new FakeLibraryService(),
             apiClient ?? new FakeTraceIntApiClient(),
             settingsService ?? new FakeSettingsService(AppSettings.Default),
-            new FakeProtocolTemplateStore(new ProtocolTemplateSet("", "", "", "", "", "", "")),
+            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet("", "", "", "", "", "", "")),
             grabSeatCoordinator ?? new FakeGrabSeatCoordinator(),
             new FakeOccupySeatCoordinator(),
-            taskAlertService ?? new FakeTaskAlertService(),
+            taskAlertService ?? new FakeTaskEventAlertService(),
             new ActivityLogService(),
             notificationService ?? new FakeNotificationService(),
             errorDialogService ?? new FakeErrorDialogService(),
