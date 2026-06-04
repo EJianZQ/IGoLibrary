@@ -61,6 +61,8 @@ internal sealed class FakeTaskEventAlertService : ITaskEventAlertService
 
     public Exception? SendTestTelegramException { get; set; }
 
+    public Exception? SendTestLocalException { get; set; }
+
     public Task NotifySessionInvalidAsync(string source, string reason, CancellationToken cancellationToken = default)
     {
         if (NotifySessionInvalidException is not null)
@@ -118,6 +120,11 @@ internal sealed class FakeTaskEventAlertService : ITaskEventAlertService
 
     public Task SendTestLocalAlertAsync(LocalAlertChannelSettings settings, CancellationToken cancellationToken = default)
     {
+        if (SendTestLocalException is not null)
+        {
+            throw SendTestLocalException;
+        }
+
         TestLocalAlertRequests.Add(settings);
         return Task.CompletedTask;
     }

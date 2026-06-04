@@ -131,16 +131,24 @@ public sealed class MainWindowClipboardTests
 
     private static MainWindowViewModel CreateViewModel()
     {
+        var sessionService = new FakeSessionService();
+        var libraryService = new FakeLibraryService();
+        var apiClient = new FakeTraceIntApiClient();
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var occupySeatCoordinator = new FakeOccupySeatCoordinator();
+        var activityLogService = new ActivityLogService();
+        var taskAlertService = new FakeTaskEventAlertService();
+
         return new MainWindowViewModel(
-            new FakeSessionService(),
-            new FakeLibraryService(),
-            new FakeTraceIntApiClient(),
-            new FakeSettingsService(AppSettings.Default),
-            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet("", "", "", "", "", "", "")),
+            new SessionWorkflowService(apiClient, sessionService),
+            new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
+            new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),
+            new SettingsWorkflowService(settingsService),
+            new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet("", "", "", "", "", "", ""))),
+            new NotificationTestService(taskAlertService),
             new FakeGrabSeatCoordinator(),
-            new FakeOccupySeatCoordinator(),
-            new FakeTaskEventAlertService(),
-            new ActivityLogService(),
+            occupySeatCoordinator,
+            activityLogService,
             new FakeNotificationService(),
             new FakeErrorDialogService(),
             new FakeAppThemeService(),

@@ -501,6 +501,105 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task RefreshSeatsAsync_PreservesVenueRulePresentation()
+    {
+        var library = new LibrarySummary(1, "场馆A", "3层", true, 120, 20, 10);
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var libraryService = new FakeLibraryService
+        {
+            LibrariesToLoad = [library]
+        };
+        libraryService.LayoutsByLibraryId[library.LibraryId] = new LibraryLayout(
+            library.LibraryId,
+            library.Name,
+            library.Floor,
+            library.IsOpen,
+            120,
+            10,
+            20,
+            [new SeatSnapshot("seat-1", "1", false, 0, 0)]);
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetLibraryRuleAsync = (_, _, _) => Task.FromResult(new LibraryRule(
+                library.LibraryId,
+                "1小时",
+                "30",
+                "30",
+                "0",
+                "{}",
+                null,
+                null,
+                0,
+                "07:30",
+                0,
+                "22:00",
+                -1))
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            libraryService: libraryService,
+            apiClient: apiClient);
+
+        viewModel.IsAuthorized = true;
+        viewModel.SelectedLibrary = library;
+
+        await viewModel.BindSelectedLibraryCommand.ExecuteAsync(null);
+        await viewModel.RefreshSeatsCommand.ExecuteAsync(null);
+
+        Assert.Equal("07:30", viewModel.VenueOpenTimeText);
+        Assert.Equal("22:00", viewModel.VenueCloseTimeText);
+    }
+
+    [Fact]
+    public async Task BindSelectedLibraryAsync_LogsRuleFailure_WithoutFailingBinding()
+    {
+        var library = new LibrarySummary(1, "场馆A", "3层", true, 120, 20, 10);
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var libraryService = new FakeLibraryService
+        {
+            LibrariesToLoad = [library]
+        };
+        libraryService.LayoutsByLibraryId[library.LibraryId] = new LibraryLayout(
+            library.LibraryId,
+            library.Name,
+            library.Floor,
+            library.IsOpen,
+            120,
+            10,
+            20,
+            [new SeatSnapshot("seat-1", "1", false, 0, 0)]);
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetLibraryRuleAsync = (_, _, _) => throw new InvalidOperationException("rule failed")
+        };
+        var activityLogService = new ActivityLogService();
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            libraryService: libraryService,
+            apiClient: apiClient,
+            activityLogService: activityLogService);
+
+        viewModel.IsAuthorized = true;
+        viewModel.SelectedLibrary = library;
+
+        await viewModel.BindSelectedLibraryCommand.ExecuteAsync(null);
+
+        Assert.Equal("场馆A / 3层 / 余座 90", viewModel.LibrarySummary);
+        Assert.Equal("--", viewModel.VenueOpenTimeText);
+        Assert.Equal("--", viewModel.VenueCloseTimeText);
+        Assert.Contains(activityLogService.Entries, entry =>
+            entry.Kind == LogEntryKind.Warning &&
+            entry.Category == "Library" &&
+            entry.Message.Contains("加载场馆开放时间失败：rule failed", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task GrabDashboardStatusBrush_UsesFailureColor_WhenTaskCompletedByStopping()
     {
         var grabCoordinator = new FakeGrabSeatCoordinator();
@@ -659,21 +758,32 @@ public sealed class MainWindowViewModelTests
         FakeSettingsService? settingsService = null,
         FakeTraceIntApiClient? apiClient = null,
         FakeGrabSeatCoordinator? grabSeatCoordinator = null,
+        FakeOccupySeatCoordinator? occupySeatCoordinator = null,
         FakeNotificationService? notificationService = null,
         FakeTaskEventAlertService? taskAlertService = null,
         FakeErrorDialogService? errorDialogService = null,
-        FakeAppThemeService? appThemeService = null)
+        FakeAppThemeService? appThemeService = null,
+        ActivityLogService? activityLogService = null)
     {
+        sessionService ??= new FakeSessionService();
+        libraryService ??= new FakeLibraryService();
+        settingsService ??= new FakeSettingsService(AppSettings.Default);
+        apiClient ??= new FakeTraceIntApiClient();
+        grabSeatCoordinator ??= new FakeGrabSeatCoordinator();
+        occupySeatCoordinator ??= new FakeOccupySeatCoordinator();
+        taskAlertService ??= new FakeTaskEventAlertService();
+        activityLogService ??= new ActivityLogService();
+
         return new MainWindowViewModel(
-            sessionService ?? new FakeSessionService(),
-            libraryService ?? new FakeLibraryService(),
-            apiClient ?? new FakeTraceIntApiClient(),
-            settingsService ?? new FakeSettingsService(AppSettings.Default),
-            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet("", "", "", "", "", "", "")),
-            grabSeatCoordinator ?? new FakeGrabSeatCoordinator(),
-            new FakeOccupySeatCoordinator(),
-            taskAlertService ?? new FakeTaskEventAlertService(),
-            new ActivityLogService(),
+            new SessionWorkflowService(apiClient, sessionService),
+            new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
+            new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),
+            new SettingsWorkflowService(settingsService),
+            new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet("", "", "", "", "", "", ""))),
+            new NotificationTestService(taskAlertService),
+            grabSeatCoordinator,
+            occupySeatCoordinator,
+            activityLogService,
             notificationService ?? new FakeNotificationService(),
             errorDialogService ?? new FakeErrorDialogService(),
             appThemeService ?? new FakeAppThemeService(),

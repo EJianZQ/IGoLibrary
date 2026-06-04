@@ -18,14 +18,14 @@ using IGoLibrary.Ex.Domain.Models;
 namespace IGoLibrary.Ex.Desktop.ViewModels;
 
 public partial class MainWindowViewModel(
-    ISessionService sessionService,
-    ILibraryService libraryService,
-    ITraceIntApiClient apiClient,
-    ISettingsService settingsService,
-    IProtocolTemplateStore protocolTemplateStore,
+    ISessionWorkflowService sessionWorkflowService,
+    IVenueWorkflowService venueWorkflowService,
+    IReservationWorkflowService reservationWorkflowService,
+    ISettingsWorkflowService settingsWorkflowService,
+    IProtocolTemplateEditorService protocolTemplateEditorService,
+    INotificationTestService notificationTestService,
     IGrabSeatCoordinator grabSeatCoordinator,
     IOccupySeatCoordinator occupySeatCoordinator,
-    ITaskEventAlertService taskAlertService,
     IActivityLogService activityLogService,
     INotificationService notificationService,
     IErrorDialogService errorDialogService,
@@ -124,6 +124,18 @@ public partial class MainWindowViewModel(
     private readonly object _processedAuthCodesGate = new();
     private readonly HashSet<string> _processedAuthCodes = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _inFlightAuthCodes = new(StringComparer.OrdinalIgnoreCase);
+
+    public HomeDashboardViewModel HomeDashboard { get; } = new();
+
+    public AccountVenueViewModel AccountVenue { get; } = new(sessionWorkflowService, venueWorkflowService);
+
+    public GrabPageViewModel GrabPage { get; } = new(grabSeatCoordinator, settingsWorkflowService);
+
+    public OccupyPageViewModel OccupyPage { get; } = new(occupySeatCoordinator, reservationWorkflowService);
+
+    public NotificationSettingsViewModel NotificationSettings { get; } = new(settingsWorkflowService, notificationTestService);
+
+    public SystemSettingsViewModel SystemSettings { get; } = new(settingsWorkflowService, protocolTemplateEditorService);
 
     public ObservableCollection<LibrarySummary> AvailableLibraries { get; } = [];
 
@@ -751,18 +763,21 @@ public partial class MainWindowViewModel(
 
             try
             {
-                var restored = await sessionService.RestoreAsync();
-                if (restored is not null)
+                var restored = await AccountVenue.RestoreSessionAsync();
+                if (restored.Session is not null)
                 {
                     IsAuthorized = true;
-                    SessionSummary = $"已恢复会话：{restored.Source} / {restored.SavedAt:yyyy-MM-dd HH:mm:ss}";
-                    ManualCookieText = restored.Cookie;
-                    UpdateSidebarCookieExpiry(restored.Cookie);
-                    await NotifySessionRestoredAsync(restored.Cookie);
-                    await LoadLibrariesAsync(restorePreferredSelection: true);
-                    if (SelectedLibrary is not null)
+                    SessionSummary = restored.StatusMessage;
+                    ManualCookieText = restored.Cookie ?? restored.Session.Cookie;
+                    UpdateSidebarCookieExpiry(restored.CookieExpirationTime, restored.Cookie);
+                    await NotifySessionRestoredAsync(restored.Cookie ?? restored.Session.Cookie);
+                    if (restored.ShouldLoadLibraries)
                     {
-                        await BindSelectedLibraryAsync();
+                        await LoadLibrariesAsync(restorePreferredSelection: true);
+                        if (SelectedLibrary is not null)
+                        {
+                            await BindSelectedLibraryAsync();
+                        }
                     }
                 }
             }
@@ -926,25 +941,29 @@ public partial class MainWindowViewModel(
             }
 
             reservedCode = code;
-            var cookie = await apiClient.GetCookieFromCodeAsync(code);
+            var result = await AccountVenue.AuthenticateFromCodeAsync(code, RememberSession);
             shouldMarkCodeAsProcessed = true;
-            ManualCookieText = cookie;
-            SessionSummary = "已获取 Cookie，等待验证";
+            ManualCookieText = result.Cookie ?? string.Empty;
+            SessionSummary = result.StatusMessage;
             SelectedTabIndex = 1;
-            await notificationService.ShowSuccessAsync("已成功获取 Cookie", BuildCookieFetchedMessage(cookie));
+            await notificationService.ShowSuccessAsync("已成功获取 Cookie", BuildCookieFetchedMessage(result.Cookie ?? string.Empty));
 
-            try
+            if (result.Session is not null)
             {
-                var session = await sessionService.AuthenticateFromCookieAsync(cookie, RememberSession);
                 IsAuthorized = true;
-                SessionSummary = $"登录成功：{session.Source} / {session.SavedAt:yyyy-MM-dd HH:mm:ss}";
-                UpdateSidebarCookieExpiry(session.Cookie);
-                await LoadLibrariesAsync(restorePreferredSelection: false);
+                SessionSummary = result.StatusMessage;
+                UpdateSidebarCookieExpiry(result.CookieExpirationTime, result.Session.Cookie);
+                if (result.ShouldLoadLibraries)
+                {
+                    await LoadLibrariesAsync(restorePreferredSelection: false);
+                }
             }
-            catch (Exception ex)
+            else if (!string.IsNullOrWhiteSpace(result.AuthenticationFailureMessage))
             {
-                activityLogService.Write(LogEntryKind.Warning, "Auth", $"Cookie 已获取，但自动验证失败：{ex.Message}");
-                await notificationService.ShowInfoAsync("已获取 Cookie", $"Cookie 已填入文本框，但自动验证失败：{ex.Message}");
+                activityLogService.Write(LogEntryKind.Warning, "Auth", $"Cookie 已获取，但自动验证失败：{result.AuthenticationFailureMessage}");
+                await notificationService.ShowInfoAsync(
+                    "已获取 Cookie",
+                    $"Cookie 已填入文本框，但自动验证失败：{result.AuthenticationFailureMessage}");
             }
 
             return true;
@@ -975,11 +994,15 @@ public partial class MainWindowViewModel(
                 return;
             }
 
-            var session = await sessionService.AuthenticateFromCookieAsync(ManualCookieText, RememberSession);
+            var result = await AccountVenue.AuthenticateFromCookieAsync(ManualCookieText, RememberSession);
+            var session = result.Session ?? throw new InvalidOperationException("Cookie 验证成功但未返回会话。");
             IsAuthorized = true;
-            SessionSummary = $"登录成功：{session.Source} / {session.SavedAt:yyyy-MM-dd HH:mm:ss}";
-            UpdateSidebarCookieExpiry(session.Cookie);
-            await LoadLibrariesAsync(restorePreferredSelection: false);
+            SessionSummary = result.StatusMessage;
+            UpdateSidebarCookieExpiry(result.CookieExpirationTime, session.Cookie);
+            if (result.ShouldLoadLibraries)
+            {
+                await LoadLibrariesAsync(restorePreferredSelection: false);
+            }
             SelectedTabIndex = 1;
         }
         catch (Exception ex)
@@ -994,19 +1017,22 @@ public partial class MainWindowViewModel(
     {
         try
         {
-            var session = await sessionService.RestoreAsync();
-            if (session is null)
+            var result = await AccountVenue.RestoreSessionAsync();
+            if (result.Session is null)
             {
                 await notificationService.ShowInfoAsync("没有会话", "本地没有可恢复的会话。");
                 return;
             }
 
             IsAuthorized = true;
-            SessionSummary = $"已恢复会话：{session.Source} / {session.SavedAt:yyyy-MM-dd HH:mm:ss}";
-            ManualCookieText = session.Cookie;
-            UpdateSidebarCookieExpiry(session.Cookie);
-            await NotifySessionRestoredAsync(session.Cookie);
-            await LoadLibrariesAsync(restorePreferredSelection: false);
+            SessionSummary = result.StatusMessage;
+            ManualCookieText = result.Cookie ?? result.Session.Cookie;
+            UpdateSidebarCookieExpiry(result.CookieExpirationTime, result.Cookie ?? result.Session.Cookie);
+            await NotifySessionRestoredAsync(result.Cookie ?? result.Session.Cookie);
+            if (result.ShouldLoadLibraries)
+            {
+                await LoadLibrariesAsync(restorePreferredSelection: false);
+            }
         }
         catch (Exception ex)
         {
@@ -1018,7 +1044,7 @@ public partial class MainWindowViewModel(
     [RelayCommand]
     private async Task SignOutAsync()
     {
-        await sessionService.SignOutAsync();
+        await AccountVenue.SignOutAsync();
         await ClearStoredLibrarySelectionAsync();
         CancelFiltering();
         IsGrabSeatSelectionOverlayOpen = false;
@@ -1078,28 +1104,16 @@ public partial class MainWindowViewModel(
     {
         try
         {
-            var libraries = await libraryService.LoadLibrariesAsync();
+            var result = await AccountVenue.LoadLibrariesAsync(
+                restorePreferredSelection,
+                preferredLibraryId);
             AvailableLibraries.Clear();
-            foreach (var library in libraries)
+            foreach (var library in result.Libraries)
             {
                 AvailableLibraries.Add(library);
             }
 
-            if (preferredLibraryId is not null)
-            {
-                SelectedLibrary = AvailableLibraries.FirstOrDefault(x => x.LibraryId == preferredLibraryId.Value);
-                return;
-            }
-
-            if (!restorePreferredSelection)
-            {
-                SelectedLibrary = null;
-                return;
-            }
-
-            var settings = await settingsService.LoadAsync();
-            SelectedLibrary = AvailableLibraries.FirstOrDefault(x => x.LibraryId == settings.Venue.LastLibraryId)
-                ?? AvailableLibraries.FirstOrDefault();
+            SelectedLibrary = result.SelectedLibrary;
         }
         catch (Exception ex)
         {
@@ -1119,12 +1133,13 @@ public partial class MainWindowViewModel(
                 return;
             }
 
-            var layout = await libraryService.BindLibraryAsync(SelectedLibrary.LibraryId);
+            var result = await AccountVenue.BindLibraryAsync(SelectedLibrary.LibraryId);
             var preserveSelection = _lockedLibrarySummary?.LibraryId == SelectedLibrary.LibraryId;
-            UpdateBoundLibraryPresentation(layout);
-            await LoadVenueRulePresentationAsync(SelectedLibrary.LibraryId, persistLockedSnapshot: true);
-            await PopulateSeatsAsync(layout, preserveSelection);
-            await LoadFavoritesAsync();
+            UpdateBoundLibraryPresentation(result.Layout);
+            ApplyVenueRuleResult(result.Rule, result.RuleFailureMessage, persistLockedSnapshot: true);
+            await PopulateSeatsAsync(result.Layout, preserveSelection);
+            ApplyFavoriteStates(result.Favorites.Select(x => x.SeatKey), syncSelection: false);
+            await notificationService.ShowInfoAsync("收藏已加载", $"已加载 {result.Favorites.Count} 个收藏座位。");
             await RefreshReservationAsync(showNotificationOnError: false);
         }
         catch (Exception ex)
@@ -1139,10 +1154,15 @@ public partial class MainWindowViewModel(
     {
         try
         {
-            var layout = await libraryService.RefreshBoundLibraryAsync();
-            UpdateBoundLibraryPresentation(layout);
-            await PopulateSeatsAsync(layout, preserveSelection: true);
-            await LoadFavoritesAsync();
+            var result = await AccountVenue.RefreshBoundLibraryAsync();
+            UpdateBoundLibraryPresentation(result.Layout);
+            if (result.Rule is not null || !string.IsNullOrWhiteSpace(result.RuleFailureMessage))
+            {
+                ApplyVenueRuleResult(result.Rule, result.RuleFailureMessage, persistLockedSnapshot: true);
+            }
+            await PopulateSeatsAsync(result.Layout, preserveSelection: true);
+            ApplyFavoriteStates(result.Favorites.Select(x => x.SeatKey), syncSelection: false);
+            await notificationService.ShowInfoAsync("收藏已加载", $"已加载 {result.Favorites.Count} 个收藏座位。");
         }
         catch (Exception ex)
         {
@@ -1265,7 +1285,7 @@ public partial class MainWindowViewModel(
                 .Where(x => x.IsSelected)
                 .Select(x => new TrackedSeat(x.SeatKey, x.SeatName))
                 .ToList();
-            await libraryService.SaveFavoritesAsync(SelectedLibrary.LibraryId, selected);
+            await AccountVenue.SaveFavoritesAsync(SelectedLibrary.LibraryId, selected);
             ApplyFavoriteStates(selected.Select(x => x.SeatKey), syncSelection: false);
         }
         catch (Exception ex)
@@ -1285,7 +1305,7 @@ public partial class MainWindowViewModel(
 
         try
         {
-            var favorites = await libraryService.GetFavoritesAsync(SelectedLibrary.LibraryId);
+            var favorites = await AccountVenue.GetFavoritesAsync(SelectedLibrary.LibraryId);
             ApplyFavoriteStates(favorites.Select(x => x.SeatKey), syncSelection: false);
             await notificationService.ShowInfoAsync("收藏已加载", $"已加载 {favorites.Count} 个收藏座位。");
         }
@@ -1339,7 +1359,7 @@ public partial class MainWindowViewModel(
                 mode,
                 GrabPollingStrategyFactory.FromMode(mode),
                 scheduledStart);
-            await grabSeatCoordinator.StartAsync(plan);
+            await GrabPage.StartAsync(plan);
         }
         catch (Exception ex)
         {
@@ -1353,7 +1373,7 @@ public partial class MainWindowViewModel(
     {
         try
         {
-            await grabSeatCoordinator.StopAsync();
+            await GrabPage.StopAsync();
         }
         catch (Exception ex)
         {
@@ -1370,17 +1390,23 @@ public partial class MainWindowViewModel(
 
     private async Task RefreshReservationAsync(bool showNotificationOnError)
     {
-        var session = sessionService.CurrentSession;
-        if (session is null)
-        {
-            UpdateReservationPresentation(null);
-            return;
-        }
-
         try
         {
-            var info = await apiClient.GetReservationInfoAsync(session.Cookie);
-            UpdateReservationPresentation(info);
+            var result = await OccupyPage.RefreshReservationAsync();
+            if (!result.HasSession)
+            {
+                UpdateReservationPresentation(null);
+                return;
+            }
+
+            if (result.Succeeded)
+            {
+                UpdateReservationPresentation(result.Reservation);
+            }
+            else if (showNotificationOnError)
+            {
+                await notificationService.ShowWarningAsync("刷新预约状态失败", result.FailureMessage ?? "接口未返回预约状态。");
+            }
         }
         catch (Exception ex)
         {
@@ -1400,32 +1426,21 @@ public partial class MainWindowViewModel(
             return;
         }
 
-        var session = sessionService.CurrentSession;
-        if (session is null)
-        {
-            await notificationService.ShowWarningAsync("未登录", "当前会话已失效，请重新授权后再操作。");
-            return;
-        }
-
         var reservation = _currentReservation;
         IsCancellingCurrentReservation = true;
 
         try
         {
-            if (IsOccupyRunning)
+            var result = await OccupyPage.CancelCurrentReservationAsync(
+                reservation,
+                stopOccupyFirst: IsOccupyRunning);
+            if (!result.HasSession)
             {
-                try
-                {
-                    await occupySeatCoordinator.StopAsync();
-                }
-                catch (Exception ex)
-                {
-                    activityLogService.Write(LogEntryKind.Warning, "Occupy", $"取消预约前停止占座失败：{ex.Message}");
-                }
+                await notificationService.ShowWarningAsync("未登录", "当前会话已失效，请重新授权后再操作。");
+                return;
             }
 
-            var cancelled = await apiClient.CancelReservationAsync(session.Cookie, reservation.ReservationToken);
-            if (!cancelled)
+            if (!result.RemoteSucceeded)
             {
                 activityLogService.Write(LogEntryKind.Warning, "Occupy", $"{reservation.SeatName} 取消预约失败，接口未返回成功结果。");
                 await notificationService.ShowWarningAsync("取消预约失败", "接口未返回成功结果，请稍后重试。");
@@ -1433,7 +1448,7 @@ public partial class MainWindowViewModel(
             }
 
             activityLogService.Write(LogEntryKind.Success, "Occupy", $"{reservation.SeatName} 已手动取消预约。");
-            UpdateReservationPresentation(null);
+            UpdateReservationPresentation(result.Reservation);
             await notificationService.ShowSuccessAsync("已取消预约", $"{reservation.SeatName} 已取消预约。");
         }
         catch (Exception ex)
@@ -1455,7 +1470,7 @@ public partial class MainWindowViewModel(
             var plan = new OccupySeatPlan(
                 TimeSpan.FromSeconds(Math.Max(1, ReReserveDelaySeconds)),
                 (OccupyRefreshMode)SelectedOccupyRefreshModeIndex);
-            await occupySeatCoordinator.StartAsync(plan);
+            await OccupyPage.StartAsync(plan);
         }
         catch (Exception ex)
         {
@@ -1469,7 +1484,7 @@ public partial class MainWindowViewModel(
     {
         try
         {
-            await occupySeatCoordinator.StopAsync();
+            await OccupyPage.StopAsync();
         }
         catch (Exception ex)
         {
@@ -1482,7 +1497,6 @@ public partial class MainWindowViewModel(
     private async Task SaveSettingsAsync()
     {
         CancelPendingNotificationSettingsAutoSave();
-        var current = await settingsService.LoadAsync();
         var grabReservationStrategy = (GrabReservationStrategy)Math.Clamp(
             SelectedGrabReservationStrategyIndex,
             0,
@@ -1490,31 +1504,15 @@ public partial class MainWindowViewModel(
         var theme = new ThemeSettings(
             (AppThemeMode)Math.Clamp(SelectedAppThemeModeIndex, 0, ThemeModes.Length - 1),
             UseSystemAccent);
-        var settings = current with
-        {
-            Notifications = current.Notifications with
-            {
-                AppBannerNotificationsEnabled = NotificationsEnabled,
-                TaskEventAlerts = BuildTaskEventAlertSettingsSnapshot()
-            },
-            Ui = current.Ui with
-            {
-                MinimizeToTray = MinimizeToTrayEnabled,
-                Theme = theme
-            },
-            Protocol = current.Protocol with
-            {
-                TemplateOverridesEnabled = ProtocolTemplateOverridesEnabled
-            },
-            RequestPolicy = new RequestPolicySettings(
-                Math.Max(3, ApiTimeoutSeconds),
-                Math.Max(1, RetryCount)),
-            Tasks = current.Tasks with
-            {
-                GrabReservationStrategy = grabReservationStrategy
-            }
-        };
-        await settingsService.SaveAsync(settings);
+        await SystemSettings.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
+            NotificationsEnabled,
+            MinimizeToTrayEnabled,
+            ProtocolTemplateOverridesEnabled,
+            ApiTimeoutSeconds,
+            RetryCount,
+            theme,
+            grabReservationStrategy,
+            BuildTaskEventAlertSettingsSnapshot()));
         await _appThemeService.ApplyThemeAsync(theme);
         await notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库。");
     }
@@ -1538,7 +1536,7 @@ public partial class MainWindowViewModel(
         {
             CancelPendingNotificationSettingsAutoSave();
             await PersistNotificationSettingsSnapshotAsync();
-            await taskAlertService.SendTestEmailAsync(BuildTaskEventAlertSettingsSnapshot().Email);
+            await NotificationSettings.SendTestEmailAsync(BuildTaskEventAlertSettingsSnapshot().Email);
             NotificationSettingsStatusText = $"测试邮件已发送于 {DateTime.Now:HH:mm:ss}。";
             await notificationService.ShowSuccessAsync("测试邮件已发送", "请检查收件箱，确认当前 SMTP 配置可用。");
         }
@@ -1557,7 +1555,7 @@ public partial class MainWindowViewModel(
         {
             CancelPendingNotificationSettingsAutoSave();
             await PersistNotificationSettingsSnapshotAsync();
-            await taskAlertService.SendTestTelegramAsync(BuildTaskEventAlertSettingsSnapshot().Telegram);
+            await NotificationSettings.SendTestTelegramAsync(BuildTaskEventAlertSettingsSnapshot().Telegram);
             NotificationSettingsStatusText = $"测试 Telegram 已发送于 {DateTime.Now:HH:mm:ss}。";
             await notificationService.ShowSuccessAsync("测试 Telegram 已发送", "请检查 Telegram，确认当前 Bot 配置可用。");
         }
@@ -1576,7 +1574,7 @@ public partial class MainWindowViewModel(
         {
             CancelPendingNotificationSettingsAutoSave();
             await PersistNotificationSettingsSnapshotAsync();
-            await taskAlertService.SendTestLocalAlertAsync(BuildTaskEventAlertSettingsSnapshot().Local);
+            await NotificationSettings.SendTestLocalAlertAsync(BuildTaskEventAlertSettingsSnapshot().Local);
             NotificationSettingsStatusText = $"测试通知已触发于 {DateTime.Now:HH:mm:ss}。";
         }
         catch (Exception ex)
@@ -1598,44 +1596,32 @@ public partial class MainWindowViewModel(
             QueryReservationInfoTemplateText,
             ReserveSeatTemplateText,
             CancelReservationTemplateText);
-        await protocolTemplateStore.SaveOverridesAsync(overrides);
+        await SystemSettings.SaveProtocolOverridesAsync(overrides);
         await notificationService.ShowSuccessAsync("协议模板已保存", "高级协议覆盖已写入数据库。");
     }
 
     [RelayCommand]
     private async Task ResetProtocolOverridesAsync()
     {
-        await protocolTemplateStore.ResetOverridesAsync();
+        await SystemSettings.ResetProtocolOverridesAsync();
         await LoadProtocolTemplatesAsync();
         await notificationService.ShowSuccessAsync("协议模板已重置", "已恢复内置默认模板。");
     }
 
     private async Task PersistGrabReservationStrategyAsync()
     {
-        var settings = await settingsService.LoadAsync();
         var strategy = (GrabReservationStrategy)Math.Clamp(
             SelectedGrabReservationStrategyIndex,
             0,
             GrabReservationStrategies.Length - 1);
 
-        if (settings.Tasks.GrabReservationStrategy == strategy)
-        {
-            return;
-        }
-
-        await settingsService.SaveAsync(settings with
-        {
-            Tasks = settings.Tasks with
-            {
-                GrabReservationStrategy = strategy
-            }
-        });
+        await GrabPage.SaveReservationStrategyAsync(strategy);
     }
 
     private async Task LoadSettingsAsync()
     {
         _isLoadingSettings = true;
-        var settings = await settingsService.LoadAsync();
+        var settings = await SystemSettings.LoadSettingsAsync();
         try
         {
             var notifications = settings.Notifications;
@@ -1708,7 +1694,7 @@ public partial class MainWindowViewModel(
 
     private async Task LoadProtocolTemplatesAsync()
     {
-        var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync();
+        var templates = await SystemSettings.LoadProtocolTemplatesAsync();
         GetCookieTemplateText = templates.GetCookieUrlTemplate;
         QueryLibrariesTemplateText = templates.QueryLibrariesTemplate;
         QueryLibraryLayoutTemplateText = templates.QueryLibraryLayoutTemplate;
@@ -1722,16 +1708,7 @@ public partial class MainWindowViewModel(
     {
         try
         {
-            var settings = await settingsService.LoadAsync();
-            if (settings.Venue.LastLibraryId is null && string.IsNullOrWhiteSpace(settings.Venue.LastLibraryName))
-            {
-                return;
-            }
-
-            await settingsService.SaveAsync(settings with
-            {
-                Venue = VenueSelectionSettings.Default
-            });
+            await SystemSettings.ClearStoredLibrarySelectionAsync();
         }
         catch (Exception ex)
         {
@@ -1741,21 +1718,16 @@ public partial class MainWindowViewModel(
 
     private async Task PreviewSelectedLibraryAsync(LibrarySummary library)
     {
-        var session = sessionService.CurrentSession;
-        if (session is null)
-        {
-            return;
-        }
-
         try
         {
-            var layout = await apiClient.GetLibraryLayoutAsync(session.Cookie, library.LibraryId);
+            var result = await AccountVenue.PreviewLibraryAsync(library);
+            var layout = result.Layout;
             VenueStatusText = layout.IsOpen ? "开放中" : "未开放";
             IsVenueOpen = layout.IsOpen;
             VenueName = layout.Name;
             VenueFloor = layout.Floor;
             VenueAvailableSeatsText = layout.AvailableSeats.ToString();
-            await LoadVenueRulePresentationAsync(library.LibraryId, persistLockedSnapshot: false);
+            ApplyVenueRuleResult(result.Rule, result.RuleFailureMessage, persistLockedSnapshot: false);
             IsCurrentLocked = _lockedLibrarySummary?.LibraryId == library.LibraryId;
             HasActiveVenuePreview = !IsCurrentLocked;
             IsVenuePickerOpen = false;
@@ -1839,31 +1811,40 @@ public partial class MainWindowViewModel(
 
     private async Task LoadVenueRulePresentationAsync(int libraryId, bool persistLockedSnapshot)
     {
-        var session = sessionService.CurrentSession;
-        if (session is null)
-        {
-            VenueOpenTimeText = "--";
-            VenueCloseTimeText = "--";
-            if (persistLockedSnapshot && IsCurrentLocked)
-            {
-                PersistLockedVenueSnapshot();
-            }
-
-            return;
-        }
-
         try
         {
-            var rule = await apiClient.GetLibraryRuleAsync(session.Cookie, libraryId);
-            VenueOpenTimeText = string.IsNullOrWhiteSpace(rule.OpenTimeText) ? "--" : rule.OpenTimeText;
-            VenueCloseTimeText = string.IsNullOrWhiteSpace(rule.CloseTimeText) ? "--" : rule.CloseTimeText;
+            var rule = await AccountVenue.LoadLibraryRuleAsync(libraryId);
+            ApplyVenueRulePresentation(rule, persistLockedSnapshot);
         }
         catch (Exception ex)
         {
             VenueOpenTimeText = "--";
             VenueCloseTimeText = "--";
             activityLogService.Write(LogEntryKind.Warning, "Library", $"加载场馆开放时间失败：{ex.Message}");
+            if (persistLockedSnapshot && IsCurrentLocked)
+            {
+                PersistLockedVenueSnapshot();
+            }
         }
+    }
+
+    private void ApplyVenueRuleResult(
+        LibraryRule? rule,
+        string? failureMessage,
+        bool persistLockedSnapshot)
+    {
+        if (!string.IsNullOrWhiteSpace(failureMessage))
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Library", $"加载场馆开放时间失败：{failureMessage}");
+        }
+
+        ApplyVenueRulePresentation(rule, persistLockedSnapshot);
+    }
+
+    private void ApplyVenueRulePresentation(LibraryRule? rule, bool persistLockedSnapshot)
+    {
+        VenueOpenTimeText = string.IsNullOrWhiteSpace(rule?.OpenTimeText) ? "--" : rule.OpenTimeText;
+        VenueCloseTimeText = string.IsNullOrWhiteSpace(rule?.CloseTimeText) ? "--" : rule.CloseTimeText;
 
         if (persistLockedSnapshot && IsCurrentLocked)
         {
@@ -2645,21 +2626,10 @@ public partial class MainWindowViewModel(
     {
         try
         {
-            var current = await settingsService.LoadAsync();
             var totalGuardSeconds = GetCurrentTotalGuardSeconds(DateTimeOffset.Now);
-
-            if (current.Dashboard.SuccessfulReservationCount == _historicalSuccessCount &&
-                current.Dashboard.TotalGuardSeconds == totalGuardSeconds)
-            {
-                return;
-            }
-
-            await settingsService.SaveAsync(current with
-            {
-                Dashboard = new DashboardMetrics(
-                    _historicalSuccessCount,
-                    totalGuardSeconds)
-            });
+            await SystemSettings.SaveDashboardMetricsAsync(new DashboardMetrics(
+                _historicalSuccessCount,
+                totalGuardSeconds));
         }
         catch (Exception ex)
         {
@@ -2783,6 +2753,25 @@ public partial class MainWindowViewModel(
         if (!SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime))
         {
             ClearSidebarCookieExpiry();
+            return;
+        }
+
+        _sidebarCookieExpirationTime = expirationTime;
+        HasSidebarCookieExpiry = true;
+        RefreshSidebarCookieExpiryPresentation(DateTimeOffset.Now);
+    }
+
+    private void UpdateSidebarCookieExpiry(DateTimeOffset? expirationTime, string? fallbackCookie)
+    {
+        if (expirationTime is null)
+        {
+            if (string.IsNullOrWhiteSpace(fallbackCookie))
+            {
+                ClearSidebarCookieExpiry();
+                return;
+            }
+
+            UpdateSidebarCookieExpiry(fallbackCookie);
             return;
         }
 
@@ -3045,14 +3034,9 @@ public partial class MainWindowViewModel(
 
     private async Task PersistNotificationSettingsSnapshotAsync(CancellationToken cancellationToken = default)
     {
-        var current = await settingsService.LoadAsync(cancellationToken);
-        await settingsService.SaveAsync(current with
-        {
-            Notifications = current.Notifications with
-            {
-                TaskEventAlerts = BuildTaskEventAlertSettingsSnapshot()
-            }
-        }, cancellationToken);
+        await NotificationSettings.SaveNotificationSettingsAsync(
+            BuildTaskEventAlertSettingsSnapshot(),
+            cancellationToken);
     }
 
     private void CancelPendingNotificationSettingsAutoSave()

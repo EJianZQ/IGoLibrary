@@ -52,14 +52,27 @@ internal sealed class FakeProtocolTemplateStore(TraceIntGraphQlTemplateSet templ
 {
     public TraceIntGraphQlTemplateSet Templates { get; private set; } = templates;
 
+    public int SaveCalls { get; private set; }
+
+    public int ResetCalls { get; private set; }
+
+    public TraceIntGraphQlTemplateOverrides? LastOverrides { get; private set; }
+
     public Task<TraceIntGraphQlTemplateSet> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(Templates);
 
     public Task SaveOverridesAsync(TraceIntGraphQlTemplateOverrides overrides, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+    {
+        SaveCalls++;
+        LastOverrides = overrides;
+        return Task.CompletedTask;
+    }
 
     public Task ResetOverridesAsync(CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+    {
+        ResetCalls++;
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class SequenceHttpMessageHandler(params Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>[] steps)

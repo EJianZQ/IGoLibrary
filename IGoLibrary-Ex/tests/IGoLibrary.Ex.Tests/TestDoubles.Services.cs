@@ -113,6 +113,8 @@ internal sealed class FakeSessionService : ISessionService
 
     public SessionCredentials? RestoreResult { get; set; }
 
+    public Exception? AuthenticateFromCookieException { get; set; }
+
     public int AuthenticateFromCookieCalls { get; private set; }
 
     public int RestoreCalls { get; private set; }
@@ -131,6 +133,11 @@ internal sealed class FakeSessionService : ISessionService
     public Task<SessionCredentials> AuthenticateFromCookieAsync(string cookie, bool remember, CancellationToken cancellationToken = default)
     {
         AuthenticateFromCookieCalls++;
+        if (AuthenticateFromCookieException is not null)
+        {
+            throw AuthenticateFromCookieException;
+        }
+
         CurrentSession = AuthenticateFromCookieResult with
         {
             Cookie = cookie,
@@ -252,6 +259,8 @@ internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
 
     public event EventHandler<CoordinatorStatus>? StatusChanged;
 
+    public int StopCalls { get; private set; }
+
     public Task StartAsync(OccupySeatPlan plan, CancellationToken cancellationToken = default)
     {
         _status = new CoordinatorStatus(
@@ -266,6 +275,7 @@ internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
 
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
+        StopCalls++;
         _status = new CoordinatorStatus(
             CoordinatorTaskState.Completed,
             "占座",
