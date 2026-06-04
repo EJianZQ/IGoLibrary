@@ -66,7 +66,10 @@ public sealed class GrabSeatCoordinatorTests
 
         Assert.Equal(0, layoutCallCount);
         Assert.Equal(2, reserveCallCount);
-        Assert.Equal(CoordinatorTaskState.Completed, coordinator.GetStatus().State);
+        var status = coordinator.GetStatus();
+        Assert.Equal(CoordinatorTaskState.Completed, status.State);
+        Assert.Equal(CoordinatorStatusReason.GrabSucceeded, status.Reason);
+        await WaitForAsync(() => eventPublisher.EventsOf<GrabSucceededCoordinatorEvent>().Count > 0);
         Assert.Contains(
             eventPublisher.EventsOf<GrabSucceededCoordinatorEvent>(),
             item => item.LibraryName == "自科阅览区一" && item.SeatName == "2号座");
@@ -103,6 +106,7 @@ public sealed class GrabSeatCoordinatorTests
 
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Completed);
+        await WaitForAsync(() => eventPublisher.EventsOf<GrabSucceededCoordinatorEvent>().Count == 1);
 
         Assert.Single(eventPublisher.EventsOf<GrabSucceededCoordinatorEvent>());
         alertCompletion.SetResult();
@@ -163,7 +167,9 @@ public sealed class GrabSeatCoordinatorTests
 
         Assert.Equal(0, layoutCallCount);
         Assert.Equal(2, reserveCallCount);
-        Assert.Equal(CoordinatorTaskState.Completed, coordinator.GetStatus().State);
+        var status = coordinator.GetStatus();
+        Assert.Equal(CoordinatorTaskState.Completed, status.State);
+        Assert.Equal(CoordinatorStatusReason.GrabSucceeded, status.Reason);
         Assert.Contains(activityLogService.Entries, entry => entry.Category == "Grab" && entry.Message.Contains("继续尝试下一个目标座位"));
     }
 
@@ -217,7 +223,9 @@ public sealed class GrabSeatCoordinatorTests
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Completed);
 
         Assert.Equal(2, reserveCallCount);
-        Assert.Equal(CoordinatorTaskState.Completed, coordinator.GetStatus().State);
+        var status = coordinator.GetStatus();
+        Assert.Equal(CoordinatorTaskState.Completed, status.State);
+        Assert.Equal(CoordinatorStatusReason.GrabSucceeded, status.Reason);
         Assert.Contains(activityLogService.Entries, entry => entry.Category == "Grab" && entry.Message.Contains("请重新尝试"));
     }
 
@@ -286,7 +294,9 @@ public sealed class GrabSeatCoordinatorTests
         Assert.Equal(1, layoutCallCount);
         Assert.Equal(1, reserveCallCount);
         Assert.NotNull(runtimeState.CurrentLayout);
-        Assert.Equal(CoordinatorTaskState.Completed, coordinator.GetStatus().State);
+        var status = coordinator.GetStatus();
+        Assert.Equal(CoordinatorTaskState.Completed, status.State);
+        Assert.Equal(CoordinatorStatusReason.GrabSucceeded, status.Reason);
     }
 
     [Fact]
@@ -319,9 +329,11 @@ public sealed class GrabSeatCoordinatorTests
 
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
+        await WaitForAsync(() => eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>().Count == 1);
 
         var alert = Assert.Single(eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>());
         Assert.Equal("抢座轮询", alert.Source);
+        Assert.Equal(CoordinatorStatusReason.SessionInvalid, coordinator.GetStatus().Reason);
     }
 
     [Fact]
@@ -362,11 +374,13 @@ public sealed class GrabSeatCoordinatorTests
 
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
+        await WaitForAsync(() => eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>().Count == 1);
 
         Assert.Equal(0, layoutCallCount);
         var alert = Assert.Single(eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>());
         Assert.Equal("抢座轮询", alert.Source);
         Assert.Contains("Cookie 已过期", alert.Reason);
+        Assert.Equal(CoordinatorStatusReason.SessionInvalid, coordinator.GetStatus().Reason);
     }
 
     [Fact]
@@ -399,10 +413,12 @@ public sealed class GrabSeatCoordinatorTests
 
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
+        await WaitForAsync(() => eventPublisher.EventsOf<TaskFailedCoordinatorEvent>().Count == 1);
 
         var failure = Assert.Single(eventPublisher.EventsOf<TaskFailedCoordinatorEvent>());
         Assert.Equal("抢座", failure.TaskName);
         Assert.Equal("场馆接口暂时不可用", failure.Reason);
+        Assert.Equal(CoordinatorStatusReason.TaskFailed, coordinator.GetStatus().Reason);
     }
 
     [Fact]
@@ -440,9 +456,12 @@ public sealed class GrabSeatCoordinatorTests
         AppSettings settings,
         FakeCoordinatorEventPublisher? eventPublisher = null,
         ActivityLogService? activityLogService = null,
-        AppRuntimeState? runtimeState = null)
+        AppRuntimeState? runtimeState = null,
+        ICoordinatorRuntime? runtime = null)
     {
         activityLogService ??= new ActivityLogService();
+        runtime ??= new FakeCoordinatorRuntime();
+        eventPublisher ??= new FakeCoordinatorEventPublisher();
         runtimeState ??= new AppRuntimeState
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
@@ -450,15 +469,20 @@ public sealed class GrabSeatCoordinatorTests
         var strategySelector = new GrabReservationStrategySelector(
             [
                 new QueryThenReserveGrabReservationStrategy(apiClient, activityLogService, runtimeState),
-                new DirectReserveGrabReservationStrategy(apiClient, activityLogService)
+                new DirectReserveGrabReservationStrategy(apiClient, activityLogService, runtime)
             ]);
 
-        return new GrabSeatCoordinator(
+        var stateMachine = new GrabSeatStateMachine(
             new FakeSettingsService(settings),
             strategySelector,
-            eventPublisher ?? new FakeCoordinatorEventPublisher(),
+            eventPublisher,
             activityLogService,
-            runtimeState);
+            runtimeState,
+            runtime);
+
+        return new GrabSeatCoordinator(
+            stateMachine,
+            runtime);
     }
 
     private static async Task WaitForStatusAsync(IGrabSeatCoordinator coordinator, CoordinatorTaskState expectedState)
@@ -474,6 +498,25 @@ public sealed class GrabSeatCoordinatorTests
 
             await Task.Delay(25, timeout.Token);
         }
+
+        throw new TimeoutException($"Expected status {expectedState} was not observed.");
+    }
+
+    private static async Task WaitForAsync(Func<bool> predicate)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        while (!timeout.IsCancellationRequested)
+        {
+            if (predicate())
+            {
+                return;
+            }
+
+            await Task.Delay(25, timeout.Token);
+        }
+
+        throw new TimeoutException("Expected condition was not observed.");
     }
 
     private static string BuildAuthorizationCookie(DateTimeOffset expiresAt)

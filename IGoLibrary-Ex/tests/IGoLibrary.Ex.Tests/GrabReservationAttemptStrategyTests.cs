@@ -23,7 +23,7 @@ public sealed class GrabReservationAttemptStrategyTests
             },
             OnReserveSeatAsync = (_, _, _, _) => Task.FromResult(true)
         };
-        var strategy = new DirectReserveGrabReservationStrategy(apiClient, new ActivityLogService());
+        var strategy = new DirectReserveGrabReservationStrategy(apiClient, new ActivityLogService(), new FakeCoordinatorRuntime());
 
         var result = await strategy.TryReserveAsync(
             CreateContext([new TrackedSeat("seat-1", "1号座")], () => requestCount++),
@@ -50,7 +50,7 @@ public sealed class GrabReservationAttemptStrategyTests
                     : Task.FromResult(true);
             }
         };
-        var strategy = new DirectReserveGrabReservationStrategy(apiClient, activityLogService);
+        var strategy = new DirectReserveGrabReservationStrategy(apiClient, activityLogService, new FakeCoordinatorRuntime());
 
         var result = await strategy.TryReserveAsync(
             CreateContext(
@@ -77,7 +77,7 @@ public sealed class GrabReservationAttemptStrategyTests
                 return Task.FromException<bool>(new InvalidOperationException("GraphQL 错误(code=1): 请重新尝试"));
             }
         };
-        var strategy = new DirectReserveGrabReservationStrategy(apiClient, new ActivityLogService());
+        var strategy = new DirectReserveGrabReservationStrategy(apiClient, new ActivityLogService(), new FakeCoordinatorRuntime());
 
         var result = await strategy.TryReserveAsync(
             CreateContext(
@@ -151,7 +151,7 @@ public sealed class GrabReservationAttemptStrategyTests
         var activityLogService = new ActivityLogService();
         var runtimeState = new AppRuntimeState();
         var queryStrategy = new QueryThenReserveGrabReservationStrategy(apiClient, activityLogService, runtimeState);
-        var directStrategy = new DirectReserveGrabReservationStrategy(apiClient, activityLogService);
+        var directStrategy = new DirectReserveGrabReservationStrategy(apiClient, activityLogService, new FakeCoordinatorRuntime());
         var selector = new GrabReservationStrategySelector([queryStrategy, directStrategy]);
 
         Assert.Same(queryStrategy, selector.Select(GrabReservationStrategy.QueryThenReserve));

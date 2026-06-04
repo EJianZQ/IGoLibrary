@@ -17,7 +17,8 @@ public sealed class OccupyReReservationExecutorTests
         var executor = new OccupyReReservationExecutor(
             apiClient,
             new FakeSettingsService(AppSettings.Default),
-            new ActivityLogService());
+            new ActivityLogService(),
+            new FakeCoordinatorRuntime());
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             executor.ExecuteAsync(
@@ -54,7 +55,8 @@ public sealed class OccupyReReservationExecutorTests
             {
                 RequestPolicy = AppSettings.Default.RequestPolicy with { RetryCount = 1 }
             }),
-            activityLogService);
+            activityLogService,
+            new FakeCoordinatorRuntime());
 
         var result = await executor.ExecuteAsync(
             "cookie",
@@ -88,7 +90,8 @@ public sealed class OccupyReReservationExecutorTests
             {
                 RequestPolicy = AppSettings.Default.RequestPolicy with { RetryCount = 1 }
             }),
-            new ActivityLogService());
+            new ActivityLogService(),
+            new FakeCoordinatorRuntime());
 
         var result = await executor.ExecuteAsync(
             "cookie",

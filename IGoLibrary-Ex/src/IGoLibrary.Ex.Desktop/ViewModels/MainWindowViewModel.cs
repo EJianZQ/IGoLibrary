@@ -109,6 +109,7 @@ public partial class MainWindowViewModel(
     private readonly HashSet<string> _draftSelectedSeatKeys = new(StringComparer.Ordinal);
     private bool _isSynchronizingSeatSelection;
     private CoordinatorTaskState _grabTaskState = CoordinatorTaskState.Idle;
+    private CoordinatorStatusReason _grabStatusReason = CoordinatorStatusReason.None;
     private DateTimeOffset? _grabLastRequestAt;
     private DateTimeOffset? _grabRuntimeStartedAt;
     private int _historicalSuccessCount;
@@ -622,7 +623,7 @@ public partial class MainWindowViewModel(
         CoordinatorTaskState.Starting => "启动中",
         CoordinatorTaskState.Running => "运行中",
         CoordinatorTaskState.Stopping => "停止中",
-        CoordinatorTaskState.Completed when GrabStatusText.Contains("停止", StringComparison.OrdinalIgnoreCase) => "已停止",
+        CoordinatorTaskState.Completed when _grabStatusReason == CoordinatorStatusReason.Stopped => "已停止",
         CoordinatorTaskState.Completed => "已完成",
         CoordinatorTaskState.Failed => "异常",
         _ => "未运行"
@@ -633,7 +634,7 @@ public partial class MainWindowViewModel(
         CoordinatorTaskState.Starting => GrabStateWarningBrush,
         CoordinatorTaskState.Running => GrabStateRunningBrush,
         CoordinatorTaskState.Stopping => GrabStateWarningBrush,
-        CoordinatorTaskState.Completed when GrabStatusText.Contains("停止", StringComparison.OrdinalIgnoreCase) => GrabStateFailureBrush,
+        CoordinatorTaskState.Completed when _grabStatusReason == CoordinatorStatusReason.Stopped => GrabStateFailureBrush,
         CoordinatorTaskState.Completed => GrabStateSuccessBrush,
         CoordinatorTaskState.Failed => GrabStateFailureBrush,
         _ => GrabStateIdleBrush
@@ -2255,7 +2256,8 @@ public partial class MainWindowViewModel(
             TryRecordGrabSuccess(status);
         });
 
-        if (status.State == CoordinatorTaskState.Completed && status.Message == "已成功预约到目标座位。")
+        if (status.State == CoordinatorTaskState.Completed &&
+            status.Reason == CoordinatorStatusReason.GrabSucceeded)
         {
             _ = Dispatcher.UIThread.InvokeAsync(async () =>
             {
@@ -2293,6 +2295,7 @@ public partial class MainWindowViewModel(
         GrabRequestCount = status.RequestCount;
         _grabLastRequestAt = status.LastRequestAt;
         _grabTaskState = status.State;
+        _grabStatusReason = status.Reason;
         UpdateGrabLastRequestText();
         ApplyGrabRuntime(status);
         UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
@@ -2589,7 +2592,7 @@ public partial class MainWindowViewModel(
     private void TryRecordGrabSuccess(CoordinatorStatus status)
     {
         if (status.State != CoordinatorTaskState.Completed ||
-            status.Message != "已成功预约到目标座位。")
+            status.Reason != CoordinatorStatusReason.GrabSucceeded)
         {
             return;
         }

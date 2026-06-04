@@ -42,6 +42,10 @@ public sealed class OccupySeatCoordinatorTests
 
         var eventPublisher = new FakeCoordinatorEventPublisher();
         var activityLogService = new ActivityLogService();
+        var runtime = new FakeCoordinatorRuntime
+        {
+            BlockDelaysStartingAtCall = 3
+        };
         var runtimeState = new AppRuntimeState
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
@@ -54,7 +58,8 @@ public sealed class OccupySeatCoordinatorTests
             },
             eventPublisher: eventPublisher,
             activityLogService: activityLogService,
-            runtimeState: runtimeState);
+            runtimeState: runtimeState,
+            runtime: runtime);
 
         using var cts = new CancellationTokenSource();
         await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds), cts.Token);
@@ -65,8 +70,9 @@ public sealed class OccupySeatCoordinatorTests
 
         Assert.Equal(2, reserveAttempts);
         Assert.Contains(activityLogService.Entries, entry => entry.Category == "Occupy" && entry.Message.Contains("重新预约尝试成功"));
+        await WaitForAsync(() => eventPublisher.EventsOf<OccupyReReserveSucceededCoordinatorEvent>().Count > 0);
         Assert.Contains(eventPublisher.EventsOf<OccupyReReserveSucceededCoordinatorEvent>(), x => x.SeatName == "1号座");
-        Assert.NotEqual(CoordinatorTaskState.Failed, coordinator.GetStatus().State);
+        Assert.Equal(CoordinatorStatusReason.Stopped, coordinator.GetStatus().Reason);
     }
 
     [Fact]
@@ -91,9 +97,11 @@ public sealed class OccupySeatCoordinatorTests
 
         await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
+        await WaitForAsync(() => eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>().Count == 1);
 
         var alert = Assert.Single(eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>());
         Assert.Equal("占座轮询", alert.Source);
+        Assert.Equal(CoordinatorStatusReason.SessionInvalid, coordinator.GetStatus().Reason);
     }
 
     [Fact]
@@ -128,9 +136,11 @@ public sealed class OccupySeatCoordinatorTests
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
         Assert.Equal(0, reservationInfoCallCount);
+        await WaitForAsync(() => eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>().Count == 1);
         var alert = Assert.Single(eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>());
         Assert.Equal("占座轮询", alert.Source);
         Assert.Contains("Cookie 已过期", alert.Reason);
+        Assert.Equal(CoordinatorStatusReason.SessionInvalid, coordinator.GetStatus().Reason);
     }
 
     [Fact]
@@ -155,10 +165,12 @@ public sealed class OccupySeatCoordinatorTests
 
         await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
+        await WaitForAsync(() => eventPublisher.EventsOf<TaskFailedCoordinatorEvent>().Count == 1);
 
         var failure = Assert.Single(eventPublisher.EventsOf<TaskFailedCoordinatorEvent>());
         Assert.Equal("占座", failure.TaskName);
         Assert.Equal("预约状态获取失败", failure.Reason);
+        Assert.Equal(CoordinatorStatusReason.TaskFailed, coordinator.GetStatus().Reason);
     }
 
     private static OccupySeatCoordinator CreateCoordinator(
@@ -166,9 +178,12 @@ public sealed class OccupySeatCoordinatorTests
         AppSettings settings,
         FakeCoordinatorEventPublisher? eventPublisher = null,
         ActivityLogService? activityLogService = null,
-        AppRuntimeState? runtimeState = null)
+        AppRuntimeState? runtimeState = null,
+        ICoordinatorRuntime? runtime = null)
     {
         activityLogService ??= new ActivityLogService();
+        runtime ??= new FakeCoordinatorRuntime();
+        eventPublisher ??= new FakeCoordinatorEventPublisher();
         runtimeState ??= new AppRuntimeState
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
@@ -176,14 +191,20 @@ public sealed class OccupySeatCoordinatorTests
         var reReservationExecutor = new OccupyReReservationExecutor(
             apiClient,
             new FakeSettingsService(settings),
-            activityLogService);
+            activityLogService,
+            runtime);
 
-        return new OccupySeatCoordinator(
+        var stateMachine = new OccupySeatStateMachine(
             apiClient,
             reReservationExecutor,
-            eventPublisher ?? new FakeCoordinatorEventPublisher(),
+            eventPublisher,
             activityLogService,
-            runtimeState);
+            runtimeState,
+            runtime);
+
+        return new OccupySeatCoordinator(
+            stateMachine,
+            runtime);
     }
 
     private static async Task WaitForStatusAsync(IOccupySeatCoordinator coordinator, CoordinatorTaskState expectedState)
@@ -201,6 +222,23 @@ public sealed class OccupySeatCoordinatorTests
         }
 
         throw new TimeoutException($"Expected status {expectedState} was not observed.");
+    }
+
+    private static async Task WaitForAsync(Func<bool> predicate)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        while (!timeout.IsCancellationRequested)
+        {
+            if (predicate())
+            {
+                return;
+            }
+
+            await Task.Delay(25, timeout.Token);
+        }
+
+        throw new TimeoutException("Expected condition was not observed.");
     }
 
     private static string BuildAuthorizationCookie(DateTimeOffset expiresAt)

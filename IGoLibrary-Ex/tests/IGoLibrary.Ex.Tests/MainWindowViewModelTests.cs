@@ -6,6 +6,7 @@ using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace IGoLibrary.Ex.Tests;
 
@@ -612,6 +613,30 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("已停止", viewModel.GrabDashboardStatusText);
         Assert.Equal(Color.Parse("#C93C37"), brush.Color);
+    }
+
+    [Fact]
+    public async Task GrabSuccessMetrics_UseStatusReason_NotSuccessMessageText()
+    {
+        var settingsService = new FakeSettingsService(WithDashboard(0, 0));
+        var grabCoordinator = new FakeGrabSeatCoordinator();
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            grabSeatCoordinator: grabCoordinator);
+        await viewModel.InitializeAsync();
+
+        grabCoordinator.EmitStatus(new CoordinatorStatus(
+            CoordinatorTaskState.Completed,
+            "抢座",
+            "预约流程完成",
+            DateTimeOffset.Now,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.GrabSucceeded));
+        Dispatcher.UIThread.RunJobs();
+        await WaitForAsync(() => settingsService.SaveCalls > 0);
+
+        Assert.Equal(1, viewModel.HomeHistoricalSuccessCount);
+        Assert.Equal(1, settingsService.CurrentSettings.Dashboard.SuccessfulReservationCount);
     }
 
     [Fact]

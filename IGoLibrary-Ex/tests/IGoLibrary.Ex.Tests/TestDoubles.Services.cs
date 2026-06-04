@@ -2,6 +2,7 @@ using System.Net;
 using Avalonia.Controls;
 using Avalonia.Media;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
@@ -101,6 +102,68 @@ internal sealed class FakeSettingsService(AppSettings settings) : ISettingsServi
         SaveCalls++;
         CurrentSettings = settings;
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeCoordinatorRuntime : ICoordinatorRuntime
+{
+    private readonly Queue<TimeSpan> _randomDelays = [];
+    private readonly Queue<int> _nextInts = [];
+
+    public DateTimeOffset Now { get; set; } = DateTimeOffset.Now;
+
+    public bool CompleteDelaysImmediately { get; set; } = true;
+
+    public bool AdvanceOnDelay { get; set; }
+
+    public int? BlockDelaysStartingAtCall { get; set; }
+
+    public List<TimeSpan> DelayRequests { get; } = [];
+
+    public TaskCompletionSource<object?>? DelayStarted { get; set; }
+
+    public void EnqueueRandomDelay(TimeSpan delay)
+    {
+        _randomDelays.Enqueue(delay);
+    }
+
+    public void EnqueueNextInt(int value)
+    {
+        _nextInts.Enqueue(value);
+    }
+
+    public Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken)
+    {
+        DelayRequests.Add(delay);
+        if (AdvanceOnDelay)
+        {
+            Now += delay;
+        }
+
+        DelayStarted?.TrySetResult(null);
+        if (BlockDelaysStartingAtCall is not null &&
+            DelayRequests.Count >= BlockDelaysStartingAtCall)
+        {
+            return Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+
+        return CompleteDelaysImmediately
+            ? Task.CompletedTask
+            : Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+    }
+
+    public TimeSpan RandomBetween(TimeSpan minimum, TimeSpan maximum)
+    {
+        return _randomDelays.Count > 0
+            ? _randomDelays.Dequeue()
+            : minimum;
+    }
+
+    public int NextInt(int minInclusive, int maxExclusive)
+    {
+        return _nextInts.Count > 0
+            ? _nextInts.Dequeue()
+            : minInclusive;
     }
 }
 
@@ -233,7 +296,8 @@ internal sealed class FakeGrabSeatCoordinator : IGrabSeatCoordinator
             "抢座",
             "测试中的抢座任务",
             DateTimeOffset.Now,
-            DateTimeOffset.Now);
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Running);
         StatusChanged?.Invoke(this, _status);
         return Task.CompletedTask;
     }
@@ -243,11 +307,18 @@ internal sealed class FakeGrabSeatCoordinator : IGrabSeatCoordinator
         _status = new CoordinatorStatus(
             CoordinatorTaskState.Completed,
             "抢座",
-            "测试中的抢座任务已停止",
+            "测试中的抢座任务已结束",
             _status.StartedAt,
-            DateTimeOffset.Now);
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Stopped);
         StatusChanged?.Invoke(this, _status);
         return Task.CompletedTask;
+    }
+
+    public void EmitStatus(CoordinatorStatus status)
+    {
+        _status = status;
+        StatusChanged?.Invoke(this, _status);
     }
 
     public CoordinatorStatus GetStatus() => _status;
@@ -268,7 +339,8 @@ internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
             "占座",
             "测试中的占座任务",
             DateTimeOffset.Now,
-            DateTimeOffset.Now);
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Running);
         StatusChanged?.Invoke(this, _status);
         return Task.CompletedTask;
     }
@@ -281,7 +353,8 @@ internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
             "占座",
             "测试中的占座任务已停止",
             _status.StartedAt,
-            DateTimeOffset.Now);
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Stopped);
         StatusChanged?.Invoke(this, _status);
         return Task.CompletedTask;
     }

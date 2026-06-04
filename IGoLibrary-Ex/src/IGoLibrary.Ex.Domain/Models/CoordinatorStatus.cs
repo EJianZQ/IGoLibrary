@@ -10,7 +10,8 @@ public sealed record CoordinatorStatus(
     DateTimeOffset? LastUpdatedAt,
     int PollCount = 0,
     int RequestCount = 0,
-    DateTimeOffset? LastRequestAt = null)
+    DateTimeOffset? LastRequestAt = null,
+    CoordinatorStatusReason Reason = CoordinatorStatusReason.None)
 {
     public static CoordinatorStatus Idle(string title) => new(
         CoordinatorTaskState.Idle,
@@ -20,5 +21,6 @@ public sealed record CoordinatorStatus(
         null,
         0,
         0,
-        null);
+        null,
+        CoordinatorStatusReason.None);
 }

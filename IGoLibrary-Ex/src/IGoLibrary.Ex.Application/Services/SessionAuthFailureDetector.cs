@@ -66,6 +66,11 @@ public static class SessionAuthFailureDetector
 
     public static bool IsSessionInvalidException(Exception exception, string? cookie)
     {
+        return IsSessionInvalidException(exception, cookie, DateTimeOffset.Now);
+    }
+
+    public static bool IsSessionInvalidException(Exception exception, string? cookie, DateTimeOffset now)
+    {
         if (IsExplicitAuthorizationFailure(exception))
         {
             return true;
@@ -73,7 +78,7 @@ public static class SessionAuthFailureDetector
 
         if (TryGetCookieExpirationTime(cookie, out _))
         {
-            return IsCookieExpired(cookie);
+            return IsCookieExpired(cookie, now);
         }
 
         return IsSessionInvalidException(exception);

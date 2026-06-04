@@ -20,10 +20,13 @@ public static class DependencyInjection
         services.AddSingleton<ISettingsWorkflowService, SettingsWorkflowService>();
         services.AddSingleton<IProtocolTemplateEditorService, ProtocolTemplateEditorService>();
         services.AddSingleton<INotificationTestService, NotificationTestService>();
+        services.AddSingleton<ICoordinatorRuntime, SystemCoordinatorRuntime>();
         services.AddSingleton<IGrabReservationAttemptStrategy, QueryThenReserveGrabReservationStrategy>();
         services.AddSingleton<IGrabReservationAttemptStrategy, DirectReserveGrabReservationStrategy>();
         services.AddSingleton<GrabReservationStrategySelector>();
         services.AddSingleton<IOccupyReReservationExecutor, OccupyReReservationExecutor>();
+        services.AddSingleton<GrabSeatStateMachine>();
+        services.AddSingleton<OccupySeatStateMachine>();
         services.AddSingleton<IGrabSeatCoordinator, GrabSeatCoordinator>();
         services.AddSingleton<IOccupySeatCoordinator, OccupySeatCoordinator>();
         return services;

@@ -5,7 +5,8 @@ namespace IGoLibrary.Ex.Application.Services;
 
 internal sealed class DirectReserveGrabReservationStrategy(
     ITraceIntApiClient apiClient,
-    IActivityLogService activityLogService) : IGrabReservationAttemptStrategy
+    IActivityLogService activityLogService,
+    ICoordinatorRuntime runtime) : IGrabReservationAttemptStrategy
 {
     private static readonly TimeSpan DirectReserveAttemptInterval = TimeSpan.FromMilliseconds(2000);
 
@@ -73,7 +74,7 @@ internal sealed class DirectReserveGrabReservationStrategy(
         return new GrabReservationAttemptResult(null, false, false, context.StartIndex);
     }
 
-    private static async Task DelayBeforeNextAttemptAsync(
+    private async Task DelayBeforeNextAttemptAsync(
         int currentOffset,
         int seatCount,
         TimeSpan delay,
@@ -84,6 +85,6 @@ internal sealed class DirectReserveGrabReservationStrategy(
             return;
         }
 
-        await Task.Delay(delay, cancellationToken);
+        await runtime.DelayAsync(delay, cancellationToken);
     }
 }

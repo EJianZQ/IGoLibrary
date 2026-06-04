@@ -7,7 +7,8 @@ namespace IGoLibrary.Ex.Application.Services;
 internal sealed class OccupyReReservationExecutor(
     ITraceIntApiClient apiClient,
     ISettingsService settingsService,
-    IActivityLogService activityLogService) : IOccupyReReservationExecutor
+    IActivityLogService activityLogService,
+    ICoordinatorRuntime runtime) : IOccupyReReservationExecutor
 {
     public async Task<OccupyReReservationResult> ExecuteAsync(
         string cookie,
@@ -21,7 +22,7 @@ internal sealed class OccupyReReservationExecutor(
             throw new InvalidOperationException("取消预约失败。");
         }
 
-        await Task.Delay(plan.ReReserveDelay, cancellationToken);
+        await runtime.DelayAsync(plan.ReReserveDelay, cancellationToken);
 
         var settings = await settingsService.LoadAsync(cancellationToken);
         var maxAttempts = Math.Max(1, settings.RequestPolicy.RetryCount + 1);
@@ -49,7 +50,7 @@ internal sealed class OccupyReReservationExecutor(
             }
 
             activityLogService.Write(LogEntryKind.Warning, "Occupy", $"第 {attempt} 次重新预约失败，1 秒后继续重试。");
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            await runtime.DelayAsync(TimeSpan.FromSeconds(1), cancellationToken);
         }
 
         return new OccupyReReservationResult(false);
