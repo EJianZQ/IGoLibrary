@@ -196,17 +196,17 @@ internal sealed class TelegramAlertSender(
 
     private async Task<(TimeSpan Timeout, int RetryCount)> LoadNetworkSettingsAsync(CancellationToken cancellationToken)
     {
-        AppSettings settings;
+        RequestPolicySettings settings;
         try
         {
-            settings = await settingsService.LoadAsync(cancellationToken);
+            settings = (await settingsService.LoadAsync(cancellationToken)).RequestPolicy;
         }
         catch
         {
-            settings = AppSettings.Default;
+            settings = RequestPolicySettings.Default;
         }
 
-        var timeoutSeconds = Math.Clamp(settings.ApiTimeoutSeconds, 1, 60);
+        var timeoutSeconds = Math.Clamp(settings.TimeoutSeconds, 1, 60);
         var retryCount = Math.Clamp(settings.RetryCount, 0, 10);
         return (TimeSpan.FromSeconds(timeoutSeconds), retryCount);
     }

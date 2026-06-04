@@ -23,7 +23,7 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     {
         var store = await CreateStoreAsync(AppSettings.Default with
         {
-            ProtocolTemplateOverridesEnabled = true
+            Protocol = new ProtocolSettings(true)
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
@@ -45,7 +45,7 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     {
         var store = await CreateStoreAsync(AppSettings.Default with
         {
-            ProtocolTemplateOverridesEnabled = true
+            Protocol = new ProtocolSettings(true)
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
@@ -64,7 +64,7 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     {
         var store = await CreateStoreAsync(AppSettings.Default with
         {
-            ProtocolTemplateOverridesEnabled = false
+            Protocol = new ProtocolSettings(false)
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 

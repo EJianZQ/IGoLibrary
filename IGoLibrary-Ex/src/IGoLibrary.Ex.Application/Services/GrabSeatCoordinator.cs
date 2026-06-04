@@ -102,7 +102,7 @@ public sealed class GrabSeatCoordinator(
             DateTimeOffset? lastRequestAt = null;
             var random = new Random();
             var settings = await settingsService.LoadAsync(cancellationToken);
-            var reservationStrategy = settings.GrabReservationStrategy;
+            var reservationStrategy = settings.Tasks.GrabReservationStrategy;
             var directReservationStartIndex = 0;
             activityLogService.Write(LogEntryKind.Info, "Grab", $"当前执行策略：{GetReservationStrategyText(reservationStrategy)}。");
 

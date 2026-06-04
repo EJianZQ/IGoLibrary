@@ -1098,7 +1098,7 @@ public partial class MainWindowViewModel(
             }
 
             var settings = await settingsService.LoadAsync();
-            SelectedLibrary = AvailableLibraries.FirstOrDefault(x => x.LibraryId == settings.LastLibraryId)
+            SelectedLibrary = AvailableLibraries.FirstOrDefault(x => x.LibraryId == settings.Venue.LastLibraryId)
                 ?? AvailableLibraries.FirstOrDefault();
         }
         catch (Exception ex)
@@ -1483,27 +1483,39 @@ public partial class MainWindowViewModel(
     {
         CancelPendingNotificationSettingsAutoSave();
         var current = await settingsService.LoadAsync();
+        var grabReservationStrategy = (GrabReservationStrategy)Math.Clamp(
+            SelectedGrabReservationStrategyIndex,
+            0,
+            GrabReservationStrategies.Length - 1);
+        var theme = new ThemeSettings(
+            (AppThemeMode)Math.Clamp(SelectedAppThemeModeIndex, 0, ThemeModes.Length - 1),
+            UseSystemAccent);
         var settings = current with
         {
-            NotificationsEnabled = NotificationsEnabled,
-            MinimizeToTray = MinimizeToTrayEnabled,
-            ProtocolTemplateOverridesEnabled = ProtocolTemplateOverridesEnabled,
-            ApiTimeoutSeconds = Math.Max(3, ApiTimeoutSeconds),
-            RetryCount = Math.Max(1, RetryCount),
-            ThemeMode = (AppThemeMode)Math.Clamp(SelectedAppThemeModeIndex, 0, ThemeModes.Length - 1),
-            UseSystemAccent = UseSystemAccent,
-            GrabReservationStrategy = (GrabReservationStrategy)Math.Clamp(
-                SelectedGrabReservationStrategyIndex,
-                0,
-                GrabReservationStrategies.Length - 1),
-            TaskEventAlerts = BuildTaskEventAlertSettingsSnapshot(),
-            LastLibraryId = SelectedLibrary?.LibraryId,
-            LastLibraryName = SelectedLibrary?.Name,
-            SuccessfulReservationCount = _historicalSuccessCount,
-            TotalGuardSeconds = GetCurrentTotalGuardSeconds(DateTimeOffset.Now)
+            Notifications = current.Notifications with
+            {
+                AppBannerNotificationsEnabled = NotificationsEnabled,
+                TaskEventAlerts = BuildTaskEventAlertSettingsSnapshot()
+            },
+            Ui = current.Ui with
+            {
+                MinimizeToTray = MinimizeToTrayEnabled,
+                Theme = theme
+            },
+            Protocol = current.Protocol with
+            {
+                TemplateOverridesEnabled = ProtocolTemplateOverridesEnabled
+            },
+            RequestPolicy = new RequestPolicySettings(
+                Math.Max(3, ApiTimeoutSeconds),
+                Math.Max(1, RetryCount)),
+            Tasks = current.Tasks with
+            {
+                GrabReservationStrategy = grabReservationStrategy
+            }
         };
         await settingsService.SaveAsync(settings);
-        await _appThemeService.ApplySettingsAsync(settings);
+        await _appThemeService.ApplyThemeAsync(theme);
         await notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库。");
     }
 
@@ -1606,14 +1618,17 @@ public partial class MainWindowViewModel(
             0,
             GrabReservationStrategies.Length - 1);
 
-        if (settings.GrabReservationStrategy == strategy)
+        if (settings.Tasks.GrabReservationStrategy == strategy)
         {
             return;
         }
 
         await settingsService.SaveAsync(settings with
         {
-            GrabReservationStrategy = strategy
+            Tasks = settings.Tasks with
+            {
+                GrabReservationStrategy = strategy
+            }
         });
     }
 
@@ -1623,36 +1638,40 @@ public partial class MainWindowViewModel(
         var settings = await settingsService.LoadAsync();
         try
         {
-            NotificationsEnabled = settings.NotificationsEnabled;
-            MinimizeToTrayEnabled = settings.MinimizeToTray;
-            ProtocolTemplateOverridesEnabled = settings.ProtocolTemplateOverridesEnabled;
-            ApiTimeoutSeconds = settings.ApiTimeoutSeconds;
-            RetryCount = settings.RetryCount;
-            SelectedAppThemeModeIndex = (int)settings.ThemeMode;
-            UseSystemAccent = settings.UseSystemAccent;
-            SelectedGrabReservationStrategyIndex = (int)settings.GrabReservationStrategy;
+            var notifications = settings.Notifications;
+            var ui = settings.Ui;
+            var theme = ui.Theme ?? ThemeSettings.Default;
+            var alertSettings = notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
 
-            var cookieAlerts = settings.TaskEventAlerts ?? TaskEventAlertSettings.Default;
-            EmailAlertsEnabled = cookieAlerts.Email.Enabled;
-            EmailAlertSmtpHost = cookieAlerts.Email.SmtpHost;
-            EmailAlertSmtpPort = cookieAlerts.Email.Port;
-            SelectedEmailAlertSecurityModeIndex = cookieAlerts.Email.SecurityMode == EmailSecurityMode.Tls ? 1 : 0;
-            EmailAlertUsername = cookieAlerts.Email.Username;
-            EmailAlertPassword = cookieAlerts.Email.Password;
-            EmailAlertFromAddress = cookieAlerts.Email.FromAddress;
-            EmailAlertToAddress = cookieAlerts.Email.ToAddress;
-            TelegramAlertsEnabled = cookieAlerts.Telegram.Enabled;
-            TelegramAlertApiBaseUrl = string.IsNullOrWhiteSpace(cookieAlerts.Telegram.ApiBaseUrl)
+            NotificationsEnabled = notifications.AppBannerNotificationsEnabled;
+            MinimizeToTrayEnabled = ui.MinimizeToTray;
+            ProtocolTemplateOverridesEnabled = settings.Protocol.TemplateOverridesEnabled;
+            ApiTimeoutSeconds = settings.RequestPolicy.TimeoutSeconds;
+            RetryCount = settings.RequestPolicy.RetryCount;
+            SelectedAppThemeModeIndex = (int)theme.Mode;
+            UseSystemAccent = theme.UseSystemAccent;
+            SelectedGrabReservationStrategyIndex = (int)settings.Tasks.GrabReservationStrategy;
+
+            EmailAlertsEnabled = alertSettings.Email.Enabled;
+            EmailAlertSmtpHost = alertSettings.Email.SmtpHost;
+            EmailAlertSmtpPort = alertSettings.Email.Port;
+            SelectedEmailAlertSecurityModeIndex = alertSettings.Email.SecurityMode == EmailSecurityMode.Tls ? 1 : 0;
+            EmailAlertUsername = alertSettings.Email.Username;
+            EmailAlertPassword = alertSettings.Email.Password;
+            EmailAlertFromAddress = alertSettings.Email.FromAddress;
+            EmailAlertToAddress = alertSettings.Email.ToAddress;
+            TelegramAlertsEnabled = alertSettings.Telegram.Enabled;
+            TelegramAlertApiBaseUrl = string.IsNullOrWhiteSpace(alertSettings.Telegram.ApiBaseUrl)
                 ? TelegramAlertChannelSettings.DefaultApiBaseUrl
-                : cookieAlerts.Telegram.ApiBaseUrl;
-            TelegramAlertBotToken = cookieAlerts.Telegram.BotToken ?? string.Empty;
-            TelegramAlertChatId = cookieAlerts.Telegram.ChatId ?? string.Empty;
-            LocalToastAlertsEnabled = cookieAlerts.Local.ToastEnabled;
-            LocalSoundAlertsEnabled = cookieAlerts.Local.SoundEnabled;
+                : alertSettings.Telegram.ApiBaseUrl;
+            TelegramAlertBotToken = alertSettings.Telegram.BotToken ?? string.Empty;
+            TelegramAlertChatId = alertSettings.Telegram.ChatId ?? string.Empty;
+            LocalToastAlertsEnabled = alertSettings.Local.ToastEnabled;
+            LocalSoundAlertsEnabled = alertSettings.Local.SoundEnabled;
             NotificationSettingsStatusText = "更改后会自动保存。";
 
-            _historicalSuccessCount = Math.Max(0, settings.SuccessfulReservationCount);
-            _totalGuardSeconds = Math.Max(0, settings.TotalGuardSeconds);
+            _historicalSuccessCount = Math.Max(0, settings.Dashboard.SuccessfulReservationCount);
+            _totalGuardSeconds = Math.Max(0, settings.Dashboard.TotalGuardSeconds);
             HomeHistoricalSuccessCount = _historicalSuccessCount;
             UpdateHomeDashboardPresentation();
         }
@@ -1677,11 +1696,9 @@ public partial class MainWindowViewModel(
     {
         try
         {
-            await _appThemeService.ApplySettingsAsync(AppSettings.Default with
-            {
-                ThemeMode = (AppThemeMode)Math.Clamp(SelectedAppThemeModeIndex, 0, ThemeModes.Length - 1),
-                UseSystemAccent = UseSystemAccent
-            });
+            await _appThemeService.ApplyThemeAsync(new ThemeSettings(
+                (AppThemeMode)Math.Clamp(SelectedAppThemeModeIndex, 0, ThemeModes.Length - 1),
+                UseSystemAccent));
         }
         catch
         {
@@ -1706,15 +1723,14 @@ public partial class MainWindowViewModel(
         try
         {
             var settings = await settingsService.LoadAsync();
-            if (settings.LastLibraryId is null && string.IsNullOrWhiteSpace(settings.LastLibraryName))
+            if (settings.Venue.LastLibraryId is null && string.IsNullOrWhiteSpace(settings.Venue.LastLibraryName))
             {
                 return;
             }
 
             await settingsService.SaveAsync(settings with
             {
-                LastLibraryId = null,
-                LastLibraryName = null
+                Venue = VenueSelectionSettings.Default
             });
         }
         catch (Exception ex)
@@ -2632,16 +2648,17 @@ public partial class MainWindowViewModel(
             var current = await settingsService.LoadAsync();
             var totalGuardSeconds = GetCurrentTotalGuardSeconds(DateTimeOffset.Now);
 
-            if (current.SuccessfulReservationCount == _historicalSuccessCount &&
-                current.TotalGuardSeconds == totalGuardSeconds)
+            if (current.Dashboard.SuccessfulReservationCount == _historicalSuccessCount &&
+                current.Dashboard.TotalGuardSeconds == totalGuardSeconds)
             {
                 return;
             }
 
             await settingsService.SaveAsync(current with
             {
-                SuccessfulReservationCount = _historicalSuccessCount,
-                TotalGuardSeconds = totalGuardSeconds
+                Dashboard = new DashboardMetrics(
+                    _historicalSuccessCount,
+                    totalGuardSeconds)
             });
         }
         catch (Exception ex)
@@ -3031,7 +3048,10 @@ public partial class MainWindowViewModel(
         var current = await settingsService.LoadAsync(cancellationToken);
         await settingsService.SaveAsync(current with
         {
-            TaskEventAlerts = BuildTaskEventAlertSettingsSnapshot()
+            Notifications = current.Notifications with
+            {
+                TaskEventAlerts = BuildTaskEventAlertSettingsSnapshot()
+            }
         }, cancellationToken);
     }
 

@@ -27,7 +27,7 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
 
     private TopLevel? _topLevel;
     private IPlatformSettings? _platformSettings;
-    private AppSettings _lastAppliedSettings = AppSettings.Default;
+    private ThemeSettings _lastAppliedTheme = ThemeSettings.Default;
 
     public event EventHandler<AppThemePalette>? PaletteChanged;
 
@@ -38,13 +38,13 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         var settings = await settingsService.LoadAsync(cancellationToken);
-        await ApplySettingsAsync(settings, cancellationToken);
+        await ApplyThemeAsync(settings.Ui.Theme ?? ThemeSettings.Default, cancellationToken);
     }
 
-    public Task ApplySettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    public Task ApplyThemeAsync(ThemeSettings theme, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _lastAppliedSettings = settings;
+        _lastAppliedTheme = theme;
 
         var app = AvaloniaApplication.Current;
         if (app is null)
@@ -54,7 +54,7 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
             return Task.CompletedTask;
         }
 
-        var requestedVariant = settings.ThemeMode switch
+        var requestedVariant = theme.Mode switch
         {
             AppThemeMode.Light => ThemeVariant.Light,
             AppThemeMode.Dark => ThemeVariant.Dark,
@@ -97,7 +97,7 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
 
     private void OnActualThemeVariantChanged(object? sender, EventArgs e)
     {
-        if (_lastAppliedSettings.ThemeMode != AppThemeMode.FollowSystem)
+        if (_lastAppliedTheme.Mode != AppThemeMode.FollowSystem)
         {
             return;
         }
@@ -107,7 +107,7 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
 
     private void OnPlatformColorValuesChanged(object? sender, PlatformColorValues e)
     {
-        if (!_lastAppliedSettings.UseSystemAccent && _lastAppliedSettings.ThemeMode != AppThemeMode.FollowSystem)
+        if (!_lastAppliedTheme.UseSystemAccent && _lastAppliedTheme.Mode != AppThemeMode.FollowSystem)
         {
             return;
         }
@@ -155,7 +155,7 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
 
     private Color ResolveAccentColor()
     {
-        if (!_lastAppliedSettings.UseSystemAccent || _platformSettings is null)
+        if (!_lastAppliedTheme.UseSystemAccent || _platformSettings is null)
         {
             return DefaultAccentColor;
         }

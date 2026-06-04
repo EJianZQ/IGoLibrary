@@ -1,37 +1,20 @@
-using System.Text.Json.Serialization;
-using IGoLibrary.Ex.Domain.Enums;
-
 namespace IGoLibrary.Ex.Domain.Models;
 
-public sealed record AppSettings(
-    bool NotificationsEnabled,
-    bool MinimizeToTray,
-    [property: JsonPropertyName("customApiOverridesEnabled")]
-    bool ProtocolTemplateOverridesEnabled,
-    int ApiTimeoutSeconds,
-    int RetryCount,
-    AppThemeMode ThemeMode,
-    bool UseSystemAccent,
-    GrabReservationStrategy GrabReservationStrategy,
-    int? LastLibraryId,
-    string? LastLibraryName,
-    [property: JsonPropertyName("cookieExpiryAlerts")]
-    TaskEventAlertSettings? TaskEventAlerts = null,
-    int SuccessfulReservationCount = 0,
-    long TotalGuardSeconds = 0)
+public sealed record AppSettings
 {
-    public static AppSettings Default { get; } = new(
-        NotificationsEnabled: true,
-        MinimizeToTray: true,
-        ProtocolTemplateOverridesEnabled: false,
-        ApiTimeoutSeconds: 5,
-        RetryCount: 3,
-        ThemeMode: AppThemeMode.FollowSystem,
-        UseSystemAccent: OperatingSystem.IsWindows(),
-        GrabReservationStrategy: GrabReservationStrategy.QueryThenReserve,
-        LastLibraryId: null,
-        LastLibraryName: null,
-        TaskEventAlerts: TaskEventAlertSettings.Default,
-        SuccessfulReservationCount: 0,
-        TotalGuardSeconds: 0);
+    public NotificationSettings Notifications { get; init; } = NotificationSettings.Default;
+
+    public AppUiSettings Ui { get; init; } = AppUiSettings.Default;
+
+    public ProtocolSettings Protocol { get; init; } = ProtocolSettings.Default;
+
+    public RequestPolicySettings RequestPolicy { get; init; } = RequestPolicySettings.Default;
+
+    public TaskExecutionSettings Tasks { get; init; } = TaskExecutionSettings.Default;
+
+    public VenueSelectionSettings Venue { get; init; } = VenueSelectionSettings.Default;
+
+    public DashboardMetrics Dashboard { get; init; } = DashboardMetrics.Default;
+
+    public static AppSettings Default { get; } = new();
 }

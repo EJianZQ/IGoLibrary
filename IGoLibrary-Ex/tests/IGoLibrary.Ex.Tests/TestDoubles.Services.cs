@@ -63,7 +63,7 @@ internal sealed class FakeAppThemeService : IAppThemeService
 
     public int ApplySettingsCalls { get; private set; }
 
-    public AppSettings? LastAppliedSettings { get; private set; }
+    public ThemeSettings? LastAppliedTheme { get; private set; }
 
     public Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -71,11 +71,11 @@ internal sealed class FakeAppThemeService : IAppThemeService
         return Task.CompletedTask;
     }
 
-    public Task ApplySettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    public Task ApplyThemeAsync(ThemeSettings theme, CancellationToken cancellationToken = default)
     {
         ApplySettingsCalls++;
-        LastAppliedSettings = settings;
-        CurrentPalette = settings.ThemeMode == AppThemeMode.Dark
+        LastAppliedTheme = theme;
+        CurrentPalette = theme.Mode == AppThemeMode.Dark
             ? DarkPalette
             : LightPalette;
         PaletteChanged?.Invoke(this, CurrentPalette);

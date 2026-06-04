@@ -67,7 +67,7 @@ public sealed class TelegramAlertSenderTests
             {
                 Content = new StringContent("""{"ok":true,"result":{"message_id":2}}""")
             }));
-        var sender = CreateSender(handler, AppSettings.Default with { ApiTimeoutSeconds = 1, RetryCount = 1 });
+        var sender = CreateSender(handler, AppSettings.Default with { RequestPolicy = new RequestPolicySettings(1, 1) });
 
         await sender.SendAsync(
             new TelegramAlertChannelSettings(true, "https://api.telegram.org", "123:ABC", "456"),
@@ -102,6 +102,9 @@ public sealed class TelegramAlertSenderTests
             {
                 Timeout = Timeout.InfiniteTimeSpan
             },
-            new FakeSettingsService(settings ?? AppSettings.Default with { RetryCount = 0 }));
+            new FakeSettingsService(settings ?? AppSettings.Default with
+            {
+                RequestPolicy = AppSettings.Default.RequestPolicy with { RetryCount = 0 }
+            }));
     }
 }

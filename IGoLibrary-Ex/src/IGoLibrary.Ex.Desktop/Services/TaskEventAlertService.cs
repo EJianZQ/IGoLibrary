@@ -104,7 +104,7 @@ public sealed class TaskEventAlertService(
         CancellationToken cancellationToken)
     {
         var settings = await settingsService.LoadAsync(cancellationToken);
-        var alertSettings = settings.TaskEventAlerts ?? TaskEventAlertSettings.Default;
+        var alertSettings = settings.Notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
         var localAlertShown = false;
 
         if (alertSettings.Local.ToastEnabled)

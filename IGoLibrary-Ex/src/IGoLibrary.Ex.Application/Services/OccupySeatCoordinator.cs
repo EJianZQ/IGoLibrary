@@ -218,7 +218,7 @@ public sealed class OccupySeatCoordinator(
     private async Task<bool> TryReserveAgainAsync(string cookie, ReservationInfo info, CancellationToken cancellationToken)
     {
         var settings = await settingsService.LoadAsync(cancellationToken);
-        var maxAttempts = Math.Max(1, settings.RetryCount + 1);
+        var maxAttempts = Math.Max(1, settings.RequestPolicy.RetryCount + 1);
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {

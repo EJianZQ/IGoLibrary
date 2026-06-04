@@ -31,9 +31,8 @@ public sealed class TaskEventAlertServiceTests
     public async Task NotifySessionInvalidAsync_SendsEmailUsingPersistedSettings()
     {
         var emailSender = new FakeEmailAlertSender();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 new EmailAlertChannelSettings(
                     Enabled: true,
                     SmtpHost: "smtp.example.com",
@@ -43,8 +42,7 @@ public sealed class TaskEventAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new LocalAlertChannelSettings(false, false))
-        });
+                new LocalAlertChannelSettings(false, false))));
 
         var service = CreateService(settingsService, emailSender);
 
@@ -64,9 +62,8 @@ public sealed class TaskEventAlertServiceTests
             SendException = new InvalidOperationException("smtp boom")
         };
         var activityLog = new ActivityLogService();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 new EmailAlertChannelSettings(
                     Enabled: true,
                     SmtpHost: "smtp.example.com",
@@ -76,8 +73,7 @@ public sealed class TaskEventAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new LocalAlertChannelSettings(false, false))
-        });
+                new LocalAlertChannelSettings(false, false))));
 
         var service = CreateService(settingsService, emailSender, activityLog);
 
@@ -94,9 +90,8 @@ public sealed class TaskEventAlertServiceTests
     public async Task NotifyGrabSucceededAsync_SendsEmailUsingPersistedSettings()
     {
         var emailSender = new FakeEmailAlertSender();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 new EmailAlertChannelSettings(
                     Enabled: true,
                     SmtpHost: "smtp.example.com",
@@ -106,8 +101,7 @@ public sealed class TaskEventAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new LocalAlertChannelSettings(false, false))
-        });
+                new LocalAlertChannelSettings(false, false))));
 
         var service = CreateService(settingsService, emailSender);
 
@@ -123,9 +117,8 @@ public sealed class TaskEventAlertServiceTests
     public async Task NotifyTaskFailedAsync_SendsEmailUsingPersistedSettings()
     {
         var emailSender = new FakeEmailAlertSender();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 new EmailAlertChannelSettings(
                     Enabled: true,
                     SmtpHost: "smtp.example.com",
@@ -135,8 +128,7 @@ public sealed class TaskEventAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new LocalAlertChannelSettings(false, false))
-        });
+                new LocalAlertChannelSettings(false, false))));
 
         var service = CreateService(settingsService, emailSender);
 
@@ -152,12 +144,10 @@ public sealed class TaskEventAlertServiceTests
     public async Task NotifyTaskFailedAsync_FallsBackToInAppToast_WhenLocalAlertIsDisabled()
     {
         var notificationService = new FakeNotificationService();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalAlertChannelSettings(false, false))
-        });
+                new LocalAlertChannelSettings(false, false))));
 
         var service = CreateService(settingsService: settingsService, notificationService: notificationService);
 
@@ -172,12 +162,10 @@ public sealed class TaskEventAlertServiceTests
     public async Task NotifyGrabSucceededAsync_DoesNotSuppressDifferentLibraries_WithSameSeatName()
     {
         var notificationService = new FakeNotificationService();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalAlertChannelSettings(false, false))
-        });
+                new LocalAlertChannelSettings(false, false))));
 
         var service = CreateService(settingsService: settingsService, notificationService: notificationService);
 
@@ -191,13 +179,11 @@ public sealed class TaskEventAlertServiceTests
     public async Task NotifySessionInvalidAsync_SendsTelegramUsingPersistedSettings()
     {
         var telegramSender = new FakeTelegramAlertSender();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
                 new LocalAlertChannelSettings(false, false),
-                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
-        });
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
 
@@ -214,13 +200,11 @@ public sealed class TaskEventAlertServiceTests
     public async Task NotifyGrabSucceededAsync_SendsTelegramUsingPersistedSettings()
     {
         var telegramSender = new FakeTelegramAlertSender();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
                 new LocalAlertChannelSettings(false, false),
-                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
-        });
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
 
@@ -236,13 +220,11 @@ public sealed class TaskEventAlertServiceTests
     public async Task NotifyTaskFailedAsync_SendsTelegramUsingPersistedSettings()
     {
         var telegramSender = new FakeTelegramAlertSender();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
                 new LocalAlertChannelSettings(false, false),
-                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
-        });
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
 
@@ -263,9 +245,8 @@ public sealed class TaskEventAlertServiceTests
             SendException = new InvalidOperationException("telegram boom")
         };
         var activityLog = new ActivityLogService();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 new EmailAlertChannelSettings(
                     Enabled: true,
                     SmtpHost: "smtp.example.com",
@@ -276,8 +257,7 @@ public sealed class TaskEventAlertServiceTests
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
                 new LocalAlertChannelSettings(false, false),
-                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
-        });
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
 
         var service = CreateService(settingsService, emailSender, activityLog, telegramSender: telegramSender);
 
@@ -295,13 +275,11 @@ public sealed class TaskEventAlertServiceTests
     public async Task NotifyTaskFailedAsync_SuppressesDuplicateTelegramWithinWindow()
     {
         var telegramSender = new FakeTelegramAlertSender();
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
                 new LocalAlertChannelSettings(false, false),
-                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
-        });
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
 
@@ -320,13 +298,11 @@ public sealed class TaskEventAlertServiceTests
         {
             SendCompletion = telegramCompletion
         };
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
                 new LocalAlertChannelSettings(false, false),
-                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
-        });
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
         var service = CreateService(
             settingsService: settingsService,
             notificationService: notificationService,
@@ -359,6 +335,15 @@ public sealed class TaskEventAlertServiceTests
             new AlertSoundService(),
             activityLogService ?? new ActivityLogService());
     }
+
+    private static AppSettings WithTaskEventAlerts(TaskEventAlertSettings alerts)
+        => AppSettings.Default with
+        {
+            Notifications = AppSettings.Default.Notifications with
+            {
+                TaskEventAlerts = alerts
+            }
+        };
 
     private static async Task WaitForAsync(Func<bool> predicate)
     {

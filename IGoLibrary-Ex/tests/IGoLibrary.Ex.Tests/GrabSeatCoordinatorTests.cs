@@ -45,7 +45,7 @@ public sealed class GrabSeatCoordinatorTests
         };
         var coordinator = new GrabSeatCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
+            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) }),
             alertService,
             new ActivityLogService(),
             runtimeState);
@@ -89,7 +89,7 @@ public sealed class GrabSeatCoordinatorTests
         };
         var coordinator = new GrabSeatCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
+            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) }),
             alertService,
             new ActivityLogService(),
             runtimeState);
@@ -142,7 +142,7 @@ public sealed class GrabSeatCoordinatorTests
         };
         var coordinator = new GrabSeatCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
+            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) }),
             new FakeTaskEventAlertService(),
             activityLogService,
             runtimeState);
@@ -198,7 +198,7 @@ public sealed class GrabSeatCoordinatorTests
         };
         var coordinator = new GrabSeatCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
+            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) }),
             new FakeTaskEventAlertService(),
             activityLogService,
             runtimeState);
@@ -267,7 +267,7 @@ public sealed class GrabSeatCoordinatorTests
         };
         var coordinator = new GrabSeatCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.QueryThenReserve }),
+            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) }),
             new FakeTaskEventAlertService(),
             new ActivityLogService(),
             runtimeState);
@@ -310,7 +310,7 @@ public sealed class GrabSeatCoordinatorTests
         };
         var coordinator = new GrabSeatCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.QueryThenReserve }),
+            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) }),
             alertService,
             new ActivityLogService(),
             runtimeState);
@@ -355,7 +355,7 @@ public sealed class GrabSeatCoordinatorTests
         };
         var coordinator = new GrabSeatCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.QueryThenReserve }),
+            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) }),
             alertService,
             new ActivityLogService(),
             runtimeState);
@@ -394,7 +394,7 @@ public sealed class GrabSeatCoordinatorTests
         };
         var coordinator = new GrabSeatCoordinator(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.QueryThenReserve }),
+            new FakeSettingsService(AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.QueryThenReserve) }),
             alertService,
             new ActivityLogService(),
             runtimeState);

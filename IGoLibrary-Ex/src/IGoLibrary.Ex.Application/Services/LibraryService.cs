@@ -41,8 +41,7 @@ public sealed class LibraryService(
         var settings = await settingsService.LoadAsync(cancellationToken);
         await settingsService.SaveAsync(settings with
         {
-            LastLibraryId = target.LibraryId,
-            LastLibraryName = target.Name
+            Venue = new VenueSelectionSettings(target.LibraryId, target.Name)
         }, cancellationToken);
 
         activityLogService.Write(LogEntryKind.Success, "Library", $"已绑定场馆：{target.Name}。");

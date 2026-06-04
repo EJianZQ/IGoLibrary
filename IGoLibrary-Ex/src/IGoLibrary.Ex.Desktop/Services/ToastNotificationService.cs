@@ -139,7 +139,7 @@ public sealed class ToastNotificationService(
     private async Task<bool> IsEnabledAsync(CancellationToken cancellationToken)
     {
         var settings = await settingsService.LoadAsync(cancellationToken);
-        return settings.NotificationsEnabled;
+        return settings.Notifications.AppBannerNotificationsEnabled;
     }
 
     private async Task AutoDismissAsync(ToastWindow toast)

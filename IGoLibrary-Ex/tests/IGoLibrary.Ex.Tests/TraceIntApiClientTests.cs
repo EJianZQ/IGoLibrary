@@ -31,7 +31,7 @@ public sealed class TraceIntApiClientTests
                 "{\"query\":\"reservation\"}",
                 "{\"query\":\"reserve\"}",
                 "{\"query\":\"cancel\"}")),
-            new FakeSettingsService(AppSettings.Default with { ApiTimeoutSeconds = 1, RetryCount = 2 }));
+            new FakeSettingsService(AppSettings.Default with { RequestPolicy = new RequestPolicySettings(1, 2) }));
 
         var libraries = await client.GetLibrariesAsync("Authorization=a; SERVERID=b");
 
@@ -66,7 +66,7 @@ public sealed class TraceIntApiClientTests
                 "{\"query\":\"reservation\"}",
                 "{\"query\":\"reserve\"}",
                 "{\"query\":\"cancel\"}")),
-            new FakeSettingsService(AppSettings.Default with { ApiTimeoutSeconds = 1, RetryCount = 1 }));
+            new FakeSettingsService(AppSettings.Default with { RequestPolicy = new RequestPolicySettings(1, 1) }));
 
         var libraries = await client.GetLibrariesAsync("Authorization=a; SERVERID=b");
 

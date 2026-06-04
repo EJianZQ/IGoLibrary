@@ -14,11 +14,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task ValidateManualCookieAsync_DoesNotRestoreStoredVenueSelection_OnFreshAuthorization()
     {
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            LastLibraryId = 1,
-            LastLibraryName = "场馆A"
-        });
+        var settingsService = new FakeSettingsService(WithVenue(1, "场馆A"));
         var libraryService = new FakeLibraryService
         {
             LibrariesToLoad =
@@ -74,9 +70,11 @@ public sealed class MainWindowViewModelTests
         viewModel.EmailAlertSmtpPort = 465;
         viewModel.EmailAlertsEnabled = true;
 
-        await WaitForAsync(() => settingsService.SaveCalls > 0 && settingsService.CurrentSettings.TaskEventAlerts?.Email.SmtpHost == "smtp.example.com");
+        await WaitForAsync(() =>
+            settingsService.SaveCalls > 0 &&
+            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Email.SmtpHost == "smtp.example.com");
 
-        var alerts = Assert.IsType<TaskEventAlertSettings>(settingsService.CurrentSettings.TaskEventAlerts);
+        var alerts = Assert.IsType<TaskEventAlertSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts);
         Assert.True(alerts.Email.Enabled);
         Assert.Equal("smtp.example.com", alerts.Email.SmtpHost);
         Assert.Equal(465, alerts.Email.Port);
@@ -137,13 +135,11 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task InitializeAsync_LoadsTelegramNotificationSettings()
     {
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default,
                 LocalAlertChannelSettings.Default,
-                new TelegramAlertChannelSettings(true, "https://telegram.example.com", "token-1", "chat-1"))
-        });
+                new TelegramAlertChannelSettings(true, "https://telegram.example.com", "token-1", "chat-1"))));
         var viewModel = CreateViewModel(settingsService: settingsService);
 
         await viewModel.InitializeAsync();
@@ -157,13 +153,11 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task InitializeAsync_DefaultsNullTelegramNotificationStrings()
     {
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            TaskEventAlerts = new TaskEventAlertSettings(
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default,
                 LocalAlertChannelSettings.Default,
-                new TelegramAlertChannelSettings(true, null!, null!, null!))
-        });
+                new TelegramAlertChannelSettings(true, null!, null!, null!))));
         var viewModel = CreateViewModel(settingsService: settingsService);
 
         await viewModel.InitializeAsync();
@@ -188,9 +182,9 @@ public sealed class MainWindowViewModelTests
 
         await WaitForAsync(() =>
             settingsService.SaveCalls > 0 &&
-            settingsService.CurrentSettings.TaskEventAlerts?.Telegram.BotToken == "token-1");
+            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Telegram.BotToken == "token-1");
 
-        var telegram = Assert.IsType<TelegramAlertChannelSettings>(settingsService.CurrentSettings.TaskEventAlerts?.Telegram);
+        var telegram = Assert.IsType<TelegramAlertChannelSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Telegram);
         Assert.True(telegram.Enabled);
         Assert.Equal("https://telegram.example.com", telegram.ApiBaseUrl);
         Assert.Equal("token-1", telegram.BotToken);
@@ -425,11 +419,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SignOutAsync_ClearsStoredLastLibrarySelection()
     {
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            LastLibraryId = 1,
-            LastLibraryName = "场馆A"
-        });
+        var settingsService = new FakeSettingsService(WithVenue(1, "场馆A"));
         var sessionService = new FakeSessionService
         {
             CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
@@ -448,8 +438,8 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.IsAuthorized);
         Assert.Equal(MainWindowViewModel.AccountAndVenueTabIndex, viewModel.SelectedTabIndex);
         Assert.Null(viewModel.SelectedLibrary);
-        Assert.Null(settingsService.CurrentSettings.LastLibraryId);
-        Assert.Null(settingsService.CurrentSettings.LastLibraryName);
+        Assert.Null(settingsService.CurrentSettings.Venue.LastLibraryId);
+        Assert.Null(settingsService.CurrentSettings.Venue.LastLibraryName);
     }
 
     [Fact]
@@ -461,11 +451,7 @@ public sealed class MainWindowViewModelTests
         {
             CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
         };
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            LastLibraryId = libraryB.LibraryId,
-            LastLibraryName = libraryB.Name
-        });
+        var settingsService = new FakeSettingsService(WithVenue(libraryB.LibraryId, libraryB.Name));
         var libraryService = new FakeLibraryService
         {
             LibrariesToLoad = [libraryA, libraryB]
@@ -532,11 +518,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task InitializeAsync_LoadsDashboardMetricsIntoHomeCards()
     {
-        var viewModel = CreateViewModel(settingsService: new FakeSettingsService(AppSettings.Default with
-        {
-            SuccessfulReservationCount = 7,
-            TotalGuardSeconds = 5400
-        }));
+        var viewModel = CreateViewModel(settingsService: new FakeSettingsService(WithDashboard(7, 5400)));
 
         await viewModel.InitializeAsync();
 
@@ -547,18 +529,28 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SaveSettingsAsync_PreservesDashboardMetrics()
     {
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            SuccessfulReservationCount = 4,
-            TotalGuardSeconds = 7200
-        });
+        var settingsService = new FakeSettingsService(WithDashboard(4, 7200));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+        viewModel.HomeHistoricalSuccessCount = 99;
+
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        Assert.Equal(4, settingsService.CurrentSettings.Dashboard.SuccessfulReservationCount);
+        Assert.Equal(7200, settingsService.CurrentSettings.Dashboard.TotalGuardSeconds);
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_PreservesStoredVenueSelection()
+    {
+        var settingsService = new FakeSettingsService(WithVenue(12, "自科阅览区一"));
         var viewModel = CreateViewModel(settingsService: settingsService);
         await viewModel.InitializeAsync();
 
         await viewModel.SaveSettingsCommand.ExecuteAsync(null);
 
-        Assert.Equal(4, settingsService.CurrentSettings.SuccessfulReservationCount);
-        Assert.Equal(7200, settingsService.CurrentSettings.TotalGuardSeconds);
+        Assert.Equal(12, settingsService.CurrentSettings.Venue.LastLibraryId);
+        Assert.Equal("自科阅览区一", settingsService.CurrentSettings.Venue.LastLibraryName);
     }
 
     [Fact]
@@ -575,7 +567,7 @@ public sealed class MainWindowViewModelTests
 
         await viewModel.SaveSettingsCommand.ExecuteAsync(null);
 
-        var telegram = Assert.IsType<TelegramAlertChannelSettings>(settingsService.CurrentSettings.TaskEventAlerts?.Telegram);
+        var telegram = Assert.IsType<TelegramAlertChannelSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Telegram);
         Assert.True(telegram.Enabled);
         Assert.Equal("https://telegram.example.com", telegram.ApiBaseUrl);
         Assert.Equal("token-1", telegram.BotToken);
@@ -599,11 +591,11 @@ public sealed class MainWindowViewModelTests
 
         await viewModel.SaveSettingsCommand.ExecuteAsync(null);
 
-        Assert.Equal(AppThemeMode.Dark, settingsService.CurrentSettings.ThemeMode);
-        Assert.False(settingsService.CurrentSettings.UseSystemAccent);
+        Assert.Equal(AppThemeMode.Dark, settingsService.CurrentSettings.Ui.Theme?.Mode);
+        Assert.False(settingsService.CurrentSettings.Ui.Theme?.UseSystemAccent);
         Assert.Equal(3, themeService.ApplySettingsCalls);
-        Assert.Equal(AppThemeMode.Dark, themeService.LastAppliedSettings?.ThemeMode);
-        Assert.False(themeService.LastAppliedSettings?.UseSystemAccent);
+        Assert.Equal(AppThemeMode.Dark, themeService.LastAppliedTheme?.Mode);
+        Assert.False(themeService.LastAppliedTheme?.UseSystemAccent);
     }
 
     [Fact]
@@ -621,12 +613,12 @@ public sealed class MainWindowViewModelTests
 
         await WaitForAsync(() =>
             themeService.ApplySettingsCalls == 2 &&
-            themeService.LastAppliedSettings?.ThemeMode == AppThemeMode.Dark &&
-            themeService.LastAppliedSettings?.UseSystemAccent == false);
+            themeService.LastAppliedTheme?.Mode == AppThemeMode.Dark &&
+            themeService.LastAppliedTheme?.UseSystemAccent == false);
 
         Assert.Equal(0, settingsService.SaveCalls);
-        Assert.Equal(AppThemeMode.FollowSystem, settingsService.CurrentSettings.ThemeMode);
-        Assert.True(settingsService.CurrentSettings.UseSystemAccent);
+        Assert.Equal(AppThemeMode.FollowSystem, settingsService.CurrentSettings.Ui.Theme?.Mode);
+        Assert.True(settingsService.CurrentSettings.Ui.Theme?.UseSystemAccent);
     }
 
     [Fact]
@@ -687,6 +679,27 @@ public sealed class MainWindowViewModelTests
             appThemeService ?? new FakeAppThemeService(),
             new AppWindowService());
     }
+
+    private static AppSettings WithVenue(int? libraryId, string? libraryName)
+        => AppSettings.Default with
+        {
+            Venue = new VenueSelectionSettings(libraryId, libraryName)
+        };
+
+    private static AppSettings WithDashboard(int successfulReservationCount, long totalGuardSeconds)
+        => AppSettings.Default with
+        {
+            Dashboard = new DashboardMetrics(successfulReservationCount, totalGuardSeconds)
+        };
+
+    private static AppSettings WithTaskEventAlerts(TaskEventAlertSettings alerts)
+        => AppSettings.Default with
+        {
+            Notifications = AppSettings.Default.Notifications with
+            {
+                TaskEventAlerts = alerts
+            }
+        };
 
     private static string BuildAuthorizationCookie(DateTimeOffset expiresAt)
     {

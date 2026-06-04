@@ -42,7 +42,10 @@ public sealed class OccupySeatCoordinatorTests
 
         var notificationService = new FakeNotificationService();
         var activityLogService = new ActivityLogService();
-        var settingsService = new FakeSettingsService(AppSettings.Default with { RetryCount = 2 });
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            RequestPolicy = AppSettings.Default.RequestPolicy with { RetryCount = 2 }
+        });
         var runtimeState = new AppRuntimeState
         {
             Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)

@@ -15,7 +15,7 @@ public sealed class DefaultProtocolTemplateStore(
     {
         var defaults = DefaultTraceIntGraphQlTemplates.Instance;
         var settings = await settingsService.LoadAsync(cancellationToken);
-        if (!settings.ProtocolTemplateOverridesEnabled)
+        if (!settings.Protocol.TemplateOverridesEnabled)
         {
             return defaults;
         }
