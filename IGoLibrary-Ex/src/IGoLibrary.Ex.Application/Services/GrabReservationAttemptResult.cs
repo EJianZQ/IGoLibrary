@@ -3,7 +3,8 @@ using IGoLibrary.Ex.Domain.Models;
 namespace IGoLibrary.Ex.Application.Services;
 
 internal sealed record GrabReservationAttemptResult(
-    TrackedSeat? ReservedSeat,
+    SeatReference? ReservedSeat,
     bool HadReservationAttempt,
     bool RateLimitTriggered,
-    int NextSeatStartIndex);
+    int NextSeatStartIndex,
+    LibraryLayout? LatestLayout = null);

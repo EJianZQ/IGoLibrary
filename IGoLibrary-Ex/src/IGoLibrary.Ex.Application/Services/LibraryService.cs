@@ -10,33 +10,34 @@ public sealed class LibraryService(
     IFavoritesRepository favoritesRepository,
     ISettingsService settingsService,
     IActivityLogService activityLogService,
-    AppRuntimeState runtimeState) : ILibraryService
+    ISessionState sessionState,
+    IVenueState venueState) : ILibraryService
 {
-    public LibrarySummary? BoundLibrary => runtimeState.BoundLibrary;
+    public LibrarySummary? BoundLibrary => venueState.BoundLibrary;
 
     public async Task<IReadOnlyList<LibrarySummary>> LoadLibrariesAsync(CancellationToken cancellationToken = default)
     {
-        var cookie = runtimeState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
+        var cookie = sessionState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
         var libraries = await apiClient.GetLibrariesAsync(cookie, cancellationToken);
-        runtimeState.Libraries = libraries;
+        venueState.Libraries = libraries;
         activityLogService.Write(LogEntryKind.Success, "Library", $"已获取 {libraries.Count} 个可绑定场馆。");
         return libraries;
     }
 
     public async Task<LibraryLayout> BindLibraryAsync(int libraryId, CancellationToken cancellationToken = default)
     {
-        var cookie = runtimeState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
-        var libraries = runtimeState.Libraries.Count > 0
-            ? runtimeState.Libraries
+        var cookie = sessionState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
+        var libraries = venueState.Libraries.Count > 0
+            ? venueState.Libraries
             : await apiClient.GetLibrariesAsync(cookie, cancellationToken);
 
         var target = libraries.FirstOrDefault(x => x.LibraryId == libraryId)
             ?? throw new InvalidOperationException("未找到指定场馆。");
         var layout = await apiClient.GetLibraryLayoutAsync(cookie, libraryId, cancellationToken);
 
-        runtimeState.Libraries = libraries;
-        runtimeState.BoundLibrary = target;
-        runtimeState.CurrentLayout = layout;
+        venueState.Libraries = libraries;
+        venueState.BoundLibrary = target;
+        venueState.CurrentLayout = layout;
 
         var settings = await settingsService.LoadAsync(cancellationToken);
         await settingsService.SaveAsync(settings with
@@ -50,19 +51,19 @@ public sealed class LibraryService(
 
     public async Task<LibraryLayout> RefreshBoundLibraryAsync(CancellationToken cancellationToken = default)
     {
-        var cookie = runtimeState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
-        var library = runtimeState.BoundLibrary ?? throw new InvalidOperationException("当前未绑定场馆。");
+        var cookie = sessionState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
+        var library = venueState.BoundLibrary ?? throw new InvalidOperationException("当前未绑定场馆。");
         var layout = await apiClient.GetLibraryLayoutAsync(cookie, library.LibraryId, cancellationToken);
-        runtimeState.CurrentLayout = layout;
+        venueState.CurrentLayout = layout;
         return layout;
     }
 
-    public Task<IReadOnlyList<TrackedSeat>> GetFavoritesAsync(int libraryId, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<SeatReference>> GetFavoritesAsync(int libraryId, CancellationToken cancellationToken = default)
     {
         return favoritesRepository.GetFavoritesAsync(libraryId, cancellationToken);
     }
 
-    public async Task SaveFavoritesAsync(int libraryId, IReadOnlyList<TrackedSeat> seats, CancellationToken cancellationToken = default)
+    public async Task SaveFavoritesAsync(int libraryId, IReadOnlyList<SeatReference> seats, CancellationToken cancellationToken = default)
     {
         await favoritesRepository.SaveFavoritesAsync(libraryId, seats, cancellationToken);
         activityLogService.Write(LogEntryKind.Success, "Favorite", $"已保存 {seats.Count} 个收藏座位。");

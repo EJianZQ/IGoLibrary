@@ -8,5 +8,5 @@ public interface INotificationTestService
 
     Task SendTestTelegramAsync(TelegramAlertChannelSettings settings, CancellationToken cancellationToken = default);
 
-    Task SendTestLocalAlertAsync(LocalAlertChannelSettings settings, CancellationToken cancellationToken = default);
+    Task SendTestLocalAlertAsync(LocalDesktopAlertSettings settings, CancellationToken cancellationToken = default);
 }

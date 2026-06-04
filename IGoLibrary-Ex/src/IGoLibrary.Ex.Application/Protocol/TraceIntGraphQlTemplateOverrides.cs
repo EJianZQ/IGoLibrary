@@ -1,4 +1,4 @@
-namespace IGoLibrary.Ex.Domain.Models;
+namespace IGoLibrary.Ex.Application.Protocol;
 
 public sealed record TraceIntGraphQlTemplateOverrides(
     string? GetCookieUrlTemplate = null,

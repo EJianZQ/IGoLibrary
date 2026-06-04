@@ -31,7 +31,10 @@ public static class DependencyInjection
             client.Timeout = Timeout.InfiniteTimeSpan;
         });
 
-        services.AddHttpClient<ITraceIntApiClient, TraceIntApiClient>(client =>
+        services.AddSingleton<TraceIntRequestPolicy>();
+        services.AddSingleton<ITraceIntCookieHttpClient, RestSharpTraceIntCookieHttpClient>();
+        services.AddSingleton<TraceIntCookieTransport>();
+        services.AddHttpClient<TraceIntGraphQlTransport>(client =>
             {
                 client.Timeout = Timeout.InfiniteTimeSpan;
                 client.DefaultRequestHeaders.TryAddWithoutValidation(
@@ -43,6 +46,7 @@ public static class DependencyInjection
                 AutomaticDecompression = DecompressionMethods.All,
                 UseCookies = false
             });
+        services.AddTransient<ITraceIntApiClient, TraceIntApiClient>();
 
         return services;
     }

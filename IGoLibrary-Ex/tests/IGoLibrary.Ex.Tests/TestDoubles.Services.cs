@@ -64,7 +64,7 @@ internal sealed class FakeAppThemeService : IAppThemeService
 
     public int ApplySettingsCalls { get; private set; }
 
-    public ThemeSettings? LastAppliedTheme { get; private set; }
+    public ThemePreferences? LastAppliedTheme { get; private set; }
 
     public Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -72,7 +72,7 @@ internal sealed class FakeAppThemeService : IAppThemeService
         return Task.CompletedTask;
     }
 
-    public Task ApplyThemeAsync(ThemeSettings theme, CancellationToken cancellationToken = default)
+    public Task ApplyThemeAsync(ThemePreferences theme, CancellationToken cancellationToken = default)
     {
         ApplySettingsCalls++;
         LastAppliedTheme = theme;
@@ -233,7 +233,7 @@ internal sealed class FakeLibraryService : ILibraryService
 
     public Dictionary<int, LibraryLayout> LayoutsByLibraryId { get; } = [];
 
-    public Dictionary<int, IReadOnlyList<TrackedSeat>> FavoritesByLibraryId { get; } = [];
+    public Dictionary<int, IReadOnlyList<SeatReference>> FavoritesByLibraryId { get; } = [];
 
     public int LoadLibrariesCalls { get; private set; }
 
@@ -267,15 +267,15 @@ internal sealed class FakeLibraryService : ILibraryService
         return Task.FromResult(LayoutsByLibraryId[BoundLibrary.LibraryId]);
     }
 
-    public Task<IReadOnlyList<TrackedSeat>> GetFavoritesAsync(int libraryId, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<SeatReference>> GetFavoritesAsync(int libraryId, CancellationToken cancellationToken = default)
     {
         return Task.FromResult(
             FavoritesByLibraryId.TryGetValue(libraryId, out var favorites)
                 ? favorites
-                : Array.Empty<TrackedSeat>() as IReadOnlyList<TrackedSeat>);
+                : Array.Empty<SeatReference>() as IReadOnlyList<SeatReference>);
     }
 
-    public Task SaveFavoritesAsync(int libraryId, IReadOnlyList<TrackedSeat> seats, CancellationToken cancellationToken = default)
+    public Task SaveFavoritesAsync(int libraryId, IReadOnlyList<SeatReference> seats, CancellationToken cancellationToken = default)
     {
         SaveFavoritesCalls++;
         FavoritesByLibraryId[libraryId] = seats.ToArray();

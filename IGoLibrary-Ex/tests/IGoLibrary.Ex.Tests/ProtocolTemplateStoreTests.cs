@@ -23,7 +23,7 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     {
         var store = await CreateStoreAsync(AppSettings.Default with
         {
-            Protocol = new ProtocolSettings(true)
+            TraceIntProtocol = new TraceIntProtocolSettings(true)
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
@@ -45,7 +45,7 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     {
         var store = await CreateStoreAsync(AppSettings.Default with
         {
-            Protocol = new ProtocolSettings(true)
+            TraceIntProtocol = new TraceIntProtocolSettings(true)
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
@@ -64,7 +64,7 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     {
         var store = await CreateStoreAsync(AppSettings.Default with
         {
-            Protocol = new ProtocolSettings(false)
+            TraceIntProtocol = new TraceIntProtocolSettings(false)
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 

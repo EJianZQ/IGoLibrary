@@ -8,5 +8,6 @@ internal interface IOccupyReReservationExecutor
         string cookie,
         ReservationInfo reservation,
         OccupySeatPlan plan,
+        int maxAttempts,
         CancellationToken cancellationToken);
 }

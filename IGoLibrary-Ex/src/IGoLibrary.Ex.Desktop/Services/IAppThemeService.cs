@@ -11,7 +11,7 @@ public interface IAppThemeService
 
     Task InitializeAsync(CancellationToken cancellationToken = default);
 
-    Task ApplyThemeAsync(ThemeSettings theme, CancellationToken cancellationToken = default);
+    Task ApplyThemeAsync(ThemePreferences theme, CancellationToken cancellationToken = default);
 
     void AttachTopLevel(TopLevel topLevel);
 }

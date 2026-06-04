@@ -1,6 +1,5 @@
 using System.Text.Json;
 using IGoLibrary.Ex.Application.Abstractions;
-using IGoLibrary.Ex.Domain.Models;
 using IGoLibrary.Ex.Infrastructure.Persistence;
 
 namespace IGoLibrary.Ex.Infrastructure.Protocol;
@@ -11,18 +10,18 @@ public sealed class DefaultProtocolTemplateStore(
 {
     private const string OverridesKey = "protocol-overrides";
 
-    public async Task<TraceIntGraphQlTemplateSet> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default)
+    public async Task<TraceIntGraphQlTemplates> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default)
     {
         var defaults = DefaultTraceIntGraphQlTemplates.Instance;
         var settings = await settingsService.LoadAsync(cancellationToken);
-        if (!settings.Protocol.TemplateOverridesEnabled)
+        if (!settings.TraceIntProtocol.GraphQlOverridesEnabled)
         {
             return defaults;
         }
 
         var overrides = await LoadOverridesAsync(cancellationToken);
 
-        return new TraceIntGraphQlTemplateSet(
+        return new TraceIntGraphQlTemplates(
             overrides.GetCookieUrlTemplate ?? defaults.GetCookieUrlTemplate,
             overrides.QueryLibrariesTemplate ?? defaults.QueryLibrariesTemplate,
             overrides.QueryLibraryLayoutTemplate ?? defaults.QueryLibraryLayoutTemplate,

@@ -48,9 +48,9 @@ internal sealed class FakeTraceIntApiClient : ITraceIntApiClient
         => OnCancelReservationAsync?.Invoke(cookie, reservationToken, cancellationToken) ?? Task.FromResult(false);
 }
 
-internal sealed class FakeProtocolTemplateStore(TraceIntGraphQlTemplateSet templates) : IProtocolTemplateStore
+internal sealed class FakeProtocolTemplateStore(TraceIntGraphQlTemplates templates) : IProtocolTemplateStore
 {
-    public TraceIntGraphQlTemplateSet Templates { get; private set; } = templates;
+    public TraceIntGraphQlTemplates Templates { get; private set; } = templates;
 
     public int SaveCalls { get; private set; }
 
@@ -58,7 +58,7 @@ internal sealed class FakeProtocolTemplateStore(TraceIntGraphQlTemplateSet templ
 
     public TraceIntGraphQlTemplateOverrides? LastOverrides { get; private set; }
 
-    public Task<TraceIntGraphQlTemplateSet> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default)
+    public Task<TraceIntGraphQlTemplates> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(Templates);
 
     public Task SaveOverridesAsync(TraceIntGraphQlTemplateOverrides overrides, CancellationToken cancellationToken = default)

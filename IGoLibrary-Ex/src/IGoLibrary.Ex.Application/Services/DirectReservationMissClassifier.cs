@@ -36,7 +36,7 @@ internal static class DirectReservationMissClassifier
         return false;
     }
 
-    public static string GetMessage(DirectReservationMissKind missKind, TrackedSeat seat)
+    public static string GetMessage(DirectReservationMissKind missKind, SeatReference seat)
     {
         return missKind switch
         {

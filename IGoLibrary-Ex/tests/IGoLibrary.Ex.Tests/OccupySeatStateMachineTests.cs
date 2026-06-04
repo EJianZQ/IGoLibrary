@@ -7,10 +7,10 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Tests;
 
-public sealed class OccupySeatStateMachineTests
+public sealed class OccupySeatWorkflowRunnerTests
 {
     [Fact]
-    public async Task FixedRefreshMode_UsesTenSecondRuntimeDelay_WhenReservationIsNotNearExpiration()
+    public async Task FixedCheckIntervalMode_UsesTenSecondRuntimeDelay_WhenReservationIsNotNearExpiration()
     {
         var runtime = CreateBlockingRuntime();
         var reservation = CreateReservation(runtime.Now.AddMinutes(2));
@@ -21,7 +21,7 @@ public sealed class OccupySeatStateMachineTests
             },
             runtime);
 
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds));
         await runtime.DelayStarted!.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await coordinator.StopAsync();
 
@@ -30,7 +30,7 @@ public sealed class OccupySeatStateMachineTests
     }
 
     [Fact]
-    public async Task RandomRefreshMode_UsesRuntimeNextIntBetweenTenAndTwentySeconds()
+    public async Task RandomCheckIntervalMode_UsesRuntimeNextIntBetweenTenAndTwentySeconds()
     {
         var runtime = CreateBlockingRuntime();
         runtime.EnqueueNextInt(17);
@@ -42,7 +42,7 @@ public sealed class OccupySeatStateMachineTests
             },
             runtime);
 
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.RandomTenToTwentySeconds));
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.RandomTenToTwentySeconds));
         await runtime.DelayStarted!.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await coordinator.StopAsync();
 
@@ -68,7 +68,7 @@ public sealed class OccupySeatStateMachineTests
             runtime,
             eventPublisher);
 
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds));
         await WaitForReasonAsync(coordinator, CoordinatorStatusReason.OccupyReReserveSucceeded);
         await WaitForAsync(() => eventPublisher.EventsOf<OccupyReReserveSucceededCoordinatorEvent>().Count == 1);
 
@@ -105,7 +105,7 @@ public sealed class OccupySeatStateMachineTests
             runtime,
             eventPublisher);
 
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds));
         await WaitForAsync(() =>
             eventPublisher.EventsOf<OccupyReReserveSucceededCoordinatorEvent>().Count == 1 &&
             runtime.DelayRequests.Count >= 3 &&
@@ -140,7 +140,7 @@ public sealed class OccupySeatStateMachineTests
             eventPublisher,
             new SessionCredentials(BuildAuthorizationCookie(expiresAt), SessionSource.ManualCookie, DateTimeOffset.Now, true));
 
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
         Assert.Equal(0, reservationInfoCalls);
@@ -172,14 +172,15 @@ public sealed class OccupySeatStateMachineTests
         };
         var reReservationExecutor = new OccupyReReservationExecutor(
             apiClient,
-            settingsService,
             activityLogService,
             runtime);
-        var stateMachine = new OccupySeatStateMachine(
+        var stateMachine = new OccupySeatWorkflowRunner(
+            settingsService,
             apiClient,
             reReservationExecutor,
             eventPublisher ?? new FakeCoordinatorEventPublisher(),
             activityLogService,
+            runtimeState,
             runtimeState,
             runtime);
 

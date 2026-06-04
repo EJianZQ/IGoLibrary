@@ -12,7 +12,7 @@ public interface ILibraryService
 
     Task<LibraryLayout> RefreshBoundLibraryAsync(CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<TrackedSeat>> GetFavoritesAsync(int libraryId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SeatReference>> GetFavoritesAsync(int libraryId, CancellationToken cancellationToken = default);
 
-    Task SaveFavoritesAsync(int libraryId, IReadOnlyList<TrackedSeat> seats, CancellationToken cancellationToken = default);
+    Task SaveFavoritesAsync(int libraryId, IReadOnlyList<SeatReference> seats, CancellationToken cancellationToken = default);
 }

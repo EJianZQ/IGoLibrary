@@ -1,4 +1,4 @@
-namespace IGoLibrary.Ex.Application.Abstractions;
+namespace IGoLibrary.Ex.Desktop.Services;
 
 public interface INotificationService
 {

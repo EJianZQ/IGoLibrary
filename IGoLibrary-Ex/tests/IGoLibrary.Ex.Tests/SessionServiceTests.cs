@@ -24,7 +24,7 @@ public sealed class SessionServiceTests
         };
         var credentialStore = new FakeCredentialStore();
         var runtimeState = new AppRuntimeState();
-        var service = new SessionService(apiClient, credentialStore, new ActivityLogService(), runtimeState);
+        var service = CreateService(apiClient, credentialStore, runtimeState);
         var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(5));
 
         var session = await service.AuthenticateFromCookieAsync(cookie, remember: true);
@@ -43,7 +43,7 @@ public sealed class SessionServiceTests
         };
         var credentialStore = new FakeCredentialStore();
         var runtimeState = new AppRuntimeState();
-        var service = new SessionService(apiClient, credentialStore, new ActivityLogService(), runtimeState);
+        var service = CreateService(apiClient, credentialStore, runtimeState);
         var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(5));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.AuthenticateFromCookieAsync(cookie, remember: true));
@@ -62,7 +62,7 @@ public sealed class SessionServiceTests
             StoredSession = new SessionCredentials("old-cookie", SessionSource.ManualCookie, DateTimeOffset.Now.AddDays(-1), true)
         };
         var runtimeState = new AppRuntimeState();
-        var service = new SessionService(apiClient, credentialStore, new ActivityLogService(), runtimeState);
+        var service = CreateService(apiClient, credentialStore, runtimeState);
 
         var session = await service.AuthenticateFromCookieAsync("fresh-cookie", remember: false);
 
@@ -94,7 +94,7 @@ public sealed class SessionServiceTests
                 true)
         };
         var runtimeState = new AppRuntimeState();
-        var service = new SessionService(apiClient, credentialStore, new ActivityLogService(), runtimeState);
+        var service = CreateService(apiClient, credentialStore, runtimeState);
 
         var restored = await service.RestoreAsync();
 
@@ -116,7 +116,7 @@ public sealed class SessionServiceTests
             StoredSession = new SessionCredentials("expired-cookie", SessionSource.ManualCookie, DateTimeOffset.Now.AddDays(-1), true)
         };
         var runtimeState = new AppRuntimeState();
-        var service = new SessionService(apiClient, credentialStore, new ActivityLogService(), runtimeState);
+        var service = CreateService(apiClient, credentialStore, runtimeState);
 
         var restored = await service.RestoreAsync();
 
@@ -139,7 +139,7 @@ public sealed class SessionServiceTests
             StoredSession = storedSession
         };
         var runtimeState = new AppRuntimeState();
-        var service = new SessionService(apiClient, credentialStore, new ActivityLogService(), runtimeState);
+        var service = CreateService(apiClient, credentialStore, runtimeState);
 
         await Assert.ThrowsAsync<HttpRequestException>(() => service.RestoreAsync());
 
@@ -156,7 +156,7 @@ public sealed class SessionServiceTests
             LoadException = new JsonException("bad json")
         };
         var runtimeState = new AppRuntimeState();
-        var service = new SessionService(new FakeTraceIntApiClient(), credentialStore, new ActivityLogService(), runtimeState);
+        var service = CreateService(new FakeTraceIntApiClient(), credentialStore, runtimeState);
 
         var restored = await service.RestoreAsync();
 
@@ -169,6 +169,20 @@ public sealed class SessionServiceTests
         var header = Base64Url("""{"typ":"JWT","alg":"RS256"}""");
         var payload = Base64Url($$"""{"userId":37580434,"schId":20175,"expireAt":{{expiresAt.ToUnixTimeSeconds()}},"tag":"cookie-test"}""");
         return $"Authorization={header}.{payload}.signature; SERVERID=d3936289adfff6c3874a2579058ac651|1777956374|1777956374";
+    }
+
+    private static SessionService CreateService(
+        FakeTraceIntApiClient apiClient,
+        FakeCredentialStore credentialStore,
+        AppRuntimeState runtimeState)
+    {
+        return new SessionService(
+            apiClient,
+            credentialStore,
+            new ActivityLogService(),
+            runtimeState,
+            runtimeState,
+            runtimeState);
     }
 
     private static string Base64Url(string value)

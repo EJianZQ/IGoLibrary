@@ -1,5 +1,5 @@
 namespace IGoLibrary.Ex.Domain.Models;
 
-public sealed record TrackedSeat(
+public sealed record SeatReference(
     string SeatKey,
     string SeatName);

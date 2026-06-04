@@ -1,54 +1,20 @@
 using System.Net;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
 using IGoLibrary.Ex.Application.Abstractions;
-using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Domain.Models;
-using IGoLibrary.Ex.Domain.Helpers;
 using RestSharp;
 
 namespace IGoLibrary.Ex.Infrastructure.Api;
 
-public sealed class TraceIntApiClient(
-    HttpClient httpClient,
+internal sealed class TraceIntApiClient(
+    TraceIntCookieTransport cookieTransport,
     IProtocolTemplateStore protocolTemplateStore,
-    ISettingsService settingsService) : ITraceIntApiClient
+    TraceIntGraphQlTransport graphQlTransport) : ITraceIntApiClient
 {
-    private const string DesktopUserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36 NetType/WIFI MicroMessenger/7.0.20.1781(0x6700143B) WindowsWechat(0x63070626)";
-    private const string AppVersion = "2.0.11";
-    private static readonly TimeSpan GetCookieTimeout = TimeSpan.FromSeconds(5);
-
     public async Task<string> GetCookieFromCodeAsync(string code, CancellationToken cancellationToken = default)
     {
-        var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
-        var requestUrl = templates.GetCookieUrlTemplate.Replace("ReplaceMeByCode", code, StringComparison.Ordinal);
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(GetCookieTimeout);
-
-        using var client = new RestClient(requestUrl);
-        var request = new RestRequest
-        {
-            Method = Method.Get
-        };
-
-        RestResponse response;
-        try
-        {
-            response = await client.ExecuteAsync(request, timeoutCts.Token);
-        }
-        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
-        {
-            throw new TimeoutException($"获取 Cookie 超时（{GetCookieTimeout.TotalSeconds:0} 秒），请检查网络或稍后重试。", ex);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            throw new InvalidOperationException("获取 Cookie 请求失败，请检查网络连接或授权链接是否可访问。", ex);
-        }
-
-        var responseCookies = response.Cookies?.Select(cookie => cookie.ToString()).ToArray();
-        ThrowIfCookieResponseFailed(response, responseCookies);
-        return BuildCookieHeaderFromResponseCookies(responseCookies);
+        var result = await cookieTransport.GetCookieAsync(code, cancellationToken);
+        ThrowIfCookieResponseFailed(result.Response, result.Cookies);
+        return BuildCookieHeaderFromResponseCookies(result.Cookies);
     }
 
     public async Task ValidateCookieAsync(string cookie, CancellationToken cancellationToken = default)
@@ -59,168 +25,35 @@ public sealed class TraceIntApiClient(
     public async Task<IReadOnlyList<LibrarySummary>> GetLibrariesAsync(string cookie, CancellationToken cancellationToken = default)
     {
         var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
-        using var response = await SendGraphQlAsync(cookie, templates.QueryLibrariesTemplate, cancellationToken);
+        using var response = await graphQlTransport.SendAsync(cookie, templates.QueryLibrariesTemplate, cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var document = JsonDocument.Parse(raw);
-
-        ThrowIfGraphQlError(document.RootElement);
-        var libs = document.RootElement
-            .GetProperty("data")
-            .GetProperty("userAuth")
-            .GetProperty("reserve")
-            .GetProperty("libs");
-
-        var results = new List<LibrarySummary>();
-        foreach (var item in libs.EnumerateArray())
-        {
-            var floor = item.GetProperty("lib_floor").GetString() ?? string.Empty;
-            if (floor == "0")
-            {
-                continue;
-            }
-
-            var runtime = item.TryGetProperty("lib_rt", out var runtimeElement)
-                ? runtimeElement
-                : default;
-
-            results.Add(new LibrarySummary(
-                item.GetProperty("lib_id").GetInt32(),
-                item.GetProperty("lib_name").GetString() ?? "Unknown",
-                floor,
-                item.GetProperty("is_open").GetBoolean(),
-                ReadOptionalIntProperty(runtime, "seats_total"),
-                ReadOptionalIntProperty(runtime, "seats_used"),
-                ReadOptionalIntProperty(runtime, "seats_booking")));
-        }
-
-        return results;
+        return TraceIntGraphQlResponseMapper.MapLibraries(raw);
     }
 
     public async Task<LibraryLayout> GetLibraryLayoutAsync(string cookie, int libraryId, CancellationToken cancellationToken = default)
     {
         var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
         var payload = templates.QueryLibraryLayoutTemplate.Replace("ReplaceMe", libraryId.ToString(), StringComparison.Ordinal);
-        using var response = await SendGraphQlAsync(cookie, payload, cancellationToken);
+        using var response = await graphQlTransport.SendAsync(cookie, payload, cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var document = JsonDocument.Parse(raw);
-
-        ThrowIfGraphQlError(document.RootElement);
-        var lib = document.RootElement
-            .GetProperty("data")
-            .GetProperty("userAuth")
-            .GetProperty("reserve")
-            .GetProperty("libs")[0];
-
-        var layout = lib.GetProperty("lib_layout");
-        var seats = new List<SeatSnapshot>();
-        foreach (var seat in layout.GetProperty("seats").EnumerateArray())
-        {
-            if (!IsSeatLayoutItem(seat))
-            {
-                continue;
-            }
-
-            var key = ReadOptionalStringProperty(seat, "key").Trim();
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                continue;
-            }
-
-            if (!TryReadBooleanLikeProperty(seat, "status", out var isOccupied) ||
-                !TryReadRequiredIntProperty(seat, "x", out var x) ||
-                !TryReadRequiredIntProperty(seat, "y", out var y))
-            {
-                continue;
-            }
-
-            var name = ReadOptionalStringProperty(seat, "name").Trim();
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                name = key;
-            }
-
-            seats.Add(new SeatSnapshot(
-                key,
-                name,
-                isOccupied,
-                x,
-                y));
-        }
-
-        return new LibraryLayout(
-            lib.GetProperty("lib_id").GetInt32(),
-            lib.GetProperty("lib_name").GetString() ?? "Unknown",
-            lib.GetProperty("lib_floor").GetString() ?? string.Empty,
-            lib.GetProperty("is_open").GetBoolean(),
-            layout.GetProperty("seats_total").GetInt32(),
-            layout.GetProperty("seats_booking").GetInt32(),
-            layout.GetProperty("seats_used").GetInt32(),
-            seats.OrderBy(x => int.TryParse(x.SeatName, out var number) ? number : int.MaxValue).ToList());
+        return TraceIntGraphQlResponseMapper.MapLibraryLayout(raw);
     }
 
     public async Task<LibraryRule> GetLibraryRuleAsync(string cookie, int libraryId, CancellationToken cancellationToken = default)
     {
         var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
         var payload = templates.QueryLibraryRuleTemplate.Replace("ReplaceMe", libraryId.ToString(), StringComparison.Ordinal);
-        using var response = await SendGraphQlAsync(cookie, payload, cancellationToken);
+        using var response = await graphQlTransport.SendAsync(cookie, payload, cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var document = JsonDocument.Parse(raw);
-
-        ThrowIfGraphQlError(document.RootElement);
-        var rule = document.RootElement
-            .GetProperty("data")
-            .GetProperty("userAuth")
-            .GetProperty("reserve")
-            .GetProperty("libRule");
-
-        return new LibraryRule(
-            libraryId,
-            rule.GetProperty("advance_booking").GetString() ?? string.Empty,
-            rule.GetProperty("lib_seat_ttl").GetString() ?? string.Empty,
-            rule.GetProperty("lib_hold_ttl").GetString() ?? string.Empty,
-            rule.GetProperty("lib_renew_time").GetString() ?? string.Empty,
-            rule.GetProperty("hold_reason").GetString() ?? string.Empty,
-            rule.TryGetProperty("close_start_date", out var closeStartDate) && closeStartDate.ValueKind != JsonValueKind.Null
-                ? closeStartDate.GetString()
-                : null,
-            rule.TryGetProperty("close_end_date", out var closeEndDate) && closeEndDate.ValueKind != JsonValueKind.Null
-                ? closeEndDate.GetString()
-                : null,
-            rule.GetProperty("open_time").GetInt64(),
-            rule.GetProperty("open_time_str").GetString() ?? string.Empty,
-            rule.GetProperty("close_time").GetInt64(),
-            rule.GetProperty("close_time_str").GetString() ?? string.Empty,
-            rule.GetProperty("lib_validate_time").GetInt32());
+        return TraceIntGraphQlResponseMapper.MapLibraryRule(raw, libraryId);
     }
 
     public async Task<ReservationInfo?> GetReservationInfoAsync(string cookie, CancellationToken cancellationToken = default)
     {
         var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
-        using var response = await SendGraphQlAsync(cookie, templates.QueryReservationInfoTemplate, cancellationToken);
+        using var response = await graphQlTransport.SendAsync(cookie, templates.QueryReservationInfoTemplate, cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var document = JsonDocument.Parse(raw);
-
-        ThrowIfGraphQlError(document.RootElement);
-        var reserveNode = document.RootElement
-            .GetProperty("data")
-            .GetProperty("userAuth")
-            .GetProperty("reserve");
-
-        if (!reserveNode.TryGetProperty("reserve", out var reservation) || reservation.ValueKind == JsonValueKind.Null)
-        {
-            return null;
-        }
-
-        var token = reserveNode.GetProperty("getSToken").GetString() ?? string.Empty;
-        var expirationTimestamp = reservation.GetProperty("exp_date").GetInt64();
-
-        return new ReservationInfo(
-            token,
-            reservation.GetProperty("lib_id").GetInt32(),
-            reservation.GetProperty("lib_name").GetString() ?? string.Empty,
-            reservation.GetProperty("seat_key").GetString() ?? string.Empty,
-            reservation.GetProperty("seat_name").GetString() ?? string.Empty,
-            ReservationTimeHelper.FromUnixSeconds(expirationTimestamp));
+        return TraceIntGraphQlResponseMapper.MapReservationInfo(raw);
     }
 
     public async Task<bool> ReserveSeatAsync(string cookie, int libraryId, string seatKey, CancellationToken cancellationToken = default)
@@ -230,18 +63,9 @@ public sealed class TraceIntApiClient(
             .Replace("ReplaceMeBySeatKey", seatKey, StringComparison.Ordinal)
             .Replace("ReplaceMeByLibID", libraryId.ToString(), StringComparison.Ordinal);
 
-        using var response = await SendGraphQlAsync(cookie, payload, cancellationToken);
+        using var response = await graphQlTransport.SendAsync(cookie, payload, cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var document = JsonDocument.Parse(raw);
-
-        ThrowIfGraphQlError(document.RootElement);
-        var reserveResult = document.RootElement
-            .GetProperty("data")
-            .GetProperty("userAuth")
-            .GetProperty("reserve")
-            .GetProperty("reserueSeat");
-
-        return ReadBooleanLike(reserveResult, "reserueSeat");
+        return TraceIntGraphQlResponseMapper.MapReserveSeat(raw);
     }
 
     public async Task<bool> CancelReservationAsync(string cookie, string reservationToken, CancellationToken cancellationToken = default)
@@ -249,331 +73,9 @@ public sealed class TraceIntApiClient(
         var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
         var payload = templates.CancelReservationTemplate.Replace("ReplaceMe", reservationToken, StringComparison.Ordinal);
 
-        using var response = await SendGraphQlAsync(cookie, payload, cancellationToken);
+        using var response = await graphQlTransport.SendAsync(cookie, payload, cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
-        using var document = JsonDocument.Parse(raw);
-
-        if (TryFindErrorInfo(document.RootElement, out var errorInfo))
-        {
-            return errorInfo.Message.Contains("成功", StringComparison.OrdinalIgnoreCase);
-        }
-
-        if (document.RootElement.TryGetProperty("data", out var data) &&
-            data.TryGetProperty("userAuth", out var userAuth) &&
-            userAuth.TryGetProperty("reserve", out var reserve) &&
-            reserve.TryGetProperty("reserveCancle", out _))
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    private async Task<HttpResponseMessage> SendGraphQlAsync(string cookie, string payload, CancellationToken cancellationToken)
-    {
-        return await ExecuteWithRequestPolicyAsync(async requestToken =>
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Post, "https://wechat.v2.traceint.com/index.php/graphql/");
-            request.Version = HttpVersion.Version11;
-            request.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
-            request.Headers.Host = "wechat.v2.traceint.com";
-            request.Headers.TryAddWithoutValidation("Cookie", cookie);
-            request.Headers.TryAddWithoutValidation("Connection", "keep-alive");
-            request.Headers.TryAddWithoutValidation("Origin", "https://web.traceint.com");
-            request.Headers.TryAddWithoutValidation("Referer", "https://web.traceint.com/web/index.html");
-            request.Headers.TryAddWithoutValidation("User-Agent", DesktopUserAgent);
-            request.Headers.TryAddWithoutValidation("App-Version", AppVersion);
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-            request.Headers.TryAddWithoutValidation("Accept-Encoding", "gzip, deflate, br");
-            request.Headers.TryAddWithoutValidation("Accept-Language", "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7");
-            request.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "same-site");
-            request.Headers.TryAddWithoutValidation("Sec-Fetch-Mode", "cors");
-            request.Headers.TryAddWithoutValidation("Sec-Fetch-Dest", "empty");
-            request.Headers.ExpectContinue = false;
-
-            var payloadBytes = Encoding.UTF8.GetBytes(payload);
-            request.Content = new ByteArrayContent(payloadBytes);
-            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-            request.Content.Headers.ContentLength = payloadBytes.Length;
-
-            var response = await httpClient.SendAsync(request, requestToken);
-            response.EnsureSuccessStatusCode();
-            return response;
-        }, cancellationToken);
-    }
-
-    private async Task<T> ExecuteWithRequestPolicyAsync<T>(
-        Func<CancellationToken, Task<T>> operation,
-        CancellationToken cancellationToken)
-    {
-        var settings = await LoadNetworkSettingsAsync(cancellationToken);
-        Exception? lastException = null;
-
-        for (var attempt = 0; attempt <= settings.RetryCount; attempt++)
-        {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(settings.Timeout);
-
-            try
-            {
-                return await operation(timeoutCts.Token);
-            }
-            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
-            {
-                lastException = new TimeoutException($"请求超时（>{settings.Timeout.TotalSeconds:0} 秒）。", ex);
-            }
-            catch (HttpRequestException ex) when (IsTransient(ex.StatusCode))
-            {
-                lastException = ex;
-            }
-
-            if (attempt >= settings.RetryCount)
-            {
-                break;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250 * (attempt + 1)), cancellationToken);
-        }
-
-        throw lastException ?? new InvalidOperationException("请求失败。");
-    }
-
-    private async Task<(TimeSpan Timeout, int RetryCount)> LoadNetworkSettingsAsync(CancellationToken cancellationToken)
-    {
-        RequestPolicySettings settings;
-        try
-        {
-            settings = (await settingsService.LoadAsync(cancellationToken)).RequestPolicy;
-        }
-        catch
-        {
-            settings = RequestPolicySettings.Default;
-        }
-
-        var timeoutSeconds = Math.Clamp(settings.TimeoutSeconds, 1, 60);
-        var retryCount = Math.Clamp(settings.RetryCount, 0, 10);
-        return (TimeSpan.FromSeconds(timeoutSeconds), retryCount);
-    }
-
-    private static bool IsTransient(HttpStatusCode? statusCode)
-    {
-        return statusCode is null
-            or HttpStatusCode.RequestTimeout
-            or HttpStatusCode.TooManyRequests
-            or HttpStatusCode.BadGateway
-            or HttpStatusCode.ServiceUnavailable
-            or HttpStatusCode.GatewayTimeout
-            || (int?)statusCode >= 500;
-    }
-
-    private static void ThrowIfGraphQlError(JsonElement root)
-    {
-        if (TryGetAuthorizationDeniedError(root, out var authError))
-        {
-            throw new TraceIntApiException(
-                authError.Message,
-                authError.Code,
-                authError.Message,
-                isAuthorizationDenied: true);
-        }
-
-        if (TryFindErrorInfo(root, out var errorInfo))
-        {
-            throw new TraceIntApiException(errorInfo.Message, errorInfo.Code, errorInfo.Message);
-        }
-    }
-
-    private static bool TryGetAuthorizationDeniedError(JsonElement root, out GraphQlErrorInfo errorInfo)
-    {
-        errorInfo = default;
-        if (root.ValueKind is not JsonValueKind.Object ||
-            !root.TryGetProperty("errors", out var errors) ||
-            errors.ValueKind is not JsonValueKind.Array ||
-            errors.GetArrayLength() == 0 ||
-            !TryReadErrorInfo(errors[0], out var candidate) ||
-            candidate.Code != 40001 ||
-            !IsAccessDeniedMessage(candidate.Message))
-        {
-            return false;
-        }
-
-        if (!root.TryGetProperty("data", out var data) || data.ValueKind is not JsonValueKind.Object)
-        {
-            return false;
-        }
-
-        if (!data.TryGetProperty("userAuth", out var userAuth) || userAuth.ValueKind is not JsonValueKind.Null)
-        {
-            return false;
-        }
-
-        errorInfo = candidate;
-        return true;
-    }
-
-    private static bool TryFindErrorInfo(JsonElement element, out GraphQlErrorInfo errorInfo)
-    {
-        if (TryReadErrorInfo(element, out errorInfo))
-        {
-            return true;
-        }
-
-        switch (element.ValueKind)
-        {
-            case JsonValueKind.Object:
-                foreach (var property in element.EnumerateObject())
-                {
-                    if (TryFindErrorInfo(property.Value, out errorInfo))
-                    {
-                        return true;
-                    }
-                }
-
-                break;
-            case JsonValueKind.Array:
-                foreach (var item in element.EnumerateArray())
-                {
-                    if (TryFindErrorInfo(item, out errorInfo))
-                    {
-                        return true;
-                    }
-                }
-
-                break;
-        }
-
-        errorInfo = default;
-        return false;
-    }
-
-    private static bool TryReadErrorInfo(JsonElement element, out GraphQlErrorInfo errorInfo)
-    {
-        errorInfo = default;
-        if (element.ValueKind is not JsonValueKind.Object ||
-            !element.TryGetProperty("msg", out var messageElement) ||
-            messageElement.ValueKind is not JsonValueKind.String)
-        {
-            return false;
-        }
-
-        var message = messageElement.GetString();
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            return false;
-        }
-
-        int? code = null;
-        if (element.TryGetProperty("code", out var codeElement))
-        {
-            code = codeElement.ValueKind switch
-            {
-                JsonValueKind.Number when codeElement.TryGetInt32(out var intValue) => intValue,
-                JsonValueKind.String when int.TryParse(codeElement.GetString(), out var intValue) => intValue,
-                _ => null
-            };
-        }
-
-        errorInfo = new GraphQlErrorInfo(message, code);
-        return true;
-    }
-
-    private static bool IsAccessDeniedMessage(string message)
-    {
-        return string.Equals(message.Trim(), "access denied!", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(message.Trim(), "access denied", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private readonly record struct GraphQlErrorInfo(string Message, int? Code);
-
-    private static bool ReadBooleanLike(JsonElement element, string fieldName)
-    {
-        return element.ValueKind switch
-        {
-            JsonValueKind.True => true,
-            JsonValueKind.False => false,
-            JsonValueKind.String => string.Equals(element.GetString(), "true", StringComparison.OrdinalIgnoreCase),
-            JsonValueKind.Number when element.TryGetInt32(out var intValue) => intValue != 0,
-            _ => throw new InvalidOperationException($"字段 {fieldName} 的返回类型不受支持: {element.ValueKind}")
-        };
-    }
-
-    private static bool IsSeatLayoutItem(JsonElement element)
-    {
-        if (element.ValueKind is not JsonValueKind.Object)
-        {
-            return false;
-        }
-
-        if (!element.TryGetProperty("type", out _))
-        {
-            return true;
-        }
-
-        return TryReadRequiredIntProperty(element, "type", out var type) && type == 1;
-    }
-
-    private static bool TryReadBooleanLikeProperty(JsonElement element, string propertyName, out bool value)
-    {
-        value = default;
-        if (element.ValueKind is not JsonValueKind.Object || !element.TryGetProperty(propertyName, out var property))
-        {
-            return false;
-        }
-
-        try
-        {
-            value = ReadBooleanLike(property, propertyName);
-            return true;
-        }
-        catch (InvalidOperationException)
-        {
-            return false;
-        }
-    }
-
-    private static bool TryReadRequiredIntProperty(JsonElement element, string propertyName, out int value)
-    {
-        value = default;
-        if (element.ValueKind is not JsonValueKind.Object || !element.TryGetProperty(propertyName, out var property))
-        {
-            return false;
-        }
-
-        return property.ValueKind switch
-        {
-            JsonValueKind.Number when property.TryGetInt32(out value) => true,
-            JsonValueKind.String when int.TryParse(property.GetString(), out value) => true,
-            _ => false
-        };
-    }
-
-    private static string ReadOptionalStringProperty(JsonElement element, string propertyName)
-    {
-        if (element.ValueKind is not JsonValueKind.Object ||
-            !element.TryGetProperty(propertyName, out var property) ||
-            property.ValueKind is JsonValueKind.Null)
-        {
-            return string.Empty;
-        }
-
-        return property.ValueKind is JsonValueKind.String
-            ? property.GetString() ?? string.Empty
-            : property.ToString();
-    }
-
-    private static int ReadOptionalIntProperty(JsonElement element, string propertyName)
-    {
-        if (element.ValueKind is not JsonValueKind.Object || !element.TryGetProperty(propertyName, out var property))
-        {
-            return 0;
-        }
-
-        return property.ValueKind switch
-        {
-            JsonValueKind.Number when property.TryGetInt32(out var intValue) => intValue,
-            JsonValueKind.String when int.TryParse(property.GetString(), out var intValue) => intValue,
-            _ => 0
-        };
+        return TraceIntGraphQlResponseMapper.MapCancelReservation(raw);
     }
 
     internal static string BuildCookieHeaderFromResponseCookies(IReadOnlyList<string>? responseCookies)

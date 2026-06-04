@@ -73,7 +73,7 @@ public sealed partial class AccountVenueViewModel(
         return venueWorkflowService.LoadLibraryRuleAsync(libraryId, cancellationToken);
     }
 
-    public Task<IReadOnlyList<TrackedSeat>> GetFavoritesAsync(
+    public Task<IReadOnlyList<SeatReference>> GetFavoritesAsync(
         int libraryId,
         CancellationToken cancellationToken = default)
     {
@@ -82,7 +82,7 @@ public sealed partial class AccountVenueViewModel(
 
     public Task SaveFavoritesAsync(
         int libraryId,
-        IReadOnlyList<TrackedSeat> seats,
+        IReadOnlyList<SeatReference> seats,
         CancellationToken cancellationToken = default)
     {
         return venueWorkflowService.SaveFavoritesAsync(libraryId, seats, cancellationToken);
@@ -168,7 +168,7 @@ public sealed partial class NotificationSettingsViewModel(
     }
 
     public Task SendTestLocalAlertAsync(
-        LocalAlertChannelSettings settings,
+        LocalDesktopAlertSettings settings,
         CancellationToken cancellationToken = default)
     {
         return notificationTestService.SendTestLocalAlertAsync(settings, cancellationToken);
@@ -203,7 +203,7 @@ public sealed partial class SystemSettingsViewModel(
         return settingsWorkflowService.SaveDashboardMetricsAsync(metrics, cancellationToken);
     }
 
-    public Task<TraceIntGraphQlTemplateSet> LoadProtocolTemplatesAsync(CancellationToken cancellationToken = default)
+    public Task<TraceIntGraphQlTemplates> LoadProtocolTemplatesAsync(CancellationToken cancellationToken = default)
     {
         return protocolTemplateEditorService.LoadTemplatesAsync(cancellationToken);
     }

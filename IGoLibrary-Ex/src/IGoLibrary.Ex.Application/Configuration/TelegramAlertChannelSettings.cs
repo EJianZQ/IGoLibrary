@@ -1,4 +1,4 @@
-namespace IGoLibrary.Ex.Domain.Models;
+namespace IGoLibrary.Ex.Application.Configuration;
 
 public sealed record TelegramAlertChannelSettings(
     bool Enabled,

@@ -338,9 +338,9 @@
                  BorderThickness="0" />
         
         <!-- Bottom Info -->
-        <StackPanel Grid.Row="2" Margin="24,24,24,32" Spacing="8" IsVisible="{Binding HasSidebarCookieExpiry}">
+        <StackPanel Grid.Row="2" Margin="24,24,24,32" Spacing="8" IsVisible="{Binding HasSidebarSessionExpiration}">
           <TextBlock Text="Cookie 到期时间" FontSize="12" Opacity="0.5" FontWeight="Bold"/>
-          <TextBlock Text="{Binding SidebarCookieExpiryText}" FontSize="13" TextWrapping="Wrap" Foreground="{Binding SidebarCookieExpiryBrush}" Opacity="0.9"/>
+          <TextBlock Text="{Binding SidebarSessionExpirationText}" FontSize="13" TextWrapping="Wrap" Foreground="{Binding SidebarSessionExpirationBrush}" Opacity="0.9"/>
         </StackPanel>
       </Grid>
     </Border>
@@ -1244,8 +1244,8 @@
                 <StackPanel Grid.Row="1" Spacing="20">
                   <StackPanel Spacing="0">
                     <TextBlock Classes="field-label" Text="轮询刷新频率" />
-                    <ComboBox SelectedIndex="{Binding SelectedOccupyRefreshModeIndex}"
-                              ItemsSource="{Binding OccupyRefreshModes}"
+                    <ComboBox SelectedIndex="{Binding SelectedOccupyCheckIntervalModeIndex}"
+                              ItemsSource="{Binding OccupyCheckIntervalModes}"
                               HorizontalAlignment="Stretch" />
                   </StackPanel>
 
@@ -1640,18 +1640,18 @@
                     <TextBlock Classes="section-title" Text="常规体验" />
                     <CheckBox Content="屏幕右下角展示应用横幅通知" IsChecked="{Binding NotificationsEnabled}" />
                     <CheckBox Content="当任务进行时，右上角关闭会最小化到托盘" IsChecked="{Binding MinimizeToTrayEnabled}" />
-                    <CheckBox Content="自定义接口地址和查询语法" IsChecked="{Binding ProtocolTemplateOverridesEnabled}" FontWeight="Bold" Foreground="{DynamicResource SemiWarningTextBrush}"/>
+                    <CheckBox Content="自定义接口地址和查询语法" IsChecked="{Binding TraceIntGraphQlOverridesEnabled}" FontWeight="Bold" Foreground="{DynamicResource SemiWarningTextBrush}"/>
                     
                     <Separator Background="{DynamicResource AppSeparatorBrush}" Margin="0,8"/>
                     
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
                       <StackPanel Spacing="8">
                         <TextBlock Text="网络 API 超时阈值（秒）" FontSize="13" Opacity="0.8"/>
-                        <NumericUpDown Minimum="3" Maximum="60" Value="{Binding ApiTimeoutSeconds}" HorizontalAlignment="Stretch"/>
+                        <NumericUpDown Minimum="3" Maximum="60" Value="{Binding RequestTimeoutSeconds}" HorizontalAlignment="Stretch"/>
                       </StackPanel>
                       <StackPanel Grid.Column="1" Spacing="8">
                         <TextBlock Text="断线恢复重试次数（次）" FontSize="13" Opacity="0.8"/>
-                        <NumericUpDown Minimum="1" Maximum="10" Value="{Binding RetryCount}" HorizontalAlignment="Stretch"/>
+                        <NumericUpDown Minimum="0" Maximum="10" Value="{Binding NetworkMaxRetries}" HorizontalAlignment="Stretch"/>
                       </StackPanel>
                     </Grid>
 
@@ -1687,7 +1687,7 @@
                 </Border>
               </StackPanel>
 
-              <Border Classes="card" Grid.Column="1" IsVisible="{Binding ProtocolTemplateOverridesEnabled}" BorderBrush="{DynamicResource AppWarningBorderBrush}">
+              <Border Classes="card" Grid.Column="1" IsVisible="{Binding TraceIntGraphQlOverridesEnabled}" BorderBrush="{DynamicResource AppWarningBorderBrush}">
                 <StackPanel Spacing="16">
                   <TextBlock Classes="section-title" Text="⚠️ 自定义接口地址和查询语法" Foreground="{DynamicResource SemiWarningTextBrush}" />
                   <TextBlock Text="如果你使用的不是官方地址，如学校自建等，请自行抓包替换" FontSize="13" Opacity="0.7" TextWrapping="Wrap" />

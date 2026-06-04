@@ -1,11 +1,12 @@
 using System.Text;
 using System.Text.Json;
 using IGoLibrary.Ex.Application.Abstractions;
-using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Infrastructure.Persistence;
 
-public sealed class SqliteSettingsRepository(SqliteConnectionFactory connectionFactory) : ISettingsRepository
+public sealed class SqliteSettingsRepository(
+    SqliteConnectionFactory connectionFactory,
+    IAppSettingsDefaults appSettingsDefaults) : ISettingsRepository
 {
     private const string SettingsKey = "app-settings";
 
@@ -21,12 +22,13 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connectionF
         var result = await command.ExecuteScalarAsync(cancellationToken);
         if (result is string json && !string.IsNullOrWhiteSpace(json))
         {
-            var migratedJson = MigrateLegacyAppSettingsJson(json);
-            var settings = JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default) ?? AppSettings.Default;
+            var migratedJson = MigrateAppSettingsJsonCore(json, appSettingsDefaults.CreateDefault());
+            var settings = JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default)
+                           ?? appSettingsDefaults.CreateDefault();
             return Normalize(settings);
         }
 
-        return AppSettings.Default;
+        return Normalize(appSettingsDefaults.CreateDefault());
     }
 
     public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -48,87 +50,143 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connectionF
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private static string MigrateLegacyAppSettingsJson(string json)
+    internal static string MigrateAppSettingsJson(string json)
+    {
+        return MigrateAppSettingsJsonCore(json, AppSettings.Default);
+    }
+
+    private static string MigrateAppSettingsJsonCore(string json, AppSettings defaults)
     {
         using var document = JsonDocument.Parse(json);
-        if (document.RootElement.ValueKind != JsonValueKind.Object)
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object)
         {
             return json;
         }
 
-        if (!HasLegacySettingsShape(document.RootElement))
+        if (IsCanonicalAndLegacyFree(root))
         {
             return json;
         }
 
-        var defaults = AppSettings.Default;
         using var stream = new MemoryStream();
         using var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
+
+        var notifications = ReadObject(root, "notifications");
+        var ui = ReadObject(root, "ui");
+        var theme = ReadObject(ui, "theme");
+        var legacyProtocol = ReadObject(root, "protocol");
+        var protocol = ReadObject(root, "traceIntProtocol");
+        var legacyRequestPolicy = ReadObject(root, "requestPolicy");
+        var network = ReadObject(root, "network");
+        var tasks = ReadObject(root, "tasks");
+        var grab = ReadObject(tasks, "grab");
+        var occupy = ReadObject(tasks, "occupy");
+
+        var legacyRetryCount = ReadInt(root, "retryCount")
+            ?? ReadInt(legacyRequestPolicy, "retryCount");
 
         writer.WriteStartObject();
 
         writer.WritePropertyName("notifications");
         writer.WriteStartObject();
-        WriteBooleanProperty(
-            writer,
+        writer.WriteBoolean(
             "appBannerNotificationsEnabled",
-            document.RootElement,
-            "notificationsEnabled",
-            defaults.Notifications.AppBannerNotificationsEnabled);
+            ReadBool(notifications, "appBannerNotificationsEnabled")
+            ?? ReadBool(root, "notificationsEnabled")
+            ?? defaults.Notifications.AppBannerNotificationsEnabled);
         writer.WritePropertyName("taskEventAlerts");
-        if (document.RootElement.TryGetProperty("cookieExpiryAlerts", out var legacyTaskEventAlerts))
-        {
-            legacyTaskEventAlerts.WriteTo(writer);
-        }
-        else
-        {
-            JsonSerializer.Serialize(writer, defaults.Notifications.TaskEventAlerts, AppJson.Default);
-        }
-
+        WriteTaskEventAlerts(writer, root, notifications, defaults.Notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default);
         writer.WriteEndObject();
 
         writer.WritePropertyName("ui");
         writer.WriteStartObject();
-        WriteBooleanProperty(writer, "minimizeToTray", document.RootElement, "minimizeToTray", defaults.Ui.MinimizeToTray);
+        writer.WriteBoolean(
+            "minimizeToTray",
+            ReadBool(ui, "minimizeToTray")
+            ?? ReadBool(root, "minimizeToTray")
+            ?? defaults.Ui.MinimizeToTray);
         writer.WritePropertyName("theme");
         writer.WriteStartObject();
-        WriteNumberProperty(writer, "mode", document.RootElement, "themeMode", (int)defaults.Ui.Theme!.Mode);
-        WriteBooleanProperty(writer, "useSystemAccent", document.RootElement, "useSystemAccent", defaults.Ui.Theme!.UseSystemAccent);
+        writer.WriteNumber(
+            "mode",
+            ReadInt(theme, "mode")
+            ?? ReadInt(root, "themeMode")
+            ?? (int)defaults.Ui.Theme!.Mode);
+        writer.WriteBoolean(
+            "useSystemAccent",
+            ReadBool(theme, "useSystemAccent")
+            ?? ReadBool(root, "useSystemAccent")
+            ?? defaults.Ui.Theme!.UseSystemAccent);
         writer.WriteEndObject();
         writer.WriteEndObject();
 
-        writer.WritePropertyName("protocol");
+        writer.WritePropertyName("traceIntProtocol");
         writer.WriteStartObject();
-        WriteBooleanProperty(
-            writer,
-            "templateOverridesEnabled",
-            document.RootElement,
-            "customApiOverridesEnabled",
-            document.RootElement.TryGetProperty("advancedMode", out var advancedMode) &&
-            advancedMode.ValueKind is JsonValueKind.True);
+        writer.WriteBoolean(
+            "graphQlOverridesEnabled",
+            ReadBool(protocol, "graphQlOverridesEnabled")
+            ?? ReadBool(legacyProtocol, "templateOverridesEnabled")
+            ?? ReadBool(root, "customApiOverridesEnabled")
+            ?? ReadBool(root, "advancedMode")
+            ?? defaults.TraceIntProtocol.GraphQlOverridesEnabled);
         writer.WriteEndObject();
 
-        writer.WritePropertyName("requestPolicy");
+        writer.WritePropertyName("network");
         writer.WriteStartObject();
-        WriteNumberProperty(writer, "timeoutSeconds", document.RootElement, "apiTimeoutSeconds", defaults.RequestPolicy.TimeoutSeconds);
-        WriteNumberProperty(writer, "retryCount", document.RootElement, "retryCount", defaults.RequestPolicy.RetryCount);
+        writer.WriteNumber(
+            "timeoutSeconds",
+            ReadInt(network, "timeoutSeconds")
+            ?? ReadInt(legacyRequestPolicy, "timeoutSeconds")
+            ?? ReadInt(root, "apiTimeoutSeconds")
+            ?? defaults.Network.TimeoutSeconds);
+        writer.WriteNumber(
+            "maxRetries",
+            ReadInt(network, "maxRetries")
+            ?? legacyRetryCount
+            ?? defaults.Network.MaxRetries);
         writer.WriteEndObject();
 
         writer.WritePropertyName("tasks");
         writer.WriteStartObject();
-        WriteNumberProperty(writer, "grabReservationStrategy", document.RootElement, "grabReservationStrategy", (int)defaults.Tasks.GrabReservationStrategy);
+        writer.WritePropertyName("grab");
+        writer.WriteStartObject();
+        writer.WriteNumber(
+            "reservationStrategy",
+            ReadInt(grab, "reservationStrategy")
+            ?? ReadInt(tasks, "grabReservationStrategy")
+            ?? ReadInt(root, "grabReservationStrategy")
+            ?? (int)defaults.Tasks.Grab.ReservationStrategy);
+        writer.WriteEndObject();
+        writer.WritePropertyName("occupy");
+        writer.WriteStartObject();
+        writer.WriteNumber(
+            "reReservationMaxAttempts",
+            ReadInt(occupy, "reReservationMaxAttempts")
+            ?? (legacyRetryCount.HasValue ? legacyRetryCount.Value + 1 : (int?)null)
+            ?? defaults.Tasks.Occupy.ReReservationMaxAttempts);
+        writer.WriteEndObject();
         writer.WriteEndObject();
 
         writer.WritePropertyName("venue");
         writer.WriteStartObject();
-        WriteNullableIntProperty(writer, "lastLibraryId", document.RootElement, "lastLibraryId");
-        WriteNullableStringProperty(writer, "lastLibraryName", document.RootElement, "lastLibraryName");
+        WriteNullableInt(writer, "lastLibraryId", ReadObject(root, "venue"), root, "lastLibraryId");
+        WriteNullableString(writer, "lastLibraryName", ReadObject(root, "venue"), root, "lastLibraryName");
         writer.WriteEndObject();
 
         writer.WritePropertyName("dashboard");
         writer.WriteStartObject();
-        WriteNumberProperty(writer, "successfulReservationCount", document.RootElement, "successfulReservationCount", defaults.Dashboard.SuccessfulReservationCount);
-        WriteNumberProperty(writer, "totalGuardSeconds", document.RootElement, "totalGuardSeconds", defaults.Dashboard.TotalGuardSeconds);
+        var dashboard = ReadObject(root, "dashboard");
+        writer.WriteNumber(
+            "successfulReservationCount",
+            ReadInt(dashboard, "successfulReservationCount")
+            ?? ReadInt(root, "successfulReservationCount")
+            ?? defaults.Dashboard.SuccessfulReservationCount);
+        writer.WriteNumber(
+            "totalGuardSeconds",
+            ReadLong(dashboard, "totalGuardSeconds")
+            ?? ReadLong(root, "totalGuardSeconds")
+            ?? defaults.Dashboard.TotalGuardSeconds);
         writer.WriteEndObject();
 
         writer.WriteEndObject();
@@ -139,157 +197,257 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connectionF
     private static AppSettings Normalize(AppSettings settings)
     {
         var notifications = settings.Notifications ?? NotificationSettings.Default;
-        var ui = settings.Ui ?? AppUiSettings.Default;
+        var ui = settings.Ui ?? UiPreferences.Default;
         var alertSettings = notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
+        var tasks = settings.Tasks ?? TaskExecutionSettings.Default;
         return settings with
         {
             Notifications = notifications with
             {
                 TaskEventAlerts = new TaskEventAlertSettings(
                     alertSettings.Email ?? EmailAlertChannelSettings.Default,
-                    alertSettings.Local ?? LocalAlertChannelSettings.Default,
+                    alertSettings.Local ?? LocalDesktopAlertSettings.Default,
                     alertSettings.Telegram ?? TelegramAlertChannelSettings.Default)
             },
             Ui = ui with
             {
-                Theme = ui.Theme ?? ThemeSettings.Default
+                Theme = ui.Theme ?? ThemePreferences.Default
             },
-            Protocol = settings.Protocol ?? ProtocolSettings.Default,
-            RequestPolicy = settings.RequestPolicy ?? RequestPolicySettings.Default,
-            Tasks = settings.Tasks ?? TaskExecutionSettings.Default,
+            TraceIntProtocol = settings.TraceIntProtocol ?? TraceIntProtocolSettings.Default,
+            Network = settings.Network ?? NetworkRequestSettings.Default,
+            Tasks = tasks with
+            {
+                Grab = tasks.Grab ?? GrabTaskSettings.Default,
+                Occupy = tasks.Occupy ?? OccupyTaskSettings.Default
+            },
             Venue = settings.Venue ?? VenueSelectionSettings.Default,
             Dashboard = settings.Dashboard ?? DashboardMetrics.Default
         };
     }
 
-    private static bool HasLegacySettingsShape(JsonElement root)
+    private static bool IsCanonicalAndLegacyFree(JsonElement root)
     {
-        return root.TryGetProperty("notificationsEnabled", out _) ||
-               root.TryGetProperty("cookieExpiryAlerts", out _) ||
-               root.TryGetProperty("minimizeToTray", out _) ||
-               root.TryGetProperty("themeMode", out _) ||
-               root.TryGetProperty("useSystemAccent", out _) ||
-               root.TryGetProperty("customApiOverridesEnabled", out _) ||
-               root.TryGetProperty("advancedMode", out _) ||
-               root.TryGetProperty("apiTimeoutSeconds", out _) ||
-               root.TryGetProperty("retryCount", out _) ||
-               root.TryGetProperty("grabReservationStrategy", out _) ||
-               root.TryGetProperty("lastLibraryId", out _) ||
-               root.TryGetProperty("lastLibraryName", out _) ||
-               root.TryGetProperty("successfulReservationCount", out _) ||
-               root.TryGetProperty("totalGuardSeconds", out _);
+        return IsCanonicalShape(root) && !ContainsLegacySettingsFields(root);
     }
 
-    private static void WriteBooleanProperty(
-        Utf8JsonWriter writer,
-        string propertyName,
-        JsonElement root,
-        string legacyPropertyName,
-        bool defaultValue)
+    private static bool IsCanonicalShape(JsonElement root)
     {
-        if (root.TryGetProperty(legacyPropertyName, out var property) &&
-            property.ValueKind is JsonValueKind.True or JsonValueKind.False)
+        return root.TryGetProperty("traceIntProtocol", out _) &&
+               root.TryGetProperty("network", out _) &&
+               root.TryGetProperty("tasks", out var tasks) &&
+               tasks.ValueKind == JsonValueKind.Object &&
+               tasks.TryGetProperty("grab", out _) &&
+               tasks.TryGetProperty("occupy", out _);
+    }
+
+    private static bool ContainsLegacySettingsFields(JsonElement root)
+    {
+        return HasAnyProperty(
+                   root,
+                   "cookieExpiryAlerts",
+                   "notificationsEnabled",
+                   "advancedMode",
+                   "customApiOverridesEnabled",
+                   "apiTimeoutSeconds",
+                   "retryCount",
+                   "grabReservationStrategy",
+                   "themeMode") ||
+               HasAnyProperty(ReadObject(root, "protocol"), "templateOverridesEnabled") ||
+               HasAnyProperty(ReadObject(root, "requestPolicy"), "timeoutSeconds", "retryCount") ||
+               HasAnyProperty(ReadObject(root, "tasks"), "grabReservationStrategy") ||
+               HasAnyProperty(
+                   ReadObject(
+                       ReadObject(
+                           ReadObject(root, "notifications"),
+                           "taskEventAlerts"),
+                       "local"),
+                   "toastEnabled");
+    }
+
+    private static bool HasAnyProperty(JsonElement parent, params string[] propertyNames)
+    {
+        if (parent.ValueKind != JsonValueKind.Object)
         {
-            writer.WriteBoolean(propertyName, property.GetBoolean());
+            return false;
+        }
+
+        foreach (var propertyName in propertyNames)
+        {
+            if (parent.TryGetProperty(propertyName, out _))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void WriteTaskEventAlerts(
+        Utf8JsonWriter writer,
+        JsonElement root,
+        JsonElement notifications,
+        TaskEventAlertSettings defaults)
+    {
+        var alerts = ReadObject(notifications, "taskEventAlerts");
+        if (alerts.ValueKind == JsonValueKind.Undefined)
+        {
+            alerts = ReadObject(root, "cookieExpiryAlerts");
+        }
+
+        if (alerts.ValueKind == JsonValueKind.Undefined)
+        {
+            JsonSerializer.Serialize(writer, defaults, AppJson.Default);
             return;
         }
 
-        writer.WriteBoolean(propertyName, defaultValue);
+        writer.WriteStartObject();
+        writer.WritePropertyName("email");
+        WriteObjectOrDefault(writer, ReadObject(alerts, "email"), defaults.Email);
+        writer.WritePropertyName("local");
+        WriteLocalDesktopAlert(writer, ReadObject(alerts, "local"), defaults.Local);
+        writer.WritePropertyName("telegram");
+        WriteObjectOrDefault(writer, ReadObject(alerts, "telegram"), defaults.Telegram);
+        writer.WriteEndObject();
     }
 
-    private static void WriteNumberProperty(
+    private static void WriteLocalDesktopAlert(
         Utf8JsonWriter writer,
-        string propertyName,
-        JsonElement root,
-        string legacyPropertyName,
-        int defaultValue)
+        JsonElement local,
+        LocalDesktopAlertSettings defaults)
     {
-        if (root.TryGetProperty(legacyPropertyName, out var property))
-        {
-            if (property.ValueKind is JsonValueKind.Number && property.TryGetInt32(out var intValue))
-            {
-                writer.WriteNumber(propertyName, intValue);
-                return;
-            }
+        writer.WriteStartObject();
+        writer.WriteBoolean(
+            "popupEnabled",
+            ReadBool(local, "popupEnabled")
+            ?? ReadBool(local, "toastEnabled")
+            ?? defaults.PopupEnabled);
+        writer.WriteBoolean(
+            "soundEnabled",
+            ReadBool(local, "soundEnabled") ?? defaults.SoundEnabled);
+        writer.WriteEndObject();
+    }
 
-            if (property.ValueKind is JsonValueKind.String && int.TryParse(property.GetString(), out intValue))
-            {
-                writer.WriteNumber(propertyName, intValue);
-                return;
-            }
+    private static void WriteObjectOrDefault<T>(
+        Utf8JsonWriter writer,
+        JsonElement element,
+        T defaultValue)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            element.WriteTo(writer);
+            return;
         }
 
-        writer.WriteNumber(propertyName, defaultValue);
+        JsonSerializer.Serialize(writer, defaultValue, AppJson.Default);
     }
 
-    private static void WriteNumberProperty(
-        Utf8JsonWriter writer,
-        string propertyName,
-        JsonElement root,
-        string legacyPropertyName,
-        long defaultValue)
+    private static JsonElement ReadObject(JsonElement parent, string propertyName)
     {
-        if (root.TryGetProperty(legacyPropertyName, out var property))
-        {
-            if (property.ValueKind is JsonValueKind.Number && property.TryGetInt64(out var longValue))
-            {
-                writer.WriteNumber(propertyName, longValue);
-                return;
-            }
+        return parent.ValueKind == JsonValueKind.Object &&
+               parent.TryGetProperty(propertyName, out var property) &&
+               property.ValueKind == JsonValueKind.Object
+            ? property
+            : default;
+    }
 
-            if (property.ValueKind is JsonValueKind.String && long.TryParse(property.GetString(), out longValue))
-            {
-                writer.WriteNumber(propertyName, longValue);
-                return;
-            }
+    private static bool? ReadBool(JsonElement parent, string propertyName)
+    {
+        if (parent.ValueKind != JsonValueKind.Object ||
+            !parent.TryGetProperty(propertyName, out var property))
+        {
+            return null;
         }
 
-        writer.WriteNumber(propertyName, defaultValue);
+        return property.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(property.GetString(), out var value) => value,
+            _ => null
+        };
     }
 
-    private static void WriteNullableIntProperty(
+    private static int? ReadInt(JsonElement parent, string propertyName)
+    {
+        if (parent.ValueKind != JsonValueKind.Object ||
+            !parent.TryGetProperty(propertyName, out var property))
+        {
+            return null;
+        }
+
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out var intValue))
+        {
+            return intValue;
+        }
+
+        return property.ValueKind == JsonValueKind.String && int.TryParse(property.GetString(), out intValue)
+            ? intValue
+            : null;
+    }
+
+    private static long? ReadLong(JsonElement parent, string propertyName)
+    {
+        if (parent.ValueKind != JsonValueKind.Object ||
+            !parent.TryGetProperty(propertyName, out var property))
+        {
+            return null;
+        }
+
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetInt64(out var longValue))
+        {
+            return longValue;
+        }
+
+        return property.ValueKind == JsonValueKind.String && long.TryParse(property.GetString(), out longValue)
+            ? longValue
+            : null;
+    }
+
+    private static void WriteNullableInt(
         Utf8JsonWriter writer,
         string propertyName,
-        JsonElement root,
+        JsonElement currentParent,
+        JsonElement legacyParent,
         string legacyPropertyName)
     {
-        if (!root.TryGetProperty(legacyPropertyName, out var property) ||
-            property.ValueKind is JsonValueKind.Null)
+        var value = ReadInt(currentParent, propertyName) ?? ReadInt(legacyParent, legacyPropertyName);
+        if (value is null)
         {
             writer.WriteNull(propertyName);
             return;
         }
 
-        if (property.ValueKind is JsonValueKind.Number && property.TryGetInt32(out var intValue))
-        {
-            writer.WriteNumber(propertyName, intValue);
-            return;
-        }
-
-        if (property.ValueKind is JsonValueKind.String && int.TryParse(property.GetString(), out intValue))
-        {
-            writer.WriteNumber(propertyName, intValue);
-            return;
-        }
-
-        writer.WriteNull(propertyName);
+        writer.WriteNumber(propertyName, value.Value);
     }
 
-    private static void WriteNullableStringProperty(
+    private static void WriteNullableString(
         Utf8JsonWriter writer,
         string propertyName,
-        JsonElement root,
+        JsonElement currentParent,
+        JsonElement legacyParent,
         string legacyPropertyName)
     {
-        if (!root.TryGetProperty(legacyPropertyName, out var property) ||
-            property.ValueKind is JsonValueKind.Null)
+        var value = ReadString(currentParent, propertyName) ?? ReadString(legacyParent, legacyPropertyName);
+        if (value is null)
         {
             writer.WriteNull(propertyName);
             return;
         }
 
-        writer.WriteString(propertyName, property.ValueKind is JsonValueKind.String
+        writer.WriteString(propertyName, value);
+    }
+
+    private static string? ReadString(JsonElement parent, string propertyName)
+    {
+        if (parent.ValueKind != JsonValueKind.Object ||
+            !parent.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return property.ValueKind == JsonValueKind.String
             ? property.GetString()
-            : property.ToString());
+            : property.ToString();
     }
 }

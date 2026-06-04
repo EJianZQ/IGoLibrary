@@ -1,6 +1,6 @@
-namespace IGoLibrary.Ex.Domain.Models;
+namespace IGoLibrary.Ex.Application.Protocol;
 
-public sealed record TraceIntGraphQlTemplateSet(
+public sealed record TraceIntGraphQlTemplates(
     string GetCookieUrlTemplate,
     string QueryLibrariesTemplate,
     string QueryLibraryLayoutTemplate,

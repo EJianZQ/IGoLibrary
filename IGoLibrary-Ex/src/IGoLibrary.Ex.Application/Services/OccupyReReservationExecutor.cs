@@ -6,7 +6,6 @@ namespace IGoLibrary.Ex.Application.Services;
 
 internal sealed class OccupyReReservationExecutor(
     ITraceIntApiClient apiClient,
-    ISettingsService settingsService,
     IActivityLogService activityLogService,
     ICoordinatorRuntime runtime) : IOccupyReReservationExecutor
 {
@@ -14,6 +13,7 @@ internal sealed class OccupyReReservationExecutor(
         string cookie,
         ReservationInfo reservation,
         OccupySeatPlan plan,
+        int maxAttempts,
         CancellationToken cancellationToken)
     {
         var cancelled = await apiClient.CancelReservationAsync(cookie, reservation.ReservationToken, cancellationToken);
@@ -24,8 +24,7 @@ internal sealed class OccupyReReservationExecutor(
 
         await runtime.DelayAsync(plan.ReReserveDelay, cancellationToken);
 
-        var settings = await settingsService.LoadAsync(cancellationToken);
-        var maxAttempts = Math.Max(1, settings.RequestPolicy.RetryCount + 1);
+        maxAttempts = Math.Max(1, maxAttempts);
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {

@@ -27,7 +27,7 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
 
     private TopLevel? _topLevel;
     private IPlatformSettings? _platformSettings;
-    private ThemeSettings _lastAppliedTheme = ThemeSettings.Default;
+    private ThemePreferences _lastAppliedTheme = ThemePreferences.Default;
 
     public event EventHandler<AppThemePalette>? PaletteChanged;
 
@@ -38,10 +38,10 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         var settings = await settingsService.LoadAsync(cancellationToken);
-        await ApplyThemeAsync(settings.Ui.Theme ?? ThemeSettings.Default, cancellationToken);
+        await ApplyThemeAsync(settings.Ui.Theme ?? ThemePreferences.Default, cancellationToken);
     }
 
-    public Task ApplyThemeAsync(ThemeSettings theme, CancellationToken cancellationToken = default)
+    public Task ApplyThemeAsync(ThemePreferences theme, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _lastAppliedTheme = theme;

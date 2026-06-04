@@ -9,7 +9,7 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class TraceIntApiClientTests
 {
     [Fact]
-    public async Task GetLibrariesAsync_RetriesTransientHttpFailures_UsingSavedRetryCount()
+    public async Task GetLibrariesAsync_RetriesTransientHttpFailures_UsingSavedMaxRetries()
     {
         var handler = new SequenceHttpMessageHandler(
             (_, _) => Task.FromException<HttpResponseMessage>(new HttpRequestException("retry-1", null, HttpStatusCode.ServiceUnavailable)),
@@ -18,20 +18,7 @@ public sealed class TraceIntApiClientTests
                 {"data":{"userAuth":{"reserve":{"libs":[{"lib_id":1,"lib_name":"自科阅览区一","lib_floor":"3","is_open":true}]}}}}
                 """));
 
-        var client = new TraceIntApiClient(
-            new HttpClient(handler)
-            {
-                Timeout = Timeout.InfiniteTimeSpan
-            },
-            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet(
-                "https://example.com/ReplaceMeByCode",
-                "{\"query\":\"libraries\"}",
-                "{\"query\":\"layout\"}",
-                "{\"query\":\"rule\"}",
-                "{\"query\":\"reservation\"}",
-                "{\"query\":\"reserve\"}",
-                "{\"query\":\"cancel\"}")),
-            new FakeSettingsService(AppSettings.Default with { RequestPolicy = new RequestPolicySettings(1, 2) }));
+        var client = CreateClient(handler, AppSettings.Default with { Network = new NetworkRequestSettings(1, 2) });
 
         var libraries = await client.GetLibrariesAsync("Authorization=a; SERVERID=b");
 
@@ -53,20 +40,7 @@ public sealed class TraceIntApiClientTests
                 {"data":{"userAuth":{"reserve":{"libs":[{"lib_id":2,"lib_name":"社科阅览区","lib_floor":"5","is_open":true}]}}}}
                 """));
 
-        var client = new TraceIntApiClient(
-            new HttpClient(handler)
-            {
-                Timeout = Timeout.InfiniteTimeSpan
-            },
-            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet(
-                "https://example.com/ReplaceMeByCode",
-                "{\"query\":\"libraries\"}",
-                "{\"query\":\"layout\"}",
-                "{\"query\":\"rule\"}",
-                "{\"query\":\"reservation\"}",
-                "{\"query\":\"reserve\"}",
-                "{\"query\":\"cancel\"}")),
-            new FakeSettingsService(AppSettings.Default with { RequestPolicy = new RequestPolicySettings(1, 1) }));
+        var client = CreateClient(handler, AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) });
 
         var libraries = await client.GetLibrariesAsync("Authorization=a; SERVERID=b");
 
@@ -104,20 +78,7 @@ public sealed class TraceIntApiClientTests
                 }
                 """));
 
-        var client = new TraceIntApiClient(
-            new HttpClient(handler)
-            {
-                Timeout = Timeout.InfiniteTimeSpan
-            },
-            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet(
-                "https://example.com/ReplaceMeByCode",
-                "{\"query\":\"libraries\"}",
-                "{\"query\":\"layout\"}",
-                "{\"query\":\"rule\"}",
-                "{\"query\":\"reservation\"}",
-                "{\"query\":\"reserve\"}",
-                "{\"query\":\"cancel\"}")),
-            new FakeSettingsService(AppSettings.Default));
+        var client = CreateClient(handler);
 
         var rule = await client.GetLibraryRuleAsync("Authorization=a; SERVERID=b", 117580);
 
@@ -170,20 +131,7 @@ public sealed class TraceIntApiClientTests
                 }
                 """));
 
-        var client = new TraceIntApiClient(
-            new HttpClient(handler)
-            {
-                Timeout = Timeout.InfiniteTimeSpan
-            },
-            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet(
-                "https://example.com/ReplaceMeByCode",
-                "{\"query\":\"libraries\"}",
-                "{\"query\":\"layout\"}",
-                "{\"query\":\"rule\"}",
-                "{\"query\":\"reservation\"}",
-                "{\"query\":\"reserve\"}",
-                "{\"query\":\"cancel\"}")),
-            new FakeSettingsService(AppSettings.Default));
+        var client = CreateClient(handler);
 
         var layout = await client.GetLibraryLayoutAsync("Authorization=a; SERVERID=b", 117580);
 
@@ -217,26 +165,97 @@ public sealed class TraceIntApiClientTests
                 }
                 """));
 
-        var client = new TraceIntApiClient(
-            new HttpClient(handler)
-            {
-                Timeout = Timeout.InfiniteTimeSpan
-            },
-            new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet(
-                "https://example.com/ReplaceMeByCode",
-                "{\"query\":\"libraries\"}",
-                "{\"query\":\"layout\"}",
-                "{\"query\":\"rule\"}",
-                "{\"query\":\"reservation\"}",
-                "{\"query\":\"reserve\"}",
-                "{\"query\":\"cancel\"}")),
-            new FakeSettingsService(AppSettings.Default));
+        var client = CreateClient(handler);
 
         var exception = await Assert.ThrowsAsync<TraceIntApiException>(() => client.GetLibrariesAsync("Authorization=a; SERVERID=b"));
 
         Assert.Equal(40001, exception.ErrorCode);
         Assert.Equal("access denied!", exception.RemoteMessage);
         Assert.True(exception.IsAuthorizationDenied);
+    }
+
+    [Fact]
+    public async Task GetCookieFromCodeAsync_RetriesTransientHttpFailure_UsingSavedMaxRetries()
+    {
+        var cookieHttpClient = new FakeTraceIntCookieHttpClient(
+            (_, _) => Task.FromResult(CookieResponse(HttpStatusCode.ServiceUnavailable)),
+            (_, _) => Task.FromResult(CookieResponse(
+                HttpStatusCode.OK,
+                "SERVERID=b",
+                "Authorization=a")));
+
+        var client = CreateClient(
+            new SequenceHttpMessageHandler(),
+            AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) },
+            cookieHttpClient);
+
+        var cookie = await client.GetCookieFromCodeAsync("code-1");
+
+        Assert.Equal("Authorization=a; SERVERID=b", cookie);
+        Assert.Equal(2, cookieHttpClient.CallCount);
+    }
+
+    [Fact]
+    public async Task GetCookieFromCodeAsync_DoesNotRetryForbiddenResponse()
+    {
+        var cookieHttpClient = new FakeTraceIntCookieHttpClient(
+            (_, _) => Task.FromResult(CookieResponse(HttpStatusCode.Forbidden)));
+
+        var client = CreateClient(
+            new SequenceHttpMessageHandler(),
+            AppSettings.Default with { Network = new NetworkRequestSettings(1, 2) },
+            cookieHttpClient);
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => client.GetCookieFromCodeAsync("code-1"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
+        Assert.Equal(1, cookieHttpClient.CallCount);
+    }
+
+    [Fact]
+    public async Task GetCookieFromCodeAsync_KeepsResponseCookieOrdering()
+    {
+        var cookieHttpClient = new FakeTraceIntCookieHttpClient(
+            (_, _) => Task.FromResult(CookieResponse(
+                HttpStatusCode.Found,
+                "SERVERID=b9fc7bd86d2eed91b23d7347e0ee995e|1775746288|1775746288",
+                "Authorization=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9")));
+
+        var client = CreateClient(
+            new SequenceHttpMessageHandler(),
+            cookieHttpClient: cookieHttpClient);
+
+        var cookie = await client.GetCookieFromCodeAsync("code-1");
+
+        Assert.Equal(
+            "Authorization=eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9; SERVERID=b9fc7bd86d2eed91b23d7347e0ee995e|1775746288|1775746288",
+            cookie);
+        Assert.Equal(1, cookieHttpClient.CallCount);
+    }
+
+    [Fact]
+    public async Task GetCookieFromCodeAsync_RetriesTimedOutRequest_UsingSavedTimeoutSetting()
+    {
+        var cookieHttpClient = new FakeTraceIntCookieHttpClient(
+            async (_, cancellationToken) =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                return CookieResponse(HttpStatusCode.OK);
+            },
+            (_, _) => Task.FromResult(CookieResponse(
+                HttpStatusCode.OK,
+                "SERVERID=b",
+                "Authorization=a")));
+
+        var client = CreateClient(
+            new SequenceHttpMessageHandler(),
+            AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) },
+            cookieHttpClient);
+
+        var cookie = await client.GetCookieFromCodeAsync("code-1");
+
+        Assert.Equal("Authorization=a; SERVERID=b", cookie);
+        Assert.Equal(2, cookieHttpClient.CallCount);
     }
 
     [Fact]
@@ -303,5 +322,80 @@ public sealed class TraceIntApiClientTests
             "SERVERID=b",
             "Authorization=a"
         ]);
+    }
+
+    private static TraceIntApiClient CreateClient(
+        HttpMessageHandler handler,
+        AppSettings? settings = null,
+        ITraceIntCookieHttpClient? cookieHttpClient = null)
+    {
+        var httpClient = new HttpClient(handler)
+        {
+            Timeout = Timeout.InfiniteTimeSpan
+        };
+        var settingsService = new FakeSettingsService(settings ?? AppSettings.Default);
+        var requestPolicy = new TraceIntRequestPolicy(settingsService);
+        var graphQlTransport = new TraceIntGraphQlTransport(httpClient, requestPolicy);
+        var protocolTemplateStore = new FakeProtocolTemplateStore(CreateTemplates());
+        var cookieTransport = new TraceIntCookieTransport(
+            protocolTemplateStore,
+            requestPolicy,
+            cookieHttpClient ?? new FakeTraceIntCookieHttpClient(
+                (_, _) => Task.FromResult(CookieResponse(
+                    HttpStatusCode.OK,
+                    "SERVERID=b",
+                    "Authorization=a"))));
+
+        return new TraceIntApiClient(
+            cookieTransport,
+            protocolTemplateStore,
+            graphQlTransport);
+    }
+
+    private static TraceIntGraphQlTemplates CreateTemplates()
+    {
+        return new TraceIntGraphQlTemplates(
+            "https://example.com/ReplaceMeByCode",
+            "{\"query\":\"libraries\"}",
+            "{\"query\":\"layout\"}",
+            "{\"query\":\"rule\"}",
+            "{\"query\":\"reservation\"}",
+            "{\"query\":\"reserve\"}",
+            "{\"query\":\"cancel\"}");
+    }
+
+    private static TraceIntCookieHttpResponse CookieResponse(
+        HttpStatusCode statusCode,
+        params string[] cookies)
+    {
+        return new TraceIntCookieHttpResponse(
+            new RestResponse
+            {
+                StatusCode = statusCode,
+                StatusDescription = statusCode.ToString(),
+                ResponseStatus = ResponseStatus.Completed
+            },
+            cookies);
+    }
+
+    private sealed class FakeTraceIntCookieHttpClient(
+        params Func<string, CancellationToken, Task<TraceIntCookieHttpResponse>>[] steps) : ITraceIntCookieHttpClient
+    {
+        private readonly Queue<Func<string, CancellationToken, Task<TraceIntCookieHttpResponse>>> _steps = new(steps);
+
+        public int CallCount { get; private set; }
+
+        public Task<TraceIntCookieHttpResponse> ExecuteGetAsync(
+            string requestUrl,
+            CancellationToken cancellationToken)
+        {
+            CallCount++;
+            if (_steps.Count == 0)
+            {
+                throw new InvalidOperationException("没有更多预设响应。");
+            }
+
+            return _steps.Dequeue().Invoke(requestUrl, cancellationToken);
+        }
     }
 }

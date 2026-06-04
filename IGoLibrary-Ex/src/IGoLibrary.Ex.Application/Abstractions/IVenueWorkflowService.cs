@@ -23,12 +23,12 @@ public interface IVenueWorkflowService
         int libraryId,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<TrackedSeat>> GetFavoritesAsync(
+    Task<IReadOnlyList<SeatReference>> GetFavoritesAsync(
         int libraryId,
         CancellationToken cancellationToken = default);
 
     Task SaveFavoritesAsync(
         int libraryId,
-        IReadOnlyList<TrackedSeat> seats,
+        IReadOnlyList<SeatReference> seats,
         CancellationToken cancellationToken = default);
 }

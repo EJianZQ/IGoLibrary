@@ -5,11 +5,11 @@ namespace IGoLibrary.Ex.Application.Services;
 
 internal sealed class OccupySeatCoordinator : IOccupySeatCoordinator
 {
-    private readonly OccupySeatStateMachine _stateMachine;
+    private readonly OccupySeatWorkflowRunner _stateMachine;
     private readonly CoordinatorRunController _controller;
 
     public OccupySeatCoordinator(
-        OccupySeatStateMachine stateMachine,
+        OccupySeatWorkflowRunner stateMachine,
         ICoordinatorRuntime runtime)
     {
         _stateMachine = stateMachine;

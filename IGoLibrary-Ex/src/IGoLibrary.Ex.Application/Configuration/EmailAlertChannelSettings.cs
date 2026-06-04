@@ -1,6 +1,6 @@
 using IGoLibrary.Ex.Domain.Enums;
 
-namespace IGoLibrary.Ex.Domain.Models;
+namespace IGoLibrary.Ex.Application.Configuration;
 
 public sealed record EmailAlertChannelSettings(
     bool Enabled,

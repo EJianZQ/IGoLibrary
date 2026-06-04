@@ -155,7 +155,7 @@ internal sealed class TelegramAlertSender(
         var settings = await LoadNetworkSettingsAsync(cancellationToken);
         Exception? lastException = null;
 
-        for (var attempt = 0; attempt <= settings.RetryCount; attempt++)
+        for (var attempt = 0; attempt <= settings.MaxRetries; attempt++)
         {
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(settings.Timeout);
@@ -183,7 +183,7 @@ internal sealed class TelegramAlertSender(
                 lastException = ex;
             }
 
-            if (attempt >= settings.RetryCount)
+            if (attempt >= settings.MaxRetries)
             {
                 break;
             }
@@ -194,21 +194,21 @@ internal sealed class TelegramAlertSender(
         throw lastException ?? new InvalidOperationException("Telegram 请求失败。");
     }
 
-    private async Task<(TimeSpan Timeout, int RetryCount)> LoadNetworkSettingsAsync(CancellationToken cancellationToken)
+    private async Task<(TimeSpan Timeout, int MaxRetries)> LoadNetworkSettingsAsync(CancellationToken cancellationToken)
     {
-        RequestPolicySettings settings;
+        NetworkRequestSettings settings;
         try
         {
-            settings = (await settingsService.LoadAsync(cancellationToken)).RequestPolicy;
+            settings = (await settingsService.LoadAsync(cancellationToken)).Network;
         }
         catch
         {
-            settings = RequestPolicySettings.Default;
+            settings = NetworkRequestSettings.Default;
         }
 
         var timeoutSeconds = Math.Clamp(settings.TimeoutSeconds, 1, 60);
-        var retryCount = Math.Clamp(settings.RetryCount, 0, 10);
-        return (TimeSpan.FromSeconds(timeoutSeconds), retryCount);
+        var maxRetries = Math.Clamp(settings.MaxRetries, 0, 10);
+        return (TimeSpan.FromSeconds(timeoutSeconds), maxRetries);
     }
 
     private static bool IsTransient(HttpStatusCode? statusCode)

@@ -77,7 +77,7 @@ public sealed class WorkflowServiceTests
         var library = new LibrarySummary(7, "自科", "4F", true);
         var layout = new LibraryLayout(7, "自科", "4F", true, 10, 1, 2, []);
         var rule = new LibraryRule(7, "", "", "", "", "", null, null, 0, "08:00", 0, "22:00", 0);
-        var favorites = new TrackedSeat[] { new("seat-1", "1") };
+        var favorites = new SeatReference[] { new("seat-1", "1") };
         var libraryService = new FakeLibraryService
         {
             LibrariesToLoad = [library]
@@ -189,18 +189,18 @@ public sealed class WorkflowServiceTests
         await service.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
             AppBannerNotificationsEnabled: false,
             MinimizeToTray: false,
-            ProtocolTemplateOverridesEnabled: true,
+            TraceIntGraphQlOverridesEnabled: true,
             RequestTimeoutSeconds: 1,
-            RequestRetryCount: 0,
-            Theme: new ThemeSettings(AppThemeMode.Dark, useSystemAccent: false),
+            NetworkMaxRetries: 0,
+            Theme: new ThemePreferences(AppThemeMode.Dark, useSystemAccent: false),
             GrabReservationStrategy: GrabReservationStrategy.ReserveDirectly,
             TaskEventAlerts: TaskEventAlertSettings.Default));
 
         Assert.Equal(initial.Venue, settingsService.CurrentSettings.Venue);
         Assert.Equal(initial.Dashboard, settingsService.CurrentSettings.Dashboard);
-        Assert.Equal(3, settingsService.CurrentSettings.RequestPolicy.TimeoutSeconds);
-        Assert.Equal(1, settingsService.CurrentSettings.RequestPolicy.RetryCount);
-        Assert.Equal(GrabReservationStrategy.ReserveDirectly, settingsService.CurrentSettings.Tasks.GrabReservationStrategy);
+        Assert.Equal(3, settingsService.CurrentSettings.Network.TimeoutSeconds);
+        Assert.Equal(0, settingsService.CurrentSettings.Network.MaxRetries);
+        Assert.Equal(GrabReservationStrategy.ReserveDirectly, settingsService.CurrentSettings.Tasks.Grab.ReservationStrategy);
     }
 
     [Fact]
@@ -209,13 +209,13 @@ public sealed class WorkflowServiceTests
         var initial = AppSettings.Default with
         {
             Notifications = new NotificationSettings(true, TaskEventAlertSettings.Default),
-            Ui = new AppUiSettings(false, new ThemeSettings(AppThemeMode.Dark, false))
+            Ui = new UiPreferences(false, new ThemePreferences(AppThemeMode.Dark, false))
         };
         var settingsService = new FakeSettingsService(initial);
         var service = new SettingsWorkflowService(settingsService);
         var alerts = new TaskEventAlertSettings(
             EmailAlertChannelSettings.Default with { Enabled = true },
-            LocalAlertChannelSettings.Default,
+            LocalDesktopAlertSettings.Default,
             TelegramAlertChannelSettings.Default);
 
         await service.SaveNotificationSettingsAsync(alerts);
@@ -228,7 +228,7 @@ public sealed class WorkflowServiceTests
     [Fact]
     public async Task ProtocolTemplateEditorService_DelegatesLoadSaveAndReset()
     {
-        var templates = new TraceIntGraphQlTemplateSet("cookie", "libs", "layout", "rule", "reservation", "reserve", "cancel");
+        var templates = new TraceIntGraphQlTemplates("cookie", "libs", "layout", "rule", "reservation", "reserve", "cancel");
         var store = new FakeProtocolTemplateStore(templates);
         var service = new ProtocolTemplateEditorService(store);
         var overrides = new TraceIntGraphQlTemplateOverrides("a", "b", "c", "d", "e", "f", "g");
@@ -246,16 +246,16 @@ public sealed class WorkflowServiceTests
     [Fact]
     public async Task NotificationTestService_DelegatesAndPropagatesFailures()
     {
-        var alertService = new FakeTaskEventAlertService
+        var alertService = new FakeTaskEventAlertDispatcher
         {
             SendTestLocalException = new InvalidOperationException("local failed")
         };
-        var service = new NotificationTestService(alertService);
+        var service = alertService;
 
         await service.SendTestEmailAsync(EmailAlertChannelSettings.Default);
         await service.SendTestTelegramAsync(TelegramAlertChannelSettings.Default);
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.SendTestLocalAlertAsync(LocalAlertChannelSettings.Default));
+            () => service.SendTestLocalAlertAsync(LocalDesktopAlertSettings.Default));
 
         Assert.Equal("local failed", exception.Message);
         Assert.Single(alertService.TestEmailRequests);

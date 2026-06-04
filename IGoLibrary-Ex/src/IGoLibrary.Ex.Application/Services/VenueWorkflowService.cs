@@ -91,7 +91,7 @@ public sealed class VenueWorkflowService(
         }
     }
 
-    public Task<IReadOnlyList<TrackedSeat>> GetFavoritesAsync(
+    public Task<IReadOnlyList<SeatReference>> GetFavoritesAsync(
         int libraryId,
         CancellationToken cancellationToken = default)
     {
@@ -100,7 +100,7 @@ public sealed class VenueWorkflowService(
 
     public Task SaveFavoritesAsync(
         int libraryId,
-        IReadOnlyList<TrackedSeat> seats,
+        IReadOnlyList<SeatReference> seats,
         CancellationToken cancellationToken = default)
     {
         return libraryService.SaveFavoritesAsync(libraryId, seats, cancellationToken);

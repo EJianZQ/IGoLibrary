@@ -54,7 +54,7 @@ public sealed class OccupySeatCoordinatorTests
             apiClient,
             AppSettings.Default with
             {
-                RequestPolicy = AppSettings.Default.RequestPolicy with { RetryCount = 2 }
+                Network = AppSettings.Default.Network with { MaxRetries = 2 }
             },
             eventPublisher: eventPublisher,
             activityLogService: activityLogService,
@@ -62,7 +62,7 @@ public sealed class OccupySeatCoordinatorTests
             runtime: runtime);
 
         using var cts = new CancellationTokenSource();
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds), cts.Token);
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds), cts.Token);
 
         await reserveSucceeded.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
@@ -95,7 +95,7 @@ public sealed class OccupySeatCoordinatorTests
             eventPublisher: eventPublisher,
             runtimeState: runtimeState);
 
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
         await WaitForAsync(() => eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>().Count == 1);
 
@@ -132,7 +132,7 @@ public sealed class OccupySeatCoordinatorTests
             eventPublisher: eventPublisher,
             runtimeState: runtimeState);
 
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
         Assert.Equal(0, reservationInfoCallCount);
@@ -163,7 +163,7 @@ public sealed class OccupySeatCoordinatorTests
             eventPublisher: eventPublisher,
             runtimeState: runtimeState);
 
-        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds));
+        await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
         await WaitForAsync(() => eventPublisher.EventsOf<TaskFailedCoordinatorEvent>().Count == 1);
 
@@ -190,15 +190,16 @@ public sealed class OccupySeatCoordinatorTests
         };
         var reReservationExecutor = new OccupyReReservationExecutor(
             apiClient,
-            new FakeSettingsService(settings),
             activityLogService,
             runtime);
 
-        var stateMachine = new OccupySeatStateMachine(
+        var stateMachine = new OccupySeatWorkflowRunner(
+            new FakeSettingsService(settings),
             apiClient,
             reReservationExecutor,
             eventPublisher,
             activityLogService,
+            runtimeState,
             runtimeState,
             runtime);
 

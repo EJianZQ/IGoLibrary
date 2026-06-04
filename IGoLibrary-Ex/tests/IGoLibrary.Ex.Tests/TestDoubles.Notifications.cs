@@ -35,11 +35,13 @@ internal sealed class FakeNotificationService : INotificationService
     }
 }
 
-internal sealed class FakeTaskEventAlertService : ITaskEventAlertService
+internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, INotificationTestService
 {
     public List<(string Source, string Reason)> SessionInvalidNotifications { get; } = [];
 
     public List<(string LibraryName, string SeatName)> GrabSucceededNotifications { get; } = [];
+
+    public List<string> OccupyReReserveSucceededNotifications { get; } = [];
 
     public List<(string TaskName, string Reason)> TaskFailedNotifications { get; } = [];
 
@@ -49,13 +51,15 @@ internal sealed class FakeTaskEventAlertService : ITaskEventAlertService
 
     public Exception? NotifyGrabSucceededException { get; set; }
 
+    public Exception? NotifyOccupyReReserveSucceededException { get; set; }
+
     public Exception? NotifyTaskFailedException { get; set; }
 
     public List<EmailAlertChannelSettings> TestEmailRequests { get; } = [];
 
     public List<TelegramAlertChannelSettings> TestTelegramRequests { get; } = [];
 
-    public List<LocalAlertChannelSettings> TestLocalAlertRequests { get; } = [];
+    public List<LocalDesktopAlertSettings> TestLocalAlertRequests { get; } = [];
 
     public Exception? SendTestEmailException { get; set; }
 
@@ -83,6 +87,17 @@ internal sealed class FakeTaskEventAlertService : ITaskEventAlertService
 
         GrabSucceededNotifications.Add((libraryName, seatName));
         return GrabSucceededCompletion?.Task ?? Task.CompletedTask;
+    }
+
+    public Task NotifyOccupyReReserveSucceededAsync(string seatName, CancellationToken cancellationToken = default)
+    {
+        if (NotifyOccupyReReserveSucceededException is not null)
+        {
+            throw NotifyOccupyReReserveSucceededException;
+        }
+
+        OccupyReReserveSucceededNotifications.Add(seatName);
+        return Task.CompletedTask;
     }
 
     public Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default)
@@ -118,7 +133,7 @@ internal sealed class FakeTaskEventAlertService : ITaskEventAlertService
         return Task.CompletedTask;
     }
 
-    public Task SendTestLocalAlertAsync(LocalAlertChannelSettings settings, CancellationToken cancellationToken = default)
+    public Task SendTestLocalAlertAsync(LocalDesktopAlertSettings settings, CancellationToken cancellationToken = default)
     {
         if (SendTestLocalException is not null)
         {

@@ -137,15 +137,15 @@ public sealed class MainWindowClipboardTests
         var settingsService = new FakeSettingsService(AppSettings.Default);
         var occupySeatCoordinator = new FakeOccupySeatCoordinator();
         var activityLogService = new ActivityLogService();
-        var taskAlertService = new FakeTaskEventAlertService();
+        var taskAlertService = new FakeTaskEventAlertDispatcher();
 
         return new MainWindowViewModel(
             new SessionWorkflowService(apiClient, sessionService),
             new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
             new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),
             new SettingsWorkflowService(settingsService),
-            new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet("", "", "", "", "", "", ""))),
-            new NotificationTestService(taskAlertService),
+            new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates("", "", "", "", "", "", ""))),
+            taskAlertService,
             new FakeGrabSeatCoordinator(),
             occupySeatCoordinator,
             activityLogService,

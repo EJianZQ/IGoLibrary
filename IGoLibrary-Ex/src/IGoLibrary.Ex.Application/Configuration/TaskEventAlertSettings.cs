@@ -1,10 +1,10 @@
-namespace IGoLibrary.Ex.Domain.Models;
+namespace IGoLibrary.Ex.Application.Configuration;
 
 public sealed record TaskEventAlertSettings
 {
     public TaskEventAlertSettings(
         EmailAlertChannelSettings email,
-        LocalAlertChannelSettings local,
+        LocalDesktopAlertSettings local,
         TelegramAlertChannelSettings? telegram = null)
     {
         Email = email;
@@ -14,12 +14,12 @@ public sealed record TaskEventAlertSettings
 
     public EmailAlertChannelSettings Email { get; init; }
 
-    public LocalAlertChannelSettings Local { get; init; }
+    public LocalDesktopAlertSettings Local { get; init; }
 
     public TelegramAlertChannelSettings Telegram { get; init; }
 
     public static TaskEventAlertSettings Default { get; } = new(
         EmailAlertChannelSettings.Default,
-        LocalAlertChannelSettings.Default,
+        LocalDesktopAlertSettings.Default,
         TelegramAlertChannelSettings.Default);
 }

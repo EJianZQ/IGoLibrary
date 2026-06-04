@@ -1,14 +1,14 @@
-namespace IGoLibrary.Ex.Domain.Models;
+namespace IGoLibrary.Ex.Application.Configuration;
 
 public sealed record AppSettings
 {
     public NotificationSettings Notifications { get; init; } = NotificationSettings.Default;
 
-    public AppUiSettings Ui { get; init; } = AppUiSettings.Default;
+    public UiPreferences Ui { get; init; } = UiPreferences.Default;
 
-    public ProtocolSettings Protocol { get; init; } = ProtocolSettings.Default;
+    public TraceIntProtocolSettings TraceIntProtocol { get; init; } = TraceIntProtocolSettings.Default;
 
-    public RequestPolicySettings RequestPolicy { get; init; } = RequestPolicySettings.Default;
+    public NetworkRequestSettings Network { get; init; } = NetworkRequestSettings.Default;
 
     public TaskExecutionSettings Tasks { get; init; } = TaskExecutionSettings.Default;
 

@@ -13,7 +13,7 @@ public sealed class TaskEventAlertService(
     ToastNotificationService toastNotificationService,
     INotificationService notificationService,
     AlertSoundService alertSoundService,
-    IActivityLogService activityLogService) : ITaskEventAlertService
+    IActivityLogService activityLogService) : ITaskEventAlertDispatcher
 {
     private readonly object _gate = new();
     private string? _lastAlertKey;
@@ -67,6 +67,28 @@ public sealed class TaskEventAlertService(
             cancellationToken);
     }
 
+    public async Task NotifyOccupyReReserveSucceededAsync(string seatName, CancellationToken cancellationToken = default)
+    {
+        var normalizedSeatName = NormalizeSeatName(seatName);
+        if (ShouldSuppress($"occupy-success|{normalizedSeatName}"))
+        {
+            return;
+        }
+
+        await DispatchAlertAsync(
+            emailLabel: "占座成功提醒",
+            telegramLabel: "占座成功提醒",
+            localLabel: "占座成功提醒",
+            emailSubject: "IGoLibrary-Ex 占座成功提醒",
+            emailBody: BuildOccupyReReserveSucceededEmailBody(normalizedSeatName),
+            telegramMessage: BuildOccupyReReserveSucceededTelegramMessage(normalizedSeatName),
+            toastKind: ToastVisualKind.Success,
+            toastTitle: "占座成功",
+            toastMessage: $"{normalizedSeatName} 已重新预约",
+            enableInAppFallback: true,
+            cancellationToken);
+    }
+
     public async Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default)
     {
         var normalizedTaskName = NormalizeTaskName(taskName);
@@ -107,7 +129,7 @@ public sealed class TaskEventAlertService(
         var alertSettings = settings.Notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
         var localAlertShown = false;
 
-        if (alertSettings.Local.ToastEnabled)
+        if (alertSettings.Local.PopupEnabled)
         {
             try
             {
@@ -201,38 +223,6 @@ public sealed class TaskEventAlertService(
         }
     }
 
-    public async Task SendTestEmailAsync(EmailAlertChannelSettings settings, CancellationToken cancellationToken = default)
-    {
-        ValidateEmailSettings(settings);
-        await emailAlertSender.SendAsync(
-            settings,
-            subject: "IGoLibrary-Ex 测试邮件",
-            body: BuildTestEmailBody(),
-            cancellationToken);
-    }
-
-    public async Task SendTestTelegramAsync(TelegramAlertChannelSettings settings, CancellationToken cancellationToken = default)
-    {
-        await telegramAlertSender.SendAsync(
-            settings,
-            BuildTestTelegramMessage(),
-            cancellationToken);
-    }
-
-    public async Task SendTestLocalAlertAsync(LocalAlertChannelSettings settings, CancellationToken cancellationToken = default)
-    {
-        await toastNotificationService.ShowForcedAsync(
-            ToastVisualKind.Info,
-            "任务提醒测试通知",
-            "这是一条测试通知，用于确认抢座成功、任务失败和 Cookie 失效提醒的弹窗与提示音效果。",
-            cancellationToken);
-
-        if (settings.SoundEnabled)
-        {
-            await alertSoundService.PlayAsync(cancellationToken);
-        }
-    }
-
     private bool ShouldSuppress(string key)
     {
         var now = DateTimeOffset.Now;
@@ -313,6 +303,18 @@ public sealed class TaskEventAlertService(
         return builder.ToString();
     }
 
+    private static string BuildOccupyReReserveSucceededEmailBody(string seatName)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 已完成占座重新预约");
+        builder.AppendLine();
+        builder.AppendLine($"目标座位：{seatName}");
+        builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine();
+        builder.AppendLine("你可以返回应用查看最新预约状态");
+        return builder.ToString();
+    }
+
     private static string BuildTaskFailedEmailBody(string taskName, string reason)
     {
         var builder = new StringBuilder();
@@ -356,6 +358,16 @@ public sealed class TaskEventAlertService(
         return builder.ToString();
     }
 
+    private static string BuildOccupyReReserveSucceededTelegramMessage(string seatName)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 占座成功");
+        builder.AppendLine($"目标座位：{seatName}");
+        builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine("你可以返回应用查看最新预约状态。");
+        return builder.ToString();
+    }
+
     private static string BuildTaskFailedTelegramMessage(string taskName, string reason)
     {
         var builder = new StringBuilder();
@@ -369,28 +381,6 @@ public sealed class TaskEventAlertService(
 
         builder.AppendLine("请返回应用检查任务状态、授权信息与场馆配置。");
         return builder.ToString();
-    }
-
-    private static string BuildTestEmailBody()
-    {
-        return
-            """
-            这是一封来自 IGoLibrary-Ex 的测试邮件。
-
-            如果你收到了这封邮件，说明当前 SMTP 参数已经可以正常工作，
-            可用于 Cookie 失效、抢座成功和任务失败提醒。
-            """;
-    }
-
-    private static string BuildTestTelegramMessage()
-    {
-        return
-            """
-            这是一条来自 IGoLibrary-Ex 的 Telegram 测试消息。
-
-            如果你收到了这条消息，说明当前 Bot Token、Chat ID 和 API 地址已经可以正常工作，
-            可用于 Cookie 失效、抢座成功和任务失败提醒。
-            """;
     }
 
     private static string AppendDetail(string message, string detail)

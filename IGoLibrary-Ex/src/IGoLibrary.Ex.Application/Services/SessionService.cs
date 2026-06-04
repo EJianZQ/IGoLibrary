@@ -10,9 +10,11 @@ public sealed class SessionService(
     ITraceIntApiClient apiClient,
     ICredentialStore credentialStore,
     IActivityLogService activityLogService,
-    AppRuntimeState runtimeState) : ISessionService
+    ISessionState sessionState,
+    IVenueState venueState,
+    IReservationState reservationState) : ISessionService
 {
-    public SessionCredentials? CurrentSession => runtimeState.Session;
+    public SessionCredentials? CurrentSession => sessionState.Session;
 
     public async Task<SessionCredentials> AuthenticateFromCodeAsync(string code, CancellationToken cancellationToken = default)
     {
@@ -20,7 +22,7 @@ public sealed class SessionService(
         await ValidateCookieForSessionAsync(cookie, cancellationToken);
 
         var session = new SessionCredentials(cookie, SessionSource.QrCodeLink, DateTimeOffset.Now, true);
-        runtimeState.Session = session;
+        sessionState.Session = session;
         await credentialStore.SaveSessionAsync(session, cancellationToken);
         activityLogService.Write(LogEntryKind.Success, "Auth", "通过扫码链接获取并验证 Cookie 成功。");
         return session;
@@ -31,7 +33,7 @@ public sealed class SessionService(
         await ValidateCookieForSessionAsync(cookie, cancellationToken);
 
         var session = new SessionCredentials(cookie, SessionSource.ManualCookie, DateTimeOffset.Now, remember);
-        runtimeState.Session = session;
+        sessionState.Session = session;
         if (remember)
         {
             await credentialStore.SaveSessionAsync(session, cancellationToken);
@@ -70,24 +72,24 @@ public sealed class SessionService(
         }
         catch (InvalidOperationException ex)
         {
-            runtimeState.Session = null;
+            sessionState.Session = null;
             await ClearStoredSessionSafelyAsync($"本地会话已失效，已自动移除：{ex.Message}", cancellationToken);
             return null;
         }
 
         var restored = stored with { Source = SessionSource.Restored };
-        runtimeState.Session = restored;
+        sessionState.Session = restored;
         activityLogService.Write(LogEntryKind.Success, "Auth", "已恢复本地保存的会话。");
         return restored;
     }
 
     public async Task SignOutAsync(CancellationToken cancellationToken = default)
     {
-        runtimeState.Session = null;
-        runtimeState.BoundLibrary = null;
-        runtimeState.CurrentLayout = null;
-        runtimeState.CurrentReservation = null;
-        runtimeState.Libraries = [];
+        sessionState.Session = null;
+        venueState.BoundLibrary = null;
+        venueState.CurrentLayout = null;
+        reservationState.CurrentReservation = null;
+        venueState.Libraries = [];
         await credentialStore.ClearSessionAsync(cancellationToken);
         activityLogService.Write(LogEntryKind.Info, "Auth", "已清除当前会话。");
     }

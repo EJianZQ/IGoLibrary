@@ -56,7 +56,7 @@ public sealed class TelegramAlertSenderTests
     }
 
     [Fact]
-    public async Task SendAsync_RetriesTransientHttpFailure_UsingSavedRetryCount()
+    public async Task SendAsync_RetriesTransientHttpFailure_UsingSavedMaxRetries()
     {
         var handler = new SequenceHttpMessageHandler(
             (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
@@ -67,7 +67,7 @@ public sealed class TelegramAlertSenderTests
             {
                 Content = new StringContent("""{"ok":true,"result":{"message_id":2}}""")
             }));
-        var sender = CreateSender(handler, AppSettings.Default with { RequestPolicy = new RequestPolicySettings(1, 1) });
+        var sender = CreateSender(handler, AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) });
 
         await sender.SendAsync(
             new TelegramAlertChannelSettings(true, "https://api.telegram.org", "123:ABC", "456"),
@@ -104,7 +104,7 @@ public sealed class TelegramAlertSenderTests
             },
             new FakeSettingsService(settings ?? AppSettings.Default with
             {
-                RequestPolicy = AppSettings.Default.RequestPolicy with { RetryCount = 0 }
+                Network = AppSettings.Default.Network with { MaxRetries = 0 }
             }));
     }
 }

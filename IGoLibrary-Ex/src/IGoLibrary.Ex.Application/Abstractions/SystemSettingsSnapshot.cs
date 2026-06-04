@@ -1,14 +1,13 @@
 using IGoLibrary.Ex.Domain.Enums;
-using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Application.Abstractions;
 
 public sealed record SystemSettingsSnapshot(
     bool AppBannerNotificationsEnabled,
     bool MinimizeToTray,
-    bool ProtocolTemplateOverridesEnabled,
+    bool TraceIntGraphQlOverridesEnabled,
     int RequestTimeoutSeconds,
-    int RequestRetryCount,
-    ThemeSettings Theme,
+    int NetworkMaxRetries,
+    ThemePreferences Theme,
     GrabReservationStrategy GrabReservationStrategy,
     TaskEventAlertSettings TaskEventAlerts);

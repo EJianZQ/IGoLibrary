@@ -26,7 +26,7 @@ public sealed class GrabReservationAttemptStrategyTests
         var strategy = new DirectReserveGrabReservationStrategy(apiClient, new ActivityLogService(), new FakeCoordinatorRuntime());
 
         var result = await strategy.TryReserveAsync(
-            CreateContext([new TrackedSeat("seat-1", "1号座")], () => requestCount++),
+            CreateContext([new SeatReference("seat-1", "1号座")], () => requestCount++),
             CancellationToken.None);
 
         Assert.Equal(0, layoutCallCount);
@@ -55,8 +55,8 @@ public sealed class GrabReservationAttemptStrategyTests
         var result = await strategy.TryReserveAsync(
             CreateContext(
                 [
-                    new TrackedSeat("seat-1", "1号座"),
-                    new TrackedSeat("seat-2", "2号座")
+                    new SeatReference("seat-1", "1号座"),
+                    new SeatReference("seat-2", "2号座")
                 ]),
             CancellationToken.None);
 
@@ -82,8 +82,8 @@ public sealed class GrabReservationAttemptStrategyTests
         var result = await strategy.TryReserveAsync(
             CreateContext(
                 [
-                    new TrackedSeat("seat-1", "1号座"),
-                    new TrackedSeat("seat-2", "2号座")
+                    new SeatReference("seat-1", "1号座"),
+                    new SeatReference("seat-2", "2号座")
                 ]),
             CancellationToken.None);
 
@@ -94,12 +94,11 @@ public sealed class GrabReservationAttemptStrategyTests
     }
 
     [Fact]
-    public async Task QueryThenReserve_LoadsLayout_ReservesFirstAvailableTargetSeat_AndUpdatesRuntimeState()
+    public async Task QueryThenReserve_LoadsLayout_ReservesFirstAvailableTargetSeat_AndReturnsLatestLayout()
     {
         var layoutCallCount = 0;
         var reserveRequests = new List<string>();
         var requestCount = 0;
-        var runtimeState = new AppRuntimeState();
         var layout = new LibraryLayout(
             1,
             "自科阅览区一",
@@ -126,13 +125,13 @@ public sealed class GrabReservationAttemptStrategyTests
                 return Task.FromResult(true);
             }
         };
-        var strategy = new QueryThenReserveGrabReservationStrategy(apiClient, new ActivityLogService(), runtimeState);
+        var strategy = new QueryThenReserveGrabReservationStrategy(apiClient, new ActivityLogService());
 
         var result = await strategy.TryReserveAsync(
             CreateContext(
                 [
-                    new TrackedSeat("seat-1", "1号座"),
-                    new TrackedSeat("seat-3", "3号座")
+                    new SeatReference("seat-1", "1号座"),
+                    new SeatReference("seat-3", "3号座")
                 ],
                 () => requestCount++),
             CancellationToken.None);
@@ -140,7 +139,7 @@ public sealed class GrabReservationAttemptStrategyTests
         Assert.Equal(1, layoutCallCount);
         Assert.Equal(2, requestCount);
         Assert.Equal(new[] { "seat-1" }, reserveRequests);
-        Assert.Same(layout, runtimeState.CurrentLayout);
+        Assert.Same(layout, result.LatestLayout);
         Assert.Equal("seat-1", result.ReservedSeat?.SeatKey);
     }
 
@@ -149,8 +148,7 @@ public sealed class GrabReservationAttemptStrategyTests
     {
         var apiClient = new FakeTraceIntApiClient();
         var activityLogService = new ActivityLogService();
-        var runtimeState = new AppRuntimeState();
-        var queryStrategy = new QueryThenReserveGrabReservationStrategy(apiClient, activityLogService, runtimeState);
+        var queryStrategy = new QueryThenReserveGrabReservationStrategy(apiClient, activityLogService);
         var directStrategy = new DirectReserveGrabReservationStrategy(apiClient, activityLogService, new FakeCoordinatorRuntime());
         var selector = new GrabReservationStrategySelector([queryStrategy, directStrategy]);
 
@@ -159,7 +157,7 @@ public sealed class GrabReservationAttemptStrategyTests
     }
 
     private static GrabReservationAttemptContext CreateContext(
-        IReadOnlyList<TrackedSeat> seats,
+        IReadOnlyList<SeatReference> seats,
         Action? markRequestSent = null)
     {
         return new GrabReservationAttemptContext(

@@ -1,5 +1,4 @@
 using IGoLibrary.Ex.Application.Abstractions;
-using IGoLibrary.Ex.Application.State;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 
@@ -7,8 +6,7 @@ namespace IGoLibrary.Ex.Application.Services;
 
 internal sealed class QueryThenReserveGrabReservationStrategy(
     ITraceIntApiClient apiClient,
-    IActivityLogService activityLogService,
-    AppRuntimeState runtimeState) : IGrabReservationAttemptStrategy
+    IActivityLogService activityLogService) : IGrabReservationAttemptStrategy
 {
     public GrabReservationStrategy Strategy => GrabReservationStrategy.QueryThenReserve;
 
@@ -21,15 +19,13 @@ internal sealed class QueryThenReserveGrabReservationStrategy(
             context.Cookie,
             context.Plan.LibraryId,
             cancellationToken);
-        runtimeState.CurrentLayout = layout;
-
         var availableSeat = layout.Seats
             .Where(seat => context.Plan.Seats.Any(target => target.SeatKey == seat.SeatKey))
             .FirstOrDefault(seat => seat.IsAvailable);
 
         if (availableSeat is null)
         {
-            return new GrabReservationAttemptResult(null, false, false, 0);
+            return new GrabReservationAttemptResult(null, false, false, 0, layout);
         }
 
         activityLogService.Write(LogEntryKind.Success, "Grab", $"{availableSeat.SeatName} 空闲，正在尝试预约。");
@@ -42,10 +38,11 @@ internal sealed class QueryThenReserveGrabReservationStrategy(
 
         return reserved
             ? new GrabReservationAttemptResult(
-                new TrackedSeat(availableSeat.SeatKey, availableSeat.SeatName),
+                new SeatReference(availableSeat.SeatKey, availableSeat.SeatName),
                 true,
                 false,
-                0)
-            : new GrabReservationAttemptResult(null, true, false, 0);
+                0,
+                layout)
+            : new GrabReservationAttemptResult(null, true, false, 0, layout);
     }
 }

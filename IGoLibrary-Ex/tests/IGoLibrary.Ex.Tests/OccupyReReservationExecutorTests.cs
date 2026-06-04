@@ -16,7 +16,6 @@ public sealed class OccupyReReservationExecutorTests
         };
         var executor = new OccupyReReservationExecutor(
             apiClient,
-            new FakeSettingsService(AppSettings.Default),
             new ActivityLogService(),
             new FakeCoordinatorRuntime());
 
@@ -24,7 +23,8 @@ public sealed class OccupyReReservationExecutorTests
             executor.ExecuteAsync(
                 "cookie",
                 CreateReservation(),
-                new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds),
+                new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds),
+                1,
                 CancellationToken.None));
 
         Assert.Equal("取消预约失败。", ex.Message);
@@ -51,17 +51,14 @@ public sealed class OccupyReReservationExecutorTests
         };
         var executor = new OccupyReReservationExecutor(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with
-            {
-                RequestPolicy = AppSettings.Default.RequestPolicy with { RetryCount = 1 }
-            }),
             activityLogService,
             new FakeCoordinatorRuntime());
 
         var result = await executor.ExecuteAsync(
             "cookie",
             CreateReservation(),
-            new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds),
+            new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds),
+            2,
             CancellationToken.None);
 
         Assert.True(result.Succeeded);
@@ -86,17 +83,14 @@ public sealed class OccupyReReservationExecutorTests
         };
         var executor = new OccupyReReservationExecutor(
             apiClient,
-            new FakeSettingsService(AppSettings.Default with
-            {
-                RequestPolicy = AppSettings.Default.RequestPolicy with { RetryCount = 1 }
-            }),
             new ActivityLogService(),
             new FakeCoordinatorRuntime());
 
         var result = await executor.ExecuteAsync(
             "cookie",
             CreateReservation(),
-            new OccupySeatPlan(TimeSpan.Zero, OccupyRefreshMode.FixedTenSeconds),
+            new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds),
+            2,
             CancellationToken.None);
 
         Assert.False(result.Succeeded);

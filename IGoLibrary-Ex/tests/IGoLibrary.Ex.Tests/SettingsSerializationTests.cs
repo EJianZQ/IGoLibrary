@@ -33,10 +33,11 @@ public sealed class SettingsSerializationTests
         Assert.False(settings.Ui.MinimizeToTray);
         Assert.Equal(AppThemeMode.Dark, settings.Ui.Theme?.Mode);
         Assert.False(settings.Ui.Theme?.UseSystemAccent);
-        Assert.True(settings.Protocol.TemplateOverridesEnabled);
-        Assert.Equal(9, settings.RequestPolicy.TimeoutSeconds);
-        Assert.Equal(4, settings.RequestPolicy.RetryCount);
-        Assert.Equal(GrabReservationStrategy.ReserveDirectly, settings.Tasks.GrabReservationStrategy);
+        Assert.True(settings.TraceIntProtocol.GraphQlOverridesEnabled);
+        Assert.Equal(9, settings.Network.TimeoutSeconds);
+        Assert.Equal(4, settings.Network.MaxRetries);
+        Assert.Equal(GrabReservationStrategy.ReserveDirectly, settings.Tasks.Grab.ReservationStrategy);
+        Assert.Equal(5, settings.Tasks.Occupy.ReReservationMaxAttempts);
         Assert.Equal(12, settings.Venue.LastLibraryId);
         Assert.Equal("自科阅览区一", settings.Venue.LastLibraryName);
         Assert.Equal(6, settings.Dashboard.SuccessfulReservationCount);
@@ -44,14 +45,14 @@ public sealed class SettingsSerializationTests
     }
 
     [Fact]
-    public void LegacyAdvancedModeMigration_MigratesToProtocolSettings()
+    public void LegacyAdvancedModeMigration_MigratesToTraceIntProtocolSettings()
     {
         const string json = """{"advancedMode":true}""";
 
         var migratedJson = MigrateLegacyAppSettingsJson(json);
         using var document = JsonDocument.Parse(migratedJson);
 
-        Assert.True(document.RootElement.GetProperty("protocol").GetProperty("templateOverridesEnabled").GetBoolean());
+        Assert.True(document.RootElement.GetProperty("traceIntProtocol").GetProperty("graphQlOverridesEnabled").GetBoolean());
         Assert.False(document.RootElement.TryGetProperty("customApiOverridesEnabled", out _));
         Assert.False(document.RootElement.TryGetProperty("advancedMode", out _));
     }
@@ -85,9 +86,84 @@ public sealed class SettingsSerializationTests
         Assert.True(alerts.Email.Enabled);
         Assert.Equal("smtp.example.com", alerts.Email.SmtpHost);
         Assert.Equal(465, alerts.Email.Port);
-        Assert.True(alerts.Local.ToastEnabled);
+        Assert.True(alerts.Local.PopupEnabled);
         Assert.False(alerts.Local.SoundEnabled);
         Assert.Equal(TelegramAlertChannelSettings.Default, alerts.Telegram);
+    }
+
+    [Fact]
+    public void CanonicalJsonWithLegacyToastEnabled_RewritesToPopupEnabled()
+    {
+        var migratedJson = MigrateLegacyAppSettingsJson(
+            """
+            {
+              "notifications": {
+                "appBannerNotificationsEnabled": true,
+                "taskEventAlerts": {
+                  "local": {
+                    "toastEnabled": true,
+                    "soundEnabled": false
+                  }
+                }
+              },
+              "traceIntProtocol": {
+                "graphQlOverridesEnabled": false
+              },
+              "network": {
+                "timeoutSeconds": 5,
+                "maxRetries": 3
+              },
+              "tasks": {
+                "grab": {
+                  "reservationStrategy": 0
+                },
+                "occupy": {
+                  "reReservationMaxAttempts": 4
+                }
+              }
+            }
+            """);
+
+        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default));
+        var alerts = Assert.IsType<TaskEventAlertSettings>(settings.Notifications.TaskEventAlerts);
+        Assert.True(alerts.Local.PopupEnabled);
+        Assert.False(alerts.Local.SoundEnabled);
+        Assert.DoesNotContain("toastEnabled", migratedJson);
+        Assert.Contains("\"popupEnabled\": true", migratedJson);
+    }
+
+    [Fact]
+    public void CanonicalJsonWithLegacyRequestPolicyRetryCount_RewritesNetworkAndOccupyAttempts()
+    {
+        var migratedJson = MigrateLegacyAppSettingsJson(
+            """
+            {
+              "notifications": {},
+              "traceIntProtocol": {
+                "graphQlOverridesEnabled": false
+              },
+              "network": {
+                "timeoutSeconds": 5
+              },
+              "requestPolicy": {
+                "retryCount": 2
+              },
+              "tasks": {
+                "grab": {
+                  "reservationStrategy": 0
+                },
+                "occupy": {}
+              }
+            }
+            """);
+
+        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default));
+        Assert.Equal(2, settings.Network.MaxRetries);
+        Assert.Equal(3, settings.Tasks.Occupy.ReReservationMaxAttempts);
+        Assert.DoesNotContain("requestPolicy", migratedJson);
+        Assert.DoesNotContain("retryCount", migratedJson);
+        Assert.Contains("\"maxRetries\": 2", migratedJson);
+        Assert.Contains("\"reReservationMaxAttempts\": 3", migratedJson);
     }
 
     [Fact]
@@ -100,7 +176,7 @@ public sealed class SettingsSerializationTests
               "ui": {
                 "theme": {}
               },
-              "requestPolicy": {},
+              "network": {},
               "tasks": {}
             }
             """,
@@ -110,10 +186,11 @@ public sealed class SettingsSerializationTests
         Assert.Equal(TaskEventAlertSettings.Default, settings.Notifications.TaskEventAlerts);
         Assert.True(settings.Ui.MinimizeToTray);
         Assert.Equal(AppThemeMode.FollowSystem, settings.Ui.Theme?.Mode);
-        Assert.Equal(ThemeSettings.Default.UseSystemAccent, settings.Ui.Theme?.UseSystemAccent);
-        Assert.Equal(5, settings.RequestPolicy.TimeoutSeconds);
-        Assert.Equal(3, settings.RequestPolicy.RetryCount);
-        Assert.Equal(GrabReservationStrategy.QueryThenReserve, settings.Tasks.GrabReservationStrategy);
+        Assert.Equal(ThemePreferences.Default.UseSystemAccent, settings.Ui.Theme?.UseSystemAccent);
+        Assert.Equal(5, settings.Network.TimeoutSeconds);
+        Assert.Equal(3, settings.Network.MaxRetries);
+        Assert.Equal(GrabReservationStrategy.QueryThenReserve, settings.Tasks.Grab.ReservationStrategy);
+        Assert.Equal(4, settings.Tasks.Occupy.ReReservationMaxAttempts);
     }
 
     [Fact]
@@ -126,18 +203,20 @@ public sealed class SettingsSerializationTests
                 AppBannerNotificationsEnabled = false,
                 TaskEventAlerts = TaskEventAlertSettings.Default
             },
-            Protocol = new ProtocolSettings(true)
+            TraceIntProtocol = new TraceIntProtocolSettings(true)
         }, AppJson.Default);
 
         Assert.Contains("\"notifications\":", json);
         Assert.Contains("\"ui\":", json);
-        Assert.Contains("\"protocol\":", json);
-        Assert.Contains("\"requestPolicy\":", json);
+        Assert.Contains("\"traceIntProtocol\":", json);
+        Assert.Contains("\"network\":", json);
         Assert.Contains("\"tasks\":", json);
+        Assert.Contains("\"grab\":", json);
+        Assert.Contains("\"occupy\":", json);
         Assert.Contains("\"venue\":", json);
         Assert.Contains("\"dashboard\":", json);
         Assert.Contains("\"taskEventAlerts\":", json);
-        Assert.Contains("\"templateOverridesEnabled\": true", json);
+        Assert.Contains("\"graphQlOverridesEnabled\": true", json);
     }
 
     [Fact]
@@ -145,8 +224,8 @@ public sealed class SettingsSerializationTests
     {
         var json = JsonSerializer.Serialize(AppSettings.Default with
         {
-            Protocol = new ProtocolSettings(true),
-            RequestPolicy = new RequestPolicySettings(7, 2),
+            TraceIntProtocol = new TraceIntProtocolSettings(true),
+            Network = new NetworkRequestSettings(7, 2),
             Notifications = AppSettings.Default.Notifications with
             {
                 TaskEventAlerts = TaskEventAlertSettings.Default
@@ -158,6 +237,10 @@ public sealed class SettingsSerializationTests
         Assert.DoesNotContain("cookieExpiryAlerts", json);
         Assert.DoesNotContain("notificationsEnabled", json);
         Assert.DoesNotContain("apiTimeoutSeconds", json);
+        Assert.DoesNotContain("retryCount", json);
+        Assert.DoesNotContain("requestPolicy", json);
+        Assert.DoesNotContain("protocol\":", json);
+        Assert.DoesNotContain("templateOverridesEnabled", json);
         Assert.DoesNotContain("themeMode", json);
     }
 
@@ -170,7 +253,7 @@ public sealed class SettingsSerializationTests
     private static string MigrateLegacyAppSettingsJson(string json)
     {
         var method = typeof(SqliteSettingsRepository).GetMethod(
-            "MigrateLegacyAppSettingsJson",
+            "MigrateAppSettingsJson",
             BindingFlags.Static | BindingFlags.NonPublic);
 
         return Assert.IsType<string>(method?.Invoke(null, [json]));

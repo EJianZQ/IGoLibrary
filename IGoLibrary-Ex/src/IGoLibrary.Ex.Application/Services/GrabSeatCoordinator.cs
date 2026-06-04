@@ -5,11 +5,11 @@ namespace IGoLibrary.Ex.Application.Services;
 
 internal sealed class GrabSeatCoordinator : IGrabSeatCoordinator
 {
-    private readonly GrabSeatStateMachine _stateMachine;
+    private readonly GrabSeatWorkflowRunner _stateMachine;
     private readonly CoordinatorRunController _controller;
 
     public GrabSeatCoordinator(
-        GrabSeatStateMachine stateMachine,
+        GrabSeatWorkflowRunner stateMachine,
         ICoordinatorRuntime runtime)
     {
         _stateMachine = stateMachine;

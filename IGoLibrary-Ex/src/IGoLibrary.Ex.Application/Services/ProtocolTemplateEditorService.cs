@@ -6,7 +6,7 @@ namespace IGoLibrary.Ex.Application.Services;
 public sealed class ProtocolTemplateEditorService(
     IProtocolTemplateStore protocolTemplateStore) : IProtocolTemplateEditorService
 {
-    public Task<TraceIntGraphQlTemplateSet> LoadTemplatesAsync(CancellationToken cancellationToken = default)
+    public Task<TraceIntGraphQlTemplates> LoadTemplatesAsync(CancellationToken cancellationToken = default)
     {
         return protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
     }

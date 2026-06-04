@@ -4,8 +4,7 @@ using IGoLibrary.Ex.Domain.Enums;
 namespace IGoLibrary.Ex.Desktop.Services;
 
 public sealed class DesktopCoordinatorEventPublisher(
-    ITaskEventAlertService taskEventAlertService,
-    INotificationService notificationService,
+    ITaskEventAlertDispatcher taskEventAlertDispatcher,
     IActivityLogService activityLogService) : ICoordinatorEventPublisher
 {
     public async Task PublishAsync(CoordinatorEvent @event, CancellationToken cancellationToken = default)
@@ -15,25 +14,24 @@ public sealed class DesktopCoordinatorEventPublisher(
             switch (@event)
             {
                 case GrabSucceededCoordinatorEvent grabSucceeded:
-                    await taskEventAlertService.NotifyGrabSucceededAsync(
+                    await taskEventAlertDispatcher.NotifyGrabSucceededAsync(
                         grabSucceeded.LibraryName,
                         grabSucceeded.SeatName,
                         cancellationToken);
                     break;
                 case OccupyReReserveSucceededCoordinatorEvent occupySucceeded:
-                    await notificationService.ShowSuccessAsync(
-                        "占座成功",
-                        $"{occupySucceeded.SeatName} 已重新预约。",
+                    await taskEventAlertDispatcher.NotifyOccupyReReserveSucceededAsync(
+                        occupySucceeded.SeatName,
                         cancellationToken);
                     break;
                 case SessionInvalidCoordinatorEvent sessionInvalid:
-                    await taskEventAlertService.NotifySessionInvalidAsync(
+                    await taskEventAlertDispatcher.NotifySessionInvalidAsync(
                         sessionInvalid.Source,
                         sessionInvalid.Reason,
                         cancellationToken);
                     break;
                 case TaskFailedCoordinatorEvent taskFailed:
-                    await taskEventAlertService.NotifyTaskFailedAsync(
+                    await taskEventAlertDispatcher.NotifyTaskFailedAsync(
                         taskFailed.TaskName,
                         taskFailed.Reason,
                         cancellationToken);

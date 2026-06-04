@@ -7,7 +7,7 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Tests;
 
-public sealed class GrabSeatStateMachineTests
+public sealed class GrabSeatWorkflowRunnerTests
 {
     [Fact]
     public async Task ScheduledStart_UsesRuntimeDelayBeforePolling()
@@ -153,14 +153,15 @@ public sealed class GrabSeatStateMachineTests
         };
         var strategySelector = new GrabReservationStrategySelector(
             [
-                new QueryThenReserveGrabReservationStrategy(apiClient, activityLogService, runtimeState),
+                new QueryThenReserveGrabReservationStrategy(apiClient, activityLogService),
                 new DirectReserveGrabReservationStrategy(apiClient, activityLogService, runtime)
             ]);
-        var stateMachine = new GrabSeatStateMachine(
+        var stateMachine = new GrabSeatWorkflowRunner(
             new FakeSettingsService(settings),
             strategySelector,
             eventPublisher ?? new FakeCoordinatorEventPublisher(),
             activityLogService,
+            runtimeState,
             runtimeState,
             runtime);
 
@@ -174,7 +175,7 @@ public sealed class GrabSeatStateMachineTests
         return new GrabSeatPlan(
             1,
             "自科阅览区一",
-            [new TrackedSeat("seat-1", "1号座")],
+            [new SeatReference("seat-1", "1号座")],
             GrabPollingMode.Aggressive,
             pollingStrategy,
             scheduledStart);

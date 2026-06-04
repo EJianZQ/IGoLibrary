@@ -36,6 +36,7 @@ internal static class HostBuilderFactory
                 }
 
                 services.AddApplication();
+                services.AddSingleton<IAppSettingsDefaults, DesktopAppSettingsDefaults>();
                 services.AddInfrastructure();
                 services.AddSingleton<IAppThemeService, AppThemeService>();
                 services.AddSingleton<AppWindowService>();
@@ -43,7 +44,8 @@ internal static class HostBuilderFactory
                 services.AddSingleton<ToastNotificationService>();
                 services.AddSingleton<INotificationService>(serviceProvider => serviceProvider.GetRequiredService<ToastNotificationService>());
                 services.AddSingleton<AlertSoundService>();
-                services.AddSingleton<ITaskEventAlertService, TaskEventAlertService>();
+                services.AddSingleton<ITaskEventAlertDispatcher, TaskEventAlertService>();
+                services.AddSingleton<INotificationTestService, DesktopNotificationTestService>();
                 services.AddSingleton<ICoordinatorEventPublisher, DesktopCoordinatorEventPublisher>();
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<MainWindowViewModel>();

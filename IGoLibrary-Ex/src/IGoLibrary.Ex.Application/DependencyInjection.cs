@@ -2,6 +2,7 @@ using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Application.State;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace IGoLibrary.Ex.Application;
 
@@ -10,7 +11,11 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddSingleton<AppRuntimeState>();
+        services.AddSingleton<ISessionState>(serviceProvider => serviceProvider.GetRequiredService<AppRuntimeState>());
+        services.AddSingleton<IVenueState>(serviceProvider => serviceProvider.GetRequiredService<AppRuntimeState>());
+        services.AddSingleton<IReservationState>(serviceProvider => serviceProvider.GetRequiredService<AppRuntimeState>());
         services.AddSingleton<IActivityLogService, ActivityLogService>();
+        services.TryAddSingleton<IAppSettingsDefaults, DefaultAppSettingsDefaults>();
         services.AddSingleton<ISessionService, SessionService>();
         services.AddSingleton<ILibraryService, LibraryService>();
         services.AddSingleton<ISettingsService, SettingsService>();
@@ -19,14 +24,13 @@ public static class DependencyInjection
         services.AddSingleton<IReservationWorkflowService, ReservationWorkflowService>();
         services.AddSingleton<ISettingsWorkflowService, SettingsWorkflowService>();
         services.AddSingleton<IProtocolTemplateEditorService, ProtocolTemplateEditorService>();
-        services.AddSingleton<INotificationTestService, NotificationTestService>();
         services.AddSingleton<ICoordinatorRuntime, SystemCoordinatorRuntime>();
         services.AddSingleton<IGrabReservationAttemptStrategy, QueryThenReserveGrabReservationStrategy>();
         services.AddSingleton<IGrabReservationAttemptStrategy, DirectReserveGrabReservationStrategy>();
         services.AddSingleton<GrabReservationStrategySelector>();
         services.AddSingleton<IOccupyReReservationExecutor, OccupyReReservationExecutor>();
-        services.AddSingleton<GrabSeatStateMachine>();
-        services.AddSingleton<OccupySeatStateMachine>();
+        services.AddSingleton<GrabSeatWorkflowRunner>();
+        services.AddSingleton<OccupySeatWorkflowRunner>();
         services.AddSingleton<IGrabSeatCoordinator, GrabSeatCoordinator>();
         services.AddSingleton<IOccupySeatCoordinator, OccupySeatCoordinator>();
         return services;

@@ -9,7 +9,7 @@ public sealed record VenueLibraryLoadResult(
 public sealed record VenueBindingResult(
     LibraryLayout Layout,
     LibraryRule? Rule,
-    IReadOnlyList<TrackedSeat> Favorites,
+    IReadOnlyList<SeatReference> Favorites,
     string? RuleFailureMessage = null);
 
 public sealed record VenuePreviewResult(

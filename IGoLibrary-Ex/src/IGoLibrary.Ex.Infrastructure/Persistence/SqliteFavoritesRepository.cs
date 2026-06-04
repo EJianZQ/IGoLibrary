@@ -6,9 +6,9 @@ namespace IGoLibrary.Ex.Infrastructure.Persistence;
 
 public sealed class SqliteFavoritesRepository(SqliteConnectionFactory connectionFactory) : IFavoritesRepository
 {
-    public async Task<IReadOnlyList<TrackedSeat>> GetFavoritesAsync(int libraryId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SeatReference>> GetFavoritesAsync(int libraryId, CancellationToken cancellationToken = default)
     {
-        var results = new List<TrackedSeat>();
+        var results = new List<SeatReference>();
 
         await using var connection = connectionFactory.Create();
         await connection.OpenAsync(cancellationToken);
@@ -20,7 +20,7 @@ public sealed class SqliteFavoritesRepository(SqliteConnectionFactory connection
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            results.Add(new TrackedSeat(
+            results.Add(new SeatReference(
                 reader.GetString(0),
                 reader.GetString(1)));
         }
@@ -28,7 +28,7 @@ public sealed class SqliteFavoritesRepository(SqliteConnectionFactory connection
         return results;
     }
 
-    public async Task SaveFavoritesAsync(int libraryId, IReadOnlyList<TrackedSeat> seats, CancellationToken cancellationToken = default)
+    public async Task SaveFavoritesAsync(int libraryId, IReadOnlyList<SeatReference> seats, CancellationToken cancellationToken = default)
     {
         await using var connection = connectionFactory.Create();
         await connection.OpenAsync(cancellationToken);

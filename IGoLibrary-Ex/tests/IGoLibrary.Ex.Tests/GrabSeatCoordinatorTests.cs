@@ -53,8 +53,8 @@ public sealed class GrabSeatCoordinatorTests
             1,
             "自科阅览区一",
             [
-                new TrackedSeat("seat-1", "1号座"),
-                new TrackedSeat("seat-2", "2号座")
+                new SeatReference("seat-1", "1号座"),
+                new SeatReference("seat-2", "2号座")
             ],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
@@ -99,7 +99,7 @@ public sealed class GrabSeatCoordinatorTests
         var plan = new GrabSeatPlan(
             1,
             "自科阅览区一",
-            [new TrackedSeat("seat-1", "1号座")],
+            [new SeatReference("seat-1", "1号座")],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
@@ -154,8 +154,8 @@ public sealed class GrabSeatCoordinatorTests
             1,
             "自科阅览区一",
             [
-                new TrackedSeat("seat-1", "1号座"),
-                new TrackedSeat("seat-2", "2号座")
+                new SeatReference("seat-1", "1号座"),
+                new SeatReference("seat-2", "2号座")
             ],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
@@ -211,8 +211,8 @@ public sealed class GrabSeatCoordinatorTests
             1,
             "自科阅览区一",
             [
-                new TrackedSeat("seat-1", "12"),
-                new TrackedSeat("seat-2", "18")
+                new SeatReference("seat-1", "12"),
+                new SeatReference("seat-2", "18")
             ],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
@@ -280,8 +280,8 @@ public sealed class GrabSeatCoordinatorTests
             1,
             "自科阅览区一",
             [
-                new TrackedSeat("seat-1", "1号座"),
-                new TrackedSeat("seat-2", "2号座")
+                new SeatReference("seat-1", "1号座"),
+                new SeatReference("seat-2", "2号座")
             ],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
@@ -322,7 +322,7 @@ public sealed class GrabSeatCoordinatorTests
         var plan = new GrabSeatPlan(
             1,
             "自科阅览区一",
-            [new TrackedSeat("seat-1", "1号座")],
+            [new SeatReference("seat-1", "1号座")],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
@@ -367,7 +367,7 @@ public sealed class GrabSeatCoordinatorTests
         var plan = new GrabSeatPlan(
             1,
             "自科阅览区一",
-            [new TrackedSeat("seat-1", "1号座")],
+            [new SeatReference("seat-1", "1号座")],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
@@ -406,7 +406,7 @@ public sealed class GrabSeatCoordinatorTests
         var plan = new GrabSeatPlan(
             1,
             "自科阅览区一",
-            [new TrackedSeat("seat-1", "1号座")],
+            [new SeatReference("seat-1", "1号座")],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
             null);
@@ -468,15 +468,16 @@ public sealed class GrabSeatCoordinatorTests
         };
         var strategySelector = new GrabReservationStrategySelector(
             [
-                new QueryThenReserveGrabReservationStrategy(apiClient, activityLogService, runtimeState),
+                new QueryThenReserveGrabReservationStrategy(apiClient, activityLogService),
                 new DirectReserveGrabReservationStrategy(apiClient, activityLogService, runtime)
             ]);
 
-        var stateMachine = new GrabSeatStateMachine(
+        var stateMachine = new GrabSeatWorkflowRunner(
             new FakeSettingsService(settings),
             strategySelector,
             eventPublisher,
             activityLogService,
+            runtimeState,
             runtimeState,
             runtime);
 

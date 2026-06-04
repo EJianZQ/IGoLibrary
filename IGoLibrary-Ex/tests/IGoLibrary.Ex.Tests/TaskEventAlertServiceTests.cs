@@ -11,7 +11,12 @@ public sealed class TaskEventAlertServiceTests
     [Fact]
     public async Task SendTestEmailAsync_ThrowsWhenOnlyUsernameIsProvided()
     {
-        var service = CreateService();
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var service = new DesktopNotificationTestService(
+            new FakeEmailAlertSender(),
+            new FakeTelegramAlertSender(),
+            new ToastNotificationService(settingsService, new AppWindowService()),
+            new AlertSoundService());
         var settings = new EmailAlertChannelSettings(
             Enabled: true,
             SmtpHost: "smtp.example.com",
@@ -42,7 +47,7 @@ public sealed class TaskEventAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new LocalAlertChannelSettings(false, false))));
+                new LocalDesktopAlertSettings(false, false))));
 
         var service = CreateService(settingsService, emailSender);
 
@@ -73,7 +78,7 @@ public sealed class TaskEventAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new LocalAlertChannelSettings(false, false))));
+                new LocalDesktopAlertSettings(false, false))));
 
         var service = CreateService(settingsService, emailSender, activityLog);
 
@@ -101,7 +106,7 @@ public sealed class TaskEventAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new LocalAlertChannelSettings(false, false))));
+                new LocalDesktopAlertSettings(false, false))));
 
         var service = CreateService(settingsService, emailSender);
 
@@ -128,7 +133,7 @@ public sealed class TaskEventAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new LocalAlertChannelSettings(false, false))));
+                new LocalDesktopAlertSettings(false, false))));
 
         var service = CreateService(settingsService, emailSender);
 
@@ -147,7 +152,7 @@ public sealed class TaskEventAlertServiceTests
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalAlertChannelSettings(false, false))));
+                new LocalDesktopAlertSettings(false, false))));
 
         var service = CreateService(settingsService: settingsService, notificationService: notificationService);
 
@@ -165,7 +170,7 @@ public sealed class TaskEventAlertServiceTests
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalAlertChannelSettings(false, false))));
+                new LocalDesktopAlertSettings(false, false))));
 
         var service = CreateService(settingsService: settingsService, notificationService: notificationService);
 
@@ -182,7 +187,7 @@ public sealed class TaskEventAlertServiceTests
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalAlertChannelSettings(false, false),
+                new LocalDesktopAlertSettings(false, false),
                 new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
@@ -203,7 +208,7 @@ public sealed class TaskEventAlertServiceTests
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalAlertChannelSettings(false, false),
+                new LocalDesktopAlertSettings(false, false),
                 new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
@@ -223,7 +228,7 @@ public sealed class TaskEventAlertServiceTests
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalAlertChannelSettings(false, false),
+                new LocalDesktopAlertSettings(false, false),
                 new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
@@ -256,7 +261,7 @@ public sealed class TaskEventAlertServiceTests
                     Password: "secret",
                     FromAddress: "sender@example.com",
                     ToAddress: "receiver@example.com"),
-                new LocalAlertChannelSettings(false, false),
+                new LocalDesktopAlertSettings(false, false),
                 new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
 
         var service = CreateService(settingsService, emailSender, activityLog, telegramSender: telegramSender);
@@ -278,7 +283,7 @@ public sealed class TaskEventAlertServiceTests
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalAlertChannelSettings(false, false),
+                new LocalDesktopAlertSettings(false, false),
                 new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
 
         var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
@@ -301,7 +306,7 @@ public sealed class TaskEventAlertServiceTests
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalAlertChannelSettings(false, false),
+                new LocalDesktopAlertSettings(false, false),
                 new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
         var service = CreateService(
             settingsService: settingsService,

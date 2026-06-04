@@ -1,6 +1,5 @@
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Domain.Enums;
-using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Application.Services;
 
@@ -28,16 +27,19 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
                 MinimizeToTray = snapshot.MinimizeToTray,
                 Theme = snapshot.Theme
             },
-            Protocol = current.Protocol with
+            TraceIntProtocol = current.TraceIntProtocol with
             {
-                TemplateOverridesEnabled = snapshot.ProtocolTemplateOverridesEnabled
+                GraphQlOverridesEnabled = snapshot.TraceIntGraphQlOverridesEnabled
             },
-            RequestPolicy = new RequestPolicySettings(
+            Network = new NetworkRequestSettings(
                 Math.Max(3, snapshot.RequestTimeoutSeconds),
-                Math.Max(1, snapshot.RequestRetryCount)),
+                Math.Max(0, snapshot.NetworkMaxRetries)),
             Tasks = current.Tasks with
             {
-                GrabReservationStrategy = snapshot.GrabReservationStrategy
+                Grab = current.Tasks.Grab with
+                {
+                    ReservationStrategy = snapshot.GrabReservationStrategy
+                }
             }
         };
 
@@ -64,7 +66,7 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
         CancellationToken cancellationToken = default)
     {
         var current = await settingsService.LoadAsync(cancellationToken);
-        if (current.Tasks.GrabReservationStrategy == strategy)
+        if (current.Tasks.Grab.ReservationStrategy == strategy)
         {
             return;
         }
@@ -73,7 +75,10 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
         {
             Tasks = current.Tasks with
             {
-                GrabReservationStrategy = strategy
+                Grab = current.Tasks.Grab with
+                {
+                    ReservationStrategy = strategy
+                }
             }
         }, cancellationToken);
     }

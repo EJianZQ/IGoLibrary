@@ -8,9 +8,9 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class DesktopCoordinatorEventPublisherTests
 {
     [Fact]
-    public async Task PublishAsync_MapsGrabSucceededEventToTaskAlertService()
+    public async Task PublishAsync_MapsGrabSucceededEventToTaskEventAlertDispatcher()
     {
-        var taskAlertService = new FakeTaskEventAlertService();
+        var taskAlertService = new FakeTaskEventAlertDispatcher();
         var publisher = CreatePublisher(taskAlertService);
 
         await publisher.PublishAsync(new GrabSucceededCoordinatorEvent("自科阅览区一", "1号座"));
@@ -21,9 +21,9 @@ public sealed class DesktopCoordinatorEventPublisherTests
     }
 
     [Fact]
-    public async Task PublishAsync_MapsSessionInvalidEventToTaskAlertService()
+    public async Task PublishAsync_MapsSessionInvalidEventToTaskEventAlertDispatcher()
     {
-        var taskAlertService = new FakeTaskEventAlertService();
+        var taskAlertService = new FakeTaskEventAlertDispatcher();
         var publisher = CreatePublisher(taskAlertService);
 
         await publisher.PublishAsync(new SessionInvalidCoordinatorEvent("抢座轮询", "Cookie 已过期。"));
@@ -34,9 +34,9 @@ public sealed class DesktopCoordinatorEventPublisherTests
     }
 
     [Fact]
-    public async Task PublishAsync_MapsTaskFailedEventToTaskAlertService()
+    public async Task PublishAsync_MapsTaskFailedEventToTaskEventAlertDispatcher()
     {
-        var taskAlertService = new FakeTaskEventAlertService();
+        var taskAlertService = new FakeTaskEventAlertDispatcher();
         var publisher = CreatePublisher(taskAlertService);
 
         await publisher.PublishAsync(new TaskFailedCoordinatorEvent("占座", "预约状态获取失败"));
@@ -47,23 +47,21 @@ public sealed class DesktopCoordinatorEventPublisherTests
     }
 
     [Fact]
-    public async Task PublishAsync_MapsOccupyReReserveSucceededEventToLocalNotification()
+    public async Task PublishAsync_MapsOccupyReReserveSucceededEventToTaskEventAlertDispatcher()
     {
-        var notificationService = new FakeNotificationService();
-        var publisher = CreatePublisher(notificationService: notificationService);
+        var taskAlertService = new FakeTaskEventAlertDispatcher();
+        var publisher = CreatePublisher(taskAlertService);
 
         await publisher.PublishAsync(new OccupyReReserveSucceededCoordinatorEvent("1号座"));
 
-        Assert.Contains(
-            notificationService.Successes,
-            item => item.Title == "占座成功" && item.Message == "1号座 已重新预约。");
+        Assert.Contains("1号座", taskAlertService.OccupyReReserveSucceededNotifications);
     }
 
     [Fact]
     public async Task PublishAsync_WritesWarning_WhenMappingFails()
     {
         var activityLogService = new ActivityLogService();
-        var taskAlertService = new FakeTaskEventAlertService
+        var taskAlertService = new FakeTaskEventAlertDispatcher
         {
             NotifyTaskFailedException = new InvalidOperationException("发送失败")
         };
@@ -79,13 +77,11 @@ public sealed class DesktopCoordinatorEventPublisherTests
     }
 
     private static DesktopCoordinatorEventPublisher CreatePublisher(
-        FakeTaskEventAlertService? taskAlertService = null,
-        FakeNotificationService? notificationService = null,
+        FakeTaskEventAlertDispatcher? taskAlertService = null,
         ActivityLogService? activityLogService = null)
     {
         return new DesktopCoordinatorEventPublisher(
-            taskAlertService ?? new FakeTaskEventAlertService(),
-            notificationService ?? new FakeNotificationService(),
+            taskAlertService ?? new FakeTaskEventAlertDispatcher(),
             activityLogService ?? new ActivityLogService());
     }
 }

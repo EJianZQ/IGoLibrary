@@ -63,7 +63,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task NotificationSettings_AutoSaveTaskEventAlerts_WhenFieldsChange()
     {
-        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
         var viewModel = CreateViewModel(settingsService: settingsService);
         await viewModel.InitializeAsync();
 
@@ -84,7 +84,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SendTestEmailAlertAsync_UsesCurrentNotificationSettingsSnapshot()
     {
-        var alertService = new FakeTaskEventAlertService();
+        var alertService = new FakeTaskEventAlertDispatcher();
         var viewModel = CreateViewModel(taskAlertService: alertService);
         await viewModel.InitializeAsync();
 
@@ -111,7 +111,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SendTestEmailAlertAsync_ShowsErrorDialog_WhenSendingFails()
     {
-        var alertService = new FakeTaskEventAlertService
+        var alertService = new FakeTaskEventAlertDispatcher
         {
             SendTestEmailException = new InvalidOperationException("smtp connect failed")
         };
@@ -139,7 +139,7 @@ public sealed class MainWindowViewModelTests
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default,
-                LocalAlertChannelSettings.Default,
+                LocalDesktopAlertSettings.Default,
                 new TelegramAlertChannelSettings(true, "https://telegram.example.com", "token-1", "chat-1"))));
         var viewModel = CreateViewModel(settingsService: settingsService);
 
@@ -157,7 +157,7 @@ public sealed class MainWindowViewModelTests
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
                 EmailAlertChannelSettings.Default,
-                LocalAlertChannelSettings.Default,
+                LocalDesktopAlertSettings.Default,
                 new TelegramAlertChannelSettings(true, null!, null!, null!))));
         var viewModel = CreateViewModel(settingsService: settingsService);
 
@@ -172,7 +172,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task NotificationSettings_AutoSaveTelegramAlerts_WhenFieldsChange()
     {
-        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
         var viewModel = CreateViewModel(settingsService: settingsService);
         await viewModel.InitializeAsync();
 
@@ -195,7 +195,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SendTestTelegramAlertAsync_UsesCurrentNotificationSettingsSnapshot()
     {
-        var alertService = new FakeTaskEventAlertService();
+        var alertService = new FakeTaskEventAlertDispatcher();
         var viewModel = CreateViewModel(taskAlertService: alertService);
         await viewModel.InitializeAsync();
 
@@ -216,7 +216,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SendTestTelegramAlertAsync_ShowsErrorDialog_WhenSendingFails()
     {
-        var alertService = new FakeTaskEventAlertService
+        var alertService = new FakeTaskEventAlertDispatcher
         {
             SendTestTelegramException = new InvalidOperationException("telegram send failed")
         };
@@ -377,8 +377,8 @@ public sealed class MainWindowViewModelTests
 
         await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
 
-        Assert.True(viewModel.HasSidebarCookieExpiry);
-        Assert.Equal("5月5日 16:56", viewModel.SidebarCookieExpiryText);
+        Assert.True(viewModel.HasSidebarSessionExpiration);
+        Assert.Equal("5月5日 16:56", viewModel.SidebarSessionExpirationText);
     }
 
     [Fact]
@@ -389,7 +389,7 @@ public sealed class MainWindowViewModelTests
 
         await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
 
-        Assert.Equal("#FFC27803", GetBrushColor(viewModel.SidebarCookieExpiryBrush).ToString(), ignoreCase: true);
+        Assert.Equal("#FFC27803", GetBrushColor(viewModel.SidebarSessionExpirationBrush).ToString(), ignoreCase: true);
     }
 
     [Fact]
@@ -400,7 +400,7 @@ public sealed class MainWindowViewModelTests
 
         await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
 
-        Assert.Equal("#FFC93C37", GetBrushColor(viewModel.SidebarCookieExpiryBrush).ToString(), ignoreCase: true);
+        Assert.Equal("#FFC93C37", GetBrushColor(viewModel.SidebarSessionExpirationBrush).ToString(), ignoreCase: true);
     }
 
     [Fact]
@@ -413,8 +413,8 @@ public sealed class MainWindowViewModelTests
 
         await viewModel.SignOutCommand.ExecuteAsync(null);
 
-        Assert.False(viewModel.HasSidebarCookieExpiry);
-        Assert.Equal(string.Empty, viewModel.SidebarCookieExpiryText);
+        Assert.False(viewModel.HasSidebarSessionExpiration);
+        Assert.Equal(string.Empty, viewModel.SidebarSessionExpirationText);
     }
 
     [Fact]
@@ -701,7 +701,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SaveSettingsAsync_PersistsThemePreferences()
     {
-        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
         var themeService = new FakeAppThemeService();
         var viewModel = CreateViewModel(
             settingsService: settingsService,
@@ -725,7 +725,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task ThemePreview_UpdatesImmediately_WithoutSavingSettings()
     {
-        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
         var themeService = new FakeAppThemeService();
         var viewModel = CreateViewModel(
             settingsService: settingsService,
@@ -785,7 +785,7 @@ public sealed class MainWindowViewModelTests
         FakeGrabSeatCoordinator? grabSeatCoordinator = null,
         FakeOccupySeatCoordinator? occupySeatCoordinator = null,
         FakeNotificationService? notificationService = null,
-        FakeTaskEventAlertService? taskAlertService = null,
+        FakeTaskEventAlertDispatcher? taskAlertService = null,
         FakeErrorDialogService? errorDialogService = null,
         FakeAppThemeService? appThemeService = null,
         ActivityLogService? activityLogService = null)
@@ -796,7 +796,7 @@ public sealed class MainWindowViewModelTests
         apiClient ??= new FakeTraceIntApiClient();
         grabSeatCoordinator ??= new FakeGrabSeatCoordinator();
         occupySeatCoordinator ??= new FakeOccupySeatCoordinator();
-        taskAlertService ??= new FakeTaskEventAlertService();
+        taskAlertService ??= new FakeTaskEventAlertDispatcher();
         activityLogService ??= new ActivityLogService();
 
         return new MainWindowViewModel(
@@ -804,8 +804,8 @@ public sealed class MainWindowViewModelTests
             new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
             new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),
             new SettingsWorkflowService(settingsService),
-            new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(new TraceIntGraphQlTemplateSet("", "", "", "", "", "", ""))),
-            new NotificationTestService(taskAlertService),
+            new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates("", "", "", "", "", "", ""))),
+            taskAlertService,
             grabSeatCoordinator,
             occupySeatCoordinator,
             activityLogService,
@@ -854,6 +854,17 @@ public sealed class MainWindowViewModelTests
     private static Color GetBrushColor(IBrush brush)
     {
         return Assert.IsType<SolidColorBrush>(brush).Color;
+    }
+
+    private static AppSettings CreateDesktopDefaultSettings()
+    {
+        return AppSettings.Default with
+        {
+            Ui = AppSettings.Default.Ui with
+            {
+                Theme = new ThemePreferences(AppThemeMode.FollowSystem, true)
+            }
+        };
     }
 
     private static async Task WaitForAsync(Func<bool> predicate)
