@@ -29,7 +29,7 @@
 - ♻️ 支持占座流程，在预约即将到期时自动取消并重新预约
 - ⭐ 支持收藏常用座位，并为每个场馆分别持久化座位收藏
 - 📊 首页面板展示当前场馆、预约状态、累计成功次数和守护时长
-- 🔔 支持 Cookie 失效提醒，可通过右下角 Toast 弹窗、提示音和 SMTP 邮件通知用户
+- 🔔 支持 Cookie 失效、抢座成功和任务失败提醒，可通过右下角 Toast 弹窗、提示音、SMTP 邮件和 Telegram Bot 通知用户
 - 🧩 支持自定义 API 地址覆盖，便于在接口地址或 GraphQL 模板变化时快速调整
 
 ## 🧱 项目结构
@@ -39,7 +39,7 @@ IGoLibrary-Ex/
   src/
     IGoLibrary.Ex.Domain/           领域模型
     IGoLibrary.Ex.Application/      用例编排、任务协调器、应用服务
-    IGoLibrary.Ex.Infrastructure/   API、持久化、GraphQL模板、邮件通知
+    IGoLibrary.Ex.Infrastructure/   API、持久化、GraphQL模板、远程通知
     IGoLibrary.Ex.Desktop/          Avalonia UI、ViewModel、桌面交互
   tests/
     IGoLibrary.Ex.Tests/            单元测试与界面逻辑测试
@@ -78,11 +78,49 @@ IGoLibrary-Ex/
 3. 点击 `开始占座` 按钮，确认任务开始后把软件挂在后台即可
 
 ### 5️⃣ 系统提醒
-系统提醒目前包含 Cookie过期提醒、抢座成功提醒和抢座失败提醒
+系统提醒目前包含 Cookie过期提醒、抢座成功提醒和抢座失败提醒，可按需开启本地弹窗、提示音、SMTP 邮件和 Telegram Bot 通知
 ####  邮件提醒配置
 参见（还未完成该文档）
+#### Telegram Bot 提醒配置
+1. 在 `通知设置` 页面切换到 `Telegram` 配置页
+2. 开启 `Telegram Bot 提醒`
+3. 填写 `API 基础地址`、`Bot Token` 和 `Chat ID`
+   - `API 基础地址` 默认使用 `https://api.telegram.org`
+   - 如果当前网络无法直连 Telegram，可以改成自己可访问的 Telegram Bot API 代理地址
+4. 点击 `测试 Telegram`，确认能够收到测试消息后即可保存使用
+
+<details>
+<summary>如何获取 Bot Token 和 Chat ID</summary>
+
+##### 获取 Bot Token
+1. 在 Telegram 中搜索并打开 `@BotFather`
+2. 发送 `/newbot`
+3. 按提示填写机器人名称和用户名，用户名通常需要以 `bot` 结尾
+4. 创建成功后，`@BotFather` 会返回一段 `Bot Token`，复制后填入软件
+
+> [!IMPORTANT]
+> `Bot Token` 相当于机器人的密码，不要公开给别人
+
+##### 获取 Chat ID
+1. 在 Telegram 中打开刚创建的机器人，点击 `Start` 或发送任意消息
+2. 在浏览器访问下面的地址，将 `<BotToken>` 替换成你的 `Bot Token`
+
+```text
+https://api.telegram.org/bot<BotToken>/getUpdates
+```
+
+3. 在返回内容中找到 `message.chat.id`，这个数字就是 `Chat ID`
+4. 如果返回内容为空，先给机器人再发一条消息，然后刷新上面的地址
+
+如果要把提醒发到群组，请先把机器人加入目标群组，并在群里发送一条消息，再通过 `getUpdates` 查找对应群组的 `chat.id`。群组的 `Chat ID` 通常是负数。
+
+如果使用的是 Telegram Bot API 代理地址，请把上面地址中的 `https://api.telegram.org` 替换成你自己的 `API 基础地址`
+
+</details>
+
+开启后，Cookie 失效、抢座成功和任务失败都会通过 Telegram Bot 发送提醒。Telegram 发送失败时只会写入应用日志，不会阻塞本地弹窗、邮件或任务执行流程
 #### 本地弹窗提醒
-当监测到 Cookie 过期时，会在屏幕右下角弹出 Toast 弹窗提醒 Cookie 已过期。如果打开了提示音，还会有相应的提示音
+当监测到 Cookie 过期、抢座成功或任务失败时，会在屏幕右下角弹出 Toast 弹窗提醒。如果打开了提示音，还会有相应的提示音
 
 ### 🍎 macOS 首次运行方法
 
