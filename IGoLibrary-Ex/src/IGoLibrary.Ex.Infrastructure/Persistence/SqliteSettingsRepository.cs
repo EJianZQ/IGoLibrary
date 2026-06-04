@@ -100,8 +100,13 @@ public sealed class SqliteSettingsRepository(SqliteConnectionFactory connectionF
 
     private static AppSettings Normalize(AppSettings settings)
     {
-        return settings.CookieExpiryAlerts is null
-            ? settings with { CookieExpiryAlerts = CookieExpiryAlertSettings.Default }
-            : settings;
+        var alertSettings = settings.CookieExpiryAlerts ?? CookieExpiryAlertSettings.Default;
+        return settings with
+        {
+            CookieExpiryAlerts = new CookieExpiryAlertSettings(
+                alertSettings.Email ?? CookieExpiryEmailAlertSettings.Default,
+                alertSettings.Local ?? CookieExpiryLocalAlertSettings.Default,
+                alertSettings.Telegram ?? TelegramAlertSettings.Default)
+        };
     }
 }

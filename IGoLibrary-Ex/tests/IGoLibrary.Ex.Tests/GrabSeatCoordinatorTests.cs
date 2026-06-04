@@ -72,6 +72,43 @@ public sealed class GrabSeatCoordinatorTests
     }
 
     [Fact]
+    public async Task StartAsync_MarksCompletedBeforeSlowSuccessAlertFinishes()
+    {
+        var alertCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var alertService = new FakeTaskAlertService
+        {
+            GrabSucceededCompletion = alertCompletion
+        };
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnReserveSeatAsync = (_, _, _, _) => Task.FromResult(true)
+        };
+        var runtimeState = new AppRuntimeState
+        {
+            Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var coordinator = new GrabSeatCoordinator(
+            apiClient,
+            new FakeSettingsService(AppSettings.Default with { GrabReservationStrategy = GrabReservationStrategy.ReserveDirectly }),
+            alertService,
+            new ActivityLogService(),
+            runtimeState);
+        var plan = new GrabSeatPlan(
+            1,
+            "自科阅览区一",
+            [new TrackedSeat("seat-1", "1号座")],
+            GrabMode.Aggressive,
+            GrabStrategyFactory.FromMode(GrabMode.Aggressive),
+            null);
+
+        await coordinator.StartAsync(plan);
+        await WaitForStatusAsync(coordinator, CoordinatorTaskState.Completed);
+
+        Assert.Single(alertService.GrabSucceededNotifications);
+        alertCompletion.SetResult();
+    }
+
+    [Fact]
     public async Task StartAsync_DirectReservationStrategy_DoesNotFailWhenSeatAlreadyBooked()
     {
         var layoutCallCount = 0;

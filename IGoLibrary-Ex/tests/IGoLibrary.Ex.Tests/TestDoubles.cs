@@ -218,11 +218,17 @@ internal sealed class FakeTaskAlertService : ITaskAlertService
 
     public List<(string TaskName, string Reason)> TaskFailedNotifications { get; } = [];
 
+    public TaskCompletionSource? GrabSucceededCompletion { get; set; }
+
     public List<CookieExpiryEmailAlertSettings> TestEmailRequests { get; } = [];
+
+    public List<TelegramAlertSettings> TestTelegramRequests { get; } = [];
 
     public List<CookieExpiryLocalAlertSettings> TestLocalAlertRequests { get; } = [];
 
     public Exception? SendTestEmailException { get; set; }
+
+    public Exception? SendTestTelegramException { get; set; }
 
     public Task NotifyCookieExpiredAsync(string source, string reason, CancellationToken cancellationToken = default)
     {
@@ -233,7 +239,7 @@ internal sealed class FakeTaskAlertService : ITaskAlertService
     public Task NotifyGrabSucceededAsync(string libraryName, string seatName, CancellationToken cancellationToken = default)
     {
         GrabSucceededNotifications.Add((libraryName, seatName));
-        return Task.CompletedTask;
+        return GrabSucceededCompletion?.Task ?? Task.CompletedTask;
     }
 
     public Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default)
@@ -250,6 +256,17 @@ internal sealed class FakeTaskAlertService : ITaskAlertService
         }
 
         TestEmailRequests.Add(settings);
+        return Task.CompletedTask;
+    }
+
+    public Task SendTestTelegramAsync(TelegramAlertSettings settings, CancellationToken cancellationToken = default)
+    {
+        if (SendTestTelegramException is not null)
+        {
+            throw SendTestTelegramException;
+        }
+
+        TestTelegramRequests.Add(settings);
         return Task.CompletedTask;
     }
 
@@ -279,6 +296,29 @@ internal sealed class FakeEmailAlertSender : IEmailAlertSender
 
         Requests.Add((settings, subject, body));
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeTelegramAlertSender : ITelegramAlertSender
+{
+    public List<(TelegramAlertSettings Settings, string Message)> Requests { get; } = [];
+
+    public Exception? SendException { get; set; }
+
+    public TaskCompletionSource? SendCompletion { get; set; }
+
+    public Task SendAsync(
+        TelegramAlertSettings settings,
+        string message,
+        CancellationToken cancellationToken = default)
+    {
+        if (SendException is not null)
+        {
+            throw SendException;
+        }
+
+        Requests.Add((settings, message));
+        return SendCompletion?.Task ?? Task.CompletedTask;
     }
 }
 

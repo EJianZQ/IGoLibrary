@@ -26,6 +26,10 @@ public static class DependencyInjection
         services.AddSingleton<ICredentialStore>(_ => PlatformCredentialStore.CreateDefault());
         services.AddSingleton<ISmtpTransportClientFactory, MailKitSmtpTransportClientFactory>();
         services.AddSingleton<IEmailAlertSender, SmtpEmailAlertSender>();
+        services.AddHttpClient<ITelegramAlertSender, TelegramAlertSender>(client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        });
 
         services.AddHttpClient<ITraceIntApiClient, TraceIntApiClient>(client =>
             {

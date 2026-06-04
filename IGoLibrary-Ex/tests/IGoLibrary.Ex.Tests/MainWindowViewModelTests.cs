@@ -135,6 +135,115 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_LoadsTelegramNotificationSettings()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            CookieExpiryAlerts = new CookieExpiryAlertSettings(
+                CookieExpiryEmailAlertSettings.Default,
+                CookieExpiryLocalAlertSettings.Default,
+                new TelegramAlertSettings(true, "https://telegram.example.com", "token-1", "chat-1"))
+        });
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.CookieTelegramAlertsEnabled);
+        Assert.Equal("https://telegram.example.com", viewModel.CookieAlertTelegramApiBaseUrl);
+        Assert.Equal("token-1", viewModel.CookieAlertTelegramBotToken);
+        Assert.Equal("chat-1", viewModel.CookieAlertTelegramChatId);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_DefaultsNullTelegramNotificationStrings()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            CookieExpiryAlerts = new CookieExpiryAlertSettings(
+                CookieExpiryEmailAlertSettings.Default,
+                CookieExpiryLocalAlertSettings.Default,
+                new TelegramAlertSettings(true, null!, null!, null!))
+        });
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.CookieTelegramAlertsEnabled);
+        Assert.Equal(TelegramAlertSettings.DefaultApiBaseUrl, viewModel.CookieAlertTelegramApiBaseUrl);
+        Assert.Equal(string.Empty, viewModel.CookieAlertTelegramBotToken);
+        Assert.Equal(string.Empty, viewModel.CookieAlertTelegramChatId);
+    }
+
+    [Fact]
+    public async Task NotificationSettings_AutoSaveTelegramAlerts_WhenFieldsChange()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.CookieTelegramAlertsEnabled = true;
+        viewModel.CookieAlertTelegramApiBaseUrl = "https://telegram.example.com/";
+        viewModel.CookieAlertTelegramBotToken = " token-1 ";
+        viewModel.CookieAlertTelegramChatId = " chat-1 ";
+
+        await WaitForAsync(() =>
+            settingsService.SaveCalls > 0 &&
+            settingsService.CurrentSettings.CookieExpiryAlerts?.Telegram.BotToken == "token-1");
+
+        var telegram = Assert.IsType<TelegramAlertSettings>(settingsService.CurrentSettings.CookieExpiryAlerts?.Telegram);
+        Assert.True(telegram.Enabled);
+        Assert.Equal("https://telegram.example.com", telegram.ApiBaseUrl);
+        Assert.Equal("token-1", telegram.BotToken);
+        Assert.Equal("chat-1", telegram.ChatId);
+    }
+
+    [Fact]
+    public async Task SendTestTelegramAlertAsync_UsesCurrentNotificationSettingsSnapshot()
+    {
+        var alertService = new FakeTaskAlertService();
+        var viewModel = CreateViewModel(taskAlertService: alertService);
+        await viewModel.InitializeAsync();
+
+        viewModel.CookieTelegramAlertsEnabled = true;
+        viewModel.CookieAlertTelegramApiBaseUrl = "https://telegram.example.com/";
+        viewModel.CookieAlertTelegramBotToken = " token-1 ";
+        viewModel.CookieAlertTelegramChatId = " chat-1 ";
+
+        await viewModel.SendTestTelegramAlertCommand.ExecuteAsync(null);
+
+        var request = Assert.Single(alertService.TestTelegramRequests);
+        Assert.True(request.Enabled);
+        Assert.Equal("https://telegram.example.com", request.ApiBaseUrl);
+        Assert.Equal("token-1", request.BotToken);
+        Assert.Equal("chat-1", request.ChatId);
+    }
+
+    [Fact]
+    public async Task SendTestTelegramAlertAsync_ShowsErrorDialog_WhenSendingFails()
+    {
+        var alertService = new FakeTaskAlertService
+        {
+            SendTestTelegramException = new InvalidOperationException("telegram send failed")
+        };
+        var errorDialogService = new FakeErrorDialogService();
+        var viewModel = CreateViewModel(
+            taskAlertService: alertService,
+            errorDialogService: errorDialogService);
+        await viewModel.InitializeAsync();
+
+        viewModel.CookieAlertTelegramApiBaseUrl = "https://telegram.example.com";
+        viewModel.CookieAlertTelegramBotToken = "token-1";
+        viewModel.CookieAlertTelegramChatId = "chat-1";
+
+        await viewModel.SendTestTelegramAlertCommand.ExecuteAsync(null);
+
+        var error = Assert.Single(errorDialogService.Errors);
+        Assert.Equal("测试 Telegram 发送失败", error.Title);
+        Assert.Equal(nameof(InvalidOperationException), error.ErrorType);
+        Assert.Equal("telegram send failed", error.ErrorMessage);
+    }
+
+    [Fact]
     public async Task TryAutoParseClipboardLinkAsync_DoesNotConsumeSameCodeTwice()
     {
         var notificationService = new FakeNotificationService();
@@ -450,6 +559,27 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(4, settingsService.CurrentSettings.SuccessfulReservationCount);
         Assert.Equal(7200, settingsService.CurrentSettings.TotalGuardSeconds);
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_PersistsTelegramNotificationSettings()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.CookieTelegramAlertsEnabled = true;
+        viewModel.CookieAlertTelegramApiBaseUrl = "https://telegram.example.com/";
+        viewModel.CookieAlertTelegramBotToken = " token-1 ";
+        viewModel.CookieAlertTelegramChatId = " chat-1 ";
+
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        var telegram = Assert.IsType<TelegramAlertSettings>(settingsService.CurrentSettings.CookieExpiryAlerts?.Telegram);
+        Assert.True(telegram.Enabled);
+        Assert.Equal("https://telegram.example.com", telegram.ApiBaseUrl);
+        Assert.Equal("token-1", telegram.BotToken);
+        Assert.Equal("chat-1", telegram.ChatId);
     }
 
     [Fact]

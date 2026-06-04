@@ -102,9 +102,9 @@ public partial class MainWindowViewModel(
     private static readonly IBrush NotificationSegmentInactiveBrush = Brushes.Transparent;
     private IBrush NotificationSegmentActiveTextBrush = appThemeService.CurrentPalette.NotificationSegmentActiveTextBrush;
     private IBrush NotificationSegmentInactiveTextBrush = appThemeService.CurrentPalette.NotificationSegmentInactiveTextBrush;
-    private const double NotificationSegmentControlWidthValue = 396d;
-    private const double NotificationSegmentSliderWidthValue = 190d;
-    private const double NotificationSegmentSliderOffsetValue = 196d;
+    private const double NotificationSegmentControlWidthValue = 560d;
+    private const double NotificationSegmentSliderWidthValue = 174d;
+    private const double NotificationSegmentSliderOffsetValue = 180d;
     private readonly HashSet<string> _committedSelectedSeatKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _draftSelectedSeatKeys = new(StringComparer.Ordinal);
     private bool _isSynchronizingSeatSelection;
@@ -486,6 +486,18 @@ public partial class MainWindowViewModel(
     private string cookieAlertToAddress = string.Empty;
 
     [ObservableProperty]
+    private bool cookieTelegramAlertsEnabled;
+
+    [ObservableProperty]
+    private string cookieAlertTelegramApiBaseUrl = TelegramAlertSettings.DefaultApiBaseUrl;
+
+    [ObservableProperty]
+    private string cookieAlertTelegramBotToken = string.Empty;
+
+    [ObservableProperty]
+    private string cookieAlertTelegramChatId = string.Empty;
+
+    [ObservableProperty]
     private bool cookieLocalToastEnabled = true;
 
     [ObservableProperty]
@@ -550,15 +562,16 @@ public partial class MainWindowViewModel(
 
     public bool IsEmailNotificationTabActive => SelectedNotificationSettingsTabIndex == 0;
 
-    public bool IsLocalNotificationTabActive => SelectedNotificationSettingsTabIndex == 1;
+    public bool IsTelegramNotificationTabActive => SelectedNotificationSettingsTabIndex == 1;
+
+    public bool IsLocalNotificationTabActive => SelectedNotificationSettingsTabIndex == 2;
 
     public double NotificationSegmentControlWidth => NotificationSegmentControlWidthValue;
 
     public double NotificationSegmentSliderWidth => NotificationSegmentSliderWidthValue;
 
-    public double NotificationSegmentSliderOffset => SelectedNotificationSettingsTabIndex == 1
-        ? NotificationSegmentSliderOffsetValue
-        : 0d;
+    public double NotificationSegmentSliderOffset => Math.Clamp(SelectedNotificationSettingsTabIndex, 0, 2) *
+                                                     NotificationSegmentSliderOffsetValue;
 
     public IBrush EmailNotificationTabBackgroundBrush => IsEmailNotificationTabActive
         ? NotificationSegmentActiveBrush
@@ -567,6 +580,10 @@ public partial class MainWindowViewModel(
     public IBrush LocalNotificationTabBackgroundBrush => IsLocalNotificationTabActive
         ? NotificationSegmentActiveBrush
         : NotificationSegmentInactiveBrush;
+
+    public IBrush TelegramNotificationTabForegroundBrush => IsTelegramNotificationTabActive
+        ? NotificationSegmentActiveTextBrush
+        : NotificationSegmentInactiveTextBrush;
 
     public IBrush EmailNotificationTabForegroundBrush => IsEmailNotificationTabActive
         ? NotificationSegmentActiveTextBrush
@@ -635,11 +652,13 @@ public partial class MainWindowViewModel(
     partial void OnSelectedNotificationSettingsTabIndexChanged(int value)
     {
         OnPropertyChanged(nameof(IsEmailNotificationTabActive));
+        OnPropertyChanged(nameof(IsTelegramNotificationTabActive));
         OnPropertyChanged(nameof(IsLocalNotificationTabActive));
         OnPropertyChanged(nameof(NotificationSegmentSliderOffset));
         OnPropertyChanged(nameof(EmailNotificationTabBackgroundBrush));
         OnPropertyChanged(nameof(LocalNotificationTabBackgroundBrush));
         OnPropertyChanged(nameof(EmailNotificationTabForegroundBrush));
+        OnPropertyChanged(nameof(TelegramNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
     }
 
@@ -779,6 +798,14 @@ public partial class MainWindowViewModel(
 
     partial void OnCookieAlertToAddressChanged(string value) => ScheduleNotificationSettingsAutoSave();
 
+    partial void OnCookieTelegramAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnCookieAlertTelegramApiBaseUrlChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnCookieAlertTelegramBotTokenChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnCookieAlertTelegramChatIdChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
     partial void OnCookieLocalToastEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
 
     partial void OnCookieLocalSoundEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
@@ -818,9 +845,15 @@ public partial class MainWindowViewModel(
     }
 
     [RelayCommand]
-    private void ShowLocalNotificationSettings()
+    private void ShowTelegramNotificationSettings()
     {
         SelectedNotificationSettingsTabIndex = 1;
+    }
+
+    [RelayCommand]
+    private void ShowLocalNotificationSettings()
+    {
+        SelectedNotificationSettingsTabIndex = 2;
     }
 
     [RelayCommand]
@@ -1506,6 +1539,25 @@ public partial class MainWindowViewModel(
     }
 
     [RelayCommand]
+    private async Task SendTestTelegramAlertAsync()
+    {
+        try
+        {
+            CancelPendingNotificationSettingsAutoSave();
+            await PersistNotificationSettingsSnapshotAsync();
+            await taskAlertService.SendTestTelegramAsync(BuildAlertSettingsSnapshot().Telegram);
+            NotificationSettingsStatusText = $"测试 Telegram 已发送于 {DateTime.Now:HH:mm:ss}。";
+            await notificationService.ShowSuccessAsync("测试 Telegram 已发送", "请检查 Telegram，确认当前 Bot 配置可用。");
+        }
+        catch (Exception ex)
+        {
+            NotificationSettingsStatusText = $"测试 Telegram 发送失败：{ex.Message}";
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Telegram 失败：{ex.Message}");
+            await errorDialogService.ShowErrorAsync("测试 Telegram 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
+        }
+    }
+
+    [RelayCommand]
     private async Task SendTestLocalAlertAsync()
     {
         try
@@ -1589,6 +1641,12 @@ public partial class MainWindowViewModel(
             CookieAlertPassword = cookieAlerts.Email.Password;
             CookieAlertFromAddress = cookieAlerts.Email.FromAddress;
             CookieAlertToAddress = cookieAlerts.Email.ToAddress;
+            CookieTelegramAlertsEnabled = cookieAlerts.Telegram.Enabled;
+            CookieAlertTelegramApiBaseUrl = string.IsNullOrWhiteSpace(cookieAlerts.Telegram.ApiBaseUrl)
+                ? TelegramAlertSettings.DefaultApiBaseUrl
+                : cookieAlerts.Telegram.ApiBaseUrl;
+            CookieAlertTelegramBotToken = cookieAlerts.Telegram.BotToken ?? string.Empty;
+            CookieAlertTelegramChatId = cookieAlerts.Telegram.ChatId ?? string.Empty;
             CookieLocalToastEnabled = cookieAlerts.Local.ToastEnabled;
             CookieLocalSoundEnabled = cookieAlerts.Local.SoundEnabled;
             NotificationSettingsStatusText = "更改后会自动保存。";
@@ -2895,7 +2953,20 @@ public partial class MainWindowViewModel(
                 CookieAlertToAddress.Trim()),
             new CookieExpiryLocalAlertSettings(
                 CookieLocalToastEnabled,
-                CookieLocalSoundEnabled));
+                CookieLocalSoundEnabled),
+            new TelegramAlertSettings(
+                CookieTelegramAlertsEnabled,
+                NormalizeTelegramApiBaseUrlForSnapshot(CookieAlertTelegramApiBaseUrl),
+                (CookieAlertTelegramBotToken ?? string.Empty).Trim(),
+                (CookieAlertTelegramChatId ?? string.Empty).Trim()));
+    }
+
+    private static string NormalizeTelegramApiBaseUrlForSnapshot(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim().TrimEnd('/');
+        return string.IsNullOrWhiteSpace(trimmed)
+            ? TelegramAlertSettings.DefaultApiBaseUrl
+            : trimmed;
     }
 
     private static string BuildExceptionDetails(Exception exception)
@@ -3007,6 +3078,7 @@ public partial class MainWindowViewModel(
         }
 
         OnPropertyChanged(nameof(EmailNotificationTabForegroundBrush));
+        OnPropertyChanged(nameof(TelegramNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(GrabDashboardStatusBrush));
         RefreshSidebarCookieExpiryPresentation(DateTimeOffset.Now);

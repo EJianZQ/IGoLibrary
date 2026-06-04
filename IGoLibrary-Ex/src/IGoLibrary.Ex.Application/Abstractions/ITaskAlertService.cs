@@ -12,5 +12,7 @@ public interface ITaskAlertService
 
     Task SendTestEmailAsync(CookieExpiryEmailAlertSettings settings, CancellationToken cancellationToken = default);
 
+    Task SendTestTelegramAsync(TelegramAlertSettings settings, CancellationToken cancellationToken = default);
+
     Task SendTestLocalAlertAsync(CookieExpiryLocalAlertSettings settings, CancellationToken cancellationToken = default);
 }

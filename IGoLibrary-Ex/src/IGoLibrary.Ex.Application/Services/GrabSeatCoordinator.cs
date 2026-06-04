@@ -125,9 +125,10 @@ public sealed class GrabSeatCoordinator(
 
                 if (reservationResult.ReservedSeat is not null)
                 {
-                    activityLogService.Write(LogEntryKind.Success, "Grab", $"{reservationResult.ReservedSeat.SeatName} 预约成功。");
-                    await taskAlertService.NotifyGrabSucceededAsync(plan.LibraryName, reservationResult.ReservedSeat.SeatName, cancellationToken);
+                    var reservedSeatName = reservationResult.ReservedSeat.SeatName;
+                    activityLogService.Write(LogEntryKind.Success, "Grab", $"{reservedSeatName} 预约成功。");
                     Complete("已成功预约到目标座位。");
+                    _ = NotifyGrabSucceededSafelyAsync(plan.LibraryName, reservedSeatName);
                     return;
                 }
 
@@ -291,6 +292,18 @@ public sealed class GrabSeatCoordinator(
     private void NotifyStatusChanged()
     {
         StatusChanged?.Invoke(this, GetStatus());
+    }
+
+    private async Task NotifyGrabSucceededSafelyAsync(string libraryName, string seatName)
+    {
+        try
+        {
+            await taskAlertService.NotifyGrabSucceededAsync(libraryName, seatName, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送抢座成功提醒失败：{ex.Message}");
+        }
     }
 
     private string GetCurrentCookieOrThrow()

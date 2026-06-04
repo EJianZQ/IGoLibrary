@@ -187,11 +187,165 @@ public sealed class TaskAlertServiceTests
         Assert.Equal(2, notificationService.Successes.Count);
     }
 
+    [Fact]
+    public async Task NotifyCookieExpiredAsync_SendsTelegramUsingPersistedSettings()
+    {
+        var telegramSender = new FakeTelegramAlertSender();
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            CookieExpiryAlerts = new CookieExpiryAlertSettings(
+                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
+                new CookieExpiryLocalAlertSettings(false, false),
+                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+        });
+
+        var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
+
+        await service.NotifyCookieExpiredAsync("抢座轮询", "Cookie 无效");
+
+        var request = Assert.Single(telegramSender.Requests);
+        Assert.Equal("chat-1", request.Settings.ChatId);
+        Assert.Contains("IGoLibrary-Ex Cookie 已失效", request.Message);
+        Assert.Contains("触发模块：抢座轮询", request.Message);
+        Assert.Contains("详细信息：Cookie 无效", request.Message);
+    }
+
+    [Fact]
+    public async Task NotifyGrabSucceededAsync_SendsTelegramUsingPersistedSettings()
+    {
+        var telegramSender = new FakeTelegramAlertSender();
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            CookieExpiryAlerts = new CookieExpiryAlertSettings(
+                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
+                new CookieExpiryLocalAlertSettings(false, false),
+                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+        });
+
+        var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
+
+        await service.NotifyGrabSucceededAsync("自科阅览区一", "2号座");
+
+        var request = Assert.Single(telegramSender.Requests);
+        Assert.Contains("IGoLibrary-Ex 抢座成功", request.Message);
+        Assert.Contains("目标场馆：自科阅览区一", request.Message);
+        Assert.Contains("目标座位：2号座", request.Message);
+    }
+
+    [Fact]
+    public async Task NotifyTaskFailedAsync_SendsTelegramUsingPersistedSettings()
+    {
+        var telegramSender = new FakeTelegramAlertSender();
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            CookieExpiryAlerts = new CookieExpiryAlertSettings(
+                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
+                new CookieExpiryLocalAlertSettings(false, false),
+                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+        });
+
+        var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
+
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+
+        var request = Assert.Single(telegramSender.Requests);
+        Assert.Contains("IGoLibrary-Ex 抢座任务失败", request.Message);
+        Assert.Contains("任务模块：抢座", request.Message);
+        Assert.Contains("详细信息：预约请求超时", request.Message);
+    }
+
+    [Fact]
+    public async Task NotifyTaskFailedAsync_LogsWarningWhenTelegramSendFails_AndContinuesEmail()
+    {
+        var emailSender = new FakeEmailAlertSender();
+        var telegramSender = new FakeTelegramAlertSender
+        {
+            SendException = new InvalidOperationException("telegram boom")
+        };
+        var activityLog = new ActivityLogService();
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            CookieExpiryAlerts = new CookieExpiryAlertSettings(
+                new CookieExpiryEmailAlertSettings(
+                    Enabled: true,
+                    SmtpHost: "smtp.example.com",
+                    Port: 587,
+                    SecurityMode: EmailSecurityMode.Tls,
+                    Username: "tester",
+                    Password: "secret",
+                    FromAddress: "sender@example.com",
+                    ToAddress: "receiver@example.com"),
+                new CookieExpiryLocalAlertSettings(false, false),
+                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+        });
+
+        var service = CreateService(settingsService, emailSender, activityLog, telegramSender: telegramSender);
+
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+
+        Assert.Single(emailSender.Requests);
+        Assert.Contains(
+            activityLog.Entries,
+            entry => entry.Kind == LogEntryKind.Warning
+                     && entry.Category == "Alert"
+                     && entry.Message.Contains("发送抢座任务失败提醒Telegram提醒失败：telegram boom", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task NotifyTaskFailedAsync_SuppressesDuplicateTelegramWithinWindow()
+    {
+        var telegramSender = new FakeTelegramAlertSender();
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            CookieExpiryAlerts = new CookieExpiryAlertSettings(
+                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
+                new CookieExpiryLocalAlertSettings(false, false),
+                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+        });
+
+        var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
+
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+
+        Assert.Single(telegramSender.Requests);
+    }
+
+    [Fact]
+    public async Task NotifyGrabSucceededAsync_ShowsInAppFallbackBeforeSlowTelegramCompletes()
+    {
+        var notificationService = new FakeNotificationService();
+        var telegramCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var telegramSender = new FakeTelegramAlertSender
+        {
+            SendCompletion = telegramCompletion
+        };
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            CookieExpiryAlerts = new CookieExpiryAlertSettings(
+                CookieExpiryEmailAlertSettings.Default with { Enabled = false },
+                new CookieExpiryLocalAlertSettings(false, false),
+                new TelegramAlertSettings(true, "https://api.telegram.org", "token-1", "chat-1"))
+        });
+        var service = CreateService(
+            settingsService: settingsService,
+            notificationService: notificationService,
+            telegramSender: telegramSender);
+
+        var notifyTask = service.NotifyGrabSucceededAsync("自科阅览区一", "2号座");
+        await WaitForAsync(() => notificationService.Successes.Count == 1);
+
+        Assert.False(notifyTask.IsCompleted);
+        telegramCompletion.SetResult();
+        await notifyTask;
+    }
+
     private static TaskAlertService CreateService(
         FakeSettingsService? settingsService = null,
         FakeEmailAlertSender? emailSender = null,
         ActivityLogService? activityLogService = null,
-        INotificationService? notificationService = null)
+        INotificationService? notificationService = null,
+        FakeTelegramAlertSender? telegramSender = null)
     {
         settingsService ??= new FakeSettingsService(AppSettings.Default);
         var toastService = new ToastNotificationService(settingsService, new AppWindowService());
@@ -199,9 +353,27 @@ public sealed class TaskAlertServiceTests
         return new TaskAlertService(
             settingsService,
             emailSender ?? new FakeEmailAlertSender(),
+            telegramSender ?? new FakeTelegramAlertSender(),
             toastService,
             notificationService ?? new FakeNotificationService(),
             new AlertSoundService(),
             activityLogService ?? new ActivityLogService());
+    }
+
+    private static async Task WaitForAsync(Func<bool> predicate)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (predicate())
+            {
+                return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException("Condition was not met within the expected time.");
     }
 }

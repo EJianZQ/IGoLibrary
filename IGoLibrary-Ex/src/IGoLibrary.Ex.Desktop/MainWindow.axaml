@@ -1312,7 +1312,7 @@
                           Padding="5"
                           Width="{Binding NotificationSegmentControlWidth}"
                           HorizontalAlignment="Center">
-                    <Grid ColumnDefinitions="*,*"
+                    <Grid ColumnDefinitions="*,*,*"
                           ColumnSpacing="6"
                           ClipToBounds="True">
                       <Border Background="{DynamicResource AppNotificationSegmentThumbBrush}"
@@ -1347,6 +1347,16 @@
                       </Grid>
 
                       <Grid Grid.Column="1">
+                        <Button Classes="notification-segment"
+                                Background="Transparent"
+                                Foreground="{Binding TelegramNotificationTabForegroundBrush}"
+                                BorderThickness="0"
+                                CornerRadius="16"
+                                Content="Telegram Bot"
+                                Command="{Binding ShowTelegramNotificationSettingsCommand}" />
+                      </Grid>
+
+                      <Grid Grid.Column="2">
                         <Button Classes="notification-segment"
                                 Background="Transparent"
                                 Foreground="{Binding LocalNotificationTabForegroundBrush}"
@@ -1482,6 +1492,73 @@
                                 Background="{DynamicResource SemiAccentBrush}"
                                 Foreground="{DynamicResource AppAccentForegroundBrush}"
                                 MinWidth="160" />
+                      </Grid>
+                    </Grid>
+                  </Grid>
+
+                  <Grid HorizontalAlignment="Stretch">
+                    <Grid RowDefinitions="Auto,Auto,Auto"
+                          RowSpacing="18"
+                          HorizontalAlignment="Stretch">
+                      <StackPanel Grid.Row="0"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
+                                   Text="Telegram API 基础地址" />
+                        <TextBox Text="{Binding CookieAlertTelegramApiBaseUrl}"
+                                 Watermark="https://api.telegram.org"
+                                 HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <Grid Grid.Row="1"
+                            ColumnDefinitions="*,*"
+                            ColumnSpacing="24">
+                        <StackPanel Grid.Column="0"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="Bot Token" />
+                          <TextBox Text="{Binding CookieAlertTelegramBotToken}"
+                                   PasswordChar="●"
+                                   Watermark="123456:ABC-DEF..."
+                                   HorizontalAlignment="Stretch" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="Chat ID" />
+                          <TextBox Text="{Binding CookieAlertTelegramChatId}"
+                                   Watermark="123456789 或 @channel"
+                                   HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                      </Grid>
+
+                      <Grid Grid.Row="2"
+                            ColumnDefinitions="*,Auto"
+                            ColumnSpacing="16"
+                            Margin="0,8,0,0">
+                        <Border Classes="notify-toggle-card">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                            <StackPanel Spacing="4">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="开启 Telegram 提醒" />
+                              <TextBlock Classes="helper-text"
+                                         Text="Cookie 失效、抢座成功或任务失败时，会通过 Telegram Bot 向指定 Chat ID 发送文本提醒" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          IsChecked="{Binding CookieTelegramAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Button Grid.Column="1"
+                                Content="发送测试 Telegram"
+                                Command="{Binding SendTestTelegramAlertCommand}"
+                                Background="{DynamicResource SemiAccentBrush}"
+                                Foreground="{DynamicResource AppAccentForegroundBrush}"
+                                MinWidth="176" />
                       </Grid>
                     </Grid>
                   </Grid>
