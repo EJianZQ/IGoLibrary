@@ -80,7 +80,7 @@ IGoLibrary-Ex/
 ### 5️⃣ 系统提醒
 系统提醒目前包含 Cookie过期提醒、抢座成功提醒和抢座失败提醒，可按需开启本地弹窗、提示音、SMTP 邮件和 Telegram Bot 通知
 ####  邮件提醒配置
-参见（还未完成该文档）
+参见 [SMTP 邮件提醒配置指南](docs/smtp-email-alert-configuration.md)
 #### Telegram Bot 提醒配置
 1. 在 `通知设置` 页面切换到 `Telegram` 配置页
 2. 开启 `Telegram Bot 提醒`
