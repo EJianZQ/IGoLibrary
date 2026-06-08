@@ -8,7 +8,8 @@ namespace IGoLibrary.Ex.Infrastructure.Api;
 internal sealed class TraceIntApiClient(
     TraceIntCookieTransport cookieTransport,
     IProtocolTemplateStore protocolTemplateStore,
-    TraceIntGraphQlTransport graphQlTransport) : ITraceIntApiClient
+    TraceIntGraphQlTransport graphQlTransport,
+    TraceIntTomorrowReservationQueueTransport tomorrowReservationQueueTransport) : ITraceIntApiClient
 {
     public async Task<string> GetCookieFromCodeAsync(string code, CancellationToken cancellationToken = default)
     {
@@ -76,6 +77,70 @@ internal sealed class TraceIntApiClient(
         using var response = await graphQlTransport.SendAsync(cookie, payload, cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         return TraceIntGraphQlResponseMapper.MapCancelReservation(raw);
+    }
+
+    public async Task<TomorrowReservationQueueResult> EnterTomorrowReservationQueueAsync(
+        string cookie,
+        CancellationToken cancellationToken = default)
+    {
+        var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
+        return await tomorrowReservationQueueTransport.EnterAsync(
+            templates.TomorrowReservationQueueUrlTemplate,
+            cookie,
+            cancellationToken);
+    }
+
+    public async Task WarmUpTomorrowReservationAsync(
+        string cookie,
+        int libraryId,
+        CancellationToken cancellationToken = default)
+    {
+        var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
+        var payload = templates.TomorrowReservationWarmUpTemplate
+            .Replace("ReplaceMeByLibID", libraryId.ToString(), StringComparison.Ordinal)
+            .Replace("ReplaceMe", libraryId.ToString(), StringComparison.Ordinal);
+
+        using var response = await graphQlTransport.SendAsync(
+            cookie,
+            payload,
+            TraceIntGraphQlTransport.TomorrowReservationProfile,
+            cancellationToken);
+        var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+        TraceIntGraphQlResponseMapper.MapTomorrowReservationWarmUp(raw);
+    }
+
+    public async Task<bool> SaveTomorrowReservationAsync(
+        string cookie,
+        int libraryId,
+        string seatKey,
+        CancellationToken cancellationToken = default)
+    {
+        var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
+        var payload = templates.TomorrowReservationSaveTemplate
+            .Replace("ReplaceMeBySeatKey", $"{seatKey}.", StringComparison.Ordinal)
+            .Replace("ReplaceMeByLibID", libraryId.ToString(), StringComparison.Ordinal);
+
+        using var response = await graphQlTransport.SendAsync(
+            cookie,
+            payload,
+            TraceIntGraphQlTransport.TomorrowReservationProfile,
+            cancellationToken);
+        var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+        return TraceIntGraphQlResponseMapper.MapTomorrowReservationSave(raw);
+    }
+
+    public async Task<TomorrowReservationInfo?> GetTomorrowReservationInfoAsync(
+        string cookie,
+        CancellationToken cancellationToken = default)
+    {
+        var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
+        using var response = await graphQlTransport.SendAsync(
+            cookie,
+            templates.TomorrowReservationInfoTemplate,
+            TraceIntGraphQlTransport.TomorrowReservationProfile,
+            cancellationToken);
+        var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+        return TraceIntGraphQlResponseMapper.MapTomorrowReservationInfo(raw);
     }
 
     internal static string BuildCookieHeaderFromResponseCookies(IReadOnlyList<string>? responseCookies)

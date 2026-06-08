@@ -19,4 +19,12 @@ public interface ITraceIntApiClient
     Task<bool> ReserveSeatAsync(string cookie, int libraryId, string seatKey, CancellationToken cancellationToken = default);
 
     Task<bool> CancelReservationAsync(string cookie, string reservationToken, CancellationToken cancellationToken = default);
+
+    Task<TomorrowReservationQueueResult> EnterTomorrowReservationQueueAsync(string cookie, CancellationToken cancellationToken = default);
+
+    Task WarmUpTomorrowReservationAsync(string cookie, int libraryId, CancellationToken cancellationToken = default);
+
+    Task<bool> SaveTomorrowReservationAsync(string cookie, int libraryId, string seatKey, CancellationToken cancellationToken = default);
+
+    Task<TomorrowReservationInfo?> GetTomorrowReservationInfoAsync(string cookie, CancellationToken cancellationToken = default);
 }

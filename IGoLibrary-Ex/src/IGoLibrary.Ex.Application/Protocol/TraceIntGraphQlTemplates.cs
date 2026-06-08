@@ -7,4 +7,8 @@ public sealed record TraceIntGraphQlTemplates(
     string QueryLibraryRuleTemplate,
     string QueryReservationInfoTemplate,
     string ReserveSeatTemplate,
-    string CancelReservationTemplate);
+    string CancelReservationTemplate,
+    string TomorrowReservationQueueUrlTemplate = "",
+    string TomorrowReservationWarmUpTemplate = "",
+    string TomorrowReservationSaveTemplate = "",
+    string TomorrowReservationInfoTemplate = "");

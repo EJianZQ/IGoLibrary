@@ -30,14 +30,14 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
         {
             if (_cts is not null || _runningTask is { IsCompleted: false })
             {
-                throw new InvalidOperationException($"{title}任务已在运行。");
+                throw new InvalidOperationException($"{title}任务已在运行");
             }
 
             _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             startingStatus = new CoordinatorStatus(
                 CoordinatorTaskState.Starting,
                 title,
-                $"准备启动{title}任务。",
+                $"准备启动{title}任务",
                 runtime.Now,
                 runtime.Now,
                 Reason: CoordinatorStatusReason.Starting);
@@ -74,7 +74,7 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
             stoppingStatus = GetStatusUnsafe() with
             {
                 State = CoordinatorTaskState.Stopping,
-                Message = $"正在停止{title}任务。",
+                Message = $"正在停止{title}任务",
                 LastUpdatedAt = runtime.Now,
                 Reason = CoordinatorStatusReason.Stopping
             };
@@ -117,12 +117,12 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
             await runAsync(context, cancellationToken);
             if (!IsTerminal(GetStatus().State))
             {
-                context.Complete($"{title}任务已停止。", CoordinatorStatusReason.Stopped);
+                context.Complete($"{title}任务已停止", CoordinatorStatusReason.Stopped);
             }
         }
         catch (OperationCanceledException)
         {
-            context.Complete($"{title}任务已停止。", CoordinatorStatusReason.Stopped);
+            context.Complete($"{title}任务已停止", CoordinatorStatusReason.Stopped);
         }
         catch (Exception ex)
         {

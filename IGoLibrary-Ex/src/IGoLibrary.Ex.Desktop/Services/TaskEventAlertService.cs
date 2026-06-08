@@ -89,6 +89,34 @@ public sealed class TaskEventAlertService(
             cancellationToken);
     }
 
+    public async Task NotifyTomorrowReservationSucceededAsync(
+        string libraryName,
+        string seatName,
+        string? day,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedLibraryName = NormalizeLibraryName(libraryName);
+        var normalizedSeatName = NormalizeSeatName(seatName);
+        var normalizedDay = string.IsNullOrWhiteSpace(day) ? "明日" : day.Trim();
+        if (ShouldSuppress($"tomorrow-success|{normalizedLibraryName}|{normalizedSeatName}|{normalizedDay}"))
+        {
+            return;
+        }
+
+        await DispatchAlertAsync(
+            emailLabel: "明日预约成功提醒",
+            telegramLabel: "明日预约成功提醒",
+            localLabel: "明日预约成功提醒",
+            emailSubject: "IGoLibrary-Ex 明日预约成功提醒",
+            emailBody: BuildTomorrowReservationSucceededEmailBody(normalizedLibraryName, normalizedSeatName, normalizedDay),
+            telegramMessage: BuildTomorrowReservationSucceededTelegramMessage(normalizedLibraryName, normalizedSeatName, normalizedDay),
+            toastKind: ToastVisualKind.Success,
+            toastTitle: "明日预约成功",
+            toastMessage: $"{normalizedDay} · {normalizedLibraryName} · {normalizedSeatName} 已成功预约",
+            enableInAppFallback: true,
+            cancellationToken);
+    }
+
     public async Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default)
     {
         var normalizedTaskName = NormalizeTaskName(taskName);
@@ -315,6 +343,20 @@ public sealed class TaskEventAlertService(
         return builder.ToString();
     }
 
+    private static string BuildTomorrowReservationSucceededEmailBody(string libraryName, string seatName, string day)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 已成功完成明日预约");
+        builder.AppendLine();
+        builder.AppendLine($"预约日期：{day}");
+        builder.AppendLine($"目标场馆：{libraryName}");
+        builder.AppendLine($"目标座位：{seatName}");
+        builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine();
+        builder.AppendLine("你可以返回应用查看明日预约任务状态");
+        return builder.ToString();
+    }
+
     private static string BuildTaskFailedEmailBody(string taskName, string reason)
     {
         var builder = new StringBuilder();
@@ -365,6 +407,18 @@ public sealed class TaskEventAlertService(
         builder.AppendLine($"目标座位：{seatName}");
         builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
         builder.AppendLine("你可以返回应用查看最新预约状态。");
+        return builder.ToString();
+    }
+
+    private static string BuildTomorrowReservationSucceededTelegramMessage(string libraryName, string seatName, string day)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 明日预约成功");
+        builder.AppendLine($"预约日期：{day}");
+        builder.AppendLine($"目标场馆：{libraryName}");
+        builder.AppendLine($"目标座位：{seatName}");
+        builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine("你可以返回应用查看明日预约任务状态");
         return builder.ToString();
     }
 

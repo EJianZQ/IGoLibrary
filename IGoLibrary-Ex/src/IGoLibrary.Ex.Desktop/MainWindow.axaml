@@ -1164,7 +1164,204 @@
             </Grid>
           </Grid>
 
-        <!-- Tab 3: Occupy -->
+        <!-- Tab 3: Tomorrow Reservation -->
+        <Grid RowDefinitions="Auto,Auto,*"
+              RowSpacing="16"
+              Margin="0,0,16,0"
+              Background="Transparent">
+          <Grid ColumnDefinitions="*,Auto"
+                ColumnSpacing="16">
+            <StackPanel Spacing="4">
+              <TextBlock Classes="page-title"
+                         Text="明日预约"
+                         Margin="0" />
+            </StackPanel>
+
+            <Border Grid.Column="1"
+                    Padding="14,10"
+                    CornerRadius="16"
+                    Background="{DynamicResource SemiAccentGlowBrush}"
+                    BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                    BorderThickness="1"
+                    VerticalAlignment="Center">
+              <StackPanel Spacing="2">
+                <TextBlock Text="当前锁定场馆"
+                           Classes="grab-stat-title" />
+                <TextBlock Text="{Binding BoundLibraryTitle}"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource SemiTextPrimaryBrush}" />
+              </StackPanel>
+            </Border>
+          </Grid>
+
+          <Border Grid.Row="1"
+                  Classes="semi-card Shadow"
+                  Padding="20">
+            <StackPanel Spacing="18">
+              <StackPanel Spacing="8">
+                <TextBlock Text="单目标座位"
+                           FontSize="18"
+                           FontWeight="Bold" />
+                <Grid ColumnDefinitions="Auto,*,Auto"
+                      ColumnSpacing="14">
+                  <Button Content="🎯 选择目标座位"
+                          Command="{Binding OpenTomorrowSeatSelectionOverlayCommand}"
+                          IsEnabled="{Binding CanEditTomorrowConfiguration}"
+                          Background="{DynamicResource AppAccentBrush}"
+                          Foreground="{DynamicResource AppAccentForegroundBrush}"
+                          FontWeight="Bold"
+                          MinWidth="160"
+                          HorizontalContentAlignment="Center"
+                          VerticalAlignment="Top" />
+
+                  <Border Grid.Column="1"
+                          Background="{DynamicResource SemiColorFill0}"
+                          BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="16"
+                          Padding="12">
+                    <TextBlock Text="{Binding SelectedTomorrowSeatText}"
+                               Classes="helper-text"
+                               VerticalAlignment="Center" />
+                  </Border>
+
+                  <Button Grid.Column="2"
+                          Content="清空"
+                          Command="{Binding ClearTomorrowSeatCommand}"
+                          IsEnabled="{Binding CanEditTomorrowConfiguration}"
+                          Classes="Secondary"
+                          HorizontalContentAlignment="Center"
+                          VerticalAlignment="Top" />
+                </Grid>
+              </StackPanel>
+
+              <StackPanel Spacing="8">
+                <TextBlock Text="执行控制"
+                           FontSize="18"
+                           FontWeight="Bold" />
+                <Grid ColumnDefinitions="180,Auto,Auto,Auto,*"
+                      ColumnSpacing="12">
+                <TextBox Text="{Binding TomorrowScheduledTimeText}"
+                         Watermark="HH:mm:ss"
+                         IsEnabled="{Binding CanEditTomorrowConfiguration}"
+                         VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Content="开始定时预约"
+                        Command="{Binding StartTomorrowReservationCommand}"
+                        IsEnabled="{Binding CanEditTomorrowConfiguration}"
+                        Background="{DynamicResource AppAccentBrush}"
+                        Foreground="{DynamicResource AppAccentForegroundBrush}"
+                        FontWeight="Bold"
+                        MinWidth="132"
+                        HorizontalContentAlignment="Center"
+                        VerticalAlignment="Center" />
+                <Button Grid.Column="2"
+                        Content="立即执行一次"
+                        Command="{Binding RunTomorrowReservationNowCommand}"
+                        IsEnabled="{Binding CanEditTomorrowConfiguration}"
+                        Classes="Secondary"
+                        MinWidth="124"
+                        HorizontalContentAlignment="Center"
+                        VerticalAlignment="Center" />
+                <Button Grid.Column="3"
+                        Content="停止任务"
+                        Command="{Binding StopTomorrowReservationCommand}"
+                        IsEnabled="{Binding IsTomorrowTaskActive}"
+                        Classes="Danger"
+                        MinWidth="112"
+                        HorizontalContentAlignment="Center"
+                        VerticalAlignment="Center" />
+                </Grid>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <Grid Grid.Row="2"
+                RowDefinitions="Auto,*"
+                RowSpacing="16">
+            <Grid ColumnDefinitions="*,*,*"
+                  ColumnSpacing="14">
+              <Border Classes="grab-stat-card Shadow">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="已发请求数"
+                             Classes="grab-stat-title" />
+                  <TextBlock Text="{Binding TomorrowRequestCount}"
+                             Classes="grab-stat-value" />
+                </StackPanel>
+              </Border>
+
+              <Border Grid.Column="1"
+                      Classes="grab-stat-card Shadow">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="最近一次请求"
+                             Classes="grab-stat-title" />
+                  <TextBlock Text="{Binding TomorrowLastRequestText}"
+                             Classes="grab-stat-value"
+                             FontSize="24" />
+                </StackPanel>
+              </Border>
+
+              <Border Grid.Column="2"
+                      Classes="grab-stat-card Shadow">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="验证结果"
+                             Classes="grab-stat-title" />
+                  <TextBlock Text="{Binding TomorrowVerificationText}"
+                             FontSize="16"
+                             FontWeight="SemiBold"
+                             TextWrapping="Wrap"
+                             Foreground="{DynamicResource SemiTextPrimaryBrush}" />
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <Border Grid.Row="1"
+                    Classes="semi-card Shadow"
+                    Padding="20">
+              <Grid RowDefinitions="Auto,*"
+                    RowSpacing="12">
+                <Grid ColumnDefinitions="*,Auto"
+                      ColumnSpacing="12">
+                  <TextBlock Text="明日预约实时日志"
+                             FontSize="18"
+                             FontWeight="Bold" />
+                  <Border Grid.Column="1"
+                          Padding="10,6"
+                          CornerRadius="999"
+                          Background="{DynamicResource SemiColorFill0}"
+                          BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                          BorderThickness="1"
+                          VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TomorrowDashboardStatusText}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{Binding TomorrowDashboardStatusBrush}" />
+                  </Border>
+                </Grid>
+
+                <Border Grid.Row="1"
+                        Background="{DynamicResource SemiColorFill0}"
+                        BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="16">
+                  <ScrollViewer x:Name="TomorrowLogScrollViewer"
+                                HorizontalScrollBarVisibility="Disabled"
+                                VerticalScrollBarVisibility="Auto">
+                    <SelectableTextBlock Text="{Binding TomorrowLogsText}"
+                                         TextWrapping="Wrap"
+                                         Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                         FontFamily="Consolas, Cascadia Mono, Monaco, monospace"
+                                         FontSize="12.5" />
+                  </ScrollViewer>
+                </Border>
+              </Grid>
+            </Border>
+          </Grid>
+        </Grid>
+
+        <!-- Tab 4: Occupy -->
         <Grid RowDefinitions="Auto,Auto,*" RowSpacing="24" Margin="0,0,16,0" Background="Transparent">
           <TextBlock Classes="page-title" Text="占座" Margin="0,0,0,16" />
 
@@ -1295,7 +1492,7 @@
           </Grid>
         </Grid>
 
-        <!-- Tab 4: Notification Settings -->
+        <!-- Tab 5: Notification Settings -->
         <ScrollViewer>
           <StackPanel Spacing="24"
                       Margin="0,0,16,0"
@@ -1628,7 +1825,7 @@
           </StackPanel>
         </ScrollViewer>
 
-        <!-- Tab 5: Settings -->
+        <!-- Tab 6: Settings -->
         <ScrollViewer>
           <StackPanel Spacing="24" Margin="0,0,16,0">
             <TextBlock Classes="page-title" Text="系统设置" />
@@ -1714,6 +1911,18 @@
                         
                         <TextBlock Text="取消当前预约模板" FontSize="13" FontWeight="SemiBold"/>
                         <TextBox Text="{Binding CancelReservationTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="明日预约排队 WebSocket 地址" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding TomorrowReservationQueueUrlTemplateText}" AcceptsReturn="True" MinHeight="56" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="明日预约预热模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding TomorrowReservationWarmUpTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="明日预约保存模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding TomorrowReservationSaveTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="明日预约结果验证模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding TomorrowReservationInfoTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
                      </StackPanel>
                   </ScrollViewer>
 
@@ -1853,6 +2062,120 @@
                 <Button Grid.Column="1"
                         Content="确认完成"
                         Command="{Binding ConfirmGrabSeatSelectionCommand}"
+                        Background="{DynamicResource AppAccentBrush}"
+                        Foreground="{DynamicResource AppAccentForegroundBrush}"
+                        FontWeight="Bold"
+                        HorizontalContentAlignment="Center" />
+              </Grid>
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="1"
+              ZIndex="30"
+              IsVisible="{Binding IsTomorrowSeatSelectionOverlayOpen}"
+              Background="{DynamicResource AppModalOverlayBrush}"
+              PointerPressed="OnTomorrowSeatOverlayPointerPressed">
+        <Grid Margin="28,16,28,28">
+          <Border Classes="semi-card Shadow"
+                  MaxWidth="1180"
+                  MaxHeight="760"
+                  Padding="24"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  PointerPressed="OnTomorrowSeatModalPointerPressed">
+            <Grid RowDefinitions="Auto,Auto,*,Auto"
+                  RowSpacing="18">
+              <Grid ColumnDefinitions="*,Auto"
+                    ColumnSpacing="12">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="选择明日预约座位"
+                             FontSize="22"
+                             FontWeight="Bold" />
+                  <TextBlock Text="{Binding DraftSelectedTomorrowSeatSummaryText}"
+                             Classes="helper-text" />
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Content="关闭 (X)"
+                        Command="{Binding CancelTomorrowSeatSelectionCommand}"
+                        Classes="Secondary"
+                        HorizontalContentAlignment="Center" />
+              </Grid>
+
+              <Grid Grid.Row="1"
+                    ColumnDefinitions="2.1*,Auto,Auto"
+                    ColumnSpacing="12">
+                <TextBox Text="{Binding TomorrowSeatFilterText}"
+                         Watermark="仅按座位号过滤"
+                         VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Content="刷新"
+                        Command="{Binding RefreshTomorrowSeatsCommand}"
+                        Classes="Secondary"
+                        HorizontalContentAlignment="Center" />
+                <Button Grid.Column="2"
+                        Content="清空选择"
+                        Command="{Binding ClearTomorrowSeatCommand}"
+                        Classes="Secondary"
+                        HorizontalContentAlignment="Center" />
+              </Grid>
+
+              <Border Grid.Row="2"
+                      Background="{DynamicResource SemiColorFill0}"
+                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="18"
+                      Padding="16">
+                <Grid>
+                  <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                VerticalScrollBarVisibility="Auto"
+                                IsVisible="{Binding HasTomorrowSeatLayout}">
+                    <ItemsControl ItemsSource="{Binding TomorrowVisibleSeats}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                  </ScrollViewer>
+
+                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
+                          CornerRadius="14"
+                          Padding="24"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          IsVisible="{Binding HasNoTomorrowSeatLayout}">
+                    <TextBlock Text="当前场馆暂无可选择的座位布局，请先刷新或重新绑定场馆"
+                               Classes="helper-text"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center" />
+                  </Border>
+
+                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
+                          CornerRadius="14"
+                          Padding="24"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          IsVisible="{Binding ShowTomorrowSeatFilterEmptyState}">
+                    <TextBlock Text="当前筛选条件下没有可显示的座位"
+                               Classes="helper-text"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center" />
+                  </Border>
+                </Grid>
+              </Border>
+
+              <Grid Grid.Row="3"
+                    ColumnDefinitions="*,Auto"
+                    ColumnSpacing="12">
+                <TextBlock Text="明日预约首版只支持一个目标座位；只有点击“确认完成”才会同步本次选择"
+                           Classes="helper-text"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Content="确认完成"
+                        Command="{Binding ConfirmTomorrowSeatSelectionCommand}"
                         Background="{DynamicResource AppAccentBrush}"
                         Foreground="{DynamicResource AppAccentForegroundBrush}"
                         FontWeight="Bold"

@@ -142,6 +142,20 @@ public sealed partial class OccupyPageViewModel(
     }
 }
 
+public sealed partial class TomorrowReservationPageViewModel(
+    ITomorrowReservationCoordinator tomorrowReservationCoordinator) : ViewModelBase
+{
+    public Task StartAsync(TomorrowReservationPlan plan, CancellationToken cancellationToken = default)
+    {
+        return tomorrowReservationCoordinator.StartAsync(plan, cancellationToken);
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        return tomorrowReservationCoordinator.StopAsync(cancellationToken);
+    }
+}
+
 public sealed partial class NotificationSettingsViewModel(
     ISettingsWorkflowService settingsWorkflowService,
     INotificationTestService notificationTestService) : ViewModelBase

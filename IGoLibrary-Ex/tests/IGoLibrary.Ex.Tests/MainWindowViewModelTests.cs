@@ -57,7 +57,7 @@ public sealed class MainWindowViewModelTests
 
         var titles = viewModel.SidebarItems.Select(item => item.Title).ToArray();
 
-        Assert.Equal(["首页", "账户与场馆", "抢座", "占座", "通知设置", "系统设置"], titles);
+        Assert.Equal(["首页", "账户与场馆", "抢座", "明日预约", "占座", "通知设置", "系统设置"], titles);
     }
 
     [Fact]
@@ -777,6 +777,242 @@ public sealed class MainWindowViewModelTests
         Assert.Contains(notifications.Successes, x => x.Title == "已取消预约");
     }
 
+    [Fact]
+    public async Task TomorrowSeatSelection_IsSingleChoice_AndDoesNotMutateGrabSelection()
+    {
+        var (viewModel, _) = await CreateBoundTomorrowViewModelAsync();
+
+        viewModel.VisibleSeats[0].IsSelected = true;
+        await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
+        viewModel.TomorrowVisibleSeats[1].IsSelected = true;
+
+        Assert.True(viewModel.IsTomorrowSeatSelectionOverlayOpen);
+        Assert.Equal(3, viewModel.TomorrowVisibleSeats.Count);
+        Assert.Contains(viewModel.TomorrowVisibleSeats, seat => seat.SeatKey == "seat-2" && seat.IsOccupied);
+        Assert.Single(viewModel.SelectedSeats);
+        Assert.Equal("seat-1", viewModel.SelectedSeats[0].SeatKey);
+        Assert.True(viewModel.VisibleSeats[0].IsSelected);
+        Assert.Null(viewModel.SelectedTomorrowSeat);
+        Assert.Equal("本次已选择 2", viewModel.DraftSelectedTomorrowSeatSummaryText);
+
+        viewModel.TomorrowVisibleSeats[2].IsSelected = true;
+
+        Assert.Null(viewModel.SelectedTomorrowSeat);
+        Assert.Equal("本次已选择 3", viewModel.DraftSelectedTomorrowSeatSummaryText);
+        Assert.False(viewModel.TomorrowVisibleSeats[1].IsSelected);
+        Assert.True(viewModel.TomorrowVisibleSeats[2].IsSelected);
+        Assert.Single(viewModel.SelectedSeats);
+        Assert.Equal("seat-1", viewModel.SelectedSeats[0].SeatKey);
+
+        viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
+
+        Assert.False(viewModel.IsTomorrowSeatSelectionOverlayOpen);
+        Assert.Equal("seat-3", viewModel.SelectedTomorrowSeat?.SeatKey);
+    }
+
+    [Fact]
+    public async Task CancelTomorrowSeatSelection_RestoresPreviouslySelectedSeat()
+    {
+        var (viewModel, _) = await CreateBoundTomorrowViewModelAsync();
+        await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
+        viewModel.TomorrowVisibleSeats[0].IsSelected = true;
+        viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
+
+        await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
+        viewModel.TomorrowVisibleSeats[2].IsSelected = true;
+        viewModel.CancelTomorrowSeatSelectionCommand.Execute(null);
+
+        Assert.False(viewModel.IsTomorrowSeatSelectionOverlayOpen);
+        Assert.Equal("seat-1", viewModel.SelectedTomorrowSeat?.SeatKey);
+        Assert.True(viewModel.TomorrowVisibleSeats[0].IsSelected);
+        Assert.False(viewModel.TomorrowVisibleSeats[2].IsSelected);
+    }
+
+    [Fact]
+    public async Task RunTomorrowReservationNowAsync_BuildsImmediateSingleSeatPlan()
+    {
+        var (viewModel, coordinator) = await CreateBoundTomorrowViewModelAsync();
+        await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
+        viewModel.TomorrowVisibleSeats[1].IsSelected = true;
+        viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
+        viewModel.TomorrowScheduledTimeText = "21:48:00";
+
+        await viewModel.RunTomorrowReservationNowCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<TomorrowReservationPlan>(coordinator.LastPlan);
+        Assert.Equal(117580, plan.LibraryId);
+        Assert.Equal("自科阅览区一", plan.LibraryName);
+        Assert.Equal(new SeatReference("seat-2", "2"), plan.Seat);
+        Assert.Equal(new TimeOnly(21, 48, 0), plan.ScheduledStart);
+        Assert.True(plan.ExecuteImmediately);
+    }
+
+    [Fact]
+    public async Task StartTomorrowReservationAsync_BuildsScheduledSingleSeatPlan()
+    {
+        var (viewModel, coordinator) = await CreateBoundTomorrowViewModelAsync();
+        await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
+        viewModel.TomorrowVisibleSeats[0].IsSelected = true;
+        viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
+        viewModel.TomorrowScheduledTimeText = "22:01:02";
+
+        await viewModel.StartTomorrowReservationCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<TomorrowReservationPlan>(coordinator.LastPlan);
+        Assert.Equal(new SeatReference("seat-1", "1"), plan.Seat);
+        Assert.Equal(new TimeOnly(22, 1, 2), plan.ScheduledStart);
+        Assert.False(plan.ExecuteImmediately);
+    }
+
+    [Fact]
+    public async Task RunTomorrowReservationNowAsync_UsesLockedLibrary_WhenSelectedLibraryDrifts()
+    {
+        var (viewModel, coordinator) = await CreateBoundTomorrowViewModelAsync();
+        await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
+        viewModel.TomorrowVisibleSeats[0].IsSelected = true;
+        viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
+        viewModel.SelectedLibrary = new LibrarySummary(999001, "临时预览场馆", "1层", true, 10, 1, 0);
+
+        await viewModel.RunTomorrowReservationNowCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<TomorrowReservationPlan>(coordinator.LastPlan);
+        Assert.Equal(117580, plan.LibraryId);
+        Assert.Equal("自科阅览区一", plan.LibraryName);
+        Assert.Equal(new SeatReference("seat-1", "1"), plan.Seat);
+    }
+
+    [Fact]
+    public async Task RunTomorrowReservationNowAsync_Blocks_WhenVenuePreviewIsActive()
+    {
+        var notifications = new FakeNotificationService();
+        var (viewModel, coordinator) = await CreateBoundTomorrowViewModelAsync(notificationService: notifications);
+        await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
+        viewModel.TomorrowVisibleSeats[0].IsSelected = true;
+        viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
+        viewModel.HasActiveVenuePreview = true;
+
+        await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
+        await viewModel.RunTomorrowReservationNowCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.CanEditTomorrowConfiguration);
+        Assert.Null(coordinator.LastPlan);
+        Assert.Contains(notifications.Warnings, warning => warning.Message == "请先锁定当前预览场馆后再进行明日预约");
+    }
+
+    [Fact]
+    public async Task RunTomorrowReservationNowAsync_ClearsSeat_WhenSelectedSeatIsNotInLockedLayout()
+    {
+        var notifications = new FakeNotificationService();
+        var (viewModel, coordinator) = await CreateBoundTomorrowViewModelAsync(notificationService: notifications);
+        viewModel.SelectedTomorrowSeat = new SeatReference("missing-seat", "不存在的座位");
+
+        await viewModel.RunTomorrowReservationNowCommand.ExecuteAsync(null);
+
+        Assert.Null(coordinator.LastPlan);
+        Assert.Null(viewModel.SelectedTomorrowSeat);
+        Assert.Contains(notifications.Warnings, warning => warning.Message == "请重新选择明日预约目标座位");
+    }
+
+    [Fact]
+    public async Task RunTomorrowReservationNowAsync_RefreshesVerificationText_WhenNewTaskStarts()
+    {
+        var (viewModel, _) = await CreateBoundTomorrowViewModelAsync();
+        await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
+        viewModel.TomorrowVisibleSeats[0].IsSelected = true;
+        viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
+        viewModel.TomorrowVerificationText = "上一次明日预约成功";
+
+        await viewModel.RunTomorrowReservationNowCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.NotEqual("上一次明日预约成功", viewModel.TomorrowVerificationText);
+        Assert.Equal("明日预约任务已启动，等待结果", viewModel.TomorrowVerificationText);
+    }
+
+    [Fact]
+    public async Task StopTomorrowReservationAsync_StopsCoordinator()
+    {
+        var (viewModel, coordinator) = await CreateBoundTomorrowViewModelAsync();
+
+        await viewModel.StopTomorrowReservationCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, coordinator.StopCalls);
+    }
+
+    [Fact]
+    public async Task TomorrowReservationSuccessMetrics_UseStatusReason_NotMessageText()
+    {
+        var settingsService = new FakeSettingsService(WithDashboard(0, 0));
+        var tomorrowCoordinator = new FakeTomorrowReservationCoordinator();
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            tomorrowReservationCoordinator: tomorrowCoordinator);
+        await viewModel.InitializeAsync();
+
+        tomorrowCoordinator.EmitStatus(new CoordinatorStatus(
+            CoordinatorTaskState.Completed,
+            "明日预约",
+            "预约流程完成",
+            DateTimeOffset.Now,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.TomorrowReservationSucceeded));
+        Dispatcher.UIThread.RunJobs();
+        await WaitForAsync(() => settingsService.SaveCalls > 0);
+
+        Assert.Equal(1, viewModel.HomeHistoricalSuccessCount);
+        Assert.Equal(1, settingsService.CurrentSettings.Dashboard.SuccessfulReservationCount);
+    }
+
+    [Fact]
+    public async Task TomorrowReservationRunningStatus_UpdatesVerificationText()
+    {
+        var tomorrowCoordinator = new FakeTomorrowReservationCoordinator();
+        var viewModel = CreateViewModel(tomorrowReservationCoordinator: tomorrowCoordinator);
+        await viewModel.InitializeAsync();
+
+        tomorrowCoordinator.EmitStatus(new CoordinatorStatus(
+            CoordinatorTaskState.Running,
+            "明日预约",
+            "正在提交明日预约",
+            DateTimeOffset.Now,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Running));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("正在提交明日预约", viewModel.TomorrowVerificationText);
+    }
+
+    [Fact]
+    public async Task SaveProtocolOverridesAsync_IncludesTomorrowReservationTemplates()
+    {
+        var protocolTemplateStore = new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates(
+            "cookie-default",
+            "libraries-default",
+            "layout-default",
+            "rule-default",
+            "reservation-default",
+            "reserve-default",
+            "cancel-default",
+            "queue-default",
+            "warm-default",
+            "save-default",
+            "info-default"));
+        var viewModel = CreateViewModel(protocolTemplateStore: protocolTemplateStore);
+        viewModel.TomorrowReservationQueueUrlTemplateText = "queue-override";
+        viewModel.TomorrowReservationWarmUpTemplateText = "warm-override";
+        viewModel.TomorrowReservationSaveTemplateText = "save-override";
+        viewModel.TomorrowReservationInfoTemplateText = "info-override";
+
+        await viewModel.SaveProtocolOverridesCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, protocolTemplateStore.SaveCalls);
+        Assert.NotNull(protocolTemplateStore.LastOverrides);
+        Assert.Equal("queue-override", protocolTemplateStore.LastOverrides.TomorrowReservationQueueUrlTemplate);
+        Assert.Equal("warm-override", protocolTemplateStore.LastOverrides.TomorrowReservationWarmUpTemplate);
+        Assert.Equal("save-override", protocolTemplateStore.LastOverrides.TomorrowReservationSaveTemplate);
+        Assert.Equal("info-override", protocolTemplateStore.LastOverrides.TomorrowReservationInfoTemplate);
+    }
+
     private static MainWindowViewModel CreateViewModel(
         FakeSessionService? sessionService = null,
         FakeLibraryService? libraryService = null,
@@ -784,11 +1020,13 @@ public sealed class MainWindowViewModelTests
         FakeTraceIntApiClient? apiClient = null,
         FakeGrabSeatCoordinator? grabSeatCoordinator = null,
         FakeOccupySeatCoordinator? occupySeatCoordinator = null,
+        FakeTomorrowReservationCoordinator? tomorrowReservationCoordinator = null,
         FakeNotificationService? notificationService = null,
         FakeTaskEventAlertDispatcher? taskAlertService = null,
         FakeErrorDialogService? errorDialogService = null,
         FakeAppThemeService? appThemeService = null,
-        ActivityLogService? activityLogService = null)
+        ActivityLogService? activityLogService = null,
+        FakeProtocolTemplateStore? protocolTemplateStore = null)
     {
         sessionService ??= new FakeSessionService();
         libraryService ??= new FakeLibraryService();
@@ -796,6 +1034,7 @@ public sealed class MainWindowViewModelTests
         apiClient ??= new FakeTraceIntApiClient();
         grabSeatCoordinator ??= new FakeGrabSeatCoordinator();
         occupySeatCoordinator ??= new FakeOccupySeatCoordinator();
+        tomorrowReservationCoordinator ??= new FakeTomorrowReservationCoordinator();
         taskAlertService ??= new FakeTaskEventAlertDispatcher();
         activityLogService ??= new ActivityLogService();
 
@@ -804,15 +1043,57 @@ public sealed class MainWindowViewModelTests
             new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
             new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),
             new SettingsWorkflowService(settingsService),
-            new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates("", "", "", "", "", "", ""))),
+            new ProtocolTemplateEditorService(protocolTemplateStore ?? new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates("", "", "", "", "", "", ""))),
             taskAlertService,
             grabSeatCoordinator,
             occupySeatCoordinator,
+            tomorrowReservationCoordinator,
             activityLogService,
             notificationService ?? new FakeNotificationService(),
             errorDialogService ?? new FakeErrorDialogService(),
             appThemeService ?? new FakeAppThemeService(),
             new AppWindowService());
+    }
+
+    private static async Task<(MainWindowViewModel ViewModel, FakeTomorrowReservationCoordinator Coordinator)>
+        CreateBoundTomorrowViewModelAsync(
+            FakeTomorrowReservationCoordinator? coordinator = null,
+            FakeNotificationService? notificationService = null)
+    {
+        var library = new LibrarySummary(117580, "自科阅览区一", "3层", true, 120, 20, 10);
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var libraryService = new FakeLibraryService
+        {
+            LibrariesToLoad = [library]
+        };
+        libraryService.LayoutsByLibraryId[library.LibraryId] = new LibraryLayout(
+            library.LibraryId,
+            library.Name,
+            library.Floor,
+            library.IsOpen,
+            120,
+            10,
+            20,
+            [
+                new SeatSnapshot("seat-1", "1", false, 0, 0),
+                new SeatSnapshot("seat-2", "2", true, 1, 0),
+                new SeatSnapshot("seat-3", "3", false, 2, 0)
+            ]);
+        coordinator ??= new FakeTomorrowReservationCoordinator();
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            libraryService: libraryService,
+            tomorrowReservationCoordinator: coordinator,
+            notificationService: notificationService);
+
+        viewModel.IsAuthorized = true;
+        viewModel.SelectedLibrary = library;
+        await viewModel.BindSelectedLibraryCommand.ExecuteAsync(null);
+
+        return (viewModel, coordinator);
     }
 
     private static AppSettings WithVenue(int? libraryId, string? libraryName)

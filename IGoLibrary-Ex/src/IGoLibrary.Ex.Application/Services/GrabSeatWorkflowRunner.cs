@@ -127,12 +127,14 @@ internal sealed class GrabSeatWorkflowRunner(
     private async Task WaitUntilScheduledStartAsync(TimeOnly scheduledStart, CancellationToken cancellationToken)
     {
         var targetStart = GrabSeatStateMachine.ResolveNextScheduledStart(scheduledStart, runtime.Now);
-        while (!cancellationToken.IsCancellationRequested)
+        while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var now = runtime.Now;
             var remaining = targetStart - now;
             if (remaining <= TimeSpan.Zero)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 return;
             }
 
@@ -141,6 +143,7 @@ internal sealed class GrabSeatWorkflowRunner(
                 "Grab",
                 $"定时抢座等待中，目标启动时间 {targetStart:yyyy-MM-dd HH:mm:ss}，还剩 {remaining:hh\\:mm\\:ss}。");
             await runtime.DelayAsync(remaining < TimeSpan.FromSeconds(1) ? remaining : TimeSpan.FromSeconds(1), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
         }
     }
 

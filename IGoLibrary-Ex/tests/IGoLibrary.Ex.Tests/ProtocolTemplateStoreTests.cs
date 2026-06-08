@@ -41,6 +41,57 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveOverridesAsync_MergesTomorrowReservationOverridesWithDefaults()
+    {
+        var store = await CreateStoreAsync(AppSettings.Default with
+        {
+            TraceIntProtocol = new TraceIntProtocolSettings(true)
+        });
+        var defaults = await store.GetEffectiveTemplatesAsync();
+
+        await store.SaveOverridesAsync(new TraceIntGraphQlTemplateOverrides(
+            TomorrowReservationQueueUrlTemplate: "wss://override.example.com/ws?ns=prereserve/queue",
+            TomorrowReservationWarmUpTemplate: "override-warm-up",
+            TomorrowReservationSaveTemplate: "override-save",
+            TomorrowReservationInfoTemplate: "override-info"));
+
+        var effective = await store.GetEffectiveTemplatesAsync();
+
+        Assert.Equal("wss://override.example.com/ws?ns=prereserve/queue", effective.TomorrowReservationQueueUrlTemplate);
+        Assert.Equal("override-warm-up", effective.TomorrowReservationWarmUpTemplate);
+        Assert.Equal("override-save", effective.TomorrowReservationSaveTemplate);
+        Assert.Equal("override-info", effective.TomorrowReservationInfoTemplate);
+        Assert.Equal(defaults.QueryLibrariesTemplate, effective.QueryLibrariesTemplate);
+        Assert.Equal(defaults.ReserveSeatTemplate, effective.ReserveSeatTemplate);
+    }
+
+    [Fact]
+    public async Task GetEffectiveTemplatesAsync_UsesDefaultsForTomorrowFields_WhenSavedJsonIsFromOldVersion()
+    {
+        var store = await CreateStoreAsync(AppSettings.Default with
+        {
+            TraceIntProtocol = new TraceIntProtocolSettings(true)
+        });
+        var defaults = await store.GetEffectiveTemplatesAsync();
+
+        await SaveRawOverridesJsonAsync("""
+            {
+              "queryLibrariesTemplate": "legacy-libraries",
+              "reserveSeatTemplate": "legacy-reserve"
+            }
+            """);
+
+        var effective = await store.GetEffectiveTemplatesAsync();
+
+        Assert.Equal("legacy-libraries", effective.QueryLibrariesTemplate);
+        Assert.Equal("legacy-reserve", effective.ReserveSeatTemplate);
+        Assert.Equal(defaults.TomorrowReservationQueueUrlTemplate, effective.TomorrowReservationQueueUrlTemplate);
+        Assert.Equal(defaults.TomorrowReservationWarmUpTemplate, effective.TomorrowReservationWarmUpTemplate);
+        Assert.Equal(defaults.TomorrowReservationSaveTemplate, effective.TomorrowReservationSaveTemplate);
+        Assert.Equal(defaults.TomorrowReservationInfoTemplate, effective.TomorrowReservationInfoTemplate);
+    }
+
+    [Fact]
     public async Task ResetOverridesAsync_RestoresDefaults()
     {
         var store = await CreateStoreAsync(AppSettings.Default with
@@ -107,5 +158,23 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
         await initializer.InitializeAsync();
         var settingsService = new FakeSettingsService(settings ?? AppSettings.Default);
         return new DefaultProtocolTemplateStore(connectionFactory, settingsService);
+    }
+
+    private static async Task SaveRawOverridesJsonAsync(string json)
+    {
+        var connectionFactory = new SqliteConnectionFactory();
+        await using var connection = connectionFactory.Create();
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO ProtocolOverrides(Key, Value)
+            VALUES($key, $value)
+            ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value;
+            """;
+        command.Parameters.AddWithValue("$key", "protocol-overrides");
+        command.Parameters.AddWithValue("$value", json);
+        await command.ExecuteNonQueryAsync();
     }
 }

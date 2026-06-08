@@ -194,6 +194,45 @@ internal static class TraceIntGraphQlResponseMapper
         return false;
     }
 
+    public static void MapTomorrowReservationWarmUp(string raw)
+    {
+        using var document = JsonDocument.Parse(raw);
+
+        ThrowIfGraphQlError(document.RootElement);
+    }
+
+    public static bool MapTomorrowReservationSave(string raw)
+    {
+        using var document = JsonDocument.Parse(raw);
+
+        ThrowIfGraphQlError(document.RootElement);
+        return true;
+    }
+
+    public static TomorrowReservationInfo? MapTomorrowReservationInfo(string raw)
+    {
+        using var document = JsonDocument.Parse(raw);
+
+        ThrowIfGraphQlError(document.RootElement);
+        var prereserveNode = document.RootElement
+            .GetProperty("data")
+            .GetProperty("userAuth")
+            .GetProperty("prereserve");
+
+        if (!prereserveNode.TryGetProperty("prereserve", out var reservation) ||
+            reservation.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return new TomorrowReservationInfo(
+            ReadOptionalStringProperty(reservation, "day"),
+            ReadOptionalIntProperty(reservation, "lib_id"),
+            ReadOptionalStringProperty(reservation, "seat_key"),
+            ReadOptionalStringProperty(reservation, "seat_name"),
+            TryReadBooleanLikeProperty(reservation, "is_used", out var isUsed) && isUsed);
+    }
+
     private static void ThrowIfGraphQlError(JsonElement root)
     {
         if (TryGetAuthorizationDeniedError(root, out var authError))
@@ -207,7 +246,11 @@ internal static class TraceIntGraphQlResponseMapper
 
         if (TryFindErrorInfo(root, out var errorInfo))
         {
-            throw new TraceIntApiException(errorInfo.Message, errorInfo.Code, errorInfo.Message);
+            throw new TraceIntApiException(
+                errorInfo.Message,
+                errorInfo.Code,
+                errorInfo.Message,
+                isAuthorizationDenied: IsAccessDeniedMessage(errorInfo.Message));
         }
     }
 
@@ -277,11 +320,19 @@ internal static class TraceIntGraphQlResponseMapper
     private static bool TryReadErrorInfo(JsonElement element, out GraphQlErrorInfo errorInfo)
     {
         errorInfo = default;
-        if (element.ValueKind is not JsonValueKind.Object ||
-            !element.TryGetProperty("msg", out var messageElement) ||
-            messageElement.ValueKind is not JsonValueKind.String)
+        if (element.ValueKind is not JsonValueKind.Object)
         {
             return false;
+        }
+
+        if (!element.TryGetProperty("message", out var messageElement) ||
+            messageElement.ValueKind is not JsonValueKind.String)
+        {
+            if (!element.TryGetProperty("msg", out messageElement) ||
+                messageElement.ValueKind is not JsonValueKind.String)
+            {
+                return false;
+            }
         }
 
         var message = messageElement.GetString();

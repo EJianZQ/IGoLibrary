@@ -361,3 +361,50 @@ internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
 
     public CoordinatorStatus GetStatus() => _status;
 }
+
+internal sealed class FakeTomorrowReservationCoordinator : ITomorrowReservationCoordinator
+{
+    private CoordinatorStatus _status = CoordinatorStatus.Idle("明日预约");
+
+    public event EventHandler<CoordinatorStatus>? StatusChanged;
+
+    public TomorrowReservationPlan? LastPlan { get; private set; }
+
+    public int StopCalls { get; private set; }
+
+    public Task StartAsync(TomorrowReservationPlan plan, CancellationToken cancellationToken = default)
+    {
+        LastPlan = plan;
+        _status = new CoordinatorStatus(
+            CoordinatorTaskState.Running,
+            "明日预约",
+            "测试中的明日预约任务",
+            DateTimeOffset.Now,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Running);
+        StatusChanged?.Invoke(this, _status);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        StopCalls++;
+        _status = new CoordinatorStatus(
+            CoordinatorTaskState.Completed,
+            "明日预约",
+            "测试中的明日预约任务已停止",
+            _status.StartedAt,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Stopped);
+        StatusChanged?.Invoke(this, _status);
+        return Task.CompletedTask;
+    }
+
+    public void EmitStatus(CoordinatorStatus status)
+    {
+        _status = status;
+        StatusChanged?.Invoke(this, _status);
+    }
+
+    public CoordinatorStatus GetStatus() => _status;
+}

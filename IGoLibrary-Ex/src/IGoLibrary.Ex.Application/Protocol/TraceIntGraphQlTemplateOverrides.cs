@@ -7,7 +7,11 @@ public sealed record TraceIntGraphQlTemplateOverrides(
     string? QueryLibraryRuleTemplate = null,
     string? QueryReservationInfoTemplate = null,
     string? ReserveSeatTemplate = null,
-    string? CancelReservationTemplate = null)
+    string? CancelReservationTemplate = null,
+    string? TomorrowReservationQueueUrlTemplate = null,
+    string? TomorrowReservationWarmUpTemplate = null,
+    string? TomorrowReservationSaveTemplate = null,
+    string? TomorrowReservationInfoTemplate = null)
 {
     public bool HasAnyValue =>
         !string.IsNullOrWhiteSpace(GetCookieUrlTemplate) ||
@@ -16,5 +20,9 @@ public sealed record TraceIntGraphQlTemplateOverrides(
         !string.IsNullOrWhiteSpace(QueryLibraryRuleTemplate) ||
         !string.IsNullOrWhiteSpace(QueryReservationInfoTemplate) ||
         !string.IsNullOrWhiteSpace(ReserveSeatTemplate) ||
-        !string.IsNullOrWhiteSpace(CancelReservationTemplate);
+        !string.IsNullOrWhiteSpace(CancelReservationTemplate) ||
+        !string.IsNullOrWhiteSpace(TomorrowReservationQueueUrlTemplate) ||
+        !string.IsNullOrWhiteSpace(TomorrowReservationWarmUpTemplate) ||
+        !string.IsNullOrWhiteSpace(TomorrowReservationSaveTemplate) ||
+        !string.IsNullOrWhiteSpace(TomorrowReservationInfoTemplate);
 }

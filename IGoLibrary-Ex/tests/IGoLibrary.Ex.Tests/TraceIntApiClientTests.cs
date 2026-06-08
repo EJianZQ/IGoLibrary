@@ -259,6 +259,138 @@ public sealed class TraceIntApiClientTests
     }
 
     [Fact]
+    public async Task SaveTomorrowReservationAsync_AppendsDotToSeatKey_AndUsesTomorrowProfile()
+    {
+        var handler = new SequenceHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            var payload = await request.Content!.ReadAsStringAsync(cancellationToken);
+
+            Assert.Contains("\"key\":\"seat-1.\"", payload);
+            Assert.Contains("\"libid\":117580", payload);
+            Assert.Equal("https://web.traceint.com/", request.Headers.Referrer?.ToString());
+            Assert.True(request.Headers.TryGetValues("Origin", out var origins));
+            Assert.Equal("https://web.traceint.com", Assert.Single(origins));
+            Assert.True(request.Headers.TryGetValues("app-version", out var appVersions));
+            Assert.Contains("2.2.5", appVersions);
+
+            return await SequenceHttpMessageHandler.JsonResponseAsync("""{"data":{"userAuth":{"prereserve":{"save":false}}}}""");
+        });
+        var client = CreateClient(handler);
+
+        var saved = await client.SaveTomorrowReservationAsync("Authorization=a; SERVERID=b", 117580, "seat-1");
+
+        Assert.True(saved);
+        Assert.Equal(1, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task WarmUpTomorrowReservationAsync_ReplacesLibraryPlaceholder()
+    {
+        var handler = new SequenceHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            var payload = await request.Content!.ReadAsStringAsync(cancellationToken);
+
+            Assert.Contains("\"libId\":117580", payload);
+
+            return await SequenceHttpMessageHandler.JsonResponseAsync("""{"data":{"userAuth":{"prereserve":{"libLayout":null}}}}""");
+        });
+        var client = CreateClient(handler);
+
+        await client.WarmUpTomorrowReservationAsync("Authorization=a; SERVERID=b", 117580);
+
+        Assert.Equal(1, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task SaveTomorrowReservationAsync_MapsMessageError_FromGraphQlErrors()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            (_, _) => SequenceHttpMessageHandler.JsonResponseAsync("""
+                {
+                  "errors": [
+                    {
+                      "message": "这一天不开放",
+                      "code": "50012"
+                    }
+                  ],
+                  "data": {
+                    "userAuth": {
+                      "prereserve": null
+                    }
+                  }
+                }
+                """));
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<TraceIntApiException>(
+            () => client.SaveTomorrowReservationAsync("Authorization=a; SERVERID=b", 117580, "seat-1"));
+
+        Assert.Equal(50012, exception.ErrorCode);
+        Assert.Equal("这一天不开放", exception.RemoteMessage);
+        Assert.False(exception.IsAuthorizationDenied);
+    }
+
+    [Fact]
+    public async Task SaveTomorrowReservationAsync_MapsAccessDeniedAsAuthorizationFailure()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            (_, _) => SequenceHttpMessageHandler.JsonResponseAsync("""
+                {
+                  "errors": [
+                    {
+                      "message": "access denied!"
+                    }
+                  ],
+                  "data": {
+                    "userAuth": {
+                      "prereserve": null
+                    }
+                  }
+                }
+                """));
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<TraceIntApiException>(
+            () => client.SaveTomorrowReservationAsync("Authorization=a; SERVERID=b", 117580, "seat-1"));
+
+        Assert.Equal("access denied!", exception.RemoteMessage);
+        Assert.True(exception.IsAuthorizationDenied);
+    }
+
+    [Fact]
+    public async Task GetTomorrowReservationInfoAsync_ParsesVerificationRecord()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            (_, _) => SequenceHttpMessageHandler.JsonResponseAsync("""
+                {
+                  "data": {
+                    "userAuth": {
+                      "prereserve": {
+                        "prereserve": {
+                          "day": "2026-06-09",
+                          "lib_id": 117580,
+                          "seat_key": "seat-1.",
+                          "seat_name": "1",
+                          "is_used": true
+                        }
+                      }
+                    }
+                  }
+                }
+                """));
+        var client = CreateClient(handler);
+
+        var info = await client.GetTomorrowReservationInfoAsync("Authorization=a; SERVERID=b");
+
+        Assert.NotNull(info);
+        Assert.Equal("2026-06-09", info.Day);
+        Assert.Equal(117580, info.LibraryId);
+        Assert.Equal("seat-1.", info.SeatKey);
+        Assert.Equal("1", info.SeatName);
+        Assert.True(info.IsUsed);
+    }
+
+    [Fact]
     public void BuildCookieHeaderFromResponseCookies_MatchesWinformOrdering()
     {
         var cookies = TraceIntApiClient.BuildCookieHeaderFromResponseCookies(
@@ -349,7 +481,8 @@ public sealed class TraceIntApiClientTests
         return new TraceIntApiClient(
             cookieTransport,
             protocolTemplateStore,
-            graphQlTransport);
+            graphQlTransport,
+            new TraceIntTomorrowReservationQueueTransport());
     }
 
     private static TraceIntGraphQlTemplates CreateTemplates()
@@ -361,7 +494,11 @@ public sealed class TraceIntApiClientTests
             "{\"query\":\"rule\"}",
             "{\"query\":\"reservation\"}",
             "{\"query\":\"reserve\"}",
-            "{\"query\":\"cancel\"}");
+            "{\"query\":\"cancel\"}",
+            "wss://wechat.v2.traceint.com/ws?ns=prereserve/queue",
+            "{\"query\":\"warm\",\"variables\":{\"libId\":ReplaceMeByLibID}}",
+            "{\"query\":\"save\",\"variables\":{\"key\":\"ReplaceMeBySeatKey\",\"libid\":ReplaceMeByLibID}}",
+            "{\"query\":\"info\"}");
     }
 
     private static TraceIntCookieHttpResponse CookieResponse(

@@ -107,6 +107,11 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.Post(() => GrabLogScrollViewer?.ScrollToEnd(), DispatcherPriority.Background);
         }
 
+        if (e.PropertyName == nameof(MainWindowViewModel.TomorrowLogsText))
+        {
+            Dispatcher.UIThread.Post(() => TomorrowLogScrollViewer?.ScrollToEnd(), DispatcherPriority.Background);
+        }
+
         if (!IsActive)
         {
             return;
@@ -158,6 +163,22 @@ public partial class MainWindow : Window
     }
 
     private static void OnGrabSeatModalPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        e.Handled = true;
+    }
+
+    private void OnTomorrowSeatOverlayPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        viewModel.CancelTomorrowSeatSelectionCommand.Execute(null);
+    }
+
+    private static void OnTomorrowSeatModalPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         e.Handled = true;
     }

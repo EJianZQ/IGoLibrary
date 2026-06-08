@@ -28,7 +28,11 @@ public sealed class DefaultProtocolTemplateStore(
             overrides.QueryLibraryRuleTemplate ?? defaults.QueryLibraryRuleTemplate,
             overrides.QueryReservationInfoTemplate ?? defaults.QueryReservationInfoTemplate,
             overrides.ReserveSeatTemplate ?? defaults.ReserveSeatTemplate,
-            overrides.CancelReservationTemplate ?? defaults.CancelReservationTemplate);
+            overrides.CancelReservationTemplate ?? defaults.CancelReservationTemplate,
+            overrides.TomorrowReservationQueueUrlTemplate ?? defaults.TomorrowReservationQueueUrlTemplate,
+            overrides.TomorrowReservationWarmUpTemplate ?? defaults.TomorrowReservationWarmUpTemplate,
+            overrides.TomorrowReservationSaveTemplate ?? defaults.TomorrowReservationSaveTemplate,
+            overrides.TomorrowReservationInfoTemplate ?? defaults.TomorrowReservationInfoTemplate);
     }
 
     public async Task SaveOverridesAsync(TraceIntGraphQlTemplateOverrides overrides, CancellationToken cancellationToken = default)

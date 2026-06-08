@@ -8,5 +8,11 @@ public interface ITaskEventAlertDispatcher
 
     Task NotifyOccupyReReserveSucceededAsync(string seatName, CancellationToken cancellationToken = default);
 
+    Task NotifyTomorrowReservationSucceededAsync(
+        string libraryName,
+        string seatName,
+        string? day,
+        CancellationToken cancellationToken = default);
+
     Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default);
 }

@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddSingleton<TraceIntRequestPolicy>();
         services.AddSingleton<ITraceIntCookieHttpClient, RestSharpTraceIntCookieHttpClient>();
         services.AddSingleton<TraceIntCookieTransport>();
+        services.AddSingleton<TraceIntTomorrowReservationQueueTransport>();
         services.AddHttpClient<TraceIntGraphQlTransport>(client =>
             {
                 client.Timeout = Timeout.InfiniteTimeSpan;

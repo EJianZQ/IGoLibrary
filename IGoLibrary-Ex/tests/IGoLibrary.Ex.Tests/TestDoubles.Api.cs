@@ -20,6 +20,10 @@ internal sealed class FakeTraceIntApiClient : ITraceIntApiClient
     public Func<string, CancellationToken, Task<ReservationInfo?>>? OnGetReservationInfoAsync { get; set; }
     public Func<string, int, string, CancellationToken, Task<bool>>? OnReserveSeatAsync { get; set; }
     public Func<string, string, CancellationToken, Task<bool>>? OnCancelReservationAsync { get; set; }
+    public Func<string, CancellationToken, Task<TomorrowReservationQueueResult>>? OnEnterTomorrowReservationQueueAsync { get; set; }
+    public Func<string, int, CancellationToken, Task>? OnWarmUpTomorrowReservationAsync { get; set; }
+    public Func<string, int, string, CancellationToken, Task<bool>>? OnSaveTomorrowReservationAsync { get; set; }
+    public Func<string, CancellationToken, Task<TomorrowReservationInfo?>>? OnGetTomorrowReservationInfoAsync { get; set; }
 
     public Task<string> GetCookieFromCodeAsync(string code, CancellationToken cancellationToken = default)
         => OnGetCookieFromCodeAsync?.Invoke(code, cancellationToken) ?? Task.FromResult(string.Empty);
@@ -46,6 +50,19 @@ internal sealed class FakeTraceIntApiClient : ITraceIntApiClient
 
     public Task<bool> CancelReservationAsync(string cookie, string reservationToken, CancellationToken cancellationToken = default)
         => OnCancelReservationAsync?.Invoke(cookie, reservationToken, cancellationToken) ?? Task.FromResult(false);
+
+    public Task<TomorrowReservationQueueResult> EnterTomorrowReservationQueueAsync(string cookie, CancellationToken cancellationToken = default)
+        => OnEnterTomorrowReservationQueueAsync?.Invoke(cookie, cancellationToken) ??
+           Task.FromResult(TomorrowReservationQueueResult.Continue());
+
+    public Task WarmUpTomorrowReservationAsync(string cookie, int libraryId, CancellationToken cancellationToken = default)
+        => OnWarmUpTomorrowReservationAsync?.Invoke(cookie, libraryId, cancellationToken) ?? Task.CompletedTask;
+
+    public Task<bool> SaveTomorrowReservationAsync(string cookie, int libraryId, string seatKey, CancellationToken cancellationToken = default)
+        => OnSaveTomorrowReservationAsync?.Invoke(cookie, libraryId, seatKey, cancellationToken) ?? Task.FromResult(false);
+
+    public Task<TomorrowReservationInfo?> GetTomorrowReservationInfoAsync(string cookie, CancellationToken cancellationToken = default)
+        => OnGetTomorrowReservationInfoAsync?.Invoke(cookie, cancellationToken) ?? Task.FromResult<TomorrowReservationInfo?>(null);
 }
 
 internal sealed class FakeProtocolTemplateStore(TraceIntGraphQlTemplates templates) : IProtocolTemplateStore

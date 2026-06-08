@@ -24,6 +24,13 @@ public sealed class DesktopCoordinatorEventPublisher(
                         occupySucceeded.SeatName,
                         cancellationToken);
                     break;
+                case TomorrowReservationSucceededCoordinatorEvent tomorrowSucceeded:
+                    await taskEventAlertDispatcher.NotifyTomorrowReservationSucceededAsync(
+                        tomorrowSucceeded.LibraryName,
+                        tomorrowSucceeded.SeatName,
+                        tomorrowSucceeded.Day,
+                        cancellationToken);
+                    break;
                 case SessionInvalidCoordinatorEvent sessionInvalid:
                     await taskEventAlertDispatcher.NotifySessionInvalidAsync(
                         sessionInvalid.Source,

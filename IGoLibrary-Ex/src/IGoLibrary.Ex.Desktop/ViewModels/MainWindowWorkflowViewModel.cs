@@ -26,6 +26,7 @@ public partial class MainWindowWorkflowViewModel(
     INotificationTestService notificationTestService,
     IGrabSeatCoordinator grabSeatCoordinator,
     IOccupySeatCoordinator occupySeatCoordinator,
+    ITomorrowReservationCoordinator tomorrowReservationCoordinator,
     IActivityLogService activityLogService,
     INotificationService notificationService,
     IErrorDialogService errorDialogService,
@@ -39,7 +40,9 @@ public partial class MainWindowWorkflowViewModel(
     private readonly AppWindowService _appWindowService = appWindowService;
     private readonly IGrabSeatCoordinator _grabSeatCoordinator = grabSeatCoordinator;
     private readonly IOccupySeatCoordinator _occupySeatCoordinator = occupySeatCoordinator;
+    private readonly ITomorrowReservationCoordinator _tomorrowReservationCoordinator = tomorrowReservationCoordinator;
     private readonly ObservableCollection<SeatItemViewModel> _allSeats = [];
+    private readonly ObservableCollection<SeatItemViewModel> _tomorrowSeats = [];
     private readonly object _filterGate = new();
     private readonly DispatcherTimer _reservationCountdownTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private CancellationTokenSource? _filteringCts;
@@ -55,8 +58,10 @@ public partial class MainWindowWorkflowViewModel(
     private string _lockedVenueOpenTimeText = "--";
     private string _lockedVenueCloseTimeText = "--";
     private static readonly CultureInfo DashboardCulture = CultureInfo.GetCultureInfo("zh-CN");
-    private const int NotificationSettingsTabIndex = 4;
-    private const int SystemSettingsTabIndex = 5;
+    private const int TomorrowReservationTabIndex = 3;
+    private const int OccupyTabIndex = 4;
+    private const int NotificationSettingsTabIndex = 5;
+    private const int SystemSettingsTabIndex = 6;
     private static readonly SidebarNavigationItem HomeSidebarItem = new(
         0,
         "首页",
@@ -69,8 +74,12 @@ public partial class MainWindowWorkflowViewModel(
         2,
         "抢座",
         "M7 2v11h3v9l7-12h-4l4-8z");
+    private static readonly SidebarNavigationItem TomorrowReservationSidebarItem = new(
+        TomorrowReservationTabIndex,
+        "明日预约",
+        "M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z");
     private static readonly SidebarNavigationItem OccupySidebarItem = new(
-        3,
+        OccupyTabIndex,
         "占座",
         "M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z");
     private static readonly SidebarNavigationItem NotificationSettingsSidebarItem = new(
@@ -91,6 +100,7 @@ public partial class MainWindowWorkflowViewModel(
         HomeSidebarItem,
         AccountAndVenueSidebarItem,
         GrabSidebarItem,
+        TomorrowReservationSidebarItem,
         OccupySidebarItem,
         NotificationSettingsSidebarItem,
         SettingsSidebarItem
@@ -116,15 +126,21 @@ public partial class MainWindowWorkflowViewModel(
     private bool _isSynchronizingSeatSelection;
     private CoordinatorTaskState _grabTaskState = CoordinatorTaskState.Idle;
     private CoordinatorStatusReason _grabStatusReason = CoordinatorStatusReason.None;
+    private CoordinatorTaskState _tomorrowTaskState = CoordinatorTaskState.Idle;
+    private CoordinatorStatusReason _tomorrowStatusReason = CoordinatorStatusReason.None;
     private DateTimeOffset? _grabLastRequestAt;
+    private DateTimeOffset? _tomorrowLastRequestAt;
     private DateTimeOffset? _grabRuntimeStartedAt;
     private int _historicalSuccessCount;
     private long _totalGuardSeconds;
     private DateTimeOffset? _guardTrackingStartedAt;
     private DateTimeOffset? _lastRecordedGrabSuccessAt;
     private DateTimeOffset? _lastRecordedOccupySuccessAt;
+    private DateTimeOffset? _lastRecordedTomorrowSuccessAt;
     private bool _isSynchronizingSidebarSelection;
     private bool _isLoadingSettings;
+    private bool _isSynchronizingTomorrowSeatSelection;
+    private string? _draftTomorrowSeatKey;
     private bool _notificationSettingsLoaded;
     private CancellationTokenSource? _notificationSettingsAutoSaveCts;
     private bool _themePaletteSubscribed;
@@ -140,6 +156,8 @@ public partial class MainWindowWorkflowViewModel(
 
     public OccupyPageViewModel OccupyPage { get; } = new(occupySeatCoordinator, reservationWorkflowService);
 
+    public TomorrowReservationPageViewModel TomorrowReservationPage { get; } = new(tomorrowReservationCoordinator);
+
     public NotificationSettingsViewModel NotificationSettings { get; } = new(settingsWorkflowService, notificationTestService);
 
     public SystemSettingsViewModel SystemSettings { get; } = new(settingsWorkflowService, protocolTemplateEditorService);
@@ -153,6 +171,8 @@ public partial class MainWindowWorkflowViewModel(
     ];
 
     public ObservableCollection<SeatItemViewModel> VisibleSeats { get; } = [];
+
+    public ObservableCollection<SeatItemViewModel> TomorrowVisibleSeats { get; } = [];
 
     public ObservableCollection<SeatReference> SelectedSeats { get; } = [];
 
@@ -400,6 +420,9 @@ public partial class MainWindowWorkflowViewModel(
     private bool isGrabSeatSelectionOverlayOpen;
 
     [ObservableProperty]
+    private bool isTomorrowSeatSelectionOverlayOpen;
+
+    [ObservableProperty]
     private bool isApplyingSeatFilter;
 
     [ObservableProperty]
@@ -413,6 +436,9 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private string scheduledTimeText = "00:00:00";
+
+    [ObservableProperty]
+    private string tomorrowScheduledTimeText = "21:48:00";
 
     [ObservableProperty]
     private string grabStatusText = "未运行";
@@ -431,6 +457,21 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private string grabRuntimeText = "00:00:00";
+
+    [ObservableProperty]
+    private string tomorrowStatusText = "未运行";
+
+    [ObservableProperty]
+    private bool isTomorrowTaskActive;
+
+    [ObservableProperty]
+    private int tomorrowRequestCount;
+
+    [ObservableProperty]
+    private string tomorrowLastRequestText = "无";
+
+    [ObservableProperty]
+    private string tomorrowVerificationText = "尚未执行明日预约";
 
     [ObservableProperty]
     private string occupyStatusText = "未运行";
@@ -535,6 +576,9 @@ public partial class MainWindowWorkflowViewModel(
     private string occupyLogsText = string.Empty;
 
     [ObservableProperty]
+    private string tomorrowLogsText = string.Empty;
+
+    [ObservableProperty]
     private string getCookieTemplateText = string.Empty;
 
     [ObservableProperty]
@@ -554,5 +598,23 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private string cancelReservationTemplateText = string.Empty;
+
+    [ObservableProperty]
+    private string tomorrowReservationQueueUrlTemplateText = string.Empty;
+
+    [ObservableProperty]
+    private string tomorrowReservationWarmUpTemplateText = string.Empty;
+
+    [ObservableProperty]
+    private string tomorrowReservationSaveTemplateText = string.Empty;
+
+    [ObservableProperty]
+    private string tomorrowReservationInfoTemplateText = string.Empty;
+
+    [ObservableProperty]
+    private string tomorrowSeatFilterText = string.Empty;
+
+    [ObservableProperty]
+    private SeatReference? selectedTomorrowSeat;
 
 }

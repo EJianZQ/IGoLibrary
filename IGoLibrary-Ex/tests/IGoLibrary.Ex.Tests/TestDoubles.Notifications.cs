@@ -43,6 +43,8 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
 
     public List<string> OccupyReReserveSucceededNotifications { get; } = [];
 
+    public List<(string LibraryName, string SeatName, string? Day)> TomorrowReservationSucceededNotifications { get; } = [];
+
     public List<(string TaskName, string Reason)> TaskFailedNotifications { get; } = [];
 
     public TaskCompletionSource? GrabSucceededCompletion { get; set; }
@@ -52,6 +54,8 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
     public Exception? NotifyGrabSucceededException { get; set; }
 
     public Exception? NotifyOccupyReReserveSucceededException { get; set; }
+
+    public Exception? NotifyTomorrowReservationSucceededException { get; set; }
 
     public Exception? NotifyTaskFailedException { get; set; }
 
@@ -97,6 +101,21 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
         }
 
         OccupyReReserveSucceededNotifications.Add(seatName);
+        return Task.CompletedTask;
+    }
+
+    public Task NotifyTomorrowReservationSucceededAsync(
+        string libraryName,
+        string seatName,
+        string? day,
+        CancellationToken cancellationToken = default)
+    {
+        if (NotifyTomorrowReservationSucceededException is not null)
+        {
+            throw NotifyTomorrowReservationSucceededException;
+        }
+
+        TomorrowReservationSucceededNotifications.Add((libraryName, seatName, day));
         return Task.CompletedTask;
     }
 

@@ -148,6 +148,7 @@ public sealed class MainWindowClipboardTests
             taskAlertService,
             new FakeGrabSeatCoordinator(),
             occupySeatCoordinator,
+            new FakeTomorrowReservationCoordinator(),
             activityLogService,
             new FakeNotificationService(),
             new FakeErrorDialogService(),

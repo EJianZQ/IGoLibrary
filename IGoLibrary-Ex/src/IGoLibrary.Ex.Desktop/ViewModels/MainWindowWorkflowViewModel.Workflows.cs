@@ -21,7 +21,9 @@ public partial class MainWindowWorkflowViewModel
 {
     public bool ShouldHideToTrayOnClose =>
         MinimizeToTrayEnabled &&
-        (IsTaskActive(_grabSeatCoordinator.GetStatus()) || IsTaskActive(_occupySeatCoordinator.GetStatus()));
+        (IsTaskActive(_grabSeatCoordinator.GetStatus()) ||
+         IsTaskActive(_occupySeatCoordinator.GetStatus()) ||
+         IsTaskActive(_tomorrowReservationCoordinator.GetStatus()));
 
     public int SelectedSeatCount => SelectedSeats.Count;
 
@@ -30,6 +32,36 @@ public partial class MainWindowWorkflowViewModel
     public bool HasNoSelectedSeats => !HasSelectedSeats;
 
     public bool CanEditGrabConfiguration => !IsGrabTaskActive;
+
+    public bool CanEditTomorrowConfiguration => !IsTomorrowTaskActive && !HasActiveVenuePreview;
+
+    public bool HasSelectedTomorrowSeat => SelectedTomorrowSeat is not null;
+
+    public bool HasNoSelectedTomorrowSeat => !HasSelectedTomorrowSeat;
+
+    public bool HasTomorrowSeatLayout => _tomorrowSeats.Count > 0;
+
+    public bool HasNoTomorrowSeatLayout => !HasTomorrowSeatLayout;
+
+    public bool HasVisibleTomorrowSeatResults => _tomorrowSeats.Any(static seat => seat.IsFilterVisible);
+
+    public bool ShowTomorrowSeatFilterEmptyState => HasTomorrowSeatLayout && !HasVisibleTomorrowSeatResults;
+
+    public string SelectedTomorrowSeatText => SelectedTomorrowSeat is null
+        ? "尚未选择明日预约座位"
+        : $"已选择 {SelectedTomorrowSeat.SeatName}";
+
+    public string DraftSelectedTomorrowSeatSummaryText
+    {
+        get
+        {
+            var seat = _tomorrowSeats.FirstOrDefault(x =>
+                string.Equals(x.SeatKey, _draftTomorrowSeatKey, StringComparison.Ordinal));
+            return seat is null
+                ? "本次尚未选择明日预约座位"
+                : $"本次已选择 {seat.SeatName}";
+        }
+    }
 
     public int DraftSelectedSeatCount => _draftSelectedSeatKeys.Count;
 
@@ -110,6 +142,28 @@ public partial class MainWindowWorkflowViewModel
         _ => GrabStateIdleBrush
     };
 
+    public string TomorrowDashboardStatusText => _tomorrowTaskState switch
+    {
+        CoordinatorTaskState.Starting => "启动中",
+        CoordinatorTaskState.Running => "运行中",
+        CoordinatorTaskState.Stopping => "停止中",
+        CoordinatorTaskState.Completed when _tomorrowStatusReason == CoordinatorStatusReason.Stopped => "已停止",
+        CoordinatorTaskState.Completed => "已完成",
+        CoordinatorTaskState.Failed => "异常",
+        _ => "未运行"
+    };
+
+    public IBrush TomorrowDashboardStatusBrush => _tomorrowTaskState switch
+    {
+        CoordinatorTaskState.Starting => GrabStateWarningBrush,
+        CoordinatorTaskState.Running => GrabStateRunningBrush,
+        CoordinatorTaskState.Stopping => GrabStateWarningBrush,
+        CoordinatorTaskState.Completed when _tomorrowStatusReason == CoordinatorStatusReason.Stopped => GrabStateFailureBrush,
+        CoordinatorTaskState.Completed => GrabStateSuccessBrush,
+        CoordinatorTaskState.Failed => GrabStateFailureBrush,
+        _ => GrabStateIdleBrush
+    };
+
     partial void OnIsOccupyRunningChanged(bool value)
     {
         OnPropertyChanged(nameof(IsOccupyStopped));
@@ -123,6 +177,25 @@ public partial class MainWindowWorkflowViewModel
     partial void OnIsGrabTaskActiveChanged(bool value)
     {
         OnPropertyChanged(nameof(CanEditGrabConfiguration));
+    }
+
+    partial void OnIsTomorrowTaskActiveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanEditTomorrowConfiguration));
+        if (!value)
+        {
+            return;
+        }
+
+        RestoreCommittedTomorrowSeatSelection();
+        IsTomorrowSeatSelectionOverlayOpen = false;
+    }
+
+    partial void OnSelectedTomorrowSeatChanged(SeatReference? value)
+    {
+        OnPropertyChanged(nameof(HasSelectedTomorrowSeat));
+        OnPropertyChanged(nameof(HasNoSelectedTomorrowSeat));
+        OnPropertyChanged(nameof(SelectedTomorrowSeatText));
     }
 
     partial void OnVisibleSeatResultCountChanged(int value)
@@ -201,6 +274,7 @@ public partial class MainWindowWorkflowViewModel
         OnPropertyChanged(nameof(CanCancelVenuePreview));
         OnPropertyChanged(nameof(ShowVenueCancelPreviewButton));
         OnPropertyChanged(nameof(ShowVenuePreviewStateTag));
+        OnPropertyChanged(nameof(CanEditTomorrowConfiguration));
     }
 
     public async Task InitializeAsync()
@@ -215,8 +289,10 @@ public partial class MainWindowWorkflowViewModel
         _activityLogService.EntryWritten += OnLogEntryWritten;
         _grabSeatCoordinator.StatusChanged += OnGrabStatusChanged;
         _occupySeatCoordinator.StatusChanged += OnOccupyStatusChanged;
+        _tomorrowReservationCoordinator.StatusChanged += OnTomorrowStatusChanged;
         ApplyGrabStatus(_grabSeatCoordinator.GetStatus());
         ApplyOccupyStatus(_occupySeatCoordinator.GetStatus());
+        ApplyTomorrowStatus(_tomorrowReservationCoordinator.GetStatus());
 
         if (!_reservationCountdownTimerInitialized)
         {
@@ -267,6 +343,8 @@ public partial class MainWindowWorkflowViewModel
     partial void OnSeatFilterTextChanged(string value) => _ = ApplySeatFilterAsync();
 
     partial void OnShowAvailableOnlyChanged(bool value) => _ = ApplySeatFilterAsync();
+
+    partial void OnTomorrowSeatFilterTextChanged(string value) => ApplyTomorrowSeatFilter();
 
     partial void OnEmailAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
 
@@ -519,17 +597,26 @@ public partial class MainWindowWorkflowViewModel
         await ClearStoredLibrarySelectionAsync();
         CancelFiltering();
         IsGrabSeatSelectionOverlayOpen = false;
+        IsTomorrowSeatSelectionOverlayOpen = false;
         _draftSelectedSeatKeys.Clear();
+        _draftTomorrowSeatKey = null;
         _committedSelectedSeatKeys.Clear();
         AvailableLibraries.Clear();
         _allSeats.Clear();
+        ClearTomorrowSeats();
         VisibleSeats.Clear();
         OnPropertyChanged(nameof(HasSeatLayout));
         OnPropertyChanged(nameof(HasNoSeatLayout));
         OnPropertyChanged(nameof(ShowSeatFilterEmptyState));
+        OnPropertyChanged(nameof(HasTomorrowSeatLayout));
+        OnPropertyChanged(nameof(HasNoTomorrowSeatLayout));
+        OnPropertyChanged(nameof(HasVisibleTomorrowSeatResults));
+        OnPropertyChanged(nameof(ShowTomorrowSeatFilterEmptyState));
+        OnPropertyChanged(nameof(DraftSelectedTomorrowSeatSummaryText));
         RefreshSelectedSeatsPresentation();
         UpdateDraftSelectionPresentation();
         VisibleSeatResultCount = 0;
+        SelectedTomorrowSeat = null;
         SelectedLibrary = null;
         IsAuthorized = false;
         SessionSummary = "未登录";
@@ -609,6 +696,7 @@ public partial class MainWindowWorkflowViewModel
             UpdateBoundLibraryPresentation(result.Layout);
             ApplyVenueRuleResult(result.Rule, result.RuleFailureMessage, persistLockedSnapshot: true);
             await PopulateSeatsAsync(result.Layout, preserveSelection);
+            PopulateTomorrowSeats(result.Layout);
             ApplyFavoriteStates(result.Favorites.Select(x => x.SeatKey), syncSelection: false);
             await _notificationService.ShowInfoAsync("收藏已加载", $"已加载 {result.Favorites.Count} 个收藏座位。");
             await RefreshReservationAsync(showNotificationOnError: false);
@@ -632,6 +720,7 @@ public partial class MainWindowWorkflowViewModel
                 ApplyVenueRuleResult(result.Rule, result.RuleFailureMessage, persistLockedSnapshot: true);
             }
             await PopulateSeatsAsync(result.Layout, preserveSelection: true);
+            PopulateTomorrowSeats(result.Layout);
             ApplyFavoriteStates(result.Favorites.Select(x => x.SeatKey), syncSelection: false);
             await _notificationService.ShowInfoAsync("收藏已加载", $"已加载 {result.Favorites.Count} 个收藏座位。");
         }
@@ -854,6 +943,165 @@ public partial class MainWindowWorkflowViewModel
     }
 
     [RelayCommand]
+    private async Task RefreshTomorrowSeatsAsync()
+    {
+        await RefreshSeatsAsync();
+    }
+
+    [RelayCommand]
+    private async Task OpenTomorrowSeatSelectionOverlayAsync()
+    {
+        if (IsTomorrowTaskActive)
+        {
+            return;
+        }
+
+        if (HasActiveVenuePreview)
+        {
+            await _notificationService.ShowWarningAsync("正在预览场馆", "请先锁定当前预览场馆后再进行明日预约");
+            return;
+        }
+
+        if (_lockedLibrarySummary is null)
+        {
+            await _notificationService.ShowWarningAsync("未绑定场馆", "请先绑定场馆后再选择明日预约目标座位");
+            return;
+        }
+
+        if (_tomorrowSeats.Count == 0)
+        {
+            await RefreshSeatsAsync();
+        }
+
+        if (_tomorrowSeats.Count == 0)
+        {
+            await _notificationService.ShowInfoAsync("暂无座位数据", "当前场馆还没有可供选择的座位布局");
+            return;
+        }
+
+        BeginTomorrowSeatSelectionDraft();
+        IsTomorrowSeatSelectionOverlayOpen = true;
+    }
+
+    [RelayCommand]
+    private void ConfirmTomorrowSeatSelection()
+    {
+        CommitTomorrowSeatSelection();
+        IsTomorrowSeatSelectionOverlayOpen = false;
+    }
+
+    [RelayCommand]
+    private void CancelTomorrowSeatSelection()
+    {
+        RestoreCommittedTomorrowSeatSelection();
+        IsTomorrowSeatSelectionOverlayOpen = false;
+    }
+
+    [RelayCommand]
+    private void ClearTomorrowSeat()
+    {
+        if (!CanEditTomorrowConfiguration)
+        {
+            return;
+        }
+
+        if (IsTomorrowSeatSelectionOverlayOpen)
+        {
+            _draftTomorrowSeatKey = null;
+            ApplyTomorrowSeatSelection(null);
+            UpdateDraftTomorrowSeatSelectionPresentation();
+            return;
+        }
+
+        SelectedTomorrowSeat = null;
+        ApplyTomorrowSeatSelection(null);
+    }
+
+    [RelayCommand]
+    private async Task StartTomorrowReservationAsync()
+    {
+        await StartTomorrowReservationCoreAsync(executeImmediately: false);
+    }
+
+    [RelayCommand]
+    private async Task RunTomorrowReservationNowAsync()
+    {
+        await StartTomorrowReservationCoreAsync(executeImmediately: true);
+    }
+
+    private async Task StartTomorrowReservationCoreAsync(bool executeImmediately)
+    {
+        if (IsTomorrowTaskActive)
+        {
+            return;
+        }
+
+        if (HasActiveVenuePreview)
+        {
+            await _notificationService.ShowWarningAsync("正在预览场馆", "请先锁定当前预览场馆后再进行明日预约");
+            return;
+        }
+
+        var lockedLibrary = _lockedLibrarySummary;
+        if (lockedLibrary is null)
+        {
+            await _notificationService.ShowWarningAsync("未绑定场馆", "请先绑定场馆");
+            return;
+        }
+
+        var selectedSeat = SelectedTomorrowSeat;
+        if (selectedSeat is null)
+        {
+            await _notificationService.ShowWarningAsync("未选择座位", "请先选择一个明日预约目标座位");
+            return;
+        }
+
+        var selectedSeatInLayout = _tomorrowSeats.FirstOrDefault(seat =>
+            string.Equals(seat.SeatKey, selectedSeat.SeatKey, StringComparison.Ordinal));
+        if (selectedSeatInLayout is null)
+        {
+            SelectedTomorrowSeat = null;
+            ApplyTomorrowSeatSelection(null);
+            await _notificationService.ShowWarningAsync("座位已失效", "请重新选择明日预约目标座位");
+            return;
+        }
+
+        try
+        {
+            var scheduledStart = ParseTomorrowScheduledTime();
+            TomorrowVerificationText = executeImmediately
+                ? "明日预约任务已启动，等待结果"
+                : $"等待触发：{scheduledStart:HH\\:mm\\:ss}";
+            var plan = new TomorrowReservationPlan(
+                lockedLibrary.LibraryId,
+                lockedLibrary.Name,
+                new SeatReference(selectedSeatInLayout.SeatKey, selectedSeatInLayout.SeatName),
+                scheduledStart,
+                executeImmediately);
+            await TomorrowReservationPage.StartAsync(plan);
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Error, "Tomorrow", $"启动明日预约失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("启动明日预约失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task StopTomorrowReservationAsync()
+    {
+        try
+        {
+            await TomorrowReservationPage.StopAsync();
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Error, "Tomorrow", $"停止明日预约失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("停止明日预约失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
     private async Task RefreshReservationAsync()
     {
         await RefreshReservationAsync(showNotificationOnError: true);
@@ -1066,7 +1314,11 @@ public partial class MainWindowWorkflowViewModel
             QueryLibraryRuleTemplateText,
             QueryReservationInfoTemplateText,
             ReserveSeatTemplateText,
-            CancelReservationTemplateText);
+            CancelReservationTemplateText,
+            TomorrowReservationQueueUrlTemplateText,
+            TomorrowReservationWarmUpTemplateText,
+            TomorrowReservationSaveTemplateText,
+            TomorrowReservationInfoTemplateText);
         await SystemSettings.SaveProtocolOverridesAsync(overrides);
         await _notificationService.ShowSuccessAsync("协议模板已保存", "高级协议覆盖已写入数据库。");
     }
@@ -1173,6 +1425,10 @@ public partial class MainWindowWorkflowViewModel
         QueryReservationInfoTemplateText = templates.QueryReservationInfoTemplate;
         ReserveSeatTemplateText = templates.ReserveSeatTemplate;
         CancelReservationTemplateText = templates.CancelReservationTemplate;
+        TomorrowReservationQueueUrlTemplateText = templates.TomorrowReservationQueueUrlTemplate;
+        TomorrowReservationWarmUpTemplateText = templates.TomorrowReservationWarmUpTemplate;
+        TomorrowReservationSaveTemplateText = templates.TomorrowReservationSaveTemplate;
+        TomorrowReservationInfoTemplateText = templates.TomorrowReservationInfoTemplate;
     }
 
     private async Task ClearStoredLibrarySelectionAsync()
@@ -1236,6 +1492,8 @@ public partial class MainWindowWorkflowViewModel
             LibrarySummary = "未绑定场馆";
             BoundLibraryTitle = "当前绑定：未锁定目标场馆";
             BoundAvailableSeatsText = "--";
+            SelectedTomorrowSeat = null;
+            ClearTomorrowSeats();
             VenueStatusText = "未绑定";
             IsVenueOpen = false;
             VenueName = "未锁定场馆";
@@ -1422,6 +1680,75 @@ public partial class MainWindowWorkflowViewModel
         }
     }
 
+    private void PopulateTomorrowSeats(LibraryLayout layout)
+    {
+        foreach (var seat in _tomorrowSeats)
+        {
+            seat.PropertyChanged -= OnTomorrowSeatItemPropertyChanged;
+        }
+
+        _tomorrowSeats.Clear();
+        TomorrowVisibleSeats.Clear();
+
+        var selectedKey = IsTomorrowSeatSelectionOverlayOpen
+            ? _draftTomorrowSeatKey
+            : SelectedTomorrowSeat?.SeatKey;
+        _isSynchronizingTomorrowSeatSelection = true;
+        try
+        {
+            foreach (var seat in layout.Seats.Where(seat => !string.IsNullOrWhiteSpace(seat.SeatName)))
+            {
+                var item = new SeatItemViewModel(seat.SeatKey, seat.SeatName, seat.IsOccupied)
+                {
+                    IsSelected = string.Equals(seat.SeatKey, selectedKey, StringComparison.Ordinal)
+                };
+                item.PropertyChanged += OnTomorrowSeatItemPropertyChanged;
+                _tomorrowSeats.Add(item);
+                TomorrowVisibleSeats.Add(item);
+            }
+        }
+        finally
+        {
+            _isSynchronizingTomorrowSeatSelection = false;
+        }
+
+        if (IsTomorrowSeatSelectionOverlayOpen)
+        {
+            if (!string.IsNullOrWhiteSpace(_draftTomorrowSeatKey) &&
+                _tomorrowSeats.All(seat => !string.Equals(seat.SeatKey, _draftTomorrowSeatKey, StringComparison.Ordinal)))
+            {
+                _draftTomorrowSeatKey = null;
+            }
+        }
+        else if (SelectedTomorrowSeat is not null &&
+            _tomorrowSeats.All(seat => !string.Equals(seat.SeatKey, SelectedTomorrowSeat.SeatKey, StringComparison.Ordinal)))
+        {
+            SelectedTomorrowSeat = null;
+        }
+
+        ApplyTomorrowSeatFilter();
+        OnPropertyChanged(nameof(HasTomorrowSeatLayout));
+        OnPropertyChanged(nameof(HasNoTomorrowSeatLayout));
+        OnPropertyChanged(nameof(DraftSelectedTomorrowSeatSummaryText));
+    }
+
+    private void ClearTomorrowSeats()
+    {
+        foreach (var seat in _tomorrowSeats)
+        {
+            seat.PropertyChanged -= OnTomorrowSeatItemPropertyChanged;
+        }
+
+        _tomorrowSeats.Clear();
+        TomorrowVisibleSeats.Clear();
+        _draftTomorrowSeatKey = null;
+        OnPropertyChanged(nameof(HasTomorrowSeatLayout));
+        OnPropertyChanged(nameof(HasNoTomorrowSeatLayout));
+        OnPropertyChanged(nameof(HasVisibleTomorrowSeatResults));
+        OnPropertyChanged(nameof(ShowTomorrowSeatFilterEmptyState));
+        OnPropertyChanged(nameof(DraftSelectedTomorrowSeatSummaryText));
+    }
+
     private async Task ApplySeatFilterAsync()
     {
         CancellationTokenSource cts;
@@ -1518,6 +1845,109 @@ public partial class MainWindowWorkflowViewModel
         }
 
         RefreshCommittedSelectionFromCurrentItems();
+    }
+
+    private void OnTomorrowSeatItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_isSynchronizingTomorrowSeatSelection ||
+            e.PropertyName != nameof(SeatItemViewModel.IsSelected) ||
+            sender is not SeatItemViewModel changedSeat)
+        {
+            return;
+        }
+
+        if (!changedSeat.IsSelected)
+        {
+            if (IsTomorrowSeatSelectionOverlayOpen)
+            {
+                if (string.Equals(_draftTomorrowSeatKey, changedSeat.SeatKey, StringComparison.Ordinal))
+                {
+                    _draftTomorrowSeatKey = null;
+                    UpdateDraftTomorrowSeatSelectionPresentation();
+                }
+
+                return;
+            }
+
+            if (SelectedTomorrowSeat?.SeatKey == changedSeat.SeatKey)
+            {
+                SelectedTomorrowSeat = null;
+            }
+
+            return;
+        }
+
+        if (IsTomorrowSeatSelectionOverlayOpen)
+        {
+            _draftTomorrowSeatKey = changedSeat.SeatKey;
+            ApplyTomorrowSeatSelection(changedSeat.SeatKey);
+            UpdateDraftTomorrowSeatSelectionPresentation();
+            return;
+        }
+
+        SelectedTomorrowSeat = new SeatReference(changedSeat.SeatKey, changedSeat.SeatName);
+        ApplyTomorrowSeatSelection(changedSeat.SeatKey);
+    }
+
+    private void BeginTomorrowSeatSelectionDraft()
+    {
+        _draftTomorrowSeatKey = SelectedTomorrowSeat?.SeatKey;
+        ApplyTomorrowSeatSelection(_draftTomorrowSeatKey);
+        UpdateDraftTomorrowSeatSelectionPresentation();
+    }
+
+    private void CommitTomorrowSeatSelection()
+    {
+        var selectedSeat = _tomorrowSeats.FirstOrDefault(x =>
+            string.Equals(x.SeatKey, _draftTomorrowSeatKey, StringComparison.Ordinal));
+        SelectedTomorrowSeat = selectedSeat is null
+            ? null
+            : new SeatReference(selectedSeat.SeatKey, selectedSeat.SeatName);
+        _draftTomorrowSeatKey = null;
+        ApplyTomorrowSeatSelection(SelectedTomorrowSeat?.SeatKey);
+        UpdateDraftTomorrowSeatSelectionPresentation();
+    }
+
+    private void RestoreCommittedTomorrowSeatSelection()
+    {
+        _draftTomorrowSeatKey = null;
+        ApplyTomorrowSeatSelection(SelectedTomorrowSeat?.SeatKey);
+        UpdateDraftTomorrowSeatSelectionPresentation();
+    }
+
+    private void ApplyTomorrowSeatSelection(string? selectedSeatKey)
+    {
+        _isSynchronizingTomorrowSeatSelection = true;
+        try
+        {
+            foreach (var seat in _tomorrowSeats)
+            {
+                seat.IsSelected = !string.IsNullOrWhiteSpace(selectedSeatKey) &&
+                                  string.Equals(seat.SeatKey, selectedSeatKey, StringComparison.Ordinal);
+            }
+        }
+        finally
+        {
+            _isSynchronizingTomorrowSeatSelection = false;
+        }
+    }
+
+    private void ApplyTomorrowSeatFilter()
+    {
+        var filterText = TomorrowSeatFilterText;
+        foreach (var seat in _tomorrowSeats)
+        {
+            seat.IsFilterVisible = string.IsNullOrWhiteSpace(filterText) ||
+                                   seat.SeatName.Contains(filterText, StringComparison.OrdinalIgnoreCase);
+        }
+
+        OnPropertyChanged(nameof(HasVisibleTomorrowSeatResults));
+        OnPropertyChanged(nameof(ShowTomorrowSeatFilterEmptyState));
+    }
+
+    private void UpdateDraftTomorrowSeatSelectionPresentation()
+    {
+        OnPropertyChanged(nameof(DraftSelectedTomorrowSeatSummaryText));
     }
 
     private void BeginGrabSeatSelectionDraft()
@@ -1660,15 +2090,36 @@ public partial class MainWindowWorkflowViewModel
         return TimeOnly.TryParse(ScheduledTimeText, out var value) ? value : null;
     }
 
+    private TimeOnly ParseTomorrowScheduledTime()
+    {
+        if (string.IsNullOrWhiteSpace(TomorrowScheduledTimeText))
+        {
+            return new TimeOnly(21, 48, 0);
+        }
+
+        if (TimeOnly.TryParse(TomorrowScheduledTimeText, out var value))
+        {
+            return value;
+        }
+
+        throw new InvalidOperationException("明日预约触发时间格式无效，请使用 HH:mm:ss");
+    }
+
     private void OnLogEntryWritten(object? sender, AppLogEntry entry)
     {
         Dispatcher.UIThread.Post(() =>
         {
-            var line = $"[{entry.Timestamp:HH:mm:ss}] {entry.Category}: {entry.Message}";
+            var displayMessage = TrimSentenceEnding(entry.Message);
+            var line = FormatLogLine(entry, displayMessage);
             AllLogsText = AppendLine(AllLogsText, line);
             if (entry.Category is "Grab" or "Library" or "Favorite" or "Auth")
             {
                 GrabLogsText = AppendLine(GrabLogsText, line);
+            }
+
+            if (entry.Category is "Tomorrow" or "Library" or "Auth")
+            {
+                TomorrowLogsText = AppendLine(TomorrowLogsText, line);
             }
 
             if (entry.Category is "Occupy" or "Auth")
@@ -1686,7 +2137,7 @@ public partial class MainWindowWorkflowViewModel
 
                 OccupyLogLines.Add(new LogLineViewModel(
                     $"[{entry.Timestamp:HH:mm:ss}]",
-                    $"{entry.Category}: {entry.Message}",
+                    $"{entry.Category}: {displayMessage}",
                     entry.Kind,
                     true,
                     hasSuccessSemantic,
@@ -1694,7 +2145,7 @@ public partial class MainWindowWorkflowViewModel
                     _appThemeService));
 
                 if (entry.Category == "Occupy" &&
-                    entry.Message.EndsWith("已重新预约成功。", StringComparison.Ordinal))
+                    displayMessage.EndsWith("已重新预约成功", StringComparison.Ordinal))
                 {
                     TryRecordOccupySuccess(entry.Timestamp);
                 }
@@ -1748,10 +2199,20 @@ public partial class MainWindowWorkflowViewModel
         Dispatcher.UIThread.Post(() => ApplyOccupyStatus(status));
     }
 
+    private void OnTomorrowStatusChanged(object? sender, CoordinatorStatus status)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            ApplyTomorrowStatus(status);
+            TryRecordTomorrowSuccess(status);
+        });
+    }
+
     private void OnReservationCountdownTick(object? sender, EventArgs e)
     {
         UpdateReservationCountdown();
         UpdateGrabLastRequestText();
+        UpdateTomorrowLastRequestText();
         UpdateGrabRuntimeClock();
         RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);
         UpdateHomeDashboardClock();
@@ -1784,6 +2245,34 @@ public partial class MainWindowWorkflowViewModel
         UpdateHomeSystemInfoPresentation();
     }
 
+    private void ApplyTomorrowStatus(CoordinatorStatus status)
+    {
+        var message = TrimSentenceEnding(status.Message);
+        TomorrowStatusText = message;
+        IsTomorrowTaskActive = IsTaskActive(status);
+        TomorrowRequestCount = status.RequestCount;
+        _tomorrowLastRequestAt = status.LastRequestAt;
+        _tomorrowTaskState = status.State;
+        _tomorrowStatusReason = status.Reason;
+        TomorrowVerificationText = status.State switch
+        {
+            CoordinatorTaskState.Idle => "尚未执行明日预约",
+            CoordinatorTaskState.Starting or
+                CoordinatorTaskState.Running or
+                CoordinatorTaskState.Stopping or
+                CoordinatorTaskState.Completed or
+                CoordinatorTaskState.Failed => message,
+            _ => TomorrowVerificationText
+        };
+
+        UpdateTomorrowLastRequestText();
+        UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
+        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeSystemInfoPresentation();
+        OnPropertyChanged(nameof(TomorrowDashboardStatusText));
+        OnPropertyChanged(nameof(TomorrowDashboardStatusBrush));
+    }
+
     private void UpdateGrabLastRequestText()
     {
         if (_grabLastRequestAt is null)
@@ -1799,6 +2288,25 @@ public partial class MainWindowWorkflowViewModel
         }
 
         GrabLastRequestText = elapsed < TimeSpan.FromSeconds(1)
+            ? "刚刚"
+            : $"{Math.Max(1, (int)Math.Floor(elapsed.TotalSeconds))} 秒前";
+    }
+
+    private void UpdateTomorrowLastRequestText()
+    {
+        if (_tomorrowLastRequestAt is null)
+        {
+            TomorrowLastRequestText = "无";
+            return;
+        }
+
+        var elapsed = DateTimeOffset.Now - _tomorrowLastRequestAt.Value;
+        if (elapsed < TimeSpan.Zero)
+        {
+            elapsed = TimeSpan.Zero;
+        }
+
+        TomorrowLastRequestText = elapsed < TimeSpan.FromSeconds(1)
             ? "刚刚"
             : $"{Math.Max(1, (int)Math.Floor(elapsed.TotalSeconds))} 秒前";
     }
@@ -1902,14 +2410,20 @@ public partial class MainWindowWorkflowViewModel
             return ("等待授权", "完成登录与场馆绑定后即可启用全部引擎。", GrabStateWarningBrush, DashboardWarningSoftBrush);
         }
 
-        if (IsGrabTaskActive && IsOccupyRunning)
+        var activeTaskCount = new[] { IsGrabTaskActive, IsTomorrowTaskActive, IsOccupyRunning }.Count(static active => active);
+        if (activeTaskCount >= 2)
         {
-            return ("双引擎协同中", "抢座与占座守护都在后台稳定运行。", GrabStateRunningBrush, DashboardRunningSoftBrush);
+            return ("多任务协同中", "后台任务正在稳定运行，请保持程序常驻。", GrabStateRunningBrush, DashboardRunningSoftBrush);
         }
 
         if (IsGrabTaskActive)
         {
             return ("抢座任务运行中", "已进入实时监控阶段，请保持程序常驻。", GrabStateRunningBrush, DashboardRunningSoftBrush);
+        }
+
+        if (IsTomorrowTaskActive)
+        {
+            return ("明日预约运行中", "已进入预约等待或提交阶段，请保持程序常驻", GrabStateRunningBrush, DashboardRunningSoftBrush);
         }
 
         if (IsOccupyRunning)
@@ -1998,19 +2512,25 @@ public partial class MainWindowWorkflowViewModel
             return "等待授权";
         }
 
-        if (IsGrabTaskActive && IsOccupyRunning)
-        {
-            return "抢座运行中 · 占座守护运行中";
-        }
-
+        var activeTasks = new List<string>(3);
         if (IsGrabTaskActive)
         {
-            return "抢座运行中 · 占座守护待命";
+            activeTasks.Add("抢座运行中");
+        }
+
+        if (IsTomorrowTaskActive)
+        {
+            activeTasks.Add("明日预约运行中");
         }
 
         if (IsOccupyRunning)
         {
-            return "抢座待命 · 占座守护运行中";
+            activeTasks.Add("占座守护运行中");
+        }
+
+        if (activeTasks.Count > 0)
+        {
+            return string.Join(" · ", activeTasks);
         }
 
         return HasLockedVenue ? "所有核心模块已就绪" : "等待绑定场馆";
@@ -2018,7 +2538,7 @@ public partial class MainWindowWorkflowViewModel
 
     private void UpdateGuardTracking(DateTimeOffset timestamp)
     {
-        if (IsGrabTaskActive || IsOccupyRunning)
+        if (IsGrabTaskActive || IsTomorrowTaskActive || IsOccupyRunning)
         {
             _guardTrackingStartedAt ??= timestamp;
             UpdateHomeGuardDurationPresentation(timestamp);
@@ -2085,6 +2605,24 @@ public partial class MainWindowWorkflowViewModel
         }
 
         _lastRecordedOccupySuccessAt = timestamp;
+        _ = RecordSuccessfulReservationAsync();
+    }
+
+    private void TryRecordTomorrowSuccess(CoordinatorStatus status)
+    {
+        if (status.State != CoordinatorTaskState.Completed ||
+            status.Reason != CoordinatorStatusReason.TomorrowReservationSucceeded)
+        {
+            return;
+        }
+
+        var recordedAt = status.LastUpdatedAt ?? DateTimeOffset.Now;
+        if (_lastRecordedTomorrowSuccessAt == recordedAt)
+        {
+            return;
+        }
+
+        _lastRecordedTomorrowSuccessAt = recordedAt;
         _ = RecordSuccessfulReservationAsync();
     }
 
@@ -2342,6 +2880,18 @@ public partial class MainWindowWorkflowViewModel
         return builder.ToString();
     }
 
+    private static string FormatLogLine(AppLogEntry entry, string message)
+    {
+        return $"[{entry.Timestamp:HH:mm:ss}] {entry.Category}: {message}";
+    }
+
+    private static string TrimSentenceEnding(string message)
+    {
+        return string.IsNullOrEmpty(message)
+            ? message
+            : message.TrimEnd('。', '.');
+    }
+
     private static bool IsTaskActive(CoordinatorStatus status)
     {
         return status.State is CoordinatorTaskState.Starting
@@ -2558,6 +3108,7 @@ public partial class MainWindowWorkflowViewModel
         OnPropertyChanged(nameof(TelegramNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(GrabDashboardStatusBrush));
+        OnPropertyChanged(nameof(TomorrowDashboardStatusBrush));
         RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);
         UpdateHomeDashboardPresentation();
     }

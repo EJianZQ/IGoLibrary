@@ -9,6 +9,7 @@ public enum CoordinatorStatusReason
     Stopped = 4,
     GrabSucceeded = 5,
     OccupyReReserveSucceeded = 6,
-    SessionInvalid = 7,
-    TaskFailed = 8
+    TomorrowReservationSucceeded = 7,
+    SessionInvalid = 8,
+    TaskFailed = 9
 }
