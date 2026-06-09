@@ -19,6 +19,14 @@ public interface ISettingsWorkflowService
         GrabReservationStrategy strategy,
         CancellationToken cancellationToken = default);
 
+    Task SaveGrabScheduledStartDefaultAsync(
+        TimeSpan value,
+        CancellationToken cancellationToken = default);
+
+    Task SaveTomorrowScheduledStartDefaultAsync(
+        TimeSpan value,
+        CancellationToken cancellationToken = default);
+
     Task ClearStoredLibrarySelectionAsync(CancellationToken cancellationToken = default);
 
     Task SaveDashboardMetricsAsync(

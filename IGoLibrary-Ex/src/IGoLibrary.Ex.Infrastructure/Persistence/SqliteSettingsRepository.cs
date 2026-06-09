@@ -82,6 +82,7 @@ public sealed class SqliteSettingsRepository(
         var tasks = ReadObject(root, "tasks");
         var grab = ReadObject(tasks, "grab");
         var occupy = ReadObject(tasks, "occupy");
+        var tomorrowReservation = ReadObject(tasks, "tomorrowReservation");
 
         var legacyRetryCount = ReadInt(root, "retryCount")
             ?? ReadInt(legacyRequestPolicy, "retryCount");
@@ -157,6 +158,11 @@ public sealed class SqliteSettingsRepository(
             ?? ReadInt(tasks, "grabReservationStrategy")
             ?? ReadInt(root, "grabReservationStrategy")
             ?? (int)defaults.Tasks.Grab.ReservationStrategy);
+        writer.WriteString(
+            "defaultScheduledStartTime",
+            NormalizeTimeOfDay(
+                ReadTimeSpan(grab, "defaultScheduledStartTime"),
+                defaults.Tasks.Grab.DefaultScheduledStartTime).ToString("c"));
         writer.WriteEndObject();
         writer.WritePropertyName("occupy");
         writer.WriteStartObject();
@@ -165,6 +171,14 @@ public sealed class SqliteSettingsRepository(
             ReadInt(occupy, "reReservationMaxAttempts")
             ?? (legacyRetryCount.HasValue ? legacyRetryCount.Value + 1 : (int?)null)
             ?? defaults.Tasks.Occupy.ReReservationMaxAttempts);
+        writer.WriteEndObject();
+        writer.WritePropertyName("tomorrowReservation");
+        writer.WriteStartObject();
+        writer.WriteString(
+            "defaultScheduledStartTime",
+            NormalizeTimeOfDay(
+                ReadTimeSpan(tomorrowReservation, "defaultScheduledStartTime"),
+                defaults.Tasks.TomorrowReservation.DefaultScheduledStartTime).ToString("c"));
         writer.WriteEndObject();
         writer.WriteEndObject();
 
@@ -200,6 +214,9 @@ public sealed class SqliteSettingsRepository(
         var ui = settings.Ui ?? UiPreferences.Default;
         var alertSettings = notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
         var tasks = settings.Tasks ?? TaskExecutionSettings.Default;
+        var grab = tasks.Grab ?? GrabTaskSettings.Default;
+        var occupy = tasks.Occupy ?? OccupyTaskSettings.Default;
+        var tomorrowReservation = tasks.TomorrowReservation ?? TomorrowReservationTaskSettings.Default;
         return settings with
         {
             Notifications = notifications with
@@ -217,8 +234,19 @@ public sealed class SqliteSettingsRepository(
             Network = settings.Network ?? NetworkRequestSettings.Default,
             Tasks = tasks with
             {
-                Grab = tasks.Grab ?? GrabTaskSettings.Default,
-                Occupy = tasks.Occupy ?? OccupyTaskSettings.Default
+                Grab = grab with
+                {
+                    DefaultScheduledStartTime = NormalizeTimeOfDay(
+                        grab.DefaultScheduledStartTime,
+                        GrabTaskSettings.Default.DefaultScheduledStartTime)
+                },
+                Occupy = occupy,
+                TomorrowReservation = tomorrowReservation with
+                {
+                    DefaultScheduledStartTime = NormalizeTimeOfDay(
+                        tomorrowReservation.DefaultScheduledStartTime,
+                        TomorrowReservationTaskSettings.Default.DefaultScheduledStartTime)
+                }
             },
             Venue = settings.Venue ?? VenueSelectionSettings.Default,
             Dashboard = settings.Dashboard ?? DashboardMetrics.Default
@@ -237,7 +265,8 @@ public sealed class SqliteSettingsRepository(
                root.TryGetProperty("tasks", out var tasks) &&
                tasks.ValueKind == JsonValueKind.Object &&
                tasks.TryGetProperty("grab", out _) &&
-               tasks.TryGetProperty("occupy", out _);
+               tasks.TryGetProperty("occupy", out _) &&
+               tasks.TryGetProperty("tomorrowReservation", out _);
     }
 
     private static bool ContainsLegacySettingsFields(JsonElement root)
@@ -255,6 +284,8 @@ public sealed class SqliteSettingsRepository(
                HasAnyProperty(ReadObject(root, "protocol"), "templateOverridesEnabled") ||
                HasAnyProperty(ReadObject(root, "requestPolicy"), "timeoutSeconds", "retryCount") ||
                HasAnyProperty(ReadObject(root, "tasks"), "grabReservationStrategy") ||
+               !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "grab"), "defaultScheduledStartTime") ||
+               !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "tomorrowReservation"), "defaultScheduledStartTime") ||
                HasAnyProperty(
                    ReadObject(
                        ReadObject(
@@ -401,6 +432,40 @@ public sealed class SqliteSettingsRepository(
         return property.ValueKind == JsonValueKind.String && long.TryParse(property.GetString(), out longValue)
             ? longValue
             : null;
+    }
+
+    private static TimeSpan? ReadTimeSpan(JsonElement parent, string propertyName)
+    {
+        if (parent.ValueKind != JsonValueKind.Object ||
+            !parent.TryGetProperty(propertyName, out var property))
+        {
+            return null;
+        }
+
+        if (property.ValueKind == JsonValueKind.String &&
+            TimeSpan.TryParse(property.GetString(), out var value))
+        {
+            return value;
+        }
+
+        return null;
+    }
+
+    private static TimeSpan NormalizeTimeOfDay(TimeSpan? value, TimeSpan fallback)
+    {
+        return value is { } timeOfDay && IsTimeOfDay(timeOfDay)
+            ? timeOfDay
+            : fallback;
+    }
+
+    private static TimeSpan NormalizeTimeOfDay(TimeSpan value, TimeSpan fallback)
+    {
+        return IsTimeOfDay(value) ? value : fallback;
+    }
+
+    private static bool IsTimeOfDay(TimeSpan value)
+    {
+        return value >= TimeSpan.Zero && value < TimeSpan.FromDays(1);
     }
 
     private static void WriteNullableInt(

@@ -21,6 +21,8 @@ public partial class MainWindow : Window
     private MainWindowViewModel? _observedViewModel;
     private string? _lastProcessedClipboardText;
     private bool _isAutoParsingClipboard;
+    private bool _isClosingAfterFlush;
+    private bool _isFlushingBeforeClose;
 
     public MainWindow()
         : this(new AppWindowService(), new NoOpNotificationService())
@@ -45,7 +47,8 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
-        if (!_appWindowService.AllowClose &&
+        if (!_isClosingAfterFlush &&
+            !_appWindowService.AllowClose &&
             DataContext is MainWindowViewModel viewModel &&
             viewModel.ShouldHideToTrayOnClose)
         {
@@ -54,9 +57,36 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!_isClosingAfterFlush &&
+            DataContext is MainWindowViewModel closeViewModel)
+        {
+            e.Cancel = true;
+            if (!_isFlushingBeforeClose)
+            {
+                _isFlushingBeforeClose = true;
+                _ = CloseAfterFlushAsync(closeViewModel);
+            }
+
+            return;
+        }
+
         if (_notificationService is ToastNotificationService toastNotificationService)
         {
             toastNotificationService.DismissAllImmediately();
+        }
+    }
+
+    private async Task CloseAfterFlushAsync(MainWindowViewModel viewModel)
+    {
+        try
+        {
+            await viewModel.FlushPendingScheduledStartDefaultsAsync();
+        }
+        finally
+        {
+            _isClosingAfterFlush = true;
+            _isFlushingBeforeClose = false;
+            Close();
         }
     }
 

@@ -90,18 +90,59 @@ internal sealed class FakeAppThemeService : IAppThemeService
 
 internal sealed class FakeSettingsService(AppSettings settings) : ISettingsService
 {
+    private readonly SemaphoreSlim _settingsGate = new(1, 1);
+
     public AppSettings CurrentSettings { get; private set; } = settings;
 
     public int SaveCalls { get; private set; }
 
-    public Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
-        => Task.FromResult(CurrentSettings);
-
-    public Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
-        SaveCalls++;
-        CurrentSettings = settings;
-        return Task.CompletedTask;
+        await _settingsGate.WaitAsync(cancellationToken);
+        try
+        {
+            return CurrentSettings;
+        }
+        finally
+        {
+            _settingsGate.Release();
+        }
+    }
+
+    public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    {
+        await _settingsGate.WaitAsync(cancellationToken);
+        try
+        {
+            SaveCalls++;
+            CurrentSettings = settings;
+        }
+        finally
+        {
+            _settingsGate.Release();
+        }
+    }
+
+    public async Task<AppSettings> UpdateAsync(
+        Func<AppSettings, AppSettings> update,
+        CancellationToken cancellationToken = default)
+    {
+        await _settingsGate.WaitAsync(cancellationToken);
+        try
+        {
+            var updated = update(CurrentSettings);
+            if (updated != CurrentSettings)
+            {
+                SaveCalls++;
+                CurrentSettings = updated;
+            }
+
+            return CurrentSettings;
+        }
+        finally
+        {
+            _settingsGate.Release();
+        }
     }
 }
 

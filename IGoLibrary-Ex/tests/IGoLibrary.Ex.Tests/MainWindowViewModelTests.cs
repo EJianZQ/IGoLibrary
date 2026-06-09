@@ -865,29 +865,112 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task TomorrowScheduledStartTime_RestoresDefault_WhenTimePickerCleared()
+    public async Task InitializeAsync_LoadsScheduledStartDefaults()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings() with
+        {
+            Tasks = new TaskExecutionSettings(
+                new GrabTaskSettings(GrabReservationStrategy.QueryThenReserve, new TimeSpan(7, 59, 55)),
+                OccupyTaskSettings.Default,
+                new TomorrowReservationTaskSettings(new TimeSpan(22, 1, 2)))
+        });
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal((TimeSpan?)new TimeSpan(7, 59, 55), viewModel.ScheduledStartTime);
+        Assert.Equal((TimeSpan?)new TimeSpan(22, 1, 2), viewModel.TomorrowScheduledStartTime);
+        Assert.Equal(0, settingsService.SaveCalls);
+    }
+
+    [Fact]
+    public async Task ScheduledStartDefaults_AutoSaveSilently_WhenTimePickerValuesChange()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
+        var notifications = new FakeNotificationService();
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            notificationService: notifications);
+        await viewModel.InitializeAsync();
+
+        viewModel.ScheduledStartTime = new TimeSpan(7, 59, 55);
+        viewModel.TomorrowScheduledStartTime = new TimeSpan(22, 1, 2);
+
+        await WaitForAsync(() =>
+            settingsService.CurrentSettings.Tasks.Grab.DefaultScheduledStartTime == new TimeSpan(7, 59, 55) &&
+            settingsService.CurrentSettings.Tasks.TomorrowReservation.DefaultScheduledStartTime == new TimeSpan(22, 1, 2));
+
+        Assert.Empty(notifications.Infos);
+        Assert.Empty(notifications.Warnings);
+        Assert.Empty(notifications.Successes);
+    }
+
+    [Fact]
+    public async Task ScheduledStartDefaults_FlushPendingSavesImmediately_WhenAutoSaveDelayHasNotElapsed()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
+        var notifications = new FakeNotificationService();
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            notificationService: notifications);
+        await viewModel.InitializeAsync();
+
+        viewModel.ScheduledStartTime = new TimeSpan(7, 59, 55);
+        viewModel.TomorrowScheduledStartTime = new TimeSpan(22, 1, 2);
+
+        await viewModel.FlushPendingScheduledStartDefaultsAsync();
+        var saveCallsAfterFlush = settingsService.SaveCalls;
+        await Task.Delay(650);
+
+        Assert.Equal(new TimeSpan(7, 59, 55), settingsService.CurrentSettings.Tasks.Grab.DefaultScheduledStartTime);
+        Assert.Equal(new TimeSpan(22, 1, 2), settingsService.CurrentSettings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
+        Assert.Equal(saveCallsAfterFlush, settingsService.SaveCalls);
+        Assert.Empty(notifications.Infos);
+        Assert.Empty(notifications.Warnings);
+        Assert.Empty(notifications.Successes);
+    }
+
+    [Fact]
+    public async Task ScheduledStartDefaults_DoNotAutoSave_WhenTimePickerValuesAreOutOfRange()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.ScheduledStartTime = TimeSpan.FromDays(1);
+        viewModel.TomorrowScheduledStartTime = TimeSpan.FromSeconds(-1);
+        await Task.Delay(650);
+
+        Assert.Equal(0, settingsService.SaveCalls);
+        Assert.Equal(TimeSpan.Zero, settingsService.CurrentSettings.Tasks.Grab.DefaultScheduledStartTime);
+        Assert.Equal(new TimeSpan(20, 0, 0), settingsService.CurrentSettings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
+    }
+
+    [Fact]
+    public async Task TomorrowScheduledStartTime_RestoresCurrentDefault_WhenTimePickerCleared()
     {
         var (viewModel, _) = await CreateBoundTomorrowViewModelAsync();
         viewModel.TomorrowScheduledStartTime = new TimeSpan(22, 1, 2);
 
         viewModel.TomorrowScheduledStartTime = null;
 
-        Assert.Equal((TimeSpan?)new TimeSpan(20, 0, 0), viewModel.TomorrowScheduledStartTime);
+        Assert.Equal((TimeSpan?)new TimeSpan(22, 1, 2), viewModel.TomorrowScheduledStartTime);
     }
 
     [Fact]
-    public async Task StartTomorrowReservationAsync_UsesRestoredDefault_WhenTimePickerCleared()
+    public async Task StartTomorrowReservationAsync_UsesCurrentDefault_WhenTimePickerCleared()
     {
         var (viewModel, coordinator) = await CreateBoundTomorrowViewModelAsync();
         await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
         viewModel.TomorrowVisibleSeats[0].IsSelected = true;
         viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
+        viewModel.TomorrowScheduledStartTime = new TimeSpan(22, 1, 2);
         viewModel.TomorrowScheduledStartTime = null;
 
         await viewModel.StartTomorrowReservationCommand.ExecuteAsync(null);
 
         var plan = Assert.IsType<TomorrowReservationPlan>(coordinator.LastPlan);
-        Assert.Equal(new TimeOnly(20, 0, 0), plan.ScheduledStart);
+        Assert.Equal(new TimeOnly(22, 1, 2), plan.ScheduledStart);
         Assert.False(plan.ExecuteImmediately);
     }
 
@@ -939,7 +1022,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task StartGrabAsync_UsesRestoredDefault_WhenTimePickerClearedAndTimedStartEnabled()
+    public async Task StartGrabAsync_UsesCurrentDefault_WhenTimePickerClearedAndTimedStartEnabled()
     {
         var (viewModel, coordinator) = await CreateBoundGrabViewModelAsync();
         viewModel.VisibleSeats[0].IsSelected = true;
@@ -950,8 +1033,8 @@ public sealed class MainWindowViewModelTests
         await viewModel.StartGrabCommand.ExecuteAsync(null);
 
         var plan = Assert.IsType<GrabSeatPlan>(coordinator.LastPlan);
-        Assert.Equal((TimeSpan?)TimeSpan.Zero, viewModel.ScheduledStartTime);
-        Assert.Equal(TimeOnly.MinValue, plan.ScheduledStart);
+        Assert.Equal((TimeSpan?)new TimeSpan(7, 59, 55), viewModel.ScheduledStartTime);
+        Assert.Equal(new TimeOnly(7, 59, 55), plan.ScheduledStart);
     }
 
     [Fact]

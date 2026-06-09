@@ -191,16 +191,34 @@ public partial class MainWindowWorkflowViewModel
     {
         if (value is null)
         {
-            ScheduledStartTime = DefaultGrabScheduledStartTime;
+            ScheduledStartTime = _grabScheduledStartDefault;
+            return;
         }
+
+        if (!IsTimeOfDay(value.Value))
+        {
+            return;
+        }
+
+        _grabScheduledStartDefault = value.Value;
+        ScheduleGrabScheduledStartDefaultAutoSave(value.Value);
     }
 
     partial void OnTomorrowScheduledStartTimeChanged(TimeSpan? value)
     {
         if (value is null)
         {
-            TomorrowScheduledStartTime = DefaultTomorrowScheduledStartTime;
+            TomorrowScheduledStartTime = _tomorrowScheduledStartDefault;
+            return;
         }
+
+        if (!IsTimeOfDay(value.Value))
+        {
+            return;
+        }
+
+        _tomorrowScheduledStartDefault = value.Value;
+        ScheduleTomorrowScheduledStartDefaultAutoSave(value.Value);
     }
 
     partial void OnIsTomorrowTaskActiveChanged(bool value)
@@ -361,6 +379,47 @@ public partial class MainWindowWorkflowViewModel
         {
             IsInitializationComplete = true;
             UpdateHomeDashboardPresentation();
+        }
+    }
+
+    public async Task FlushPendingScheduledStartDefaultsAsync(CancellationToken cancellationToken = default)
+    {
+        var pendingGrab = _pendingGrabScheduledStartDefault;
+        var pendingTomorrow = _pendingTomorrowScheduledStartDefault;
+
+        CancelPendingGrabScheduledStartDefaultAutoSave();
+        CancelPendingTomorrowScheduledStartDefaultAutoSave();
+
+        if (pendingGrab is not null)
+        {
+            try
+            {
+                await PersistGrabScheduledStartDefaultAsync(pendingGrab.Value, cancellationToken);
+                if (_pendingGrabScheduledStartDefault == pendingGrab)
+                {
+                    _pendingGrabScheduledStartDefault = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存抢座定时时间默认值失败：{ex.Message}");
+            }
+        }
+
+        if (pendingTomorrow is not null)
+        {
+            try
+            {
+                await PersistTomorrowScheduledStartDefaultAsync(pendingTomorrow.Value, cancellationToken);
+                if (_pendingTomorrowScheduledStartDefault == pendingTomorrow)
+                {
+                    _pendingTomorrowScheduledStartDefault = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存明日预约触发时间默认值失败：{ex.Message}");
+            }
         }
     }
 
@@ -1384,6 +1443,14 @@ public partial class MainWindowWorkflowViewModel
             SelectedAppThemeModeIndex = (int)theme.Mode;
             UseSystemAccent = theme.UseSystemAccent;
             SelectedGrabReservationStrategyIndex = (int)settings.Tasks.Grab.ReservationStrategy;
+            _grabScheduledStartDefault = NormalizeTimeOfDay(
+                settings.Tasks.Grab.DefaultScheduledStartTime,
+                DefaultGrabScheduledStartTime);
+            _tomorrowScheduledStartDefault = NormalizeTimeOfDay(
+                settings.Tasks.TomorrowReservation.DefaultScheduledStartTime,
+                DefaultTomorrowScheduledStartTime);
+            ScheduledStartTime = _grabScheduledStartDefault;
+            TomorrowScheduledStartTime = _tomorrowScheduledStartDefault;
 
             EmailAlertsEnabled = alertSettings.Email.Enabled;
             EmailAlertSmtpHost = alertSettings.Email.SmtpHost;
@@ -2127,12 +2194,22 @@ public partial class MainWindowWorkflowViewModel
 
     private static TimeOnly ToTimeOnly(TimeSpan value, string fieldName)
     {
-        if (value < TimeSpan.Zero || value >= TimeSpan.FromDays(1))
+        if (!IsTimeOfDay(value))
         {
             throw new InvalidOperationException($"{fieldName}必须介于 00:00:00 和 23:59:59 之间");
         }
 
         return TimeOnly.FromTimeSpan(value);
+    }
+
+    private static TimeSpan NormalizeTimeOfDay(TimeSpan value, TimeSpan fallback)
+    {
+        return IsTimeOfDay(value) ? value : fallback;
+    }
+
+    private static bool IsTimeOfDay(TimeSpan value)
+    {
+        return value >= TimeSpan.Zero && value < TimeSpan.FromDays(1);
     }
 
     private void OnLogEntryWritten(object? sender, AppLogEntry entry)
@@ -3092,6 +3169,88 @@ public partial class MainWindowWorkflowViewModel
             cancellationToken);
     }
 
+    private void ScheduleGrabScheduledStartDefaultAutoSave(TimeSpan value)
+    {
+        if (_isLoadingSettings || !IsInitializationComplete || !IsTimeOfDay(value))
+        {
+            return;
+        }
+
+        CancelPendingGrabScheduledStartDefaultAutoSave();
+        _pendingGrabScheduledStartDefault = value;
+        var cts = new CancellationTokenSource();
+        _grabScheduledStartDefaultAutoSaveCts = cts;
+        _ = AutoSaveGrabScheduledStartDefaultAsync(value, cts, cts.Token);
+    }
+
+    private async Task AutoSaveGrabScheduledStartDefaultAsync(
+        TimeSpan value,
+        CancellationTokenSource cancellationTokenSource,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(450), cancellationToken);
+            await PersistGrabScheduledStartDefaultAsync(value, cancellationToken);
+            ClearCompletedGrabScheduledStartDefaultAutoSave(cancellationTokenSource, value);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存抢座定时时间默认值失败：{ex.Message}");
+        }
+    }
+
+    private Task PersistGrabScheduledStartDefaultAsync(
+        TimeSpan value,
+        CancellationToken cancellationToken = default)
+    {
+        return SystemSettings.SaveGrabScheduledStartDefaultAsync(value, cancellationToken);
+    }
+
+    private void ScheduleTomorrowScheduledStartDefaultAutoSave(TimeSpan value)
+    {
+        if (_isLoadingSettings || !IsInitializationComplete || !IsTimeOfDay(value))
+        {
+            return;
+        }
+
+        CancelPendingTomorrowScheduledStartDefaultAutoSave();
+        _pendingTomorrowScheduledStartDefault = value;
+        var cts = new CancellationTokenSource();
+        _tomorrowScheduledStartDefaultAutoSaveCts = cts;
+        _ = AutoSaveTomorrowScheduledStartDefaultAsync(value, cts, cts.Token);
+    }
+
+    private async Task AutoSaveTomorrowScheduledStartDefaultAsync(
+        TimeSpan value,
+        CancellationTokenSource cancellationTokenSource,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(450), cancellationToken);
+            await PersistTomorrowScheduledStartDefaultAsync(value, cancellationToken);
+            ClearCompletedTomorrowScheduledStartDefaultAutoSave(cancellationTokenSource, value);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存明日预约触发时间默认值失败：{ex.Message}");
+        }
+    }
+
+    private Task PersistTomorrowScheduledStartDefaultAsync(
+        TimeSpan value,
+        CancellationToken cancellationToken = default)
+    {
+        return SystemSettings.SaveTomorrowScheduledStartDefaultAsync(value, cancellationToken);
+    }
+
     private void CancelPendingNotificationSettingsAutoSave()
     {
         if (_notificationSettingsAutoSaveCts is null)
@@ -3102,6 +3261,64 @@ public partial class MainWindowWorkflowViewModel
         _notificationSettingsAutoSaveCts.Cancel();
         _notificationSettingsAutoSaveCts.Dispose();
         _notificationSettingsAutoSaveCts = null;
+    }
+
+    private void CancelPendingGrabScheduledStartDefaultAutoSave()
+    {
+        if (_grabScheduledStartDefaultAutoSaveCts is null)
+        {
+            return;
+        }
+
+        _grabScheduledStartDefaultAutoSaveCts.Cancel();
+        _grabScheduledStartDefaultAutoSaveCts.Dispose();
+        _grabScheduledStartDefaultAutoSaveCts = null;
+    }
+
+    private void ClearCompletedGrabScheduledStartDefaultAutoSave(
+        CancellationTokenSource cancellationTokenSource,
+        TimeSpan value)
+    {
+        if (!ReferenceEquals(_grabScheduledStartDefaultAutoSaveCts, cancellationTokenSource))
+        {
+            return;
+        }
+
+        _grabScheduledStartDefaultAutoSaveCts.Dispose();
+        _grabScheduledStartDefaultAutoSaveCts = null;
+        if (_pendingGrabScheduledStartDefault == value)
+        {
+            _pendingGrabScheduledStartDefault = null;
+        }
+    }
+
+    private void CancelPendingTomorrowScheduledStartDefaultAutoSave()
+    {
+        if (_tomorrowScheduledStartDefaultAutoSaveCts is null)
+        {
+            return;
+        }
+
+        _tomorrowScheduledStartDefaultAutoSaveCts.Cancel();
+        _tomorrowScheduledStartDefaultAutoSaveCts.Dispose();
+        _tomorrowScheduledStartDefaultAutoSaveCts = null;
+    }
+
+    private void ClearCompletedTomorrowScheduledStartDefaultAutoSave(
+        CancellationTokenSource cancellationTokenSource,
+        TimeSpan value)
+    {
+        if (!ReferenceEquals(_tomorrowScheduledStartDefaultAutoSaveCts, cancellationTokenSource))
+        {
+            return;
+        }
+
+        _tomorrowScheduledStartDefaultAutoSaveCts.Dispose();
+        _tomorrowScheduledStartDefaultAutoSaveCts = null;
+        if (_pendingTomorrowScheduledStartDefault == value)
+        {
+            _pendingTomorrowScheduledStartDefault = null;
+        }
     }
 
     private void OnThemePaletteChanged(object? sender, AppThemePalette palette)

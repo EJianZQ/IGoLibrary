@@ -210,6 +210,20 @@ public sealed partial class SystemSettingsViewModel(
         return settingsWorkflowService.ClearStoredLibrarySelectionAsync(cancellationToken);
     }
 
+    public Task SaveGrabScheduledStartDefaultAsync(
+        TimeSpan value,
+        CancellationToken cancellationToken = default)
+    {
+        return settingsWorkflowService.SaveGrabScheduledStartDefaultAsync(value, cancellationToken);
+    }
+
+    public Task SaveTomorrowScheduledStartDefaultAsync(
+        TimeSpan value,
+        CancellationToken cancellationToken = default)
+    {
+        return settingsWorkflowService.SaveTomorrowScheduledStartDefaultAsync(value, cancellationToken);
+    }
+
     public Task SaveDashboardMetricsAsync(
         DashboardMetrics metrics,
         CancellationToken cancellationToken = default)

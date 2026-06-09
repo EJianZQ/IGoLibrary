@@ -62,8 +62,9 @@ public partial class MainWindowWorkflowViewModel(
     private const int OccupyTabIndex = 4;
     private const int NotificationSettingsTabIndex = 5;
     private const int SystemSettingsTabIndex = 6;
-    private static readonly TimeSpan DefaultGrabScheduledStartTime = TimeSpan.Zero;
-    private static readonly TimeSpan DefaultTomorrowScheduledStartTime = new(20, 0, 0);
+    private static readonly TimeSpan DefaultGrabScheduledStartTime = GrabTaskSettings.Default.DefaultScheduledStartTime;
+    private static readonly TimeSpan DefaultTomorrowScheduledStartTime =
+        TomorrowReservationTaskSettings.Default.DefaultScheduledStartTime;
     private static readonly SidebarNavigationItem HomeSidebarItem = new(
         0,
         "首页",
@@ -141,6 +142,12 @@ public partial class MainWindowWorkflowViewModel(
     private DateTimeOffset? _lastRecordedTomorrowSuccessAt;
     private bool _isSynchronizingSidebarSelection;
     private bool _isLoadingSettings;
+    private TimeSpan _grabScheduledStartDefault = DefaultGrabScheduledStartTime;
+    private TimeSpan _tomorrowScheduledStartDefault = DefaultTomorrowScheduledStartTime;
+    private TimeSpan? _pendingGrabScheduledStartDefault;
+    private TimeSpan? _pendingTomorrowScheduledStartDefault;
+    private CancellationTokenSource? _grabScheduledStartDefaultAutoSaveCts;
+    private CancellationTokenSource? _tomorrowScheduledStartDefaultAutoSaveCts;
     private bool _isSynchronizingTomorrowSeatSelection;
     private string? _draftTomorrowSeatKey;
     private bool _notificationSettingsLoaded;

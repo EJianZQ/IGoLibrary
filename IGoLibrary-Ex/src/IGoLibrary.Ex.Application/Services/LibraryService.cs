@@ -39,8 +39,7 @@ public sealed class LibraryService(
         venueState.BoundLibrary = target;
         venueState.CurrentLayout = layout;
 
-        var settings = await settingsService.LoadAsync(cancellationToken);
-        await settingsService.SaveAsync(settings with
+        await settingsService.UpdateAsync(settings => settings with
         {
             Venue = new VenueSelectionSettings(target.LibraryId, target.Name)
         }, cancellationToken);

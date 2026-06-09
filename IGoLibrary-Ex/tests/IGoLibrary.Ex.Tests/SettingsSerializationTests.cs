@@ -37,7 +37,9 @@ public sealed class SettingsSerializationTests
         Assert.Equal(9, settings.Network.TimeoutSeconds);
         Assert.Equal(4, settings.Network.MaxRetries);
         Assert.Equal(GrabReservationStrategy.ReserveDirectly, settings.Tasks.Grab.ReservationStrategy);
+        Assert.Equal(TimeSpan.Zero, settings.Tasks.Grab.DefaultScheduledStartTime);
         Assert.Equal(5, settings.Tasks.Occupy.ReReservationMaxAttempts);
+        Assert.Equal(new TimeSpan(20, 0, 0), settings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
         Assert.Equal(12, settings.Venue.LastLibraryId);
         Assert.Equal("自科阅览区一", settings.Venue.LastLibraryName);
         Assert.Equal(6, settings.Dashboard.SuccessfulReservationCount);
@@ -190,7 +192,9 @@ public sealed class SettingsSerializationTests
         Assert.Equal(5, settings.Network.TimeoutSeconds);
         Assert.Equal(3, settings.Network.MaxRetries);
         Assert.Equal(GrabReservationStrategy.QueryThenReserve, settings.Tasks.Grab.ReservationStrategy);
+        Assert.Equal(TimeSpan.Zero, settings.Tasks.Grab.DefaultScheduledStartTime);
         Assert.Equal(4, settings.Tasks.Occupy.ReReservationMaxAttempts);
+        Assert.Equal(new TimeSpan(20, 0, 0), settings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
     }
 
     [Fact]
@@ -213,6 +217,8 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"tasks\":", json);
         Assert.Contains("\"grab\":", json);
         Assert.Contains("\"occupy\":", json);
+        Assert.Contains("\"tomorrowReservation\":", json);
+        Assert.Contains("\"defaultScheduledStartTime\":", json);
         Assert.Contains("\"venue\":", json);
         Assert.Contains("\"dashboard\":", json);
         Assert.Contains("\"taskEventAlerts\":", json);

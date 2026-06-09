@@ -226,6 +226,86 @@ public sealed class WorkflowServiceTests
     }
 
     [Fact]
+    public async Task SettingsWorkflowService_SaveGrabScheduledStartDefaultAsync_OnlyChangesGrabTime()
+    {
+        var initial = AppSettings.Default with
+        {
+            Venue = new VenueSelectionSettings(3, "三楼"),
+            Dashboard = new DashboardMetrics(8, 900),
+            Tasks = new TaskExecutionSettings(
+                new GrabTaskSettings(GrabReservationStrategy.ReserveDirectly),
+                new OccupyTaskSettings(6),
+                new TomorrowReservationTaskSettings(new TimeSpan(21, 0, 0)))
+        };
+        var settingsService = new FakeSettingsService(initial);
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveGrabScheduledStartDefaultAsync(new TimeSpan(7, 59, 55));
+
+        Assert.Equal(new TimeSpan(7, 59, 55), settingsService.CurrentSettings.Tasks.Grab.DefaultScheduledStartTime);
+        Assert.Equal(GrabReservationStrategy.ReserveDirectly, settingsService.CurrentSettings.Tasks.Grab.ReservationStrategy);
+        Assert.Equal(6, settingsService.CurrentSettings.Tasks.Occupy.ReReservationMaxAttempts);
+        Assert.Equal(new TimeSpan(21, 0, 0), settingsService.CurrentSettings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
+        Assert.Equal(initial.Venue, settingsService.CurrentSettings.Venue);
+        Assert.Equal(initial.Dashboard, settingsService.CurrentSettings.Dashboard);
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_SaveTomorrowScheduledStartDefaultAsync_OnlyChangesTomorrowTime()
+    {
+        var initial = AppSettings.Default with
+        {
+            Tasks = new TaskExecutionSettings(
+                new GrabTaskSettings(GrabReservationStrategy.ReserveDirectly, new TimeSpan(7, 59, 55)),
+                new OccupyTaskSettings(6),
+                TomorrowReservationTaskSettings.Default)
+        };
+        var settingsService = new FakeSettingsService(initial);
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveTomorrowScheduledStartDefaultAsync(new TimeSpan(22, 1, 2));
+
+        Assert.Equal(new TimeSpan(7, 59, 55), settingsService.CurrentSettings.Tasks.Grab.DefaultScheduledStartTime);
+        Assert.Equal(GrabReservationStrategy.ReserveDirectly, settingsService.CurrentSettings.Tasks.Grab.ReservationStrategy);
+        Assert.Equal(6, settingsService.CurrentSettings.Tasks.Occupy.ReReservationMaxAttempts);
+        Assert.Equal(new TimeSpan(22, 1, 2), settingsService.CurrentSettings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_ScheduledStartDefaults_IgnoresOutOfRangeValues()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveGrabScheduledStartDefaultAsync(TimeSpan.FromDays(1));
+        await service.SaveTomorrowScheduledStartDefaultAsync(TimeSpan.FromSeconds(-1));
+
+        Assert.Equal(0, settingsService.SaveCalls);
+        Assert.Equal(TimeSpan.Zero, settingsService.CurrentSettings.Tasks.Grab.DefaultScheduledStartTime);
+        Assert.Equal(new TimeSpan(20, 0, 0), settingsService.CurrentSettings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
+    }
+
+    [Fact]
+    public async Task SettingsService_UpdateAsync_SerializesConcurrentPartialUpdates()
+    {
+        var repository = new SlowSettingsRepository(AppSettings.Default);
+        var settingsService = new SettingsService(repository);
+        var workflowService = new SettingsWorkflowService(settingsService);
+
+        await Task.WhenAll(
+            settingsService.UpdateAsync(settings => settings with
+            {
+                Venue = new VenueSelectionSettings(7, "自科")
+            }),
+            workflowService.SaveGrabScheduledStartDefaultAsync(new TimeSpan(7, 59, 55)));
+
+        var settings = await settingsService.LoadAsync();
+        Assert.Equal(7, settings.Venue.LastLibraryId);
+        Assert.Equal("自科", settings.Venue.LastLibraryName);
+        Assert.Equal(new TimeSpan(7, 59, 55), settings.Tasks.Grab.DefaultScheduledStartTime);
+    }
+
+    [Fact]
     public async Task ProtocolTemplateEditorService_DelegatesLoadSaveAndReset()
     {
         var templates = new TraceIntGraphQlTemplates("cookie", "libs", "layout", "rule", "reservation", "reserve", "cancel");
@@ -260,5 +340,22 @@ public sealed class WorkflowServiceTests
         Assert.Equal("local failed", exception.Message);
         Assert.Single(alertService.TestEmailRequests);
         Assert.Single(alertService.TestTelegramRequests);
+    }
+
+    private sealed class SlowSettingsRepository(AppSettings settings) : ISettingsRepository
+    {
+        private AppSettings _settings = settings;
+
+        public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(25, cancellationToken);
+            return _settings;
+        }
+
+        public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(25, cancellationToken);
+            _settings = settings;
+        }
     }
 }

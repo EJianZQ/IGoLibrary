@@ -8,14 +8,20 @@ public sealed record TaskExecutionSettings
 
     public OccupyTaskSettings Occupy { get; init; } = OccupyTaskSettings.Default;
 
+    public TomorrowReservationTaskSettings TomorrowReservation { get; init; } = TomorrowReservationTaskSettings.Default;
+
     public TaskExecutionSettings()
     {
     }
 
-    public TaskExecutionSettings(GrabTaskSettings grab, OccupyTaskSettings occupy)
+    public TaskExecutionSettings(
+        GrabTaskSettings grab,
+        OccupyTaskSettings occupy,
+        TomorrowReservationTaskSettings? tomorrowReservation = null)
     {
         Grab = grab;
         Occupy = occupy;
+        TomorrowReservation = tomorrowReservation ?? TomorrowReservationTaskSettings.Default;
     }
 
     public TaskExecutionSettings(GrabReservationStrategy grabReservationStrategy)
@@ -30,6 +36,8 @@ public sealed record GrabTaskSettings
 {
     public GrabReservationStrategy ReservationStrategy { get; init; } = GrabReservationStrategy.QueryThenReserve;
 
+    public TimeSpan DefaultScheduledStartTime { get; init; } = TimeSpan.Zero;
+
     public GrabTaskSettings()
     {
     }
@@ -37,6 +45,12 @@ public sealed record GrabTaskSettings
     public GrabTaskSettings(GrabReservationStrategy reservationStrategy)
     {
         ReservationStrategy = reservationStrategy;
+    }
+
+    public GrabTaskSettings(GrabReservationStrategy reservationStrategy, TimeSpan defaultScheduledStartTime)
+    {
+        ReservationStrategy = reservationStrategy;
+        DefaultScheduledStartTime = defaultScheduledStartTime;
     }
 
     public static GrabTaskSettings Default { get; } = new();
@@ -56,4 +70,20 @@ public sealed record OccupyTaskSettings
     }
 
     public static OccupyTaskSettings Default { get; } = new();
+}
+
+public sealed record TomorrowReservationTaskSettings
+{
+    public TimeSpan DefaultScheduledStartTime { get; init; } = new(20, 0, 0);
+
+    public TomorrowReservationTaskSettings()
+    {
+    }
+
+    public TomorrowReservationTaskSettings(TimeSpan defaultScheduledStartTime)
+    {
+        DefaultScheduledStartTime = defaultScheduledStartTime;
+    }
+
+    public static TomorrowReservationTaskSettings Default { get; } = new();
 }
