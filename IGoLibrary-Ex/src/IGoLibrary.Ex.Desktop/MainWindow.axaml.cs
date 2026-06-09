@@ -244,7 +244,7 @@ public partial class MainWindow : Window
             _isAutoParsingClipboard = true;
             _lastProcessedClipboardText = clipboardText;
             await TryShowNotificationAsync(
-                () => _notificationService.ShowInfoAsync("已从剪贴板读取", "检测到授权链接，已自动填入并开始解析。"));
+                () => _notificationService.ShowInfoAsync("已从剪贴板读取", "检测到授权链接，已自动填入并开始解析"));
             await viewModel.TryAutoParseClipboardLinkAsync(clipboardText);
         }
         finally
@@ -294,7 +294,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             var message = string.IsNullOrWhiteSpace(ex.Message)
-                ? "界面操作失败，请稍后重试。"
+                ? "界面操作失败，请稍后重试"
                 : ex.Message;
             await TryShowNotificationAsync(() => notificationService.ShowWarningAsync(failureTitle, message));
         }

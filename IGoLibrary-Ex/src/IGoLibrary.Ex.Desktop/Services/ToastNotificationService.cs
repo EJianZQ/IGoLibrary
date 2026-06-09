@@ -63,6 +63,8 @@ public sealed class ToastNotificationService(
             return;
         }
 
+        message = TrimTrailingSentencePeriod(message);
+
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             ToastWindow? toast = null;
@@ -105,6 +107,13 @@ public sealed class ToastNotificationService(
                 Debug.WriteLine($"Toast notification failed to show: {ex}");
             }
         });
+    }
+
+    private static string TrimTrailingSentencePeriod(string message)
+    {
+        return string.IsNullOrWhiteSpace(message)
+            ? message
+            : message.TrimEnd('。');
     }
 
     public void DismissAllImmediately()

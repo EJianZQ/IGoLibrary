@@ -125,7 +125,7 @@ public sealed class TaskEventAlertService(
             return;
         }
 
-        var message = $"{normalizedTaskName}任务执行失败。";
+        var message = $"{normalizedTaskName}任务执行失败";
         await DispatchAlertAsync(
             emailLabel: $"{normalizedTaskName}任务失败提醒",
             telegramLabel: $"{normalizedTaskName}任务失败提醒",

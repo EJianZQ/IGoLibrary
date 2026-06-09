@@ -49,7 +49,7 @@ public sealed class DesktopNotificationTestService(
         await toastNotificationService.ShowForcedAsync(
             ToastVisualKind.Info,
             "任务提醒测试通知",
-            "这是一条测试通知，用于确认抢座成功、占座成功、任务失败和 Cookie 失效提醒的弹窗与提示音效果。",
+            "这是一条测试通知，用于确认抢座成功、占座成功、任务失败和 Cookie 失效提醒的弹窗与提示音效果",
             cancellationToken);
 
         if (settings.SoundEnabled)

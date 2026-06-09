@@ -555,7 +555,7 @@ public partial class MainWindowWorkflowViewModel
             {
                 if (notifyOnInvalidLink)
                 {
-                    await _notificationService.ShowWarningAsync("链接无效", "未能从链接中提取 32 位 code。");
+                    await _notificationService.ShowWarningAsync("链接无效", "未能从链接中提取 32 位 code");
                 }
 
                 return false;
@@ -566,7 +566,7 @@ public partial class MainWindowWorkflowViewModel
                 _activityLogService.Write(LogEntryKind.Info, "Auth", $"授权 code 已处理，跳过重复解析：{code}");
                 if (notifyOnInvalidLink)
                 {
-                    await _notificationService.ShowInfoAsync("链接已处理", "该授权链接已处理过一次。如需重试，请重新从微信获取新的授权链接。");
+                    await _notificationService.ShowInfoAsync("链接已处理", "该授权链接已处理过一次，如需重试，请重新从微信获取新的授权链接");
                 }
 
                 return false;
@@ -622,7 +622,7 @@ public partial class MainWindowWorkflowViewModel
         {
             if (string.IsNullOrWhiteSpace(ManualCookieText))
             {
-                await _notificationService.ShowWarningAsync("Cookie 为空", "请先输入 Cookie。");
+                await _notificationService.ShowWarningAsync("Cookie 为空", "请先输入 Cookie");
                 return;
             }
 
@@ -652,7 +652,7 @@ public partial class MainWindowWorkflowViewModel
             var result = await AccountVenue.RestoreSessionAsync();
             if (result.Session is null)
             {
-                await _notificationService.ShowInfoAsync("没有会话", "本地没有可恢复的会话。");
+                await _notificationService.ShowInfoAsync("没有会话", "本地没有可恢复的会话");
                 return;
             }
 
@@ -770,7 +770,7 @@ public partial class MainWindowWorkflowViewModel
         {
             if (SelectedLibrary is null)
             {
-                await _notificationService.ShowWarningAsync("未选择场馆", "请先选择一个场馆。");
+                await _notificationService.ShowWarningAsync("未选择场馆", "请先选择一个场馆");
                 return;
             }
 
@@ -781,7 +781,11 @@ public partial class MainWindowWorkflowViewModel
             await PopulateSeatsAsync(result.Layout, preserveSelection);
             PopulateTomorrowSeats(result.Layout);
             ApplyFavoriteStates(result.Favorites.Select(x => x.SeatKey), syncSelection: false);
-            await _notificationService.ShowInfoAsync("收藏已加载", $"已加载 {result.Favorites.Count} 个收藏座位。");
+            if (result.Favorites.Count > 0)
+            {
+                await _notificationService.ShowInfoAsync("收藏已加载", $"已加载 {result.Favorites.Count} 个收藏座位");
+            }
+
             await RefreshReservationAsync(showNotificationOnError: false);
         }
         catch (Exception ex)
@@ -805,7 +809,10 @@ public partial class MainWindowWorkflowViewModel
             await PopulateSeatsAsync(result.Layout, preserveSelection: true);
             PopulateTomorrowSeats(result.Layout);
             ApplyFavoriteStates(result.Favorites.Select(x => x.SeatKey), syncSelection: false);
-            await _notificationService.ShowInfoAsync("收藏已加载", $"已加载 {result.Favorites.Count} 个收藏座位。");
+            if (result.Favorites.Count > 0)
+            {
+                await _notificationService.ShowInfoAsync("收藏已加载", $"已加载 {result.Favorites.Count} 个收藏座位");
+            }
         }
         catch (Exception ex)
         {
@@ -840,7 +847,7 @@ public partial class MainWindowWorkflowViewModel
 
         if (SelectedLibrary is null)
         {
-            await _notificationService.ShowWarningAsync("未绑定场馆", "请先绑定场馆后再选择目标座位。");
+            await _notificationService.ShowWarningAsync("未绑定场馆", "请先绑定场馆后再选择目标座位");
             return;
         }
 
@@ -851,7 +858,7 @@ public partial class MainWindowWorkflowViewModel
 
         if (_allSeats.Count == 0)
         {
-            await _notificationService.ShowInfoAsync("暂无座位数据", "当前场馆还没有可供编辑的座位布局。");
+            await _notificationService.ShowInfoAsync("暂无座位数据", "当前场馆还没有可供编辑的座位布局");
             return;
         }
 
@@ -950,7 +957,10 @@ public partial class MainWindowWorkflowViewModel
         {
             var favorites = await AccountVenue.GetFavoritesAsync(SelectedLibrary.LibraryId);
             ApplyFavoriteStates(favorites.Select(x => x.SeatKey), syncSelection: false);
-            await _notificationService.ShowInfoAsync("收藏已加载", $"已加载 {favorites.Count} 个收藏座位。");
+            if (favorites.Count > 0)
+            {
+                await _notificationService.ShowInfoAsync("收藏已加载", $"已加载 {favorites.Count} 个收藏座位");
+            }
         }
         catch (Exception ex)
         {
@@ -979,14 +989,14 @@ public partial class MainWindowWorkflowViewModel
     {
         if (SelectedLibrary is null)
         {
-            await _notificationService.ShowWarningAsync("未绑定场馆", "请先绑定场馆。");
+            await _notificationService.ShowWarningAsync("未绑定场馆", "请先绑定场馆");
             return;
         }
 
         var selectedSeats = SelectedSeats.ToList();
         if (selectedSeats.Count == 0)
         {
-            await _notificationService.ShowWarningAsync("未选择座位", "请至少选中一个目标座位。");
+            await _notificationService.ShowWarningAsync("未选择座位", "请至少选中一个目标座位");
             return;
         }
 
@@ -1207,7 +1217,7 @@ public partial class MainWindowWorkflowViewModel
             }
             else if (showNotificationOnError)
             {
-                await _notificationService.ShowWarningAsync("刷新预约状态失败", result.FailureMessage ?? "接口未返回预约状态。");
+                await _notificationService.ShowWarningAsync("刷新预约状态失败", result.FailureMessage ?? "接口未返回预约状态");
             }
         }
         catch (Exception ex)
@@ -1238,20 +1248,20 @@ public partial class MainWindowWorkflowViewModel
                 stopOccupyFirst: IsOccupyRunning);
             if (!result.HasSession)
             {
-                await _notificationService.ShowWarningAsync("未登录", "当前会话已失效，请重新授权后再操作。");
+                await _notificationService.ShowWarningAsync("未登录", "当前会话已失效，请重新授权后再操作");
                 return;
             }
 
             if (!result.RemoteSucceeded)
             {
                 _activityLogService.Write(LogEntryKind.Warning, "Occupy", $"{reservation.SeatName} 取消预约失败，接口未返回成功结果。");
-                await _notificationService.ShowWarningAsync("取消预约失败", "接口未返回成功结果，请稍后重试。");
+                await _notificationService.ShowWarningAsync("取消预约失败", "接口未返回成功结果，请稍后重试");
                 return;
             }
 
             _activityLogService.Write(LogEntryKind.Success, "Occupy", $"{reservation.SeatName} 已手动取消预约。");
             UpdateReservationPresentation(result.Reservation);
-            await _notificationService.ShowSuccessAsync("已取消预约", $"{reservation.SeatName} 已取消预约。");
+            await _notificationService.ShowSuccessAsync("已取消预约", $"{reservation.SeatName} 已取消预约");
         }
         catch (Exception ex)
         {
@@ -1316,7 +1326,7 @@ public partial class MainWindowWorkflowViewModel
             grabReservationStrategy,
             BuildTaskEventAlertSettingsSnapshot()));
         await _appThemeService.ApplyThemeAsync(theme);
-        await _notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库。");
+        await _notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库");
     }
 
     [RelayCommand]
@@ -1324,11 +1334,11 @@ public partial class MainWindowWorkflowViewModel
     {
         if (_notificationService is ToastNotificationService toastNotificationService)
         {
-            await toastNotificationService.ShowPreviewAsync("测试通知", "这是一条用于测试界面动效与停留时间的 Toast 通知。");
+            await toastNotificationService.ShowPreviewAsync("测试通知", "这是一条用于测试界面动效与停留时间的 Toast 通知");
             return;
         }
 
-        await _notificationService.ShowInfoAsync("测试通知", "这是一条用于测试界面动效与停留时间的 Toast 通知。");
+        await _notificationService.ShowInfoAsync("测试通知", "这是一条用于测试界面动效与停留时间的 Toast 通知");
     }
 
     [RelayCommand]
@@ -1340,7 +1350,7 @@ public partial class MainWindowWorkflowViewModel
             await PersistNotificationSettingsSnapshotAsync();
             await NotificationSettings.SendTestEmailAsync(BuildTaskEventAlertSettingsSnapshot().Email);
             NotificationSettingsStatusText = $"测试邮件已发送于 {DateTime.Now:HH:mm:ss}。";
-            await _notificationService.ShowSuccessAsync("测试邮件已发送", "请检查收件箱，确认当前 SMTP 配置可用。");
+            await _notificationService.ShowSuccessAsync("测试邮件已发送", "请检查收件箱，确认当前 SMTP 配置可用");
         }
         catch (Exception ex)
         {
@@ -1359,7 +1369,7 @@ public partial class MainWindowWorkflowViewModel
             await PersistNotificationSettingsSnapshotAsync();
             await NotificationSettings.SendTestTelegramAsync(BuildTaskEventAlertSettingsSnapshot().Telegram);
             NotificationSettingsStatusText = $"测试 Telegram 已发送于 {DateTime.Now:HH:mm:ss}。";
-            await _notificationService.ShowSuccessAsync("测试 Telegram 已发送", "请检查 Telegram，确认当前 Bot 配置可用。");
+            await _notificationService.ShowSuccessAsync("测试 Telegram 已发送", "请检查 Telegram，确认当前 Bot 配置可用");
         }
         catch (Exception ex)
         {
@@ -1403,7 +1413,7 @@ public partial class MainWindowWorkflowViewModel
             TomorrowReservationSaveTemplateText,
             TomorrowReservationInfoTemplateText);
         await SystemSettings.SaveProtocolOverridesAsync(overrides);
-        await _notificationService.ShowSuccessAsync("协议模板已保存", "高级协议覆盖已写入数据库。");
+        await _notificationService.ShowSuccessAsync("协议模板已保存", "高级协议覆盖已写入数据库");
     }
 
     [RelayCommand]
@@ -1411,7 +1421,7 @@ public partial class MainWindowWorkflowViewModel
     {
         await SystemSettings.ResetProtocolOverridesAsync();
         await LoadProtocolTemplatesAsync();
-        await _notificationService.ShowSuccessAsync("协议模板已重置", "已恢复内置默认模板。");
+        await _notificationService.ShowSuccessAsync("协议模板已重置", "已恢复内置默认模板");
     }
 
     private async Task PersistGrabReservationStrategyAsync()
@@ -2842,17 +2852,17 @@ public partial class MainWindowWorkflowViewModel
     {
         if (!SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime))
         {
-            return "授权链接解析成功，Cookie 已填入。";
+            return "授权链接解析成功，Cookie 已填入";
         }
 
-        return $"授权链接解析成功，Cookie 已填入。{Environment.NewLine}Cookie 到期时间：{expirationTime:M月d日 HH:mm}";
+        return $"授权链接解析成功，Cookie 已填入{Environment.NewLine}Cookie 到期时间：{expirationTime:M月d日 HH:mm}";
     }
 
     private async Task NotifySessionRestoredAsync(string cookie)
     {
         if (!SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime))
         {
-            await _notificationService.ShowSuccessAsync("已成功恢复上次的 Cookie", "本地会话已恢复。");
+            await _notificationService.ShowSuccessAsync("已成功恢复上次的 Cookie", "本地会话已恢复");
             return;
         }
 

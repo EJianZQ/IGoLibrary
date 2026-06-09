@@ -285,7 +285,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(result);
         var success = Assert.Single(notificationService.Successes, item => item.Title == "已成功获取 Cookie");
         Assert.Equal(
-            $"授权链接解析成功，Cookie 已填入。{Environment.NewLine}Cookie 到期时间：5月5日 16:56",
+            $"授权链接解析成功，Cookie 已填入{Environment.NewLine}Cookie 到期时间：5月5日 16:56",
             success.Message);
     }
 
