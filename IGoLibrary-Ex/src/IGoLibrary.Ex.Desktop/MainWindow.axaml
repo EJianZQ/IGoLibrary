@@ -1018,7 +1018,7 @@
                     </Grid>
                   </StackPanel>
 
-                  <Grid ColumnDefinitions="*,*,*"
+                  <Grid ColumnDefinitions="15*,9*,24*"
                         ColumnSpacing="16">
                     <StackPanel Spacing="0">
                       <TextBlock Text="抢座执行策略"
@@ -1040,12 +1040,25 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="2"
-                                Spacing="0">
+                                Spacing="4">
                       <TextBlock Text="定时启动"
                                  Classes="field-label" />
-                      <TextBox Text="{Binding ScheduledTimeText}"
-                               Watermark="HH:mm:ss"
-                               IsEnabled="{Binding CanEditGrabConfiguration}" />
+                      <Grid ColumnDefinitions="Auto,*"
+                            ColumnSpacing="8">
+                        <ToggleSwitch IsChecked="{Binding IsGrabScheduledStartEnabled}"
+                                      OnContent="开"
+                                      OffContent="关"
+                                      IsEnabled="{Binding CanEditGrabConfiguration}"
+                                      VerticalAlignment="Center" />
+                        <TimePicker Grid.Column="1"
+                                    SelectedTime="{Binding ScheduledStartTime}"
+                                    UseSeconds="True"
+                                    MinuteIncrement="1"
+                                    SecondIncrement="1"
+                                    ClockIdentifier="24HourClock"
+                                    IsEnabled="{Binding CanEditGrabScheduledStartTime}"
+                                    HorizontalAlignment="Stretch" />
+                      </Grid>
                     </StackPanel>
                   </Grid>
                 </StackPanel>
@@ -1240,12 +1253,16 @@
                 <TextBlock Text="执行控制"
                            FontSize="18"
                            FontWeight="Bold" />
-                <Grid ColumnDefinitions="180,Auto,Auto,Auto,*"
+                <Grid ColumnDefinitions="240,Auto,Auto,Auto,*"
                       ColumnSpacing="12">
-                <TextBox Text="{Binding TomorrowScheduledTimeText}"
-                         Watermark="HH:mm:ss"
-                         IsEnabled="{Binding CanEditTomorrowConfiguration}"
-                         VerticalAlignment="Center" />
+                <TimePicker SelectedTime="{Binding TomorrowScheduledStartTime}"
+                            UseSeconds="True"
+                            MinuteIncrement="1"
+                            SecondIncrement="1"
+                            ClockIdentifier="24HourClock"
+                            IsEnabled="{Binding CanEditTomorrowConfiguration}"
+                            MinWidth="240"
+                            VerticalAlignment="Center" />
                 <Button Grid.Column="1"
                         Content="开始定时预约"
                         Command="{Binding StartTomorrowReservationCommand}"

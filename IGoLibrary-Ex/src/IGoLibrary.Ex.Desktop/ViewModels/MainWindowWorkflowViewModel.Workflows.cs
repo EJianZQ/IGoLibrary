@@ -33,6 +33,8 @@ public partial class MainWindowWorkflowViewModel
 
     public bool CanEditGrabConfiguration => !IsGrabTaskActive;
 
+    public bool CanEditGrabScheduledStartTime => CanEditGrabConfiguration && IsGrabScheduledStartEnabled;
+
     public bool CanEditTomorrowConfiguration => !IsTomorrowTaskActive && !HasActiveVenuePreview;
 
     public bool HasSelectedTomorrowSeat => SelectedTomorrowSeat is not null;
@@ -177,6 +179,20 @@ public partial class MainWindowWorkflowViewModel
     partial void OnIsGrabTaskActiveChanged(bool value)
     {
         OnPropertyChanged(nameof(CanEditGrabConfiguration));
+        OnPropertyChanged(nameof(CanEditGrabScheduledStartTime));
+    }
+
+    partial void OnIsGrabScheduledStartEnabledChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanEditGrabScheduledStartTime));
+    }
+
+    partial void OnTomorrowScheduledStartTimeChanged(TimeSpan? value)
+    {
+        if (value is null)
+        {
+            TomorrowScheduledStartTime = DefaultTomorrowScheduledStartTime;
+        }
     }
 
     partial void OnIsTomorrowTaskActiveChanged(bool value)
@@ -2082,27 +2098,20 @@ public partial class MainWindowWorkflowViewModel
 
     private TimeOnly? ParseScheduledTime()
     {
-        if (string.IsNullOrWhiteSpace(ScheduledTimeText) || ScheduledTimeText == "00:00:00")
+        if (!IsGrabScheduledStartEnabled || ScheduledStartTime is null)
         {
             return null;
         }
 
-        return TimeOnly.TryParse(ScheduledTimeText, out var value) ? value : null;
+        return TimeOnly.FromTimeSpan(ScheduledStartTime.Value);
     }
 
     private TimeOnly ParseTomorrowScheduledTime()
     {
-        if (string.IsNullOrWhiteSpace(TomorrowScheduledTimeText))
-        {
-            return new TimeOnly(21, 48, 0);
-        }
+        var scheduledStart = TomorrowScheduledStartTime
+            ?? throw new InvalidOperationException("明日预约触发时间不能为空");
 
-        if (TimeOnly.TryParse(TomorrowScheduledTimeText, out var value))
-        {
-            return value;
-        }
-
-        throw new InvalidOperationException("明日预约触发时间格式无效，请使用 HH:mm:ss");
+        return TimeOnly.FromTimeSpan(scheduledStart);
     }
 
     private void OnLogEntryWritten(object? sender, AppLogEntry entry)

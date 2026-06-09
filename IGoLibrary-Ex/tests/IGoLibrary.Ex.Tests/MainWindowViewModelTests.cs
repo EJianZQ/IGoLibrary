@@ -835,7 +835,7 @@ public sealed class MainWindowViewModelTests
         await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
         viewModel.TomorrowVisibleSeats[1].IsSelected = true;
         viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
-        viewModel.TomorrowScheduledTimeText = "21:48:00";
+        viewModel.TomorrowScheduledStartTime = new TimeSpan(21, 48, 0);
 
         await viewModel.RunTomorrowReservationNowCommand.ExecuteAsync(null);
 
@@ -854,7 +854,7 @@ public sealed class MainWindowViewModelTests
         await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
         viewModel.TomorrowVisibleSeats[0].IsSelected = true;
         viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
-        viewModel.TomorrowScheduledTimeText = "22:01:02";
+        viewModel.TomorrowScheduledStartTime = new TimeSpan(22, 1, 2);
 
         await viewModel.StartTomorrowReservationCommand.ExecuteAsync(null);
 
@@ -862,6 +862,75 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(new SeatReference("seat-1", "1"), plan.Seat);
         Assert.Equal(new TimeOnly(22, 1, 2), plan.ScheduledStart);
         Assert.False(plan.ExecuteImmediately);
+    }
+
+    [Fact]
+    public async Task TomorrowScheduledStartTime_RestoresDefault_WhenTimePickerCleared()
+    {
+        var (viewModel, _) = await CreateBoundTomorrowViewModelAsync();
+        viewModel.TomorrowScheduledStartTime = new TimeSpan(22, 1, 2);
+
+        viewModel.TomorrowScheduledStartTime = null;
+
+        Assert.Equal((TimeSpan?)new TimeSpan(21, 48, 0), viewModel.TomorrowScheduledStartTime);
+    }
+
+    [Fact]
+    public async Task StartTomorrowReservationAsync_UsesRestoredDefault_WhenTimePickerCleared()
+    {
+        var (viewModel, coordinator) = await CreateBoundTomorrowViewModelAsync();
+        await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
+        viewModel.TomorrowVisibleSeats[0].IsSelected = true;
+        viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
+        viewModel.TomorrowScheduledStartTime = null;
+
+        await viewModel.StartTomorrowReservationCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<TomorrowReservationPlan>(coordinator.LastPlan);
+        Assert.Equal(new TimeOnly(21, 48, 0), plan.ScheduledStart);
+        Assert.False(plan.ExecuteImmediately);
+    }
+
+    [Fact]
+    public async Task StartGrabAsync_UsesSelectedTimePickerValue_ForScheduledStart()
+    {
+        var (viewModel, coordinator) = await CreateBoundGrabViewModelAsync();
+        viewModel.VisibleSeats[0].IsSelected = true;
+        viewModel.IsGrabScheduledStartEnabled = true;
+        viewModel.ScheduledStartTime = new TimeSpan(7, 59, 55);
+
+        await viewModel.StartGrabCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<GrabSeatPlan>(coordinator.LastPlan);
+        Assert.Equal(new TimeOnly(7, 59, 55), plan.ScheduledStart);
+    }
+
+    [Fact]
+    public async Task StartGrabAsync_TreatsMidnightTimePickerValue_AsScheduledStart_WhenTimedStartEnabled()
+    {
+        var (viewModel, coordinator) = await CreateBoundGrabViewModelAsync();
+        viewModel.VisibleSeats[0].IsSelected = true;
+        viewModel.IsGrabScheduledStartEnabled = true;
+        viewModel.ScheduledStartTime = TimeSpan.Zero;
+
+        await viewModel.StartGrabCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<GrabSeatPlan>(coordinator.LastPlan);
+        Assert.Equal(TimeOnly.MinValue, plan.ScheduledStart);
+    }
+
+    [Fact]
+    public async Task StartGrabAsync_IgnoresTimePickerValue_WhenTimedStartDisabled()
+    {
+        var (viewModel, coordinator) = await CreateBoundGrabViewModelAsync();
+        viewModel.VisibleSeats[0].IsSelected = true;
+        viewModel.IsGrabScheduledStartEnabled = false;
+        viewModel.ScheduledStartTime = new TimeSpan(7, 59, 55);
+
+        await viewModel.StartGrabCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<GrabSeatPlan>(coordinator.LastPlan);
+        Assert.Null(plan.ScheduledStart);
     }
 
     [Fact]
@@ -1060,6 +1129,37 @@ public sealed class MainWindowViewModelTests
             FakeTomorrowReservationCoordinator? coordinator = null,
             FakeNotificationService? notificationService = null)
     {
+        var grabCoordinator = new FakeGrabSeatCoordinator();
+        var result = await CreateBoundSeatViewModelAsync(
+            grabCoordinator: grabCoordinator,
+            tomorrowCoordinator: coordinator,
+            notificationService: notificationService);
+
+        return (result.ViewModel, result.TomorrowCoordinator);
+    }
+
+    private static async Task<(MainWindowViewModel ViewModel, FakeGrabSeatCoordinator Coordinator)>
+        CreateBoundGrabViewModelAsync(
+            FakeGrabSeatCoordinator? coordinator = null,
+            FakeNotificationService? notificationService = null)
+    {
+        coordinator ??= new FakeGrabSeatCoordinator();
+        var result = await CreateBoundSeatViewModelAsync(
+            grabCoordinator: coordinator,
+            notificationService: notificationService);
+
+        return (result.ViewModel, coordinator);
+    }
+
+    private static async Task<(
+        MainWindowViewModel ViewModel,
+        FakeGrabSeatCoordinator GrabCoordinator,
+        FakeTomorrowReservationCoordinator TomorrowCoordinator)>
+        CreateBoundSeatViewModelAsync(
+            FakeGrabSeatCoordinator? grabCoordinator = null,
+            FakeTomorrowReservationCoordinator? tomorrowCoordinator = null,
+            FakeNotificationService? notificationService = null)
+    {
         var library = new LibrarySummary(117580, "自科阅览区一", "3层", true, 120, 20, 10);
         var sessionService = new FakeSessionService
         {
@@ -1082,18 +1182,20 @@ public sealed class MainWindowViewModelTests
                 new SeatSnapshot("seat-2", "2", true, 1, 0),
                 new SeatSnapshot("seat-3", "3", false, 2, 0)
             ]);
-        coordinator ??= new FakeTomorrowReservationCoordinator();
+        grabCoordinator ??= new FakeGrabSeatCoordinator();
+        tomorrowCoordinator ??= new FakeTomorrowReservationCoordinator();
         var viewModel = CreateViewModel(
             sessionService: sessionService,
             libraryService: libraryService,
-            tomorrowReservationCoordinator: coordinator,
+            grabSeatCoordinator: grabCoordinator,
+            tomorrowReservationCoordinator: tomorrowCoordinator,
             notificationService: notificationService);
 
         viewModel.IsAuthorized = true;
         viewModel.SelectedLibrary = library;
         await viewModel.BindSelectedLibraryCommand.ExecuteAsync(null);
 
-        return (viewModel, coordinator);
+        return (viewModel, grabCoordinator, tomorrowCoordinator);
     }
 
     private static AppSettings WithVenue(int? libraryId, string? libraryName)

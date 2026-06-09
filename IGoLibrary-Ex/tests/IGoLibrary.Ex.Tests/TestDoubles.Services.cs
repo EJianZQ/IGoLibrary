@@ -289,8 +289,11 @@ internal sealed class FakeGrabSeatCoordinator : IGrabSeatCoordinator
 
     public event EventHandler<CoordinatorStatus>? StatusChanged;
 
+    public GrabSeatPlan? LastPlan { get; private set; }
+
     public Task StartAsync(GrabSeatPlan plan, CancellationToken cancellationToken = default)
     {
+        LastPlan = plan;
         _status = new CoordinatorStatus(
             CoordinatorTaskState.Running,
             "抢座",
