@@ -187,6 +187,14 @@ public partial class MainWindowWorkflowViewModel
         OnPropertyChanged(nameof(CanEditGrabScheduledStartTime));
     }
 
+    partial void OnScheduledStartTimeChanged(TimeSpan? value)
+    {
+        if (value is null)
+        {
+            ScheduledStartTime = DefaultGrabScheduledStartTime;
+        }
+    }
+
     partial void OnTomorrowScheduledStartTimeChanged(TimeSpan? value)
     {
         if (value is null)
@@ -2098,12 +2106,15 @@ public partial class MainWindowWorkflowViewModel
 
     private TimeOnly? ParseScheduledTime()
     {
-        if (!IsGrabScheduledStartEnabled || ScheduledStartTime is null)
+        if (!IsGrabScheduledStartEnabled)
         {
             return null;
         }
 
-        return TimeOnly.FromTimeSpan(ScheduledStartTime.Value);
+        var scheduledStart = ScheduledStartTime
+            ?? throw new InvalidOperationException("抢座定时启动时间不能为空");
+
+        return ToTimeOnly(scheduledStart, "抢座定时启动时间");
     }
 
     private TimeOnly ParseTomorrowScheduledTime()
@@ -2111,7 +2122,17 @@ public partial class MainWindowWorkflowViewModel
         var scheduledStart = TomorrowScheduledStartTime
             ?? throw new InvalidOperationException("明日预约触发时间不能为空");
 
-        return TimeOnly.FromTimeSpan(scheduledStart);
+        return ToTimeOnly(scheduledStart, "明日预约触发时间");
+    }
+
+    private static TimeOnly ToTimeOnly(TimeSpan value, string fieldName)
+    {
+        if (value < TimeSpan.Zero || value >= TimeSpan.FromDays(1))
+        {
+            throw new InvalidOperationException($"{fieldName}必须介于 00:00:00 和 23:59:59 之间");
+        }
+
+        return TimeOnly.FromTimeSpan(value);
     }
 
     private void OnLogEntryWritten(object? sender, AppLogEntry entry)

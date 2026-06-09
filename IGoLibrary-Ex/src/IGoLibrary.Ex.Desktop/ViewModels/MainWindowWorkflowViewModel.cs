@@ -62,7 +62,8 @@ public partial class MainWindowWorkflowViewModel(
     private const int OccupyTabIndex = 4;
     private const int NotificationSettingsTabIndex = 5;
     private const int SystemSettingsTabIndex = 6;
-    private static readonly TimeSpan DefaultTomorrowScheduledStartTime = new(21, 48, 0);
+    private static readonly TimeSpan DefaultGrabScheduledStartTime = TimeSpan.Zero;
+    private static readonly TimeSpan DefaultTomorrowScheduledStartTime = new(20, 0, 0);
     private static readonly SidebarNavigationItem HomeSidebarItem = new(
         0,
         "首页",
@@ -439,7 +440,7 @@ public partial class MainWindowWorkflowViewModel(
     private bool isGrabScheduledStartEnabled;
 
     [ObservableProperty]
-    private TimeSpan? scheduledStartTime = TimeSpan.Zero;
+    private TimeSpan? scheduledStartTime = DefaultGrabScheduledStartTime;
 
     [ObservableProperty]
     private TimeSpan? tomorrowScheduledStartTime = DefaultTomorrowScheduledStartTime;

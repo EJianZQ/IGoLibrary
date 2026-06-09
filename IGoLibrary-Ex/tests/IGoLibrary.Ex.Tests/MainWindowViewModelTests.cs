@@ -835,7 +835,7 @@ public sealed class MainWindowViewModelTests
         await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
         viewModel.TomorrowVisibleSeats[1].IsSelected = true;
         viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
-        viewModel.TomorrowScheduledStartTime = new TimeSpan(21, 48, 0);
+        viewModel.TomorrowScheduledStartTime = new TimeSpan(20, 0, 0);
 
         await viewModel.RunTomorrowReservationNowCommand.ExecuteAsync(null);
 
@@ -843,7 +843,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(117580, plan.LibraryId);
         Assert.Equal("自科阅览区一", plan.LibraryName);
         Assert.Equal(new SeatReference("seat-2", "2"), plan.Seat);
-        Assert.Equal(new TimeOnly(21, 48, 0), plan.ScheduledStart);
+        Assert.Equal(new TimeOnly(20, 0, 0), plan.ScheduledStart);
         Assert.True(plan.ExecuteImmediately);
     }
 
@@ -872,7 +872,7 @@ public sealed class MainWindowViewModelTests
 
         viewModel.TomorrowScheduledStartTime = null;
 
-        Assert.Equal((TimeSpan?)new TimeSpan(21, 48, 0), viewModel.TomorrowScheduledStartTime);
+        Assert.Equal((TimeSpan?)new TimeSpan(20, 0, 0), viewModel.TomorrowScheduledStartTime);
     }
 
     [Fact]
@@ -887,8 +887,27 @@ public sealed class MainWindowViewModelTests
         await viewModel.StartTomorrowReservationCommand.ExecuteAsync(null);
 
         var plan = Assert.IsType<TomorrowReservationPlan>(coordinator.LastPlan);
-        Assert.Equal(new TimeOnly(21, 48, 0), plan.ScheduledStart);
+        Assert.Equal(new TimeOnly(20, 0, 0), plan.ScheduledStart);
         Assert.False(plan.ExecuteImmediately);
+    }
+
+    [Fact]
+    public async Task StartTomorrowReservationAsync_ShowsWarning_WhenScheduledStartTimeOutOfRange()
+    {
+        var notifications = new FakeNotificationService();
+        var (viewModel, coordinator) = await CreateBoundTomorrowViewModelAsync(notificationService: notifications);
+        await viewModel.OpenTomorrowSeatSelectionOverlayCommand.ExecuteAsync(null);
+        viewModel.TomorrowVisibleSeats[0].IsSelected = true;
+        viewModel.ConfirmTomorrowSeatSelectionCommand.Execute(null);
+        viewModel.TomorrowScheduledStartTime = TimeSpan.FromDays(1);
+
+        await viewModel.StartTomorrowReservationCommand.ExecuteAsync(null);
+
+        Assert.Null(coordinator.LastPlan);
+        Assert.Contains(
+            notifications.Warnings,
+            warning => warning.Title == "启动明日预约失败" &&
+                       warning.Message.Contains("明日预约触发时间", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -920,6 +939,22 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task StartGrabAsync_UsesRestoredDefault_WhenTimePickerClearedAndTimedStartEnabled()
+    {
+        var (viewModel, coordinator) = await CreateBoundGrabViewModelAsync();
+        viewModel.VisibleSeats[0].IsSelected = true;
+        viewModel.IsGrabScheduledStartEnabled = true;
+        viewModel.ScheduledStartTime = new TimeSpan(7, 59, 55);
+
+        viewModel.ScheduledStartTime = null;
+        await viewModel.StartGrabCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<GrabSeatPlan>(coordinator.LastPlan);
+        Assert.Equal((TimeSpan?)TimeSpan.Zero, viewModel.ScheduledStartTime);
+        Assert.Equal(TimeOnly.MinValue, plan.ScheduledStart);
+    }
+
+    [Fact]
     public async Task StartGrabAsync_IgnoresTimePickerValue_WhenTimedStartDisabled()
     {
         var (viewModel, coordinator) = await CreateBoundGrabViewModelAsync();
@@ -931,6 +966,24 @@ public sealed class MainWindowViewModelTests
 
         var plan = Assert.IsType<GrabSeatPlan>(coordinator.LastPlan);
         Assert.Null(plan.ScheduledStart);
+    }
+
+    [Fact]
+    public async Task StartGrabAsync_ShowsWarning_WhenScheduledStartTimeOutOfRange()
+    {
+        var notifications = new FakeNotificationService();
+        var (viewModel, coordinator) = await CreateBoundGrabViewModelAsync(notificationService: notifications);
+        viewModel.VisibleSeats[0].IsSelected = true;
+        viewModel.IsGrabScheduledStartEnabled = true;
+        viewModel.ScheduledStartTime = TimeSpan.FromDays(1);
+
+        await viewModel.StartGrabCommand.ExecuteAsync(null);
+
+        Assert.Null(coordinator.LastPlan);
+        Assert.Contains(
+            notifications.Warnings,
+            warning => warning.Title == "启动抢座失败" &&
+                       warning.Message.Contains("抢座定时启动时间", StringComparison.Ordinal));
     }
 
     [Fact]
