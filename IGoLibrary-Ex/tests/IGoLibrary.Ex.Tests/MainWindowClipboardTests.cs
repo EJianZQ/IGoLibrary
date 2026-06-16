@@ -152,6 +152,9 @@ public sealed class MainWindowClipboardTests
             activityLogService,
             new FakeNotificationService(),
             new FakeErrorDialogService(),
+            new FakeUpdateCheckService(),
+            new FakeUpdateDialogService(),
+            new FakeExternalLinkService(),
             new FakeAppThemeService(),
             new AppWindowService());
     }

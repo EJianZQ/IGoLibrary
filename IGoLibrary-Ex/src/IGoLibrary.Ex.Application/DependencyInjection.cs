@@ -16,6 +16,8 @@ public static class DependencyInjection
         services.AddSingleton<IReservationState>(serviceProvider => serviceProvider.GetRequiredService<AppRuntimeState>());
         services.AddSingleton<IActivityLogService, ActivityLogService>();
         services.TryAddSingleton<IAppSettingsDefaults, DefaultAppSettingsDefaults>();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        services.AddSingleton<IAppVersionProvider, AssemblyAppVersionProvider>();
         services.AddSingleton<ISessionService, SessionService>();
         services.AddSingleton<ILibraryService, LibraryService>();
         services.AddSingleton<ISettingsService, SettingsService>();
@@ -23,6 +25,7 @@ public static class DependencyInjection
         services.AddSingleton<IVenueWorkflowService, VenueWorkflowService>();
         services.AddSingleton<IReservationWorkflowService, ReservationWorkflowService>();
         services.AddSingleton<ISettingsWorkflowService, SettingsWorkflowService>();
+        services.AddSingleton<IUpdateCheckService, UpdateCheckService>();
         services.AddSingleton<IProtocolTemplateEditorService, ProtocolTemplateEditorService>();
         services.AddSingleton<ICoordinatorRuntime, SystemCoordinatorRuntime>();
         services.AddSingleton<IGrabReservationAttemptStrategy, QueryThenReserveGrabReservationStrategy>();

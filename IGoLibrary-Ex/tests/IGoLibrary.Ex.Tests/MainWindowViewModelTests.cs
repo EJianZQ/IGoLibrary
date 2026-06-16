@@ -1,8 +1,10 @@
 using System.Net;
 using System.Text;
+using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Application.Services;
+using IGoLibrary.Ex.Application.Updates;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 using Avalonia.Media;
@@ -723,6 +725,146 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SaveSettingsAsync_PersistsStartupUpdateCheckPreference()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+        viewModel.CheckUpdatesOnStartup = false;
+
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        Assert.False(settingsService.CurrentSettings.Updates.CheckOnStartup);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_TriggersAutomaticUpdateCheck()
+    {
+        var updateCheckService = new FakeUpdateCheckService();
+        var viewModel = CreateViewModel(updateCheckService: updateCheckService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Contains(UpdateCheckMode.Automatic, updateCheckService.CheckModes);
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesAsync_ShowsDialogAndSkipsSelectedVersion_WhenUpdateExists()
+    {
+        var version = new ReleaseVersion(1, 0, 2);
+        var release = new ReleaseUpdateInfo(
+            version,
+            "v1.0.2",
+            "IGoLibrary-Ex v1.0.2",
+            "更新内容",
+            new Uri("https://github.com/EJianZQ/IGoLibrary/releases/tag/v1.0.2"),
+            new DateTimeOffset(2026, 6, 9, 8, 0, 0, TimeSpan.Zero),
+            false);
+        var updateCheckService = new FakeUpdateCheckService();
+        updateCheckService.Results.Enqueue(UpdateCheckResult.UpdateAvailable(release));
+        var updateDialogService = new FakeUpdateDialogService
+        {
+            Result = UpdateDialogResult.SkipVersion
+        };
+        var viewModel = CreateViewModel(
+            updateCheckService: updateCheckService,
+            updateDialogService: updateDialogService);
+
+        await viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.Equal([UpdateCheckMode.Manual], updateCheckService.CheckModes);
+        Assert.Same(release, Assert.Single(updateDialogService.Releases));
+        Assert.Equal(version, Assert.Single(updateCheckService.SkippedVersions));
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesAsync_OpensReleasePage_WhenUserChoosesOpen()
+    {
+        var release = CreateReleaseUpdateInfo("v1.0.2");
+        var updateCheckService = new FakeUpdateCheckService();
+        updateCheckService.Results.Enqueue(UpdateCheckResult.UpdateAvailable(release));
+        var updateDialogService = new FakeUpdateDialogService
+        {
+            Result = UpdateDialogResult.OpenReleasePage
+        };
+        var externalLinkService = new FakeExternalLinkService();
+        var viewModel = CreateViewModel(
+            updateCheckService: updateCheckService,
+            updateDialogService: updateDialogService,
+            externalLinkService: externalLinkService);
+
+        await viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.Equal(release.HtmlUrl, Assert.Single(externalLinkService.OpenedUris));
+        Assert.Empty(updateCheckService.SkippedVersions);
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesAsync_ShowsWarning_WhenOpeningReleasePageFails()
+    {
+        var release = CreateReleaseUpdateInfo("v1.0.2");
+        var updateCheckService = new FakeUpdateCheckService();
+        updateCheckService.Results.Enqueue(UpdateCheckResult.UpdateAvailable(release));
+        var updateDialogService = new FakeUpdateDialogService
+        {
+            Result = UpdateDialogResult.OpenReleasePage
+        };
+        var externalLinkService = new FakeExternalLinkService
+        {
+            OpenException = new InvalidOperationException("browser unavailable")
+        };
+        var notificationService = new FakeNotificationService();
+        var viewModel = CreateViewModel(
+            notificationService: notificationService,
+            updateCheckService: updateCheckService,
+            updateDialogService: updateDialogService,
+            externalLinkService: externalLinkService);
+
+        await viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        var warning = Assert.Single(notificationService.Warnings);
+        Assert.Equal("打开 Release 页面失败", warning.Title);
+        Assert.Contains("browser unavailable", warning.Message);
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesAsync_DoesNotStartSecondRequest_WhenStartupCheckIsRunning()
+    {
+        var release = CreateReleaseUpdateInfo("v1.0.2");
+        var startupCheckStarted = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var allowStartupCheckToComplete = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var updateCheckService = new FakeUpdateCheckService
+        {
+            CheckHandler = async (mode, _) =>
+            {
+                startupCheckStarted.TrySetResult(null);
+                await allowStartupCheckToComplete.Task;
+                return UpdateCheckResult.UpdateAvailable(release);
+            }
+        };
+        var updateDialogService = new FakeUpdateDialogService();
+        var viewModel = CreateViewModel(
+            updateCheckService: updateCheckService,
+            updateDialogService: updateDialogService);
+
+        await viewModel.InitializeAsync();
+        await startupCheckStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+
+        await viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsCheckingForUpdates);
+        Assert.Equal([UpdateCheckMode.Automatic], updateCheckService.CheckModes);
+
+        allowStartupCheckToComplete.SetResult(null);
+        await WaitForAsync(() => updateDialogService.Releases.Count == 1);
+
+        Assert.Same(release, Assert.Single(updateDialogService.Releases));
+        Assert.False(viewModel.IsCheckingForUpdates);
+    }
+
+    [Fact]
     public async Task ThemePreview_UpdatesImmediately_WithoutSavingSettings()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
@@ -1229,6 +1371,9 @@ public sealed class MainWindowViewModelTests
         FakeNotificationService? notificationService = null,
         FakeTaskEventAlertDispatcher? taskAlertService = null,
         FakeErrorDialogService? errorDialogService = null,
+        FakeUpdateCheckService? updateCheckService = null,
+        FakeUpdateDialogService? updateDialogService = null,
+        FakeExternalLinkService? externalLinkService = null,
         FakeAppThemeService? appThemeService = null,
         ActivityLogService? activityLogService = null,
         FakeProtocolTemplateStore? protocolTemplateStore = null)
@@ -1256,8 +1401,24 @@ public sealed class MainWindowViewModelTests
             activityLogService,
             notificationService ?? new FakeNotificationService(),
             errorDialogService ?? new FakeErrorDialogService(),
+            updateCheckService ?? new FakeUpdateCheckService(),
+            updateDialogService ?? new FakeUpdateDialogService(),
+            externalLinkService ?? new FakeExternalLinkService(),
             appThemeService ?? new FakeAppThemeService(),
             new AppWindowService());
+    }
+
+    private static ReleaseUpdateInfo CreateReleaseUpdateInfo(string tagName)
+    {
+        Assert.True(ReleaseVersion.TryParse(tagName, out var version));
+        return new ReleaseUpdateInfo(
+            version,
+            tagName,
+            $"IGoLibrary-Ex {tagName}",
+            "更新内容",
+            new Uri($"https://github.com/EJianZQ/IGoLibrary/releases/tag/{tagName}"),
+            new DateTimeOffset(2026, 6, 9, 8, 0, 0, TimeSpan.Zero),
+            version.IsPrerelease);
     }
 
     private static async Task<(MainWindowViewModel ViewModel, FakeTomorrowReservationCoordinator Coordinator)>

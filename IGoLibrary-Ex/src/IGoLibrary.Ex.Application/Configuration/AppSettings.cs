@@ -16,5 +16,7 @@ public sealed record AppSettings
 
     public DashboardMetrics Dashboard { get; init; } = DashboardMetrics.Default;
 
+    public UpdateCheckSettings Updates { get; init; } = UpdateCheckSettings.Default;
+
     public static AppSettings Default { get; } = new();
 }

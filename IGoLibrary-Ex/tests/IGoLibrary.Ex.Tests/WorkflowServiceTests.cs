@@ -190,6 +190,7 @@ public sealed class WorkflowServiceTests
             AppBannerNotificationsEnabled: false,
             MinimizeToTray: false,
             TraceIntGraphQlOverridesEnabled: true,
+            CheckUpdatesOnStartup: false,
             RequestTimeoutSeconds: 1,
             NetworkMaxRetries: 0,
             Theme: new ThemePreferences(AppThemeMode.Dark, useSystemAccent: false),
@@ -200,6 +201,7 @@ public sealed class WorkflowServiceTests
         Assert.Equal(initial.Dashboard, settingsService.CurrentSettings.Dashboard);
         Assert.Equal(3, settingsService.CurrentSettings.Network.TimeoutSeconds);
         Assert.Equal(0, settingsService.CurrentSettings.Network.MaxRetries);
+        Assert.False(settingsService.CurrentSettings.Updates.CheckOnStartup);
         Assert.Equal(GrabReservationStrategy.ReserveDirectly, settingsService.CurrentSettings.Tasks.Grab.ReservationStrategy);
     }
 

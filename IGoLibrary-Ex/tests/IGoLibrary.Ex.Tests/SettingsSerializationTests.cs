@@ -44,6 +44,7 @@ public sealed class SettingsSerializationTests
         Assert.Equal("自科阅览区一", settings.Venue.LastLibraryName);
         Assert.Equal(6, settings.Dashboard.SuccessfulReservationCount);
         Assert.Equal(3600, settings.Dashboard.TotalGuardSeconds);
+        Assert.True(settings.Updates.CheckOnStartup);
     }
 
     [Fact]
@@ -195,6 +196,7 @@ public sealed class SettingsSerializationTests
         Assert.Equal(TimeSpan.Zero, settings.Tasks.Grab.DefaultScheduledStartTime);
         Assert.Equal(4, settings.Tasks.Occupy.ReReservationMaxAttempts);
         Assert.Equal(new TimeSpan(20, 0, 0), settings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
+        Assert.True(settings.Updates.CheckOnStartup);
     }
 
     [Fact]
@@ -221,8 +223,45 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"defaultScheduledStartTime\":", json);
         Assert.Contains("\"venue\":", json);
         Assert.Contains("\"dashboard\":", json);
+        Assert.Contains("\"updates\":", json);
         Assert.Contains("\"taskEventAlerts\":", json);
         Assert.Contains("\"graphQlOverridesEnabled\": true", json);
+    }
+
+    [Fact]
+    public void CanonicalJsonWithoutUpdates_RewritesWithDefaultUpdateSettings()
+    {
+        var migratedJson = MigrateLegacyAppSettingsJson(
+            """
+            {
+              "notifications": {},
+              "ui": {},
+              "traceIntProtocol": {
+                "graphQlOverridesEnabled": false
+              },
+              "network": {
+                "timeoutSeconds": 5,
+                "maxRetries": 3
+              },
+              "tasks": {
+                "grab": {
+                  "reservationStrategy": 0,
+                  "defaultScheduledStartTime": "00:00:00"
+                },
+                "occupy": {
+                  "reReservationMaxAttempts": 4
+                },
+                "tomorrowReservation": {
+                  "defaultScheduledStartTime": "20:00:00"
+                }
+              },
+              "venue": {},
+              "dashboard": {}
+            }
+            """);
+
+        Assert.Contains("\"updates\":", migratedJson);
+        Assert.Contains("\"checkOnStartup\": true", migratedJson);
     }
 
     [Fact]

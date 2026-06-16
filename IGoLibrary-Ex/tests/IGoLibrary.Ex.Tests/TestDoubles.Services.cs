@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
+using IGoLibrary.Ex.Application.Updates;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
@@ -18,6 +19,80 @@ internal sealed class FakeErrorDialogService : IErrorDialogService
     public Task ShowErrorAsync(string title, string errorType, string errorMessage, CancellationToken cancellationToken = default)
     {
         Errors.Add((title, errorType, errorMessage));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeUpdateCheckService : IUpdateCheckService
+{
+    public Queue<UpdateCheckResult> Results { get; } = [];
+
+    public List<UpdateCheckMode> CheckModes { get; } = [];
+
+    public List<ReleaseVersion> SkippedVersions { get; } = [];
+
+    public Exception? CheckException { get; set; }
+
+    public Func<UpdateCheckMode, CancellationToken, Task<UpdateCheckResult>>? CheckHandler { get; set; }
+
+    public async Task<UpdateCheckResult> CheckAsync(
+        UpdateCheckMode mode,
+        CancellationToken cancellationToken = default)
+    {
+        CheckModes.Add(mode);
+        if (CheckException is not null)
+        {
+            throw CheckException;
+        }
+
+        if (CheckHandler is not null)
+        {
+            return await CheckHandler(mode, cancellationToken);
+        }
+
+        return Results.Count > 0
+            ? Results.Dequeue()
+            : UpdateCheckResult.NoUpdate("当前已是最新版本");
+    }
+
+    public Task SkipVersionAsync(
+        ReleaseVersion version,
+        CancellationToken cancellationToken = default)
+    {
+        SkippedVersions.Add(version);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeUpdateDialogService : IUpdateDialogService
+{
+    public List<ReleaseUpdateInfo> Releases { get; } = [];
+
+    public UpdateDialogResult Result { get; set; } = UpdateDialogResult.Later;
+
+    public Task<UpdateDialogResult> ShowUpdateAsync(
+        ReleaseUpdateInfo release,
+        CancellationToken cancellationToken = default)
+    {
+        Releases.Add(release);
+        return Task.FromResult(Result);
+    }
+}
+
+internal sealed class FakeExternalLinkService : IExternalLinkService
+{
+    public List<Uri> OpenedUris { get; } = [];
+
+    public Exception? OpenException { get; set; }
+
+    public Task OpenAsync(Uri uri, CancellationToken cancellationToken = default)
+    {
+        if (OpenException is not null)
+        {
+            throw OpenException;
+        }
+
+        OpenedUris.Add(uri);
         return Task.CompletedTask;
     }
 }

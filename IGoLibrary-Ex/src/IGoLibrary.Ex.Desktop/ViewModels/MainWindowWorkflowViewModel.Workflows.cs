@@ -379,6 +379,7 @@ public partial class MainWindowWorkflowViewModel
         {
             IsInitializationComplete = true;
             UpdateHomeDashboardPresentation();
+            _ = RunStartupUpdateCheckAsync();
         }
     }
 
@@ -1320,6 +1321,7 @@ public partial class MainWindowWorkflowViewModel
             NotificationsEnabled,
             MinimizeToTrayEnabled,
             TraceIntGraphQlOverridesEnabled,
+            CheckUpdatesOnStartup,
             RequestTimeoutSeconds,
             NetworkMaxRetries,
             theme,
@@ -1327,6 +1329,12 @@ public partial class MainWindowWorkflowViewModel
             BuildTaskEventAlertSettingsSnapshot()));
         await _appThemeService.ApplyThemeAsync(theme);
         await _notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库");
+    }
+
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync()
+    {
+        await RunUpdateCheckAsync(UpdateCheckMode.Manual, notifyWhenNoUpdate: true);
     }
 
     [RelayCommand]
@@ -1424,6 +1432,94 @@ public partial class MainWindowWorkflowViewModel
         await _notificationService.ShowSuccessAsync("协议模板已重置", "已恢复内置默认模板");
     }
 
+    private async Task RunStartupUpdateCheckAsync()
+    {
+        await RunUpdateCheckAsync(UpdateCheckMode.Automatic, notifyWhenNoUpdate: false);
+    }
+
+    private async Task RunUpdateCheckAsync(
+        UpdateCheckMode mode,
+        bool notifyWhenNoUpdate)
+    {
+        if (IsCheckingForUpdates || !(await _updateCheckGate.WaitAsync(0)))
+        {
+            return;
+        }
+
+        IsCheckingForUpdates = true;
+        try
+        {
+            var result = await _updateCheckService.CheckAsync(mode);
+            await HandleUpdateCheckResultAsync(result, notifyWhenNoUpdate);
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Update", $"检查更新失败：{ex.Message}");
+            if (notifyWhenNoUpdate)
+            {
+                await _notificationService.ShowWarningAsync("检查更新失败", ex.Message);
+            }
+        }
+        finally
+        {
+            IsCheckingForUpdates = false;
+            _updateCheckGate.Release();
+        }
+    }
+
+    private async Task HandleUpdateCheckResultAsync(
+        UpdateCheckResult result,
+        bool notifyWhenNoUpdate)
+    {
+        if (result.HasUpdate && result.Release is { } release)
+        {
+            _activityLogService.Write(LogEntryKind.Info, "Update", $"发现新版本：{release.TagName}");
+            var dialogResult = await _updateDialogService.ShowUpdateAsync(release);
+            if (dialogResult == UpdateDialogResult.OpenReleasePage)
+            {
+                await OpenUpdateReleasePageAsync(release.HtmlUrl);
+            }
+            else if (dialogResult == UpdateDialogResult.SkipVersion)
+            {
+                await _updateCheckService.SkipVersionAsync(release.Version);
+                await _notificationService.ShowSuccessAsync(
+                    "已跳过此版本",
+                    $"{release.TagName} 将不再提示");
+            }
+
+            return;
+        }
+
+        if (result.Status == UpdateCheckStatus.Failed)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Update", result.Message);
+            if (notifyWhenNoUpdate)
+            {
+                await _notificationService.ShowWarningAsync("检查更新失败", result.Message);
+            }
+
+            return;
+        }
+
+        if (notifyWhenNoUpdate)
+        {
+            await _notificationService.ShowSuccessAsync("检查更新完成", result.Message);
+        }
+    }
+
+    private async Task OpenUpdateReleasePageAsync(Uri releaseUrl)
+    {
+        try
+        {
+            await _externalLinkService.OpenAsync(releaseUrl);
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Update", $"打开 Release 页面失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("打开 Release 页面失败", ex.Message);
+        }
+    }
+
     private async Task PersistGrabReservationStrategyAsync()
     {
         var strategy = (GrabReservationStrategy)Math.Clamp(
@@ -1448,6 +1544,7 @@ public partial class MainWindowWorkflowViewModel
             NotificationsEnabled = notifications.AppBannerNotificationsEnabled;
             MinimizeToTrayEnabled = ui.MinimizeToTray;
             TraceIntGraphQlOverridesEnabled = settings.TraceIntProtocol.GraphQlOverridesEnabled;
+            CheckUpdatesOnStartup = settings.Updates.CheckOnStartup;
             RequestTimeoutSeconds = settings.Network.TimeoutSeconds;
             NetworkMaxRetries = settings.Network.MaxRetries;
             SelectedAppThemeModeIndex = (int)theme.Mode;

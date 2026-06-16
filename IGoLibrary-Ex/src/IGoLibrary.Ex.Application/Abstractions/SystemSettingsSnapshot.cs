@@ -6,6 +6,7 @@ public sealed record SystemSettingsSnapshot(
     bool AppBannerNotificationsEnabled,
     bool MinimizeToTray,
     bool TraceIntGraphQlOverridesEnabled,
+    bool CheckUpdatesOnStartup,
     int RequestTimeoutSeconds,
     int NetworkMaxRetries,
     ThemePreferences Theme,

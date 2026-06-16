@@ -3,7 +3,7 @@ param(
     [string]$Runtime = "osx-arm64",
     [string]$AppName = "IGoLibrary-Ex",
     [string]$BundleIdentifier = "com.igolibrary.ex",
-    [string]$AppVersion = "1.0.0",
+    [string]$AppVersion,
     [string]$PackageName,
     [string]$PublishOutput,
     [switch]$SkipPublish
@@ -11,6 +11,18 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+
+$versionPattern = '^\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z-]*(\.[0-9A-Za-z][0-9A-Za-z-]*)*)?$'
+if ([string]::IsNullOrWhiteSpace($AppVersion)) {
+    throw "必须通过 -AppVersion 提供版本号，例如：-AppVersion `"0.4.0-beta.1`"。"
+}
+if ($AppVersion.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "AppVersion 不要带 v 前缀；请传 `"0.4.0-beta.1`"，Git tag / Release 再使用 `"v0.4.0-beta.1`"。"
+}
+if ($AppVersion -notmatch $versionPattern) {
+    throw "AppVersion 格式无效：$AppVersion。请使用 0.4.0、0.4.0-beta.1 或 0.4.0-rc.1。"
+}
+$BundleVersion = $AppVersion -replace '-.*$', ''
 
 $ExecutableName = "IGoLibrary.Ex.Desktop"
 $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
@@ -28,9 +40,9 @@ $MacOSDir = Join-Path $ContentsDir "MacOS"
 $ResourcesDir = Join-Path $ContentsDir "Resources"
 if ([string]::IsNullOrWhiteSpace($PackageName)) {
     $PackageName = switch ($Runtime) {
-        "osx-arm64" { "$AppName-macOS-Apple-Silicon-arm64.zip" }
-        "osx-x64" { "$AppName-macOS-Intel-x64.zip" }
-        default { "$AppName-$Runtime.zip" }
+        "osx-arm64" { "$AppName-v$AppVersion-macOS-Apple-Silicon-arm64.zip" }
+        "osx-x64" { "$AppName-v$AppVersion-macOS-Intel-x64.zip" }
+        default { "$AppName-v$AppVersion-$Runtime.zip" }
     }
 }
 $ZipPath = Join-Path $AppOutputRoot $PackageName
@@ -53,7 +65,7 @@ function Write-InfoPlist {
 
     $bundleName = ConvertTo-PlistEscapedText $AppName
     $bundleIdentifierText = ConvertTo-PlistEscapedText $BundleIdentifier
-    $versionText = ConvertTo-PlistEscapedText $AppVersion
+    $bundleVersionText = ConvertTo-PlistEscapedText $BundleVersion
     $executableText = ConvertTo-PlistEscapedText $ExecutableName
     $content = @"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -67,9 +79,9 @@ function Write-InfoPlist {
     <key>CFBundleIdentifier</key>
     <string>$bundleIdentifierText</string>
     <key>CFBundleVersion</key>
-    <string>$versionText</string>
+    <string>$bundleVersionText</string>
     <key>CFBundleShortVersionString</key>
-    <string>$versionText</string>
+    <string>$bundleVersionText</string>
     <key>CFBundleExecutable</key>
     <string>$executableText</string>
     <key>CFBundlePackageType</key>
@@ -281,6 +293,8 @@ if (-not $SkipPublish) {
         -p:DebugSymbols=false `
         -p:UsedAvaloniaProducts= `
         -p:UseSharedCompilation=false `
+        -p:Version=$AppVersion `
+        -p:InformationalVersion=$AppVersion `
         -o $PublishOutput
 
     if ($LASTEXITCODE -ne 0) {

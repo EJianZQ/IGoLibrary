@@ -1854,6 +1854,7 @@
                     <TextBlock Classes="section-title" Text="常规体验" />
                     <CheckBox Content="屏幕右下角展示应用横幅通知" IsChecked="{Binding NotificationsEnabled}" />
                     <CheckBox Content="当任务进行时，右上角关闭会最小化到托盘" IsChecked="{Binding MinimizeToTrayEnabled}" />
+                    <CheckBox Content="启动时检查应用版本更新" IsChecked="{Binding CheckUpdatesOnStartup}" />
                     <CheckBox Content="自定义接口地址和查询语法" IsChecked="{Binding TraceIntGraphQlOverridesEnabled}" FontWeight="Bold" Foreground="{DynamicResource SemiWarningTextBrush}"/>
                     
                     <Separator Background="{DynamicResource AppSeparatorBrush}" Margin="0,8"/>
@@ -1882,7 +1883,7 @@
                       </StackPanel>
                     </Grid>
 
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,16,0,0">
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12" Margin="0,16,0,0">
                       <Button Content="💾 保存设置"
                               Command="{Binding SaveSettingsCommand}"
                               Background="{DynamicResource AppAccentBrush}"
@@ -1891,6 +1892,13 @@
                               HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Center" />
                       <Button Grid.Column="1"
+                              Content="{Binding CheckForUpdatesButtonText}"
+                              Command="{Binding CheckForUpdatesCommand}"
+                              Classes="Secondary"
+                              IsEnabled="{Binding CanCheckForUpdates}"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Center" />
+                      <Button Grid.Column="2"
                               Content="测试Toast通知"
                               Command="{Binding TestToastCommand}"
                               Classes="Secondary"

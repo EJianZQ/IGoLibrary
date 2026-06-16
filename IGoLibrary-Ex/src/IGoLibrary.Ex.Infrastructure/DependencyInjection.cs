@@ -6,6 +6,7 @@ using IGoLibrary.Ex.Infrastructure.Notifications;
 using IGoLibrary.Ex.Infrastructure.Persistence;
 using IGoLibrary.Ex.Infrastructure.Protocol;
 using IGoLibrary.Ex.Infrastructure.Security;
+using IGoLibrary.Ex.Infrastructure.Updates;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -29,6 +30,13 @@ public static class DependencyInjection
         services.AddHttpClient<ITelegramAlertSender, TelegramAlertSender>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
+        });
+        services.AddHttpClient<IGitHubReleaseClient, GitHubReleaseClient>(client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("IGoLibrary-Ex");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+            client.DefaultRequestHeaders.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
         });
 
         services.AddSingleton<TraceIntRequestPolicy>();

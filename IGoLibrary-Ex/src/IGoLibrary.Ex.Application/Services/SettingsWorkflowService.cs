@@ -30,6 +30,10 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
             {
                 GraphQlOverridesEnabled = snapshot.TraceIntGraphQlOverridesEnabled
             },
+            Updates = (current.Updates ?? UpdateCheckSettings.Default) with
+            {
+                CheckOnStartup = snapshot.CheckUpdatesOnStartup
+            },
             Network = new NetworkRequestSettings(
                 Math.Max(3, snapshot.RequestTimeoutSeconds),
                 Math.Max(0, snapshot.NetworkMaxRetries)),

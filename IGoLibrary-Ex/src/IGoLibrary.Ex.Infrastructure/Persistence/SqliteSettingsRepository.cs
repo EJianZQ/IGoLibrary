@@ -83,6 +83,7 @@ public sealed class SqliteSettingsRepository(
         var grab = ReadObject(tasks, "grab");
         var occupy = ReadObject(tasks, "occupy");
         var tomorrowReservation = ReadObject(tasks, "tomorrowReservation");
+        var updates = ReadObject(root, "updates");
 
         var legacyRetryCount = ReadInt(root, "retryCount")
             ?? ReadInt(legacyRequestPolicy, "retryCount");
@@ -203,6 +204,17 @@ public sealed class SqliteSettingsRepository(
             ?? defaults.Dashboard.TotalGuardSeconds);
         writer.WriteEndObject();
 
+        writer.WritePropertyName("updates");
+        writer.WriteStartObject();
+        writer.WriteBoolean(
+            "checkOnStartup",
+            ReadBool(updates, "checkOnStartup")
+            ?? defaults.Updates.CheckOnStartup);
+        WriteNullableDateTimeOffset(writer, "lastCheckedAtUtc", updates);
+        WriteNullableString(writer, "skippedVersion", updates, default, "skippedVersion");
+        WriteNullableString(writer, "lastReleaseETag", updates, default, "lastReleaseETag");
+        writer.WriteEndObject();
+
         writer.WriteEndObject();
         writer.Flush();
         return Encoding.UTF8.GetString(stream.ToArray());
@@ -217,6 +229,7 @@ public sealed class SqliteSettingsRepository(
         var grab = tasks.Grab ?? GrabTaskSettings.Default;
         var occupy = tasks.Occupy ?? OccupyTaskSettings.Default;
         var tomorrowReservation = tasks.TomorrowReservation ?? TomorrowReservationTaskSettings.Default;
+        var updates = settings.Updates ?? UpdateCheckSettings.Default;
         return settings with
         {
             Notifications = notifications with
@@ -249,7 +262,8 @@ public sealed class SqliteSettingsRepository(
                 }
             },
             Venue = settings.Venue ?? VenueSelectionSettings.Default,
-            Dashboard = settings.Dashboard ?? DashboardMetrics.Default
+            Dashboard = settings.Dashboard ?? DashboardMetrics.Default,
+            Updates = updates
         };
     }
 
@@ -266,7 +280,8 @@ public sealed class SqliteSettingsRepository(
                tasks.ValueKind == JsonValueKind.Object &&
                tasks.TryGetProperty("grab", out _) &&
                tasks.TryGetProperty("occupy", out _) &&
-               tasks.TryGetProperty("tomorrowReservation", out _);
+               tasks.TryGetProperty("tomorrowReservation", out _) &&
+               root.TryGetProperty("updates", out _);
     }
 
     private static bool ContainsLegacySettingsFields(JsonElement root)
@@ -451,6 +466,21 @@ public sealed class SqliteSettingsRepository(
         return null;
     }
 
+    private static DateTimeOffset? ReadDateTimeOffset(JsonElement parent, string propertyName)
+    {
+        if (parent.ValueKind != JsonValueKind.Object ||
+            !parent.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return property.ValueKind == JsonValueKind.String &&
+               DateTimeOffset.TryParse(property.GetString(), out var value)
+            ? value
+            : null;
+    }
+
     private static TimeSpan NormalizeTimeOfDay(TimeSpan? value, TimeSpan fallback)
     {
         return value is { } timeOfDay && IsTimeOfDay(timeOfDay)
@@ -500,6 +530,21 @@ public sealed class SqliteSettingsRepository(
         }
 
         writer.WriteString(propertyName, value);
+    }
+
+    private static void WriteNullableDateTimeOffset(
+        Utf8JsonWriter writer,
+        string propertyName,
+        JsonElement currentParent)
+    {
+        var value = ReadDateTimeOffset(currentParent, propertyName);
+        if (value is null)
+        {
+            writer.WriteNull(propertyName);
+            return;
+        }
+
+        writer.WriteString(propertyName, value.Value);
     }
 
     private static string? ReadString(JsonElement parent, string propertyName)

@@ -17,6 +17,9 @@ public sealed class MainWindowViewModel(
     IActivityLogService activityLogService,
     INotificationService notificationService,
     IErrorDialogService errorDialogService,
+    IUpdateCheckService updateCheckService,
+    IUpdateDialogService updateDialogService,
+    IExternalLinkService externalLinkService,
     IAppThemeService appThemeService,
     AppWindowService appWindowService)
     : MainWindowWorkflowViewModel(
@@ -32,5 +35,8 @@ public sealed class MainWindowViewModel(
         activityLogService,
         notificationService,
         errorDialogService,
+        updateCheckService,
+        updateDialogService,
+        externalLinkService,
         appThemeService,
         appWindowService);

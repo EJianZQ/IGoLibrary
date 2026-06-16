@@ -1,5 +1,5 @@
 #define MyAppName "IGoLibrary-Ex"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "0.3.0-beta"
 #define MyAppPublisher "EJianZQ"
 #define MyAppExeName "IGoLibrary.Ex.Desktop.exe"
 

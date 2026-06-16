@@ -178,7 +178,7 @@ Windows
 
 ```powershell
 cd .\IGoLibrary-Ex
-.\build\publish-windows.ps1
+.\build\publish-windows.ps1 -Configuration Release -AppVersion 1.0.1
 ```
 
 macOS
@@ -187,30 +187,30 @@ macOS
 
 ```powershell
 cd .\IGoLibrary-Ex
-.\build\publish-macos-all.ps1 -Configuration Release -AppVersion 0.2.0
+.\build\publish-macos-all.ps1 -Configuration Release -AppVersion 1.0.1
 ```
 
 脚本会分别生成 `artifacts\publish\osx-arm64\` 与 `artifacts\publish\osx-x64\` 原始发布目录，然后组装为标准 macOS 应用包并输出两个最终 zip：
 
 ```text
-artifacts\macos\osx-arm64\IGoLibrary-Ex-macOS-Apple-Silicon-arm64.zip
-artifacts\macos\osx-x64\IGoLibrary-Ex-macOS-Intel-x64.zip
+artifacts\macos\osx-arm64\IGoLibrary-Ex-v1.0.1-macOS-Apple-Silicon-arm64.zip
+artifacts\macos\osx-x64\IGoLibrary-Ex-v1.0.1-macOS-Intel-x64.zip
 ```
 
-发布给 M 芯片用户时发送 `IGoLibrary-Ex-macOS-Apple-Silicon-arm64.zip`，发布给 Intel 芯片用户时发送 `IGoLibrary-Ex-macOS-Intel-x64.zip`。用户解压后打开 `IGoLibrary-Ex.app`，不要直接双击应用包内部的 `IGoLibrary.Ex.Desktop` 可执行文件。
+发布给 M 芯片用户时发送 `IGoLibrary-Ex-v1.0.1-macOS-Apple-Silicon-arm64.zip`，发布给 Intel 芯片用户时发送 `IGoLibrary-Ex-v1.0.1-macOS-Intel-x64.zip`。用户解压后打开 `IGoLibrary-Ex.app`，不要直接双击应用包内部的 `IGoLibrary.Ex.Desktop` 可执行文件。
 
 如果只想单独发布某一个架构，也可以直接调用单架构脚本：
 
 ```powershell
-.\build\publish-macos.ps1 -Configuration Release -Runtime osx-arm64 -AppVersion 0.2.0
-.\build\publish-macos.ps1 -Configuration Release -Runtime osx-x64 -AppVersion 0.2.0
+.\build\publish-macos.ps1 -Configuration Release -Runtime osx-arm64 -AppVersion 1.0.1
+.\build\publish-macos.ps1 -Configuration Release -Runtime osx-x64 -AppVersion 1.0.1
 ```
 
 如果在 macOS 发布机上构建，也可以使用 Bash 脚本：
 
 ```bash
 cd ./IGoLibrary-Ex
-./build/publish-macos.sh
+APP_VERSION=1.0.1 ./build/publish-macos.sh Release osx-arm64
 ```
 
 未签名、未公证的 macOS 包首次运行时，系统可能会拦截并提示“已损坏，无法打开”。zip 内已包含 `macOS首次运行说明.txt` 和 `首次运行.command`，用户可按说明解除隔离标记后再打开 `IGoLibrary-Ex.app`。

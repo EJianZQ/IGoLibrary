@@ -41,6 +41,8 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IAppThemeService, AppThemeService>();
                 services.AddSingleton<AppWindowService>();
                 services.AddSingleton<IErrorDialogService, ErrorDialogService>();
+                services.AddSingleton<IUpdateDialogService, UpdateDialogService>();
+                services.AddSingleton<IExternalLinkService, ExternalLinkService>();
                 services.AddSingleton<ToastNotificationService>();
                 services.AddSingleton<INotificationService>(serviceProvider => serviceProvider.GetRequiredService<ToastNotificationService>());
                 services.AddSingleton<AlertSoundService>();

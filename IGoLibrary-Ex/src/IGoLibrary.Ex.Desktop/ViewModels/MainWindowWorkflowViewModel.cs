@@ -30,6 +30,9 @@ public partial class MainWindowWorkflowViewModel(
     IActivityLogService activityLogService,
     INotificationService notificationService,
     IErrorDialogService errorDialogService,
+    IUpdateCheckService updateCheckService,
+    IUpdateDialogService updateDialogService,
+    IExternalLinkService externalLinkService,
     IAppThemeService appThemeService,
     AppWindowService appWindowService) : ViewModelBase
 {
@@ -37,6 +40,9 @@ public partial class MainWindowWorkflowViewModel(
     private readonly IActivityLogService _activityLogService = activityLogService;
     private readonly INotificationService _notificationService = notificationService;
     private readonly IErrorDialogService _errorDialogService = errorDialogService;
+    private readonly IUpdateCheckService _updateCheckService = updateCheckService;
+    private readonly IUpdateDialogService _updateDialogService = updateDialogService;
+    private readonly IExternalLinkService _externalLinkService = externalLinkService;
     private readonly AppWindowService _appWindowService = appWindowService;
     private readonly IGrabSeatCoordinator _grabSeatCoordinator = grabSeatCoordinator;
     private readonly IOccupySeatCoordinator _occupySeatCoordinator = occupySeatCoordinator;
@@ -44,6 +50,7 @@ public partial class MainWindowWorkflowViewModel(
     private readonly ObservableCollection<SeatItemViewModel> _allSeats = [];
     private readonly ObservableCollection<SeatItemViewModel> _tomorrowSeats = [];
     private readonly object _filterGate = new();
+    private readonly SemaphoreSlim _updateCheckGate = new(1, 1);
     private readonly DispatcherTimer _reservationCountdownTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private CancellationTokenSource? _filteringCts;
     private ReservationInfo? _currentReservation;
@@ -512,6 +519,9 @@ public partial class MainWindowWorkflowViewModel(
     private bool traceIntGraphQlOverridesEnabled;
 
     [ObservableProperty]
+    private bool checkUpdatesOnStartup = true;
+
+    [ObservableProperty]
     private int requestTimeoutSeconds = 5;
 
     [ObservableProperty]
@@ -519,6 +529,19 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private int selectedAppThemeModeIndex;
+
+    [ObservableProperty]
+    private bool isCheckingForUpdates;
+
+    public bool CanCheckForUpdates => !IsCheckingForUpdates;
+
+    public string CheckForUpdatesButtonText => IsCheckingForUpdates ? "正在检查..." : "立即检查更新";
+
+    partial void OnIsCheckingForUpdatesChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanCheckForUpdates));
+        OnPropertyChanged(nameof(CheckForUpdatesButtonText));
+    }
 
     partial void OnSelectedAppThemeModeIndexChanged(int value)
     {

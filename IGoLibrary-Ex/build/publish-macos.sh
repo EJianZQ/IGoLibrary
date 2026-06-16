@@ -5,8 +5,23 @@ CONFIGURATION="${1:-Release}"
 RUNTIME="${2:-osx-arm64}"
 APP_NAME="${APP_NAME:-IGoLibrary-Ex}"
 BUNDLE_IDENTIFIER="${BUNDLE_IDENTIFIER:-com.igolibrary.ex}"
-APP_VERSION="${APP_VERSION:-1.0.0}"
+APP_VERSION="${APP_VERSION:-}"
 EXECUTABLE_NAME="IGoLibrary.Ex.Desktop"
+
+if [[ -z "${APP_VERSION//[[:space:]]/}" ]]; then
+  echo "APP_VERSION is required. Example: APP_VERSION=0.4.0-beta.1 ./build/publish-macos.sh Release osx-arm64" >&2
+  exit 1
+fi
+if [[ "$APP_VERSION" =~ ^[vV] ]]; then
+  echo "APP_VERSION must not include the v prefix. Use 0.4.0-beta.1; use v0.4.0-beta.1 only for the Git tag / GitHub Release." >&2
+  exit 1
+fi
+if [[ ! $APP_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z-]*(\.[0-9A-Za-z][0-9A-Za-z-]*)*)?$ ]]; then
+  echo "Invalid APP_VERSION: $APP_VERSION. Use 0.4.0, 0.4.0-beta.1, or 0.4.0-rc.1." >&2
+  exit 1
+fi
+BUNDLE_VERSION="${APP_VERSION%%-*}"
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT="$ROOT/src/IGoLibrary.Ex.Desktop/IGoLibrary.Ex.Desktop.csproj"
 PUBLISH_OUTPUT="${PUBLISH_OUTPUT:-$ROOT/artifacts/publish/$RUNTIME}"
@@ -14,7 +29,7 @@ APP_OUTPUT_ROOT="$ROOT/artifacts/macos/$RUNTIME"
 APP_DIR="$APP_OUTPUT_ROOT/$APP_NAME.app"
 MACOS_DIR="$APP_DIR/Contents/MacOS"
 RESOURCES_DIR="$APP_DIR/Contents/Resources"
-ZIP_PATH="$APP_OUTPUT_ROOT/$APP_NAME-$RUNTIME.zip"
+ZIP_PATH="$APP_OUTPUT_ROOT/$APP_NAME-v$APP_VERSION-$RUNTIME.zip"
 
 if [[ "${SKIP_PUBLISH:-0}" != "1" ]]; then
   dotnet publish "$PROJECT" \
@@ -25,6 +40,8 @@ if [[ "${SKIP_PUBLISH:-0}" != "1" ]]; then
     -p:DebugSymbols=false \
     -p:UsedAvaloniaProducts= \
     -p:UseSharedCompilation=false \
+    -p:Version="$APP_VERSION" \
+    -p:InformationalVersion="$APP_VERSION" \
     -o "$PUBLISH_OUTPUT"
 else
   echo "Skipping dotnet publish; packaging existing files from $PUBLISH_OUTPUT"
@@ -56,9 +73,9 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <key>CFBundleIdentifier</key>
     <string>$BUNDLE_IDENTIFIER</string>
     <key>CFBundleVersion</key>
-    <string>$APP_VERSION</string>
+    <string>$BUNDLE_VERSION</string>
     <key>CFBundleShortVersionString</key>
-    <string>$APP_VERSION</string>
+    <string>$BUNDLE_VERSION</string>
     <key>CFBundleExecutable</key>
     <string>$EXECUTABLE_NAME</string>
     <key>CFBundlePackageType</key>
