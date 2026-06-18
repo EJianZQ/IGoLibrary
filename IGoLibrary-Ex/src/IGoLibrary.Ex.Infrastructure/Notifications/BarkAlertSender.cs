@@ -212,7 +212,8 @@ internal sealed class BarkAlertSender(
             or HttpStatusCode.TooManyRequests
             or HttpStatusCode.BadGateway
             or HttpStatusCode.ServiceUnavailable
-            or HttpStatusCode.GatewayTimeout;
+            or HttpStatusCode.GatewayTimeout
+            || (int?)statusCode >= 500;
     }
 
     private static int? ReadOptionalInt(JsonElement root, string name)
