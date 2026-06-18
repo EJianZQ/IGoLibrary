@@ -81,13 +81,15 @@ public partial class MainWindowWorkflowViewModel
 
     public bool IsTelegramNotificationTabActive => SelectedNotificationSettingsTabIndex == 1;
 
-    public bool IsLocalNotificationTabActive => SelectedNotificationSettingsTabIndex == 2;
+    public bool IsBarkNotificationTabActive => SelectedNotificationSettingsTabIndex == 2;
+
+    public bool IsLocalNotificationTabActive => SelectedNotificationSettingsTabIndex == 3;
 
     public double NotificationSegmentControlWidth => NotificationSegmentControlWidthValue;
 
     public double NotificationSegmentSliderWidth => NotificationSegmentSliderWidthValue;
 
-    public double NotificationSegmentSliderOffset => Math.Clamp(SelectedNotificationSettingsTabIndex, 0, 2) *
+    public double NotificationSegmentSliderOffset => Math.Clamp(SelectedNotificationSettingsTabIndex, 0, 3) *
                                                      NotificationSegmentSliderOffsetValue;
 
     public IBrush EmailNotificationTabBackgroundBrush => IsEmailNotificationTabActive
@@ -98,7 +100,15 @@ public partial class MainWindowWorkflowViewModel
         ? NotificationSegmentActiveBrush
         : NotificationSegmentInactiveBrush;
 
+    public IBrush BarkNotificationTabBackgroundBrush => IsBarkNotificationTabActive
+        ? NotificationSegmentActiveBrush
+        : NotificationSegmentInactiveBrush;
+
     public IBrush TelegramNotificationTabForegroundBrush => IsTelegramNotificationTabActive
+        ? NotificationSegmentActiveTextBrush
+        : NotificationSegmentInactiveTextBrush;
+
+    public IBrush BarkNotificationTabForegroundBrush => IsBarkNotificationTabActive
         ? NotificationSegmentActiveTextBrush
         : NotificationSegmentInactiveTextBrush;
 
@@ -251,12 +261,15 @@ public partial class MainWindowWorkflowViewModel
     {
         OnPropertyChanged(nameof(IsEmailNotificationTabActive));
         OnPropertyChanged(nameof(IsTelegramNotificationTabActive));
+        OnPropertyChanged(nameof(IsBarkNotificationTabActive));
         OnPropertyChanged(nameof(IsLocalNotificationTabActive));
         OnPropertyChanged(nameof(NotificationSegmentSliderOffset));
         OnPropertyChanged(nameof(EmailNotificationTabBackgroundBrush));
+        OnPropertyChanged(nameof(BarkNotificationTabBackgroundBrush));
         OnPropertyChanged(nameof(LocalNotificationTabBackgroundBrush));
         OnPropertyChanged(nameof(EmailNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(TelegramNotificationTabForegroundBrush));
+        OnPropertyChanged(nameof(BarkNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
     }
 
@@ -454,6 +467,16 @@ public partial class MainWindowWorkflowViewModel
 
     partial void OnTelegramAlertChatIdChanged(string value) => ScheduleNotificationSettingsAutoSave();
 
+    partial void OnBarkAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnBarkAlertServerUrlChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnBarkAlertDeviceKeyChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnBarkAlertSoundChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnBarkAlertGroupChanged(string value) => ScheduleNotificationSettingsAutoSave();
+
     partial void OnLocalToastAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
 
     partial void OnLocalSoundAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
@@ -500,6 +523,12 @@ public partial class MainWindowWorkflowViewModel
 
     [RelayCommand]
     private void ShowLocalNotificationSettings()
+    {
+        SelectedNotificationSettingsTabIndex = 3;
+    }
+
+    [RelayCommand]
+    private void ShowBarkNotificationSettings()
     {
         SelectedNotificationSettingsTabIndex = 2;
     }
@@ -1406,6 +1435,25 @@ public partial class MainWindowWorkflowViewModel
     }
 
     [RelayCommand]
+    private async Task SendTestBarkAlertAsync()
+    {
+        try
+        {
+            CancelPendingNotificationSettingsAutoSave();
+            await PersistNotificationSettingsSnapshotAsync();
+            await NotificationSettings.SendTestBarkAsync(BuildTaskEventAlertSettingsSnapshot().Bark);
+            NotificationSettingsStatusText = $"测试 Bark 已发送于 {DateTime.Now:HH:mm:ss}。";
+            await _notificationService.ShowSuccessAsync("测试 Bark 已发送", "请检查 Bark 客户端，确认当前 Device Key 可用");
+        }
+        catch (Exception ex)
+        {
+            NotificationSettingsStatusText = $"测试 Bark 发送失败：{ex.Message}";
+            _activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Bark 失败：{ex.Message}");
+            await _errorDialogService.ShowErrorAsync("测试 Bark 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
+        }
+    }
+
+    [RelayCommand]
     private async Task SaveProtocolOverridesAsync()
     {
         var overrides = new TraceIntGraphQlTemplateOverrides(
@@ -1573,6 +1621,15 @@ public partial class MainWindowWorkflowViewModel
                 : alertSettings.Telegram.ApiBaseUrl;
             TelegramAlertBotToken = alertSettings.Telegram.BotToken ?? string.Empty;
             TelegramAlertChatId = alertSettings.Telegram.ChatId ?? string.Empty;
+            BarkAlertsEnabled = alertSettings.Bark.Enabled;
+            BarkAlertServerUrl = string.IsNullOrWhiteSpace(alertSettings.Bark.ServerUrl)
+                ? BarkAlertChannelSettings.DefaultServerUrl
+                : alertSettings.Bark.ServerUrl;
+            BarkAlertDeviceKey = alertSettings.Bark.DeviceKey ?? string.Empty;
+            BarkAlertSound = alertSettings.Bark.Sound ?? string.Empty;
+            BarkAlertGroup = string.IsNullOrWhiteSpace(alertSettings.Bark.Group)
+                ? BarkAlertChannelSettings.Default.Group
+                : alertSettings.Bark.Group;
             LocalToastAlertsEnabled = alertSettings.Local.PopupEnabled;
             LocalSoundAlertsEnabled = alertSettings.Local.SoundEnabled;
             NotificationSettingsStatusText = "更改后会自动保存。";
@@ -3201,7 +3258,13 @@ public partial class MainWindowWorkflowViewModel
                 TelegramAlertsEnabled,
                 NormalizeTelegramApiBaseUrlForSnapshot(TelegramAlertApiBaseUrl),
                 (TelegramAlertBotToken ?? string.Empty).Trim(),
-                (TelegramAlertChatId ?? string.Empty).Trim()));
+                (TelegramAlertChatId ?? string.Empty).Trim()),
+            new BarkAlertChannelSettings(
+                BarkAlertsEnabled,
+                NormalizeBarkServerUrlForSnapshot(BarkAlertServerUrl),
+                (BarkAlertDeviceKey ?? string.Empty).Trim(),
+                (BarkAlertSound ?? string.Empty).Trim(),
+                NormalizeBarkGroupForSnapshot(BarkAlertGroup)));
     }
 
     private static string NormalizeTelegramApiBaseUrlForSnapshot(string? value)
@@ -3209,6 +3272,22 @@ public partial class MainWindowWorkflowViewModel
         var trimmed = (value ?? string.Empty).Trim().TrimEnd('/');
         return string.IsNullOrWhiteSpace(trimmed)
             ? TelegramAlertChannelSettings.DefaultApiBaseUrl
+            : trimmed;
+    }
+
+    private static string NormalizeBarkServerUrlForSnapshot(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim().TrimEnd('/');
+        return string.IsNullOrWhiteSpace(trimmed)
+            ? BarkAlertChannelSettings.DefaultServerUrl
+            : trimmed;
+    }
+
+    private static string NormalizeBarkGroupForSnapshot(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim();
+        return string.IsNullOrWhiteSpace(trimmed)
+            ? BarkAlertChannelSettings.Default.Group
             : trimmed;
     }
 
@@ -3460,6 +3539,7 @@ public partial class MainWindowWorkflowViewModel
 
         OnPropertyChanged(nameof(EmailNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(TelegramNotificationTabForegroundBrush));
+        OnPropertyChanged(nameof(BarkNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(GrabDashboardStatusBrush));
         OnPropertyChanged(nameof(TomorrowDashboardStatusBrush));
