@@ -15,6 +15,7 @@ public sealed class TaskEventAlertServiceTests
         var service = new DesktopNotificationTestService(
             new FakeEmailAlertSender(),
             new FakeTelegramAlertSender(),
+            new FakeBarkAlertSender(),
             new ToastNotificationService(settingsService, new AppWindowService()),
             new AlertSoundService());
         var settings = new EmailAlertChannelSettings(
@@ -295,6 +296,64 @@ public sealed class TaskEventAlertServiceTests
     }
 
     [Fact]
+    public async Task NotifyGrabSucceededAsync_SendsBarkUsingPersistedSettings()
+    {
+        var barkSender = new FakeBarkAlertSender();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default with { Enabled = false },
+                new BarkAlertChannelSettings(true, "https://api.day.app", "device-key", "alarm", "Library"))));
+
+        var service = CreateService(settingsService: settingsService, barkSender: barkSender);
+
+        await service.NotifyGrabSucceededAsync("自科阅览区一", "2号座");
+
+        var request = Assert.Single(barkSender.Requests);
+        Assert.Equal("device-key", request.Settings.DeviceKey);
+        Assert.Equal("抢座成功", request.Title);
+        Assert.Contains("自科阅览区一", request.Message);
+        Assert.Contains("2号座", request.Message);
+    }
+
+    [Fact]
+    public async Task NotifyTaskFailedAsync_LogsWarningWhenBarkSendFails_AndContinuesEmail()
+    {
+        var emailSender = new FakeEmailAlertSender();
+        var barkSender = new FakeBarkAlertSender
+        {
+            SendException = new InvalidOperationException("bark boom")
+        };
+        var activityLog = new ActivityLogService();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                new EmailAlertChannelSettings(
+                    Enabled: true,
+                    SmtpHost: "smtp.example.com",
+                    Port: 587,
+                    SecurityMode: EmailSecurityMode.Tls,
+                    Username: "tester",
+                    Password: "secret",
+                    FromAddress: "sender@example.com",
+                    ToAddress: "receiver@example.com"),
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default with { Enabled = false },
+                new BarkAlertChannelSettings(true, "https://api.day.app", "device-key", string.Empty, "Library"))));
+
+        var service = CreateService(settingsService, emailSender, activityLog, barkSender: barkSender);
+
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+
+        Assert.Single(emailSender.Requests);
+        Assert.Contains(
+            activityLog.Entries,
+            entry => entry.Kind == LogEntryKind.Warning
+                     && entry.Category == "Alert"
+                     && entry.Message.Contains("发送抢座任务失败提醒Bark提醒失败：bark boom", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task NotifyGrabSucceededAsync_ShowsInAppFallbackBeforeSlowTelegramCompletes()
     {
         var notificationService = new FakeNotificationService();
@@ -326,7 +385,8 @@ public sealed class TaskEventAlertServiceTests
         FakeEmailAlertSender? emailSender = null,
         ActivityLogService? activityLogService = null,
         INotificationService? notificationService = null,
-        FakeTelegramAlertSender? telegramSender = null)
+        FakeTelegramAlertSender? telegramSender = null,
+        FakeBarkAlertSender? barkSender = null)
     {
         settingsService ??= new FakeSettingsService(AppSettings.Default);
         var toastService = new ToastNotificationService(settingsService, new AppWindowService());
@@ -335,6 +395,7 @@ public sealed class TaskEventAlertServiceTests
             settingsService,
             emailSender ?? new FakeEmailAlertSender(),
             telegramSender ?? new FakeTelegramAlertSender(),
+            barkSender ?? new FakeBarkAlertSender(),
             toastService,
             notificationService ?? new FakeNotificationService(),
             new AlertSoundService(),
