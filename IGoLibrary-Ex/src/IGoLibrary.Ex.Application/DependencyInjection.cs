@@ -24,6 +24,7 @@ public static class DependencyInjection
         services.AddSingleton<IReservationWorkflowService, ReservationWorkflowService>();
         services.AddSingleton<ISettingsWorkflowService, SettingsWorkflowService>();
         services.AddSingleton<IProtocolTemplateEditorService, ProtocolTemplateEditorService>();
+        services.AddSingleton<IHealthCheckService, HealthCheckService>();
         services.AddSingleton<ICoordinatorRuntime, SystemCoordinatorRuntime>();
         services.AddSingleton<IGrabReservationAttemptStrategy, QueryThenReserveGrabReservationStrategy>();
         services.AddSingleton<IGrabReservationAttemptStrategy, DirectReserveGrabReservationStrategy>();
@@ -32,9 +33,13 @@ public static class DependencyInjection
         services.AddSingleton<GrabSeatWorkflowRunner>();
         services.AddSingleton<OccupySeatWorkflowRunner>();
         services.AddSingleton<TomorrowReservationWorkflowRunner>();
+        services.AddSingleton<VenueAvailabilityWorkflowRunner>();
+        services.AddSingleton<CheckInGuardWorkflowRunner>();
         services.AddSingleton<IGrabSeatCoordinator, GrabSeatCoordinator>();
         services.AddSingleton<IOccupySeatCoordinator, OccupySeatCoordinator>();
         services.AddSingleton<ITomorrowReservationCoordinator, TomorrowReservationCoordinator>();
+        services.AddSingleton<IVenueAvailabilityCoordinator, VenueAvailabilityCoordinator>();
+        services.AddSingleton<ICheckInGuardCoordinator, CheckInGuardCoordinator>();
         return services;
     }
 }

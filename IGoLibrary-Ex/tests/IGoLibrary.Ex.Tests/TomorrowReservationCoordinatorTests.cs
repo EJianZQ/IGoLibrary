@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Application.State;
 using IGoLibrary.Ex.Domain.Enums;
@@ -76,7 +77,7 @@ public sealed class TomorrowReservationCoordinatorTests
     }
 
     [Fact]
-    public async Task StartAsync_NotifiesSessionInvalid_FromExpiredJwt_WithoutQueueing()
+    public async Task StartAsync_NotifiesSessionInvalid_FromApiAuthorizationFailure_EvenWhenJwtLooksExpired()
     {
         var queueCalls = 0;
         var eventPublisher = new FakeCoordinatorEventPublisher();
@@ -85,7 +86,7 @@ public sealed class TomorrowReservationCoordinatorTests
             OnEnterTomorrowReservationQueueAsync = (_, _) =>
             {
                 queueCalls++;
-                return Task.FromResult(TomorrowReservationQueueResult.Continue());
+                throw new TraceIntApiException("access denied!", 40001, "access denied!", isAuthorizationDenied: true);
             }
         };
         var runtimeState = new AppRuntimeState
@@ -105,7 +106,7 @@ public sealed class TomorrowReservationCoordinatorTests
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
         await WaitForAsync(() => eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>().Count == 1);
 
-        Assert.Equal(0, queueCalls);
+        Assert.Equal(1, queueCalls);
         Assert.Equal(CoordinatorStatusReason.SessionInvalid, coordinator.GetStatus().Reason);
     }
 

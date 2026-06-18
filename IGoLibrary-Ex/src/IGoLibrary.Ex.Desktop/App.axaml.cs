@@ -31,7 +31,9 @@ public partial class App : Avalonia.Application
             DataContext = viewModel;
             mainWindow.DataContext = viewModel;
             desktop.MainWindow = mainWindow;
-            services.GetRequiredService<AppWindowService>().Attach(mainWindow);
+            var appWindowService = services.GetRequiredService<AppWindowService>();
+            appWindowService.Attach(mainWindow);
+            RegisterApplicationActivationHandler(appWindowService);
             services.GetRequiredService<IAppThemeService>().AttachTopLevel(mainWindow);
 
             Dispatcher.UIThread.Post(async () =>
@@ -49,5 +51,31 @@ public partial class App : Avalonia.Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    public static bool ShouldRestoreMainWindowForActivation(ActivationKind kind)
+    {
+        return kind == ActivationKind.Reopen;
+    }
+
+    private void RegisterApplicationActivationHandler(AppWindowService appWindowService)
+    {
+        var activatableLifetime = ApplicationLifetime as IActivatableLifetime
+            ?? TryGetFeature(typeof(IActivatableLifetime)) as IActivatableLifetime;
+
+        if (activatableLifetime is null)
+        {
+            return;
+        }
+
+        activatableLifetime.Activated += (_, args) =>
+        {
+            if (!ShouldRestoreMainWindowForActivation(args.Kind))
+            {
+                return;
+            }
+
+            Dispatcher.UIThread.Post(appWindowService.ShowMainWindow);
+        };
     }
 }

@@ -1,3 +1,5 @@
+using IGoLibrary.Ex.Domain.Models;
+
 namespace IGoLibrary.Ex.Application.Abstractions;
 
 public interface ISessionWorkflowService
@@ -13,6 +15,8 @@ public interface ISessionWorkflowService
         CancellationToken cancellationToken = default);
 
     Task<SessionWorkflowResult> RestoreAsync(CancellationToken cancellationToken = default);
+
+    Task<CookieValidationSnapshot> ValidateCurrentCookieAsync(CancellationToken cancellationToken = default);
 
     Task SignOutAsync(CancellationToken cancellationToken = default);
 }

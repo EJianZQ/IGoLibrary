@@ -64,6 +64,17 @@ public sealed class SessionAuthFailureDetectorTests
     }
 
     [Fact]
+    public void IsSessionInvalidException_ReturnsFalse_ForTransientFailure_WhenJwtLooksExpired()
+    {
+        var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(-5));
+        var exception = new HttpRequestException("temporary", null, HttpStatusCode.ServiceUnavailable);
+
+        var isSessionInvalid = SessionAuthFailureDetector.IsSessionInvalidException(exception, cookie);
+
+        Assert.False(isSessionInvalid);
+    }
+
+    [Fact]
     public void IsSessionInvalidException_IgnoresAmbiguousCookieMessage_WhenJwtIsStillValid()
     {
         var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(5));

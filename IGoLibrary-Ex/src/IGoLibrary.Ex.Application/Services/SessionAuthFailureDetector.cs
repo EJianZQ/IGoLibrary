@@ -8,7 +8,6 @@ public static class SessionAuthFailureDetector
 {
     private static readonly string[] Keywords =
     [
-        "cookie",
         "授权",
         "未登录",
         "登录",
@@ -74,11 +73,6 @@ public static class SessionAuthFailureDetector
         if (IsExplicitAuthorizationFailure(exception))
         {
             return true;
-        }
-
-        if (TryGetCookieExpirationTime(cookie, out _))
-        {
-            return IsCookieExpired(cookie, now);
         }
 
         return IsSessionInvalidException(exception);

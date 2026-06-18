@@ -31,6 +31,33 @@ public sealed class DesktopCoordinatorEventPublisher(
                         tomorrowSucceeded.Day,
                         cancellationToken);
                     break;
+                case VenueAvailableCoordinatorEvent venueAvailable:
+                    await taskEventAlertDispatcher.NotifyVenueAvailableAsync(
+                        venueAvailable.LibraryName,
+                        venueAvailable.AvailableSeats,
+                        cancellationToken);
+                    break;
+                case CheckInReminderCoordinatorEvent checkInReminder:
+                    await taskEventAlertDispatcher.NotifyCheckInReminderAsync(
+                        checkInReminder.LibraryName,
+                        checkInReminder.SeatName,
+                        checkInReminder.Deadline,
+                        cancellationToken);
+                    break;
+                case CheckInMissedCoordinatorEvent checkInMissed:
+                    await taskEventAlertDispatcher.NotifyCheckInMissedAsync(
+                        checkInMissed.LibraryName,
+                        checkInMissed.SeatName,
+                        checkInMissed.Deadline,
+                        checkInMissed.ActionText,
+                        cancellationToken);
+                    break;
+                case CheckInAutoRescueSucceededCoordinatorEvent checkInRescueSucceeded:
+                    await taskEventAlertDispatcher.NotifyCheckInAutoRescueSucceededAsync(
+                        checkInRescueSucceeded.LibraryName,
+                        checkInRescueSucceeded.SeatName,
+                        cancellationToken);
+                    break;
                 case SessionInvalidCoordinatorEvent sessionInvalid:
                     await taskEventAlertDispatcher.NotifySessionInvalidAsync(
                         sessionInvalid.Source,

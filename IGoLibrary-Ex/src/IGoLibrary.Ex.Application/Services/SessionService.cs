@@ -98,12 +98,7 @@ public sealed class SessionService(
     {
         if (SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime))
         {
-            if (expirationTime <= DateTimeOffset.Now)
-            {
-                throw new InvalidOperationException(SessionAuthFailureDetector.BuildCookieExpiredMessage(expirationTime));
-            }
-
-            activityLogService.Write(LogEntryKind.Info, "Auth", $"Cookie JWT 未过期，到期时间：{expirationTime:yyyy-MM-dd HH:mm:ss}。");
+            activityLogService.Write(LogEntryKind.Info, "Auth", $"Cookie Token 推测时间：{expirationTime:yyyy-MM-dd HH:mm:ss}，实际状态以接口校验为准。");
         }
 
         await apiClient.ValidateCookieAsync(cookie, cancellationToken);

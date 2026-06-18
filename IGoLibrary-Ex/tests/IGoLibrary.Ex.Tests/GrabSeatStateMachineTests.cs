@@ -1,5 +1,6 @@
 using System.Text;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Application.State;
 using IGoLibrary.Ex.Domain.Enums;
@@ -105,7 +106,7 @@ public sealed class GrabSeatWorkflowRunnerTests
     }
 
     [Fact]
-    public async Task ExpiredJwtClassification_UsesRuntimeClock()
+    public async Task ExpiredJwtClassification_StillLetsApiDecideSessionValidity()
     {
         var expiresAt = DateTimeOffset.Now.AddHours(1);
         var runtime = new FakeCoordinatorRuntime
@@ -119,7 +120,7 @@ public sealed class GrabSeatWorkflowRunnerTests
             OnGetLibraryLayoutAsync = (_, _, _) =>
             {
                 layoutCalls++;
-                throw new InvalidOperationException("过期 JWT 不应继续请求场馆布局。");
+                throw new TraceIntApiException("access denied!", 40001, "access denied!", isAuthorizationDenied: true);
             }
         };
         var coordinator = CreateCoordinator(
@@ -133,7 +134,7 @@ public sealed class GrabSeatWorkflowRunnerTests
             new GrabSeatPollingStrategy(TimeSpan.Zero, TimeSpan.Zero, 0, TimeSpan.Zero, TimeSpan.Zero)));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
 
-        Assert.Equal(0, layoutCalls);
+        Assert.Equal(1, layoutCalls);
         Assert.Equal(CoordinatorStatusReason.SessionInvalid, coordinator.GetStatus().Reason);
         await WaitForAsync(() => eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>().Count == 1);
         Assert.Single(eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>());

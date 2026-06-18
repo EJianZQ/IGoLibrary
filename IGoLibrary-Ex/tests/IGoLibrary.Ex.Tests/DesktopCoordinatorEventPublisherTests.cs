@@ -58,6 +58,22 @@ public sealed class DesktopCoordinatorEventPublisherTests
     }
 
     [Fact]
+    public async Task PublishAsync_MapsCheckInReminderEventToTaskEventAlertDispatcher()
+    {
+        var taskAlertService = new FakeTaskEventAlertDispatcher();
+        var publisher = CreatePublisher(taskAlertService);
+        var deadline = DateTimeOffset.Now.AddMinutes(5);
+
+        await publisher.PublishAsync(new CheckInReminderCoordinatorEvent("自科阅览区一", "1号座", deadline));
+
+        Assert.Contains(
+            taskAlertService.CheckInReminderNotifications,
+            item => item.LibraryName == "自科阅览区一" &&
+                item.SeatName == "1号座" &&
+                item.Deadline == deadline);
+    }
+
+    [Fact]
     public async Task PublishAsync_WritesWarning_WhenMappingFails()
     {
         var activityLogService = new ActivityLogService();

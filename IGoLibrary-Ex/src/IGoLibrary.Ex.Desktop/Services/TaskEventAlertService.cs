@@ -10,6 +10,7 @@ public sealed class TaskEventAlertService(
     ISettingsService settingsService,
     IEmailAlertSender emailAlertSender,
     ITelegramAlertSender telegramAlertSender,
+    IBarkAlertSender barkAlertSender,
     ToastNotificationService toastNotificationService,
     INotificationService notificationService,
     AlertSoundService alertSoundService,
@@ -37,6 +38,8 @@ public sealed class TaskEventAlertService(
             emailSubject: "IGoLibrary-Ex Cookie 失效提醒",
             emailBody: BuildSessionInvalidEmailBody(source, reason),
             telegramMessage: BuildSessionInvalidTelegramMessage(source, reason),
+            barkTitle: title,
+            barkMessage: detailMessage,
             toastKind: ToastVisualKind.Warning,
             toastTitle: title,
             toastMessage: detailMessage,
@@ -60,6 +63,8 @@ public sealed class TaskEventAlertService(
             emailSubject: "IGoLibrary-Ex 抢座成功提醒",
             emailBody: BuildGrabSucceededEmailBody(normalizedLibraryName, normalizedSeatName),
             telegramMessage: BuildGrabSucceededTelegramMessage(normalizedLibraryName, normalizedSeatName),
+            barkTitle: "抢座成功",
+            barkMessage: $"{normalizedLibraryName} · {normalizedSeatName} 已成功预约",
             toastKind: ToastVisualKind.Success,
             toastTitle: "抢座成功",
             toastMessage: $"{normalizedLibraryName} · {normalizedSeatName} 已成功预约",
@@ -82,6 +87,8 @@ public sealed class TaskEventAlertService(
             emailSubject: "IGoLibrary-Ex 占座成功提醒",
             emailBody: BuildOccupyReReserveSucceededEmailBody(normalizedSeatName),
             telegramMessage: BuildOccupyReReserveSucceededTelegramMessage(normalizedSeatName),
+            barkTitle: "占座成功",
+            barkMessage: $"{normalizedSeatName} 已重新预约",
             toastKind: ToastVisualKind.Success,
             toastTitle: "占座成功",
             toastMessage: $"{normalizedSeatName} 已重新预约",
@@ -110,9 +117,128 @@ public sealed class TaskEventAlertService(
             emailSubject: "IGoLibrary-Ex 明日预约成功提醒",
             emailBody: BuildTomorrowReservationSucceededEmailBody(normalizedLibraryName, normalizedSeatName, normalizedDay),
             telegramMessage: BuildTomorrowReservationSucceededTelegramMessage(normalizedLibraryName, normalizedSeatName, normalizedDay),
+            barkTitle: "明日预约成功",
+            barkMessage: $"{normalizedDay} · {normalizedLibraryName} · {normalizedSeatName} 已成功预约",
             toastKind: ToastVisualKind.Success,
             toastTitle: "明日预约成功",
             toastMessage: $"{normalizedDay} · {normalizedLibraryName} · {normalizedSeatName} 已成功预约",
+            enableInAppFallback: true,
+            cancellationToken);
+    }
+
+    public async Task NotifyVenueAvailableAsync(string libraryName, int availableSeats, CancellationToken cancellationToken = default)
+    {
+        var normalizedLibraryName = NormalizeLibraryName(libraryName);
+        var normalizedAvailableSeats = Math.Max(1, availableSeats);
+        if (ShouldSuppress($"venue-available|{normalizedLibraryName}|{normalizedAvailableSeats}"))
+        {
+            return;
+        }
+
+        var message = $"{normalizedLibraryName} 当前有 {normalizedAvailableSeats} 个空座";
+        await DispatchAlertAsync(
+            emailLabel: "场馆空座提醒",
+            telegramLabel: "场馆空座提醒",
+            localLabel: "场馆空座提醒",
+            emailSubject: "IGoLibrary-Ex 场馆空座提醒",
+            emailBody: BuildVenueAvailableEmailBody(normalizedLibraryName, normalizedAvailableSeats),
+            telegramMessage: BuildVenueAvailableTelegramMessage(normalizedLibraryName, normalizedAvailableSeats),
+            barkTitle: "场馆有空座了",
+            barkMessage: message,
+            toastKind: ToastVisualKind.Success,
+            toastTitle: "场馆有空座了",
+            toastMessage: message,
+            enableInAppFallback: true,
+            cancellationToken);
+    }
+
+    public async Task NotifyCheckInReminderAsync(
+        string libraryName,
+        string seatName,
+        DateTimeOffset deadline,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedLibraryName = NormalizeLibraryName(libraryName);
+        var normalizedSeatName = NormalizeSeatName(seatName);
+        if (ShouldSuppress($"checkin-reminder|{normalizedLibraryName}|{normalizedSeatName}|{deadline:O}"))
+        {
+            return;
+        }
+
+        var message = $"{normalizedLibraryName} · {normalizedSeatName} 请在 {deadline:HH:mm:ss} 前完成签到";
+        await DispatchAlertAsync(
+            emailLabel: "签到提醒",
+            telegramLabel: "签到提醒",
+            localLabel: "签到提醒",
+            emailSubject: "IGoLibrary-Ex 签到提醒",
+            emailBody: BuildCheckInReminderBody(normalizedLibraryName, normalizedSeatName, deadline),
+            telegramMessage: BuildCheckInReminderBody(normalizedLibraryName, normalizedSeatName, deadline),
+            barkTitle: "请尽快签到",
+            barkMessage: message,
+            toastKind: ToastVisualKind.Warning,
+            toastTitle: "请尽快签到",
+            toastMessage: message,
+            enableInAppFallback: true,
+            cancellationToken);
+    }
+
+    public async Task NotifyCheckInMissedAsync(
+        string libraryName,
+        string seatName,
+        DateTimeOffset deadline,
+        string actionText,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedLibraryName = NormalizeLibraryName(libraryName);
+        var normalizedSeatName = NormalizeSeatName(seatName);
+        var normalizedActionText = string.IsNullOrWhiteSpace(actionText) ? "仅发送提醒" : actionText.Trim();
+        if (ShouldSuppress($"checkin-missed|{normalizedLibraryName}|{normalizedSeatName}|{deadline:O}|{normalizedActionText}"))
+        {
+            return;
+        }
+
+        var message = $"{normalizedLibraryName} · {normalizedSeatName} 已超过签到截止时间，策略：{normalizedActionText}";
+        await DispatchAlertAsync(
+            emailLabel: "错过签到提醒",
+            telegramLabel: "错过签到提醒",
+            localLabel: "错过签到提醒",
+            emailSubject: "IGoLibrary-Ex 错过签到提醒",
+            emailBody: BuildCheckInMissedBody(normalizedLibraryName, normalizedSeatName, deadline, normalizedActionText),
+            telegramMessage: BuildCheckInMissedBody(normalizedLibraryName, normalizedSeatName, deadline, normalizedActionText),
+            barkTitle: "已超过签到时间",
+            barkMessage: message,
+            toastKind: ToastVisualKind.Warning,
+            toastTitle: "已超过签到时间",
+            toastMessage: message,
+            enableInAppFallback: true,
+            cancellationToken);
+    }
+
+    public async Task NotifyCheckInAutoRescueSucceededAsync(
+        string libraryName,
+        string seatName,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedLibraryName = NormalizeLibraryName(libraryName);
+        var normalizedSeatName = NormalizeSeatName(seatName);
+        if (ShouldSuppress($"checkin-rescue-success|{normalizedLibraryName}|{normalizedSeatName}"))
+        {
+            return;
+        }
+
+        var message = $"{normalizedLibraryName} · {normalizedSeatName} 已完成自动补约";
+        await DispatchAlertAsync(
+            emailLabel: "签到补约成功提醒",
+            telegramLabel: "签到补约成功提醒",
+            localLabel: "签到补约成功提醒",
+            emailSubject: "IGoLibrary-Ex 签到补约成功提醒",
+            emailBody: BuildCheckInAutoRescueSucceededBody(normalizedLibraryName, normalizedSeatName),
+            telegramMessage: BuildCheckInAutoRescueSucceededBody(normalizedLibraryName, normalizedSeatName),
+            barkTitle: "补约成功",
+            barkMessage: message,
+            toastKind: ToastVisualKind.Success,
+            toastTitle: "补约成功",
+            toastMessage: message,
             enableInAppFallback: true,
             cancellationToken);
     }
@@ -133,6 +259,8 @@ public sealed class TaskEventAlertService(
             emailSubject: $"IGoLibrary-Ex {normalizedTaskName}任务失败提醒",
             emailBody: BuildTaskFailedEmailBody(normalizedTaskName, reason),
             telegramMessage: BuildTaskFailedTelegramMessage(normalizedTaskName, reason),
+            barkTitle: $"{normalizedTaskName}失败",
+            barkMessage: AppendDetail(message, reason),
             toastKind: ToastVisualKind.Warning,
             toastTitle: $"{normalizedTaskName}失败",
             toastMessage: AppendDetail(message, reason),
@@ -147,6 +275,8 @@ public sealed class TaskEventAlertService(
         string emailSubject,
         string emailBody,
         string telegramMessage,
+        string barkTitle,
+        string barkMessage,
         ToastVisualKind toastKind,
         string toastTitle,
         string toastMessage,
@@ -184,7 +314,7 @@ public sealed class TaskEventAlertService(
             await ShowInAppFallbackAsync(toastKind, toastTitle, toastMessage, cancellationToken);
         }
 
-        var remoteAlertTasks = new List<Task>(capacity: 2);
+        var remoteAlertTasks = new List<Task>(capacity: 3);
         if (alertSettings.Email.Enabled)
         {
             remoteAlertTasks.Add(SendEmailAlertSafelyAsync(
@@ -201,6 +331,16 @@ public sealed class TaskEventAlertService(
                 alertSettings.Telegram,
                 telegramLabel,
                 telegramMessage,
+                cancellationToken));
+        }
+
+        if (alertSettings.Bark.Enabled)
+        {
+            remoteAlertTasks.Add(SendBarkAlertSafelyAsync(
+                alertSettings.Bark,
+                localLabel,
+                barkTitle,
+                barkMessage,
                 cancellationToken));
         }
 
@@ -248,6 +388,27 @@ public sealed class TaskEventAlertService(
         catch (Exception ex)
         {
             activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{telegramLabel}Telegram提醒失败：{ex.Message}");
+        }
+    }
+
+    private async Task SendBarkAlertSafelyAsync(
+        BarkAlertChannelSettings settings,
+        string barkLabel,
+        string title,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await barkAlertSender.SendAsync(
+                settings,
+                title,
+                message,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{barkLabel}Bark提醒失败：{ex.Message}");
         }
     }
 
@@ -374,6 +535,19 @@ public sealed class TaskEventAlertService(
         return builder.ToString();
     }
 
+    private static string BuildVenueAvailableEmailBody(string libraryName, int availableSeats)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 检测到目标场馆出现空座");
+        builder.AppendLine();
+        builder.AppendLine($"目标场馆：{libraryName}");
+        builder.AppendLine($"当前空座数：{availableSeats}");
+        builder.AppendLine($"发现时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine();
+        builder.AppendLine("你可以返回应用查看场馆详情。");
+        return builder.ToString();
+    }
+
     private static string BuildSessionInvalidTelegramMessage(string source, string reason)
     {
         var builder = new StringBuilder();
@@ -434,6 +608,57 @@ public sealed class TaskEventAlertService(
         }
 
         builder.AppendLine("请返回应用检查任务状态、授权信息与场馆配置。");
+        return builder.ToString();
+    }
+
+    private static string BuildVenueAvailableTelegramMessage(string libraryName, int availableSeats)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 场馆有空座了");
+        builder.AppendLine($"目标场馆：{libraryName}");
+        builder.AppendLine($"当前空座数：{availableSeats}");
+        builder.AppendLine($"发现时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine("你可以返回应用查看场馆详情。");
+        return builder.ToString();
+    }
+
+    private static string BuildCheckInReminderBody(string libraryName, string seatName, DateTimeOffset deadline)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 签到提醒");
+        builder.AppendLine();
+        builder.AppendLine($"目标场馆：{libraryName}");
+        builder.AppendLine($"目标座位：{seatName}");
+        builder.AppendLine($"签到截止：{deadline:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine();
+        builder.AppendLine("请尽快到馆签到，避免预约失效。");
+        return builder.ToString();
+    }
+
+    private static string BuildCheckInMissedBody(
+        string libraryName,
+        string seatName,
+        DateTimeOffset deadline,
+        string actionText)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 检测到签到截止时间已到");
+        builder.AppendLine();
+        builder.AppendLine($"目标场馆：{libraryName}");
+        builder.AppendLine($"目标座位：{seatName}");
+        builder.AppendLine($"签到截止：{deadline:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine($"执行策略：{actionText}");
+        return builder.ToString();
+    }
+
+    private static string BuildCheckInAutoRescueSucceededBody(string libraryName, string seatName)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 已完成签到防漏补约");
+        builder.AppendLine();
+        builder.AppendLine($"补约场馆：{libraryName}");
+        builder.AppendLine($"补约座位：{seatName}");
+        builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
         return builder.ToString();
     }
 

@@ -182,12 +182,6 @@ internal sealed class TomorrowReservationWorkflowRunner(
     private string GetCurrentCookieOrThrow()
     {
         var cookie = sessionState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录");
-        if (SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime) &&
-            expirationTime <= runtime.Now)
-        {
-            throw new InvalidOperationException(SessionAuthFailureDetector.BuildCookieExpiredMessage(expirationTime));
-        }
-
         return cookie;
     }
 }

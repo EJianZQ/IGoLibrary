@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Application.State;
 using IGoLibrary.Ex.Domain.Enums;
@@ -337,7 +338,7 @@ public sealed class GrabSeatCoordinatorTests
     }
 
     [Fact]
-    public async Task StartAsync_NotifiesSessionInvalid_FromExpiredJwt_WithoutPollingApi()
+    public async Task StartAsync_NotifiesSessionInvalid_FromApiAuthorizationFailure_EvenWhenJwtLooksExpired()
     {
         var layoutCallCount = 0;
         var eventPublisher = new FakeCoordinatorEventPublisher();
@@ -346,7 +347,7 @@ public sealed class GrabSeatCoordinatorTests
             OnGetLibraryLayoutAsync = (_, _, _) =>
             {
                 layoutCallCount++;
-                throw new InvalidOperationException("过期 JWT 不应继续请求场馆布局。");
+                throw new TraceIntApiException("access denied!", 40001, "access denied!", isAuthorizationDenied: true);
             }
         };
 
@@ -376,10 +377,10 @@ public sealed class GrabSeatCoordinatorTests
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
         await WaitForAsync(() => eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>().Count == 1);
 
-        Assert.Equal(0, layoutCallCount);
+        Assert.Equal(1, layoutCallCount);
         var alert = Assert.Single(eventPublisher.EventsOf<SessionInvalidCoordinatorEvent>());
         Assert.Equal("抢座轮询", alert.Source);
-        Assert.Contains("Cookie 已过期", alert.Reason);
+        Assert.Contains("access denied", alert.Reason);
         Assert.Equal(CoordinatorStatusReason.SessionInvalid, coordinator.GetStatus().Reason);
     }
 

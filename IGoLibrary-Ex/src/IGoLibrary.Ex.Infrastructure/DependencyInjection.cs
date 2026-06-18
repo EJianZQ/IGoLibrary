@@ -1,6 +1,7 @@
 using System.Net;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Infrastructure.Api;
+using IGoLibrary.Ex.Infrastructure.Diagnostics;
 using IGoLibrary.Ex.Infrastructure.Logging;
 using IGoLibrary.Ex.Infrastructure.Notifications;
 using IGoLibrary.Ex.Infrastructure.Persistence;
@@ -23,10 +24,15 @@ public static class DependencyInjection
         services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
         services.AddSingleton<IFavoritesRepository, SqliteFavoritesRepository>();
         services.AddSingleton<IProtocolTemplateStore, DefaultProtocolTemplateStore>();
+        services.AddSingleton<IDiagnosticExportService, DiagnosticExportService>();
         services.AddSingleton<ICredentialStore>(_ => PlatformCredentialStore.CreateDefault());
         services.AddSingleton<ISmtpTransportClientFactory, MailKitSmtpTransportClientFactory>();
         services.AddSingleton<IEmailAlertSender, SmtpEmailAlertSender>();
         services.AddHttpClient<ITelegramAlertSender, TelegramAlertSender>(client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        });
+        services.AddHttpClient<IBarkAlertSender, BarkAlertSender>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
         });

@@ -6,6 +6,7 @@ param(
     [string]$AppVersion = "1.0.0",
     [string]$PackageName,
     [string]$PublishOutput,
+    [string]$IconSource,
     [switch]$SkipPublish
 )
 
@@ -13,8 +14,15 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $ExecutableName = "IGoLibrary.Ex.Desktop"
+$IconFileName = "AppIcon.icns"
 $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $Project = Join-Path $Root "src\IGoLibrary.Ex.Desktop\IGoLibrary.Ex.Desktop.csproj"
+if ([string]::IsNullOrWhiteSpace($IconSource)) {
+    $IconSource = Join-Path $Root "..\docs\images\ex\软件图标-大.png"
+}
+else {
+    $IconSource = [System.IO.Path]::GetFullPath($IconSource)
+}
 if ([string]::IsNullOrWhiteSpace($PublishOutput)) {
     $PublishOutput = Join-Path $Root "artifacts\publish\$Runtime"
 }
@@ -55,6 +63,7 @@ function Write-InfoPlist {
     $bundleIdentifierText = ConvertTo-PlistEscapedText $BundleIdentifier
     $versionText = ConvertTo-PlistEscapedText $AppVersion
     $executableText = ConvertTo-PlistEscapedText $ExecutableName
+    $iconFileText = ConvertTo-PlistEscapedText ([System.IO.Path]::GetFileNameWithoutExtension($IconFileName))
     $content = @"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -72,6 +81,8 @@ function Write-InfoPlist {
     <string>$versionText</string>
     <key>CFBundleExecutable</key>
     <string>$executableText</string>
+    <key>CFBundleIconFile</key>
+    <string>$iconFileText</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>
@@ -231,6 +242,102 @@ function Set-ZipCentralDirectoryHostToUnix {
     [System.IO.File]::WriteAllBytes($Path, $bytes)
 }
 
+function Copy-AppIcon {
+    param(
+        [string]$SourcePath,
+        [string]$DestinationResourcesDir
+    )
+
+    if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
+        Write-Warning "App icon source was not found: $SourcePath"
+        return
+    }
+
+    $sips = Get-Command "sips" -ErrorAction SilentlyContinue
+    $iconutil = Get-Command "iconutil" -ErrorAction SilentlyContinue
+    if ($null -eq $sips -or $null -eq $iconutil) {
+        Write-Warning "sips/iconutil was not found; skipping macOS app icon generation."
+        return
+    }
+
+    $iconset = Join-Path $AppOutputRoot "AppIcon.iconset"
+    if (Test-Path -LiteralPath $iconset) {
+        Remove-Item -LiteralPath $iconset -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Path $iconset -Force | Out-Null
+    foreach ($size in @(16, 32, 128, 256, 512)) {
+        $oneXPath = Join-Path $iconset "icon_${size}x${size}.png"
+        $twoXSize = $size * 2
+        $twoXPath = Join-Path $iconset "icon_${size}x${size}@2x.png"
+        & $sips.Source "-z" $size $size $SourcePath "--out" $oneXPath | Out-Null
+        & $sips.Source "-z" $twoXSize $twoXSize $SourcePath "--out" $twoXPath | Out-Null
+    }
+
+    $destination = Join-Path $DestinationResourcesDir $IconFileName
+    & $iconutil.Source "-c" "icns" $iconset "-o" $destination
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "iconutil rejected the generated iconset; writing ICNS container directly."
+        Write-IcnsFromIconSet -IconSetPath $iconset -DestinationPath $destination
+    }
+
+    Remove-Item -LiteralPath $iconset -Recurse -Force
+}
+
+function Write-IcnsFromIconSet {
+    param(
+        [string]$IconSetPath,
+        [string]$DestinationPath
+    )
+
+    $entries = @(
+        @{ Type = "icp4"; Name = "icon_16x16.png" },
+        @{ Type = "icp5"; Name = "icon_32x32.png" },
+        @{ Type = "icp6"; Name = "icon_32x32@2x.png" },
+        @{ Type = "ic07"; Name = "icon_128x128.png" },
+        @{ Type = "ic08"; Name = "icon_256x256.png" },
+        @{ Type = "ic09"; Name = "icon_512x512.png" },
+        @{ Type = "ic10"; Name = "icon_512x512@2x.png" }
+    )
+
+    $chunks = New-Object System.Collections.Generic.List[byte[]]
+    $payloadLength = 0
+    foreach ($entry in $entries) {
+        $path = Join-Path $IconSetPath $entry.Name
+        $data = [System.IO.File]::ReadAllBytes($path)
+        $chunk = New-Object byte[] ($data.Length + 8)
+        [System.Text.Encoding]::ASCII.GetBytes($entry.Type, 0, 4, $chunk, 0) | Out-Null
+        Write-BigEndianUInt32 -Buffer $chunk -Offset 4 -Value ($data.Length + 8)
+        [Array]::Copy($data, 0, $chunk, 8, $data.Length)
+        $chunks.Add($chunk)
+        $payloadLength += $chunk.Length
+    }
+
+    $output = New-Object byte[] ($payloadLength + 8)
+    [System.Text.Encoding]::ASCII.GetBytes("icns", 0, 4, $output, 0) | Out-Null
+    Write-BigEndianUInt32 -Buffer $output -Offset 4 -Value ($payloadLength + 8)
+    $offset = 8
+    foreach ($chunk in $chunks) {
+        [Array]::Copy($chunk, 0, $output, $offset, $chunk.Length)
+        $offset += $chunk.Length
+    }
+
+    [System.IO.File]::WriteAllBytes($DestinationPath, $output)
+}
+
+function Write-BigEndianUInt32 {
+    param(
+        [byte[]]$Buffer,
+        [int]$Offset,
+        [int]$Value
+    )
+
+    $Buffer[$Offset] = [byte](($Value -shr 24) -band 0xff)
+    $Buffer[$Offset + 1] = [byte](($Value -shr 16) -band 0xff)
+    $Buffer[$Offset + 2] = [byte](($Value -shr 8) -band 0xff)
+    $Buffer[$Offset + 3] = [byte]($Value -band 0xff)
+}
+
 function New-MacAppZip {
     param(
         [string]$SourceAppDir,
@@ -308,6 +415,7 @@ New-Item -ItemType Directory -Path $ResourcesDir -Force | Out-Null
 Get-ChildItem -LiteralPath $PublishOutput -Force | ForEach-Object {
     Copy-Item -LiteralPath $_.FullName -Destination $MacOSDir -Recurse -Force
 }
+Copy-AppIcon -SourcePath $IconSource -DestinationResourcesDir $ResourcesDir
 Write-InfoPlist (Join-Path $ContentsDir "Info.plist")
 Write-FirstRunGuide $FirstRunGuidePath
 Write-FirstRunCommand $FirstRunCommandPath

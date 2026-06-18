@@ -11,5 +11,8 @@ public enum CoordinatorStatusReason
     OccupyReReserveSucceeded = 6,
     TomorrowReservationSucceeded = 7,
     SessionInvalid = 8,
-    TaskFailed = 9
+    TaskFailed = 9,
+    VenueAvailable = 10,
+    CheckInReminderSent = 11,
+    CheckInGuardCompleted = 12
 }

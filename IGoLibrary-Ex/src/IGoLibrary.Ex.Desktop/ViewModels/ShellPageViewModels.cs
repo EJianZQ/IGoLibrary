@@ -31,6 +31,11 @@ public sealed partial class AccountVenueViewModel(
         return sessionWorkflowService.RestoreAsync(cancellationToken);
     }
 
+    public Task<CookieValidationSnapshot> ValidateCurrentCookieAsync(CancellationToken cancellationToken = default)
+    {
+        return sessionWorkflowService.ValidateCurrentCookieAsync(cancellationToken);
+    }
+
     public Task SignOutAsync(CancellationToken cancellationToken = default)
     {
         return sessionWorkflowService.SignOutAsync(cancellationToken);
@@ -179,6 +184,13 @@ public sealed partial class NotificationSettingsViewModel(
         CancellationToken cancellationToken = default)
     {
         return notificationTestService.SendTestTelegramAsync(settings, cancellationToken);
+    }
+
+    public Task SendTestBarkAsync(
+        BarkAlertChannelSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        return notificationTestService.SendTestBarkAsync(settings, cancellationToken);
     }
 
     public Task SendTestLocalAlertAsync(

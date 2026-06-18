@@ -19,11 +19,7 @@ namespace IGoLibrary.Ex.Desktop.ViewModels;
 
 public partial class MainWindowWorkflowViewModel
 {
-    public bool ShouldHideToTrayOnClose =>
-        MinimizeToTrayEnabled &&
-        (IsTaskActive(_grabSeatCoordinator.GetStatus()) ||
-         IsTaskActive(_occupySeatCoordinator.GetStatus()) ||
-         IsTaskActive(_tomorrowReservationCoordinator.GetStatus()));
+    public bool ShouldHideToTrayOnClose => MinimizeToTrayEnabled;
 
     public int SelectedSeatCount => SelectedSeats.Count;
 
@@ -81,16 +77,22 @@ public partial class MainWindowWorkflowViewModel
 
     public bool IsTelegramNotificationTabActive => SelectedNotificationSettingsTabIndex == 1;
 
-    public bool IsLocalNotificationTabActive => SelectedNotificationSettingsTabIndex == 2;
+    public bool IsBarkNotificationTabActive => SelectedNotificationSettingsTabIndex == 2;
+
+    public bool IsLocalNotificationTabActive => SelectedNotificationSettingsTabIndex == 3;
 
     public double NotificationSegmentControlWidth => NotificationSegmentControlWidthValue;
 
     public double NotificationSegmentSliderWidth => NotificationSegmentSliderWidthValue;
 
-    public double NotificationSegmentSliderOffset => Math.Clamp(SelectedNotificationSettingsTabIndex, 0, 2) *
+    public double NotificationSegmentSliderOffset => Math.Clamp(SelectedNotificationSettingsTabIndex, 0, 3) *
                                                      NotificationSegmentSliderOffsetValue;
 
     public IBrush EmailNotificationTabBackgroundBrush => IsEmailNotificationTabActive
+        ? NotificationSegmentActiveBrush
+        : NotificationSegmentInactiveBrush;
+
+    public IBrush TelegramNotificationTabBackgroundBrush => IsTelegramNotificationTabActive
         ? NotificationSegmentActiveBrush
         : NotificationSegmentInactiveBrush;
 
@@ -98,7 +100,15 @@ public partial class MainWindowWorkflowViewModel
         ? NotificationSegmentActiveBrush
         : NotificationSegmentInactiveBrush;
 
+    public IBrush BarkNotificationTabBackgroundBrush => IsBarkNotificationTabActive
+        ? NotificationSegmentActiveBrush
+        : NotificationSegmentInactiveBrush;
+
     public IBrush TelegramNotificationTabForegroundBrush => IsTelegramNotificationTabActive
+        ? NotificationSegmentActiveTextBrush
+        : NotificationSegmentInactiveTextBrush;
+
+    public IBrush BarkNotificationTabForegroundBrush => IsBarkNotificationTabActive
         ? NotificationSegmentActiveTextBrush
         : NotificationSegmentInactiveTextBrush;
 
@@ -169,6 +179,42 @@ public partial class MainWindowWorkflowViewModel
     partial void OnIsOccupyRunningChanged(bool value)
     {
         OnPropertyChanged(nameof(IsOccupyStopped));
+        OnReservationGuardStateChanged();
+    }
+
+    partial void OnIsCheckInGuardRunningChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsCheckInGuardStopped));
+        OnReservationGuardStateChanged();
+    }
+
+    partial void OnSelectedReservationGuardModeIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(SelectedReservationGuardMode));
+        OnReservationGuardStateChanged();
+    }
+
+    partial void OnOccupyStatusTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(ReservationGuardStatusText));
+    }
+
+    partial void OnCheckInGuardStatusTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(ReservationGuardStatusText));
+    }
+
+    private void OnReservationGuardStateChanged()
+    {
+        OnPropertyChanged(nameof(IsOccupyGuardModeActive));
+        OnPropertyChanged(nameof(IsCheckInGuardModeActive));
+        OnPropertyChanged(nameof(CanStartSelectedReservationGuard));
+        OnPropertyChanged(nameof(ReservationGuardStatusText));
+    }
+
+    partial void OnCheckInWindowMinutesChanged(int value)
+    {
+        CheckInEffectiveDeadlineText = BuildCheckInDeadlineText(_currentReservation, DateTimeOffset.Now);
     }
 
     partial void OnIsCancellingCurrentReservationChanged(bool value)
@@ -180,6 +226,11 @@ public partial class MainWindowWorkflowViewModel
     {
         OnPropertyChanged(nameof(CanEditGrabConfiguration));
         OnPropertyChanged(nameof(CanEditGrabScheduledStartTime));
+    }
+
+    partial void OnIsVenueAvailabilityRunningChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsVenueAvailabilityStopped));
     }
 
     partial void OnIsGrabScheduledStartEnabledChanged(bool value)
@@ -251,12 +302,16 @@ public partial class MainWindowWorkflowViewModel
     {
         OnPropertyChanged(nameof(IsEmailNotificationTabActive));
         OnPropertyChanged(nameof(IsTelegramNotificationTabActive));
+        OnPropertyChanged(nameof(IsBarkNotificationTabActive));
         OnPropertyChanged(nameof(IsLocalNotificationTabActive));
         OnPropertyChanged(nameof(NotificationSegmentSliderOffset));
         OnPropertyChanged(nameof(EmailNotificationTabBackgroundBrush));
+        OnPropertyChanged(nameof(TelegramNotificationTabBackgroundBrush));
+        OnPropertyChanged(nameof(BarkNotificationTabBackgroundBrush));
         OnPropertyChanged(nameof(LocalNotificationTabBackgroundBrush));
         OnPropertyChanged(nameof(EmailNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(TelegramNotificationTabForegroundBrush));
+        OnPropertyChanged(nameof(BarkNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
     }
 
@@ -330,11 +385,15 @@ public partial class MainWindowWorkflowViewModel
 
         _activityLogService.EntryWritten += OnLogEntryWritten;
         _grabSeatCoordinator.StatusChanged += OnGrabStatusChanged;
+        _venueAvailabilityCoordinator.StatusChanged += OnVenueAvailabilityStatusChanged;
         _occupySeatCoordinator.StatusChanged += OnOccupyStatusChanged;
         _tomorrowReservationCoordinator.StatusChanged += OnTomorrowStatusChanged;
+        _checkInGuardCoordinator.StatusChanged += OnCheckInGuardStatusChanged;
         ApplyGrabStatus(_grabSeatCoordinator.GetStatus());
+        ApplyVenueAvailabilityStatus(_venueAvailabilityCoordinator.GetStatus());
         ApplyOccupyStatus(_occupySeatCoordinator.GetStatus());
         ApplyTomorrowStatus(_tomorrowReservationCoordinator.GetStatus());
+        ApplyCheckInGuardStatus(_checkInGuardCoordinator.GetStatus());
 
         if (!_reservationCountdownTimerInitialized)
         {
@@ -359,6 +418,7 @@ public partial class MainWindowWorkflowViewModel
                     SessionSummary = restored.StatusMessage;
                     ManualCookieText = restored.Cookie ?? restored.Session.Cookie;
                     UpdateSidebarSessionExpiration(restored.CookieExpirationTime, restored.Cookie);
+                    await ValidateCurrentCookieStatusAsync(force: true);
                     await NotifySessionRestoredAsync(restored.Cookie ?? restored.Session.Cookie);
                     if (restored.ShouldLoadLibraries)
                     {
@@ -378,6 +438,7 @@ public partial class MainWindowWorkflowViewModel
         finally
         {
             IsInitializationComplete = true;
+            await RefreshHealthSnapshotSilentlyAsync();
             UpdateHomeDashboardPresentation();
         }
     }
@@ -429,33 +490,49 @@ public partial class MainWindowWorkflowViewModel
 
     partial void OnTomorrowSeatFilterTextChanged(string value) => ApplyTomorrowSeatFilter();
 
-    partial void OnEmailAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertsEnabledChanged(bool value) => OnNotificationSettingsChanged();
 
-    partial void OnEmailAlertSmtpHostChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertSmtpHostChanged(string value) => OnNotificationSettingsChanged();
 
-    partial void OnEmailAlertSmtpPortChanged(int value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertSmtpPortChanged(int value) => OnNotificationSettingsChanged();
 
-    partial void OnSelectedEmailAlertSecurityModeIndexChanged(int value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnSelectedEmailAlertSecurityModeIndexChanged(int value) => OnNotificationSettingsChanged();
 
-    partial void OnEmailAlertUsernameChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertUsernameChanged(string value) => OnNotificationSettingsChanged();
 
-    partial void OnEmailAlertPasswordChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertPasswordChanged(string value) => OnNotificationSettingsChanged();
 
-    partial void OnEmailAlertFromAddressChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertFromAddressChanged(string value) => OnNotificationSettingsChanged();
 
-    partial void OnEmailAlertToAddressChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnEmailAlertToAddressChanged(string value) => OnNotificationSettingsChanged();
 
-    partial void OnTelegramAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnTelegramAlertsEnabledChanged(bool value) => OnNotificationSettingsChanged();
 
-    partial void OnTelegramAlertApiBaseUrlChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnTelegramAlertApiBaseUrlChanged(string value) => OnNotificationSettingsChanged();
 
-    partial void OnTelegramAlertBotTokenChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnTelegramAlertBotTokenChanged(string value) => OnNotificationSettingsChanged();
 
-    partial void OnTelegramAlertChatIdChanged(string value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnTelegramAlertChatIdChanged(string value) => OnNotificationSettingsChanged();
 
-    partial void OnLocalToastAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnBarkAlertsEnabledChanged(bool value) => OnNotificationSettingsChanged();
 
-    partial void OnLocalSoundAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+    partial void OnBarkAlertServerUrlChanged(string value) => OnNotificationSettingsChanged();
+
+    partial void OnBarkAlertDeviceKeyChanged(string value) => OnNotificationSettingsChanged();
+
+    partial void OnBarkAlertSoundChanged(string value) => OnNotificationSettingsChanged();
+
+    partial void OnBarkAlertGroupChanged(string value) => OnNotificationSettingsChanged();
+
+    partial void OnLocalToastAlertsEnabledChanged(bool value) => OnNotificationSettingsChanged();
+
+    partial void OnLocalSoundAlertsEnabledChanged(bool value) => OnNotificationSettingsChanged();
+
+    private void OnNotificationSettingsChanged()
+    {
+        RefreshNotificationSurfacePresentation();
+        ScheduleNotificationSettingsAutoSave();
+    }
 
     partial void OnSelectedLibraryChanged(LibrarySummary? value)
     {
@@ -499,6 +576,12 @@ public partial class MainWindowWorkflowViewModel
 
     [RelayCommand]
     private void ShowLocalNotificationSettings()
+    {
+        SelectedNotificationSettingsTabIndex = 3;
+    }
+
+    [RelayCommand]
+    private void ShowBarkNotificationSettings()
     {
         SelectedNotificationSettingsTabIndex = 2;
     }
@@ -585,6 +668,7 @@ public partial class MainWindowWorkflowViewModel
                 IsAuthorized = true;
                 SessionSummary = result.StatusMessage;
                 UpdateSidebarSessionExpiration(result.CookieExpirationTime, result.Session.Cookie);
+                await ValidateCurrentCookieStatusAsync(force: true);
                 if (result.ShouldLoadLibraries)
                 {
                     await LoadLibrariesAsync(restorePreferredSelection: false);
@@ -631,6 +715,7 @@ public partial class MainWindowWorkflowViewModel
             IsAuthorized = true;
             SessionSummary = result.StatusMessage;
             UpdateSidebarSessionExpiration(result.CookieExpirationTime, session.Cookie);
+            await ValidateCurrentCookieStatusAsync(force: true);
             if (result.ShouldLoadLibraries)
             {
                 await LoadLibrariesAsync(restorePreferredSelection: false);
@@ -660,6 +745,7 @@ public partial class MainWindowWorkflowViewModel
             SessionSummary = result.StatusMessage;
             ManualCookieText = result.Cookie ?? result.Session.Cookie;
             UpdateSidebarSessionExpiration(result.CookieExpirationTime, result.Cookie ?? result.Session.Cookie);
+            await ValidateCurrentCookieStatusAsync(force: true);
             await NotifySessionRestoredAsync(result.Cookie ?? result.Session.Cookie);
             if (result.ShouldLoadLibraries)
             {
@@ -733,6 +819,7 @@ public partial class MainWindowWorkflowViewModel
         UpdateHomeSystemInfoPresentation();
         UpdateReservationPresentation(null);
         ApplyGrabStatus(CoordinatorStatus.Idle("抢座"));
+        ApplyVenueAvailabilityStatus(CoordinatorStatus.Idle("空座追踪"));
     }
 
     [RelayCommand]
@@ -1002,6 +1089,13 @@ public partial class MainWindowWorkflowViewModel
 
         try
         {
+            if (!await EnsurePreflightAllowsStartAsync(
+                    PreflightTarget.Grab(selectedSeats),
+                    "启动抢座"))
+            {
+                return;
+            }
+
             var mode = (GrabPollingMode)SelectedGrabPollingModeIndex;
             var scheduledStart = ParseScheduledTime();
             await PersistGrabReservationStrategyAsync();
@@ -1032,6 +1126,46 @@ public partial class MainWindowWorkflowViewModel
         {
             _activityLogService.Write(LogEntryKind.Error, "Grab", $"停止抢座失败：{ex.Message}");
             await _notificationService.ShowWarningAsync("停止抢座失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task StartVenueAvailabilityAsync()
+    {
+        if (SelectedLibrary is null)
+        {
+            await _notificationService.ShowWarningAsync("未绑定场馆", "请先绑定场馆");
+            return;
+        }
+
+        try
+        {
+            var plan = new VenueAvailabilityWatchPlan(
+                SelectedLibrary.LibraryId,
+                SelectedLibrary.Name,
+                TimeSpan.FromSeconds(Math.Clamp(VenueAvailabilityPollingIntervalSeconds, 5, 3600)));
+            await _venueAvailabilityCoordinator.StartAsync(plan);
+            ApplyVenueAvailabilityStatus(_venueAvailabilityCoordinator.GetStatus());
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Error, "Vacancy", $"启动空座追踪失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("启动空座追踪失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task StopVenueAvailabilityAsync()
+    {
+        try
+        {
+            await _venueAvailabilityCoordinator.StopAsync();
+            ApplyVenueAvailabilityStatus(_venueAvailabilityCoordinator.GetStatus());
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Error, "Vacancy", $"停止空座追踪失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("停止空座追踪失败", ex.Message);
         }
     }
 
@@ -1161,6 +1295,15 @@ public partial class MainWindowWorkflowViewModel
 
         try
         {
+            if (!await EnsurePreflightAllowsStartAsync(
+                    PreflightTarget.TomorrowReservation([
+                        new SeatReference(selectedSeatInLayout.SeatKey, selectedSeatInLayout.SeatName)
+                    ]),
+                    executeImmediately ? "立即执行明日预约" : "启动明日预约"))
+            {
+                return;
+            }
+
             var scheduledStart = ParseTomorrowScheduledTime();
             TomorrowVerificationText = executeImmediately
                 ? "明日预约任务已启动，等待结果"
@@ -1279,6 +1422,23 @@ public partial class MainWindowWorkflowViewModel
     {
         try
         {
+            if (IsOccupyRunning)
+            {
+                await _notificationService.ShowWarningAsync("预约守护正在运行", "续占守护已经在运行");
+                return;
+            }
+
+            if (IsCheckInGuardRunning)
+            {
+                await _notificationService.ShowWarningAsync("预约守护正在运行", "签到防漏正在运行，请先停止签到防漏后再启动续占守护");
+                return;
+            }
+
+            if (!await EnsurePreflightAllowsStartAsync(PreflightTarget.Occupy(), "启动预约守护"))
+            {
+                return;
+            }
+
             var plan = new OccupySeatPlan(
                 TimeSpan.FromSeconds(Math.Max(1, ReReserveDelaySeconds)),
                 (OccupyCheckIntervalMode)SelectedOccupyCheckIntervalModeIndex);
@@ -1286,8 +1446,79 @@ public partial class MainWindowWorkflowViewModel
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Occupy", $"启动占座失败：{ex.Message}");
-            await _notificationService.ShowWarningAsync("启动占座失败", ex.Message);
+            _activityLogService.Write(LogEntryKind.Error, "Occupy", $"启动续占守护失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("启动续占守护失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task StartCheckInGuardAsync()
+    {
+        try
+        {
+            if (IsCheckInGuardRunning)
+            {
+                await _notificationService.ShowWarningAsync("预约守护正在运行", "签到防漏已经在运行");
+                return;
+            }
+
+            if (IsOccupyRunning)
+            {
+                await _notificationService.ShowWarningAsync("预约守护正在运行", "续占守护正在运行，请先停止续占守护后再启动签到防漏");
+                return;
+            }
+
+            if (_currentReservation is null)
+            {
+                await RefreshReservationAsync(showNotificationOnError: true);
+            }
+
+            if (_currentReservation is null)
+            {
+                await _notificationService.ShowWarningAsync("暂无预约", "请先刷新并确认当前已有预约记录");
+                return;
+            }
+
+            if (!await EnsurePreflightAllowsStartAsync(PreflightTarget.CheckInGuard(), "启动预约守护"))
+            {
+                return;
+            }
+
+            var deadline = ResolveCheckInDeadline();
+            var checkInWindow = TimeSpan.FromMinutes(Math.Clamp(CheckInWindowMinutes, 1, 240));
+            var action = (CheckInGuardMissedAction)Math.Clamp(
+                SelectedCheckInGuardMissedActionIndex,
+                0,
+                CheckInGuardMissedActions.Length - 1);
+            var plan = new CheckInGuardPlan(
+                deadline,
+                TimeSpan.FromMinutes(Math.Clamp(CheckInReminderLeadMinutes, 1, 240)),
+                action,
+                TimeSpan.FromSeconds(Math.Max(1, CheckInReReserveDelaySeconds)),
+                _lockedLibrarySummary?.LibraryId,
+                _lockedLibrarySummary?.Name,
+                checkInWindow,
+                TimeSpan.FromMinutes(1));
+            await _checkInGuardCoordinator.StartAsync(plan);
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Error, "CheckIn", $"启动签到防漏失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("启动签到防漏失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task StopCheckInGuardAsync()
+    {
+        try
+        {
+            await _checkInGuardCoordinator.StopAsync();
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Error, "CheckIn", $"停止签到防漏失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("停止签到防漏失败", ex.Message);
         }
     }
 
@@ -1300,9 +1531,28 @@ public partial class MainWindowWorkflowViewModel
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Occupy", $"停止占座失败：{ex.Message}");
-            await _notificationService.ShowWarningAsync("停止占座失败", ex.Message);
+            _activityLogService.Write(LogEntryKind.Error, "Occupy", $"停止续占守护失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("停止续占守护失败", ex.Message);
         }
+    }
+
+    private DateTimeOffset ResolveCheckInDeadline()
+    {
+        var now = DateTimeOffset.Now;
+        if (_currentReservation?.ValidateTime is { } validateTime && validateTime > now)
+        {
+            return validateTime;
+        }
+
+        var fallbackDeadline = now.AddMinutes(Math.Clamp(CheckInWindowMinutes, 1, 240));
+        if (_currentReservation?.ExpirationTime is { } expirationTime &&
+            expirationTime > now &&
+            expirationTime < fallbackDeadline)
+        {
+            return expirationTime;
+        }
+
+        return fallbackDeadline;
     }
 
     [RelayCommand]
@@ -1327,6 +1577,55 @@ public partial class MainWindowWorkflowViewModel
             BuildTaskEventAlertSettingsSnapshot()));
         await _appThemeService.ApplyThemeAsync(theme);
         await _notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库");
+        await RefreshHealthSnapshotSilentlyAsync();
+    }
+
+    [RelayCommand]
+    private async Task RefreshHealthSnapshotAsync()
+    {
+        try
+        {
+            var snapshot = await _healthCheckService.BuildSnapshotAsync();
+            ApplyHealthSnapshot(snapshot);
+            await _notificationService.ShowSuccessAsync("健康检查已刷新", HealthCheckStatusText);
+        }
+        catch (Exception ex)
+        {
+            HealthCheckStatusText = $"健康检查失败：{ex.Message}";
+            HomeHealthStatusText = "检查失败";
+            HomeHealthDetailText = ex.Message;
+            _activityLogService.Write(LogEntryKind.Warning, "Health", $"健康检查失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("健康检查失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExportDiagnosticsAsync()
+    {
+        if (IsExportingDiagnostics)
+        {
+            return;
+        }
+
+        IsExportingDiagnostics = true;
+        try
+        {
+            var result = await _diagnosticExportService.ExportAsync();
+            DiagnosticExportStatusText = string.IsNullOrWhiteSpace(result.FilePath)
+                ? "诊断导出服务未配置。"
+                : $"诊断包已导出：{result.FilePath}";
+            await _notificationService.ShowSuccessAsync("诊断包已导出", DiagnosticExportStatusText);
+        }
+        catch (Exception ex)
+        {
+            DiagnosticExportStatusText = $"导出诊断包失败：{ex.Message}";
+            _activityLogService.Write(LogEntryKind.Warning, "Diagnostic", $"导出诊断包失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("导出诊断包失败", ex.Message);
+        }
+        finally
+        {
+            IsExportingDiagnostics = false;
+        }
     }
 
     [RelayCommand]
@@ -1376,6 +1675,25 @@ public partial class MainWindowWorkflowViewModel
             NotificationSettingsStatusText = $"测试 Telegram 发送失败：{ex.Message}";
             _activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Telegram 失败：{ex.Message}");
             await _errorDialogService.ShowErrorAsync("测试 Telegram 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
+        }
+    }
+
+    [RelayCommand]
+    private async Task SendTestBarkAlertAsync()
+    {
+        try
+        {
+            CancelPendingNotificationSettingsAutoSave();
+            await PersistNotificationSettingsSnapshotAsync();
+            await NotificationSettings.SendTestBarkAsync(BuildTaskEventAlertSettingsSnapshot().Bark);
+            NotificationSettingsStatusText = $"测试 Bark 已发送于 {DateTime.Now:HH:mm:ss}。";
+            await _notificationService.ShowSuccessAsync("测试 Bark 已发送", "请检查 Bark 客户端，确认当前 Device Key 可用");
+        }
+        catch (Exception ex)
+        {
+            NotificationSettingsStatusText = $"测试 Bark 发送失败：{ex.Message}";
+            _activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Bark 失败：{ex.Message}");
+            await _errorDialogService.ShowErrorAsync("测试 Bark 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
         }
     }
 
@@ -1476,9 +1794,19 @@ public partial class MainWindowWorkflowViewModel
                 : alertSettings.Telegram.ApiBaseUrl;
             TelegramAlertBotToken = alertSettings.Telegram.BotToken ?? string.Empty;
             TelegramAlertChatId = alertSettings.Telegram.ChatId ?? string.Empty;
+            BarkAlertsEnabled = alertSettings.Bark.Enabled;
+            BarkAlertServerUrl = string.IsNullOrWhiteSpace(alertSettings.Bark.ServerUrl)
+                ? BarkAlertChannelSettings.DefaultServerUrl
+                : alertSettings.Bark.ServerUrl;
+            BarkAlertDeviceKey = alertSettings.Bark.DeviceKey ?? string.Empty;
+            BarkAlertSound = alertSettings.Bark.Sound ?? string.Empty;
+            BarkAlertGroup = string.IsNullOrWhiteSpace(alertSettings.Bark.Group)
+                ? BarkAlertChannelSettings.Default.Group
+                : alertSettings.Bark.Group;
             LocalToastAlertsEnabled = alertSettings.Local.PopupEnabled;
             LocalSoundAlertsEnabled = alertSettings.Local.SoundEnabled;
             NotificationSettingsStatusText = "更改后会自动保存。";
+            RefreshNotificationSurfacePresentation();
 
             _historicalSuccessCount = Math.Max(0, settings.Dashboard.SuccessfulReservationCount);
             _totalGuardSeconds = Math.Max(0, settings.Dashboard.TotalGuardSeconds);
@@ -2229,7 +2557,7 @@ public partial class MainWindowWorkflowViewModel
             var displayMessage = TrimSentenceEnding(entry.Message);
             var line = FormatLogLine(entry, displayMessage);
             AllLogsText = AppendLine(AllLogsText, line);
-            if (entry.Category is "Grab" or "Library" or "Favorite" or "Auth")
+            if (entry.Category is "Grab" or "Vacancy" or "Library" or "Favorite" or "Auth")
             {
                 GrabLogsText = AppendLine(GrabLogsText, line);
             }
@@ -2283,6 +2611,28 @@ public partial class MainWindowWorkflowViewModel
                     });
                 }
             }
+
+            if (entry.Category is "CheckIn" or "Auth")
+            {
+                if (CheckInLogLines.Count > 0)
+                {
+                    CheckInLogLines[^1].IsLatest = false;
+                }
+
+                var hasSuccessSemantic = entry.Kind == LogEntryKind.Success ||
+                                         entry.Message.Contains("成功", StringComparison.OrdinalIgnoreCase);
+                var hasFailureSemantic = entry.Kind == LogEntryKind.Error ||
+                                         entry.Message.Contains("失败", StringComparison.OrdinalIgnoreCase);
+
+                CheckInLogLines.Add(new LogLineViewModel(
+                    $"[{entry.Timestamp:HH:mm:ss}]",
+                    $"{entry.Category}: {displayMessage}",
+                    entry.Kind,
+                    true,
+                    hasSuccessSemantic,
+                    hasFailureSemantic,
+                    _appThemeService));
+            }
         });
     }
 
@@ -2311,9 +2661,19 @@ public partial class MainWindowWorkflowViewModel
         }
     }
 
+    private void OnVenueAvailabilityStatusChanged(object? sender, CoordinatorStatus status)
+    {
+        Dispatcher.UIThread.Post(() => ApplyVenueAvailabilityStatus(status));
+    }
+
     private void OnOccupyStatusChanged(object? sender, CoordinatorStatus status)
     {
         Dispatcher.UIThread.Post(() => ApplyOccupyStatus(status));
+    }
+
+    private void OnCheckInGuardStatusChanged(object? sender, CoordinatorStatus status)
+    {
+        Dispatcher.UIThread.Post(() => ApplyCheckInGuardStatus(status));
     }
 
     private void OnTomorrowStatusChanged(object? sender, CoordinatorStatus status)
@@ -2329,9 +2689,11 @@ public partial class MainWindowWorkflowViewModel
     {
         UpdateReservationCountdown();
         UpdateGrabLastRequestText();
+        UpdateVenueAvailabilityLastRequestText();
         UpdateTomorrowLastRequestText();
         UpdateGrabRuntimeClock();
-        RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);
+        RefreshSidebarCookieStatusPresentation();
+        _ = ValidateCurrentCookieStatusAsync(force: false);
         UpdateHomeDashboardClock();
     }
 
@@ -2357,6 +2719,29 @@ public partial class MainWindowWorkflowViewModel
     {
         OccupyStatusText = status.Message;
         IsOccupyRunning = IsTaskActive(status);
+        UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
+        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeSystemInfoPresentation();
+    }
+
+    private void ApplyCheckInGuardStatus(CoordinatorStatus status)
+    {
+        CheckInGuardStatusText = TrimSentenceEnding(status.Message);
+        IsCheckInGuardRunning = IsTaskActive(status);
+        UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
+        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeSystemInfoPresentation();
+    }
+
+    private void ApplyVenueAvailabilityStatus(CoordinatorStatus status)
+    {
+        VenueAvailabilityStatusText = TrimSentenceEnding(status.Message);
+        IsVenueAvailabilityRunning = IsTaskActive(status);
+        VenueAvailabilityPollCount = status.PollCount;
+        VenueAvailabilityRequestCount = status.RequestCount;
+        _venueAvailabilityTaskState = status.State;
+        _venueAvailabilityLastRequestAt = status.LastRequestAt;
+        UpdateVenueAvailabilityLastRequestText();
         UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
         UpdateHomeHeroPresentation(DateTimeOffset.Now);
         UpdateHomeSystemInfoPresentation();
@@ -2424,6 +2809,25 @@ public partial class MainWindowWorkflowViewModel
         }
 
         TomorrowLastRequestText = elapsed < TimeSpan.FromSeconds(1)
+            ? "刚刚"
+            : $"{Math.Max(1, (int)Math.Floor(elapsed.TotalSeconds))} 秒前";
+    }
+
+    private void UpdateVenueAvailabilityLastRequestText()
+    {
+        if (_venueAvailabilityLastRequestAt is null)
+        {
+            VenueAvailabilityLastRequestText = "无";
+            return;
+        }
+
+        var elapsed = DateTimeOffset.Now - _venueAvailabilityLastRequestAt.Value;
+        if (elapsed < TimeSpan.Zero)
+        {
+            elapsed = TimeSpan.Zero;
+        }
+
+        VenueAvailabilityLastRequestText = elapsed < TimeSpan.FromSeconds(1)
             ? "刚刚"
             : $"{Math.Max(1, (int)Math.Floor(elapsed.TotalSeconds))} 秒前";
     }
@@ -2527,7 +2931,14 @@ public partial class MainWindowWorkflowViewModel
             return ("等待授权", "完成登录与场馆绑定后即可启用全部引擎。", GrabStateWarningBrush, DashboardWarningSoftBrush);
         }
 
-        var activeTaskCount = new[] { IsGrabTaskActive, IsTomorrowTaskActive, IsOccupyRunning }.Count(static active => active);
+        var activeTaskCount = new[]
+        {
+            IsGrabTaskActive,
+            IsVenueAvailabilityRunning,
+            IsTomorrowTaskActive,
+            IsOccupyRunning,
+            IsCheckInGuardRunning
+        }.Count(static active => active);
         if (activeTaskCount >= 2)
         {
             return ("多任务协同中", "后台任务正在稳定运行，请保持程序常驻。", GrabStateRunningBrush, DashboardRunningSoftBrush);
@@ -2538,6 +2949,11 @@ public partial class MainWindowWorkflowViewModel
             return ("抢座任务运行中", "已进入实时监控阶段，请保持程序常驻。", GrabStateRunningBrush, DashboardRunningSoftBrush);
         }
 
+        if (IsVenueAvailabilityRunning)
+        {
+            return ("空座追踪运行中", "场馆满座后会守候下一次释放并提醒你。", GrabStateRunningBrush, DashboardRunningSoftBrush);
+        }
+
         if (IsTomorrowTaskActive)
         {
             return ("明日预约运行中", "已进入预约等待或提交阶段，请保持程序常驻", GrabStateRunningBrush, DashboardRunningSoftBrush);
@@ -2545,7 +2961,12 @@ public partial class MainWindowWorkflowViewModel
 
         if (IsOccupyRunning)
         {
-            return ("占座守护运行中", "预约过期前会自动续占，请安心保持后台运行。", GrabStateSuccessBrush, DashboardSuccessSoftBrush);
+            return ("续占守护运行中", "预约过期前会自动续占，请安心保持后台运行。", GrabStateSuccessBrush, DashboardSuccessSoftBrush);
+        }
+
+        if (IsCheckInGuardRunning)
+        {
+            return ("签到防漏运行中", "会在签到截止前提醒，并按策略处理错过签到。", GrabStateRunningBrush, DashboardRunningSoftBrush);
         }
 
         if (HasLockedVenue)
@@ -2584,14 +3005,12 @@ public partial class MainWindowWorkflowViewModel
 
     private void UpdateHomeReservationCardPresentation(DateTimeOffset now)
     {
+        ApplyReservationUsagePresentation(now);
         if (_currentReservation is null)
         {
             HomeReservationSeatNumberText = "--";
             HomeReservationVenueText = "当前暂无预约记录";
             HomeReservationExpirationTimeText = "--:--:--";
-            HomeReservationBadgeText = "空闲中";
-            HomeReservationBadgeBrush = GrabStateIdleBrush;
-            HomeReservationBadgeBackgroundBrush = DashboardNeutralSoftBrush;
             HomeReservationRemainingText = "--";
             return;
         }
@@ -2601,25 +3020,207 @@ public partial class MainWindowWorkflowViewModel
         HomeReservationVenueText = _currentReservation.LibraryName;
         HomeReservationExpirationTimeText = _currentReservation.ExpirationTime.ToString("HH:mm:ss", DashboardCulture);
 
+        if (_currentReservation.HoldTime.HasValue)
+        {
+            HomeReservationRemainingText = "已签到";
+            return;
+        }
+
         if (remaining <= TimeSpan.Zero)
         {
-            HomeReservationBadgeText = "待刷新";
-            HomeReservationBadgeBrush = GrabStateWarningBrush;
-            HomeReservationBadgeBackgroundBrush = DashboardWarningSoftBrush;
             HomeReservationRemainingText = "已到期";
             return;
         }
 
-        HomeReservationBadgeText = "生效中";
-        HomeReservationBadgeBrush = GrabStateSuccessBrush;
-        HomeReservationBadgeBackgroundBrush = DashboardSuccessSoftBrush;
         HomeReservationRemainingText = FormatReservationRemaining(remaining);
+    }
+
+    private void ApplyReservationUsagePresentation(DateTimeOffset now)
+    {
+        var state = ResolveReservationUsageState(now);
+        ReservationUsageStatusText = state switch
+        {
+            ReservationUsageState.PendingCheckIn => "待签到",
+            ReservationUsageState.Studying => "学习中",
+            ReservationUsageState.Expired => "已到期",
+            _ => "暂无预约"
+        };
+
+        ReservationUsageDurationText = state switch
+        {
+            ReservationUsageState.PendingCheckIn => "尚未签到",
+            ReservationUsageState.Studying => FormatStudyDuration(now - _currentReservation!.HoldTime!.Value),
+            ReservationUsageState.Expired => "已到期",
+            _ => "--"
+        };
+
+        ReservationUsageBadgeBrush = state switch
+        {
+            ReservationUsageState.PendingCheckIn => GrabStateWarningBrush,
+            ReservationUsageState.Studying => GrabStateSuccessBrush,
+            ReservationUsageState.Expired => GrabStateWarningBrush,
+            _ => GrabStateIdleBrush
+        };
+
+        ReservationUsageBadgeBackgroundBrush = state switch
+        {
+            ReservationUsageState.PendingCheckIn => DashboardWarningSoftBrush,
+            ReservationUsageState.Studying => DashboardSuccessSoftBrush,
+            ReservationUsageState.Expired => DashboardWarningSoftBrush,
+            _ => DashboardNeutralSoftBrush
+        };
+
+        HomeReservationBadgeText = state == ReservationUsageState.Expired ? "待刷新" : ReservationUsageStatusText;
+        HomeReservationBadgeBrush = ReservationUsageBadgeBrush;
+        HomeReservationBadgeBackgroundBrush = ReservationUsageBadgeBackgroundBrush;
+    }
+
+    private ReservationUsageState ResolveReservationUsageState(DateTimeOffset now)
+    {
+        if (_currentReservation is null)
+        {
+            return ReservationUsageState.None;
+        }
+
+        if (_currentReservation.HoldTime.HasValue)
+        {
+            return ReservationUsageState.Studying;
+        }
+
+        if (_currentReservation.ExpirationTime <= now)
+        {
+            return ReservationUsageState.Expired;
+        }
+
+        return ReservationUsageState.PendingCheckIn;
+    }
+
+    private static string FormatStudyDuration(TimeSpan duration)
+    {
+        if (duration <= TimeSpan.Zero)
+        {
+            return "不足1分钟";
+        }
+
+        var totalMinutes = Math.Max(0, (int)Math.Floor(duration.TotalMinutes));
+        if (totalMinutes < 1)
+        {
+            return "不足1分钟";
+        }
+
+        var hours = totalMinutes / 60;
+        var minutes = totalMinutes % 60;
+        return hours > 0
+            ? $"{hours}小时{minutes}分钟"
+            : $"{minutes}分钟";
     }
 
     private void UpdateHomeSystemInfoPresentation()
     {
         HomeEngineSummaryText = BuildHomeEngineSummaryText();
+        HomeNotificationCoverageText = $"通知：{BuildNotificationCoverageText()}";
+        HomeCookieGuardText = BuildCookieGuardText(DateTimeOffset.Now);
         HomeMemoryUsageText = MeasureMemoryUsageText();
+    }
+
+    private async Task RefreshHealthSnapshotSilentlyAsync()
+    {
+        try
+        {
+            var snapshot = await _healthCheckService.BuildSnapshotAsync();
+            ApplyHealthSnapshot(snapshot);
+        }
+        catch (Exception ex)
+        {
+            HealthCheckStatusText = $"健康检查失败：{ex.Message}";
+            HomeHealthStatusText = "检查失败";
+            HomeHealthDetailText = ex.Message;
+            _activityLogService.Write(LogEntryKind.Warning, "Health", $"健康检查失败：{ex.Message}");
+        }
+    }
+
+    private void ApplyHealthSnapshot(SystemHealthSnapshot snapshot)
+    {
+        var blockingCount = snapshot.Items.Count(static item => item.Severity == HealthSeverity.Blocking);
+        var warningCount = snapshot.Items.Count(static item => item.Severity == HealthSeverity.Warning);
+        var checkedAt = snapshot.GeneratedAt.ToString("HH:mm:ss", DashboardCulture);
+
+        if (blockingCount > 0)
+        {
+            HomeHealthStatusText = $"{blockingCount} 项阻断";
+            HomeHealthDetailText = snapshot.Items.First(item => item.Severity == HealthSeverity.Blocking).Message;
+            HealthCheckStatusText = $"最近检查 {checkedAt}：{blockingCount} 项阻断，{warningCount} 项警告。";
+            return;
+        }
+
+        if (warningCount > 0)
+        {
+            HomeHealthStatusText = $"{warningCount} 项提醒";
+            HomeHealthDetailText = snapshot.Items.First(item => item.Severity == HealthSeverity.Warning).Message;
+            HealthCheckStatusText = $"最近检查 {checkedAt}：无阻断，{warningCount} 项提醒。";
+            return;
+        }
+
+        HomeHealthStatusText = "状态正常";
+        HomeHealthDetailText = $"最近检查 {checkedAt}";
+        HealthCheckStatusText = $"最近检查 {checkedAt}：全部通过。";
+    }
+
+    private async Task<bool> EnsurePreflightAllowsStartAsync(PreflightTarget target, string actionTitle)
+    {
+        var result = await _healthCheckService.RunPreflightAsync(target);
+        ApplyPreflightSummary(result);
+
+        if (!result.CanStart)
+        {
+            var firstBlocking = result.BlockingItems.First();
+            var message = $"{firstBlocking.Title}：{firstBlocking.Message}";
+            _activityLogService.Write(LogEntryKind.Warning, "Preflight", $"{actionTitle}被启动前检查阻止：{message}");
+            await _notificationService.ShowWarningAsync("启动前检查未通过", message);
+            return false;
+        }
+
+        if (result.WarningItems.Count > 0)
+        {
+            var firstWarning = result.WarningItems.First();
+            await _notificationService.ShowInfoAsync(
+                "启动前检查提醒",
+                $"{firstWarning.Title}：{firstWarning.Message}");
+        }
+
+        return true;
+    }
+
+    private void ApplyPreflightSummary(PreflightResult result)
+    {
+        var checkedAt = result.CheckedAt.ToString("HH:mm:ss", DashboardCulture);
+        if (!result.CanStart)
+        {
+            HomeHealthStatusText = $"{result.BlockingItems.Count} 项阻断";
+            HomeHealthDetailText = result.BlockingItems.First().Message;
+            HealthCheckStatusText = $"启动前检查 {checkedAt}：{result.BlockingItems.Count} 项阻断，{result.WarningItems.Count} 项提醒。";
+            return;
+        }
+
+        if (result.WarningItems.Count > 0)
+        {
+            HomeHealthStatusText = $"{result.WarningItems.Count} 项提醒";
+            HomeHealthDetailText = result.WarningItems.First().Message;
+            HealthCheckStatusText = $"启动前检查 {checkedAt}：可启动，{result.WarningItems.Count} 项提醒。";
+            return;
+        }
+
+        HomeHealthStatusText = "可启动";
+        HomeHealthDetailText = $"启动前检查 {checkedAt} 通过";
+        HealthCheckStatusText = $"启动前检查 {checkedAt}：全部通过。";
+    }
+
+    private void RefreshNotificationSurfacePresentation()
+    {
+        var coverage = BuildNotificationCoverageText();
+        NotificationCoverageSummaryText = coverage;
+        BarkNotificationReadinessText = BuildBarkReadinessText();
+        HomeNotificationCoverageText = $"通知：{coverage}";
     }
 
     private string BuildHomeEngineSummaryText()
@@ -2629,10 +3230,15 @@ public partial class MainWindowWorkflowViewModel
             return "等待授权";
         }
 
-        var activeTasks = new List<string>(3);
+        var activeTasks = new List<string>(4);
         if (IsGrabTaskActive)
         {
             activeTasks.Add("抢座运行中");
+        }
+
+        if (IsVenueAvailabilityRunning)
+        {
+            activeTasks.Add("空座追踪中");
         }
 
         if (IsTomorrowTaskActive)
@@ -2642,7 +3248,12 @@ public partial class MainWindowWorkflowViewModel
 
         if (IsOccupyRunning)
         {
-            activeTasks.Add("占座守护运行中");
+            activeTasks.Add("续占守护运行中");
+        }
+
+        if (IsCheckInGuardRunning)
+        {
+            activeTasks.Add("签到防漏运行中");
         }
 
         if (activeTasks.Count > 0)
@@ -2653,9 +3264,75 @@ public partial class MainWindowWorkflowViewModel
         return HasLockedVenue ? "所有核心模块已就绪" : "等待绑定场馆";
     }
 
+    private string BuildNotificationCoverageText()
+    {
+        var channels = new List<string>(5);
+        if (EmailAlertsEnabled)
+        {
+            channels.Add("邮件");
+        }
+
+        if (TelegramAlertsEnabled)
+        {
+            channels.Add("Telegram");
+        }
+
+        if (BarkAlertsEnabled)
+        {
+            channels.Add("Bark");
+        }
+
+        if (LocalToastAlertsEnabled)
+        {
+            channels.Add("本地弹窗");
+        }
+
+        if (LocalSoundAlertsEnabled)
+        {
+            channels.Add("提示音");
+        }
+
+        return channels.Count == 0
+            ? "未开启任何提醒渠道"
+            : string.Join(" / ", channels);
+    }
+
+    private string BuildBarkReadinessText()
+    {
+        if (!BarkAlertsEnabled)
+        {
+            return "Bark 未开启";
+        }
+
+        if (string.IsNullOrWhiteSpace(BarkAlertServerUrl))
+        {
+            return "Bark 已开启，缺少服务器地址";
+        }
+
+        if (string.IsNullOrWhiteSpace(BarkAlertDeviceKey))
+        {
+            return "Bark 已开启，缺少 Device Key";
+        }
+
+        var group = string.IsNullOrWhiteSpace(BarkAlertGroup)
+            ? BarkAlertChannelSettings.Default.Group
+            : BarkAlertGroup.Trim();
+        return $"Bark 已就绪 · {group}";
+    }
+
+    private string BuildCookieGuardText(DateTimeOffset now)
+    {
+        if (!IsAuthorized)
+        {
+            return "等待授权";
+        }
+
+        return BuildCookieStatusSummary(_cookieValidationSnapshot);
+    }
+
     private void UpdateGuardTracking(DateTimeOffset timestamp)
     {
-        if (IsGrabTaskActive || IsTomorrowTaskActive || IsOccupyRunning)
+        if (IsGrabTaskActive || IsVenueAvailabilityRunning || IsTomorrowTaskActive || IsOccupyRunning || IsCheckInGuardRunning)
         {
             _guardTrackingStartedAt ??= timestamp;
             UpdateHomeGuardDurationPresentation(timestamp);
@@ -2852,27 +3529,21 @@ public partial class MainWindowWorkflowViewModel
     {
         if (!SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime))
         {
-            return "授权链接解析成功，Cookie 已填入";
+            return "授权链接解析成功，Cookie 已填入，实际状态将以接口校验为准";
         }
 
-        return $"授权链接解析成功，Cookie 已填入{Environment.NewLine}Cookie 到期时间：{expirationTime:M月d日 HH:mm}";
+        return $"授权链接解析成功，Cookie 已填入{Environment.NewLine}Token 推测时间：{expirationTime:M月d日 HH:mm}，实际状态以接口校验为准";
     }
 
     private async Task NotifySessionRestoredAsync(string cookie)
     {
         if (!SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime))
         {
-            await _notificationService.ShowSuccessAsync("已成功恢复上次的 Cookie", "本地会话已恢复");
+            await _notificationService.ShowSuccessAsync("已成功恢复上次的 Cookie", "本地会话已恢复，实际状态以接口校验为准");
             return;
         }
 
-        var message = $"Cookie 到期时间：{expirationTime:M月d日 HH:mm}";
-        if (expirationTime - DateTimeOffset.Now < TimeSpan.FromMinutes(30))
-        {
-            await _notificationService.ShowWarningAsync("已成功恢复上次的 Cookie，注意到期时间", message);
-            return;
-        }
-
+        var message = $"Token 推测时间：{expirationTime:M月d日 HH:mm}，实际状态以接口校验为准";
         await _notificationService.ShowSuccessAsync("已成功恢复上次的 Cookie", message);
     }
 
@@ -2880,13 +3551,11 @@ public partial class MainWindowWorkflowViewModel
     {
         if (!SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime))
         {
-            ClearSidebarSessionExpiration();
+            ApplyCookieValidationSnapshot(CookieValidationSnapshot.Unknown(DateTimeOffset.Now));
             return;
         }
 
-        _sidebarSessionExpirationTime = expirationTime;
-        HasSidebarSessionExpiration = true;
-        RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);
+        ApplyCookieValidationSnapshot(CookieValidationSnapshot.Unknown(DateTimeOffset.Now, expirationTime));
     }
 
     private void UpdateSidebarSessionExpiration(DateTimeOffset? expirationTime, string? fallbackCookie)
@@ -2903,35 +3572,140 @@ public partial class MainWindowWorkflowViewModel
             return;
         }
 
-        _sidebarSessionExpirationTime = expirationTime;
-        HasSidebarSessionExpiration = true;
-        RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);
+        ApplyCookieValidationSnapshot(CookieValidationSnapshot.Unknown(DateTimeOffset.Now, expirationTime));
     }
 
-    private void RefreshSidebarSessionExpirationPresentation(DateTimeOffset timestamp)
+    private void RefreshSidebarCookieStatusPresentation()
     {
-        if (_sidebarSessionExpirationTime is null || !HasSidebarSessionExpiration)
-        {
-            return;
-        }
-
-        var expirationTime = _sidebarSessionExpirationTime.Value;
-        SidebarSessionExpirationText = expirationTime.ToString("M月d日 HH:mm", DashboardCulture);
-
-        var remaining = expirationTime - timestamp;
-        SidebarSessionExpirationBrush = remaining <= TimeSpan.FromMinutes(10)
-            ? GrabStateFailureBrush
-            : remaining <= TimeSpan.FromMinutes(30)
-                ? GrabStateWarningBrush
-                : _appThemeService.CurrentPalette.LogDefaultBrush;
+        SidebarCookieStatusText = BuildSidebarCookieStatusText(_cookieValidationSnapshot);
+        SidebarCookieStatusBrush = GetCookieStatusBrush(_cookieValidationSnapshot.State);
+        HomeCookieGuardText = BuildCookieGuardText(DateTimeOffset.Now);
     }
 
     private void ClearSidebarSessionExpiration()
     {
         _sidebarSessionExpirationTime = null;
+        _cookieValidationSnapshot = CookieValidationSnapshot.Unknown(DateTimeOffset.Now);
+        _nextCookieValidationAt = DateTimeOffset.MinValue;
         SidebarSessionExpirationText = string.Empty;
         SidebarSessionExpirationBrush = _appThemeService.CurrentPalette.LogDefaultBrush;
         HasSidebarSessionExpiration = false;
+        SidebarCookieStatusText = string.Empty;
+        SidebarCookieStatusBrush = _appThemeService.CurrentPalette.LogDefaultBrush;
+        HasSidebarCookieStatus = false;
+        HomeCookieGuardText = BuildCookieGuardText(DateTimeOffset.Now);
+    }
+
+    public Task ValidateCurrentCookieStatusForTestsAsync()
+    {
+        return ValidateCurrentCookieStatusAsync(force: true);
+    }
+
+    private async Task ValidateCurrentCookieStatusAsync(bool force, CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.Now;
+        if (!IsAuthorized)
+        {
+            ClearSidebarSessionExpiration();
+            return;
+        }
+
+        if (!force && now < _nextCookieValidationAt)
+        {
+            return;
+        }
+
+        if (_isCookieValidationInFlight)
+        {
+            return;
+        }
+
+        _isCookieValidationInFlight = true;
+        try
+        {
+            var previousState = _cookieValidationSnapshot.State;
+            var snapshot = await AccountVenue.ValidateCurrentCookieAsync(cancellationToken);
+            ApplyCookieValidationSnapshot(snapshot);
+            _nextCookieValidationAt = snapshot.CheckedAt + CookieValidationInterval;
+
+            if (snapshot.State == CookieValidationState.Invalid &&
+                previousState != CookieValidationState.Invalid)
+            {
+                await NotifyCookieInvalidAsync(snapshot);
+            }
+        }
+        finally
+        {
+            _isCookieValidationInFlight = false;
+        }
+    }
+
+    private void ApplyCookieValidationSnapshot(CookieValidationSnapshot snapshot)
+    {
+        _cookieValidationSnapshot = snapshot;
+        _sidebarSessionExpirationTime = snapshot.InferredExpirationTime;
+        HasSidebarCookieStatus = IsAuthorized;
+        HasSidebarSessionExpiration = false;
+        SidebarSessionExpirationText = string.Empty;
+        RefreshSidebarCookieStatusPresentation();
+    }
+
+    private async Task NotifyCookieInvalidAsync(CookieValidationSnapshot snapshot)
+    {
+        var reason = string.IsNullOrWhiteSpace(snapshot.FailureReason)
+            ? "Cookie 已失效，请重新获取新的 Cookie。"
+            : snapshot.FailureReason;
+        _activityLogService.Write(LogEntryKind.Warning, "Auth", $"Cookie 状态检测失败：{reason}");
+        try
+        {
+            await _taskEventAlertDispatcher.NotifySessionInvalidAsync("Cookie 状态检测", reason);
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送 Cookie 状态提醒失败：{ex.Message}");
+        }
+    }
+
+    private string BuildSidebarCookieStatusText(CookieValidationSnapshot snapshot)
+    {
+        var checkedAt = snapshot.CheckedAt.ToString("HH:mm:ss", DashboardCulture);
+        return snapshot.State switch
+        {
+            CookieValidationState.Valid => $"Cookie 有效 · 最近校验 {checkedAt}",
+            CookieValidationState.Invalid => $"Cookie 已失效 · 最近校验 {checkedAt}",
+            CookieValidationState.CheckFailed => $"Cookie 校验失败 · 最近校验 {checkedAt}",
+            _ => "Cookie 状态未知 · 等待接口校验"
+        };
+    }
+
+    private string BuildCookieStatusSummary(CookieValidationSnapshot snapshot)
+    {
+        var checkedAt = snapshot.CheckedAt.ToString("HH:mm", DashboardCulture);
+        var prefix = snapshot.State switch
+        {
+            CookieValidationState.Valid => $"Cookie 有效 · 最近校验 {checkedAt}",
+            CookieValidationState.Invalid => $"Cookie 已失效 · 最近校验 {checkedAt}",
+            CookieValidationState.CheckFailed => $"Cookie 校验失败 · 最近校验 {checkedAt}",
+            _ => "Cookie 状态未知，等待接口校验"
+        };
+
+        if (snapshot.InferredExpirationTime is not { } inferredExpirationTime)
+        {
+            return prefix;
+        }
+
+        return $"{prefix} · Token 推测：{inferredExpirationTime:M月d日 HH:mm}";
+    }
+
+    private IBrush GetCookieStatusBrush(CookieValidationState state)
+    {
+        return state switch
+        {
+            CookieValidationState.Valid => GrabStateSuccessBrush,
+            CookieValidationState.Invalid => GrabStateFailureBrush,
+            CookieValidationState.CheckFailed => GrabStateWarningBrush,
+            _ => _appThemeService.CurrentPalette.LogDefaultBrush
+        };
     }
 
     private static string MeasureMemoryUsageText()
@@ -2954,6 +3728,7 @@ public partial class MainWindowWorkflowViewModel
             ReservationHeroTitle = "暂无预约";
             ReservationExpiryText = "到期：--:--:--";
             ReservationCountdownText = "等待建立预约状态";
+            CheckInEffectiveDeadlineText = "等待读取当前预约";
             UpdateHomeReservationCardPresentation(DateTimeOffset.Now);
             UpdateHomeSystemInfoPresentation();
             return;
@@ -2961,9 +3736,36 @@ public partial class MainWindowWorkflowViewModel
 
         ReservationSummary = $"{info.LibraryName} / {info.SeatName} / 到期 {info.ExpirationTime:HH:mm:ss}";
         ReservationHeroTitle = $"{info.LibraryName} · {info.SeatName}";
+        CheckInEffectiveDeadlineText = BuildCheckInDeadlineText(info, DateTimeOffset.Now);
         UpdateReservationCountdown();
         UpdateHomeReservationCardPresentation(DateTimeOffset.Now);
         UpdateHomeSystemInfoPresentation();
+    }
+
+    private string BuildCheckInDeadlineText(ReservationInfo? reservation, DateTimeOffset now)
+    {
+        if (reservation is null)
+        {
+            return "等待读取当前预约";
+        }
+
+        if (reservation.ValidateTime is { } validateTime)
+        {
+            return $"接口截止：{validateTime:HH:mm:ss}，自动处理：{BuildSafeActionTimeText(validateTime)}";
+        }
+
+        var fallbackDeadline = now.AddMinutes(Math.Clamp(CheckInWindowMinutes, 1, 240));
+        if (reservation.ExpirationTime > now && reservation.ExpirationTime < fallbackDeadline)
+        {
+            fallbackDeadline = reservation.ExpirationTime;
+        }
+
+        return $"接口未返回，按预约后 {Math.Clamp(CheckInWindowMinutes, 1, 240)} 分钟估算：{fallbackDeadline:HH:mm:ss}，自动处理：{BuildSafeActionTimeText(fallbackDeadline)}";
+    }
+
+    private static string BuildSafeActionTimeText(DateTimeOffset deadline)
+    {
+        return deadline.Subtract(TimeSpan.FromMinutes(1)).ToString("HH:mm:ss", DashboardCulture);
     }
 
     private void UpdateReservationCountdown()
@@ -3104,7 +3906,13 @@ public partial class MainWindowWorkflowViewModel
                 TelegramAlertsEnabled,
                 NormalizeTelegramApiBaseUrlForSnapshot(TelegramAlertApiBaseUrl),
                 (TelegramAlertBotToken ?? string.Empty).Trim(),
-                (TelegramAlertChatId ?? string.Empty).Trim()));
+                (TelegramAlertChatId ?? string.Empty).Trim()),
+            new BarkAlertChannelSettings(
+                BarkAlertsEnabled,
+                NormalizeBarkServerUrlForSnapshot(BarkAlertServerUrl),
+                (BarkAlertDeviceKey ?? string.Empty).Trim(),
+                (BarkAlertSound ?? string.Empty).Trim(),
+                NormalizeBarkGroupForSnapshot(BarkAlertGroup)));
     }
 
     private static string NormalizeTelegramApiBaseUrlForSnapshot(string? value)
@@ -3112,6 +3920,22 @@ public partial class MainWindowWorkflowViewModel
         var trimmed = (value ?? string.Empty).Trim().TrimEnd('/');
         return string.IsNullOrWhiteSpace(trimmed)
             ? TelegramAlertChannelSettings.DefaultApiBaseUrl
+            : trimmed;
+    }
+
+    private static string NormalizeBarkServerUrlForSnapshot(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim().TrimEnd('/');
+        return string.IsNullOrWhiteSpace(trimmed)
+            ? BarkAlertChannelSettings.DefaultServerUrl
+            : trimmed;
+    }
+
+    private static string NormalizeBarkGroupForSnapshot(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim();
+        return string.IsNullOrWhiteSpace(trimmed)
+            ? BarkAlertChannelSettings.Default.Group
             : trimmed;
     }
 
@@ -3361,12 +4185,18 @@ public partial class MainWindowWorkflowViewModel
             logLine.RefreshTheme();
         }
 
+        foreach (var logLine in CheckInLogLines)
+        {
+            logLine.RefreshTheme();
+        }
+
         OnPropertyChanged(nameof(EmailNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(TelegramNotificationTabForegroundBrush));
+        OnPropertyChanged(nameof(BarkNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(GrabDashboardStatusBrush));
         OnPropertyChanged(nameof(TomorrowDashboardStatusBrush));
-        RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);
+        RefreshSidebarCookieStatusPresentation();
         UpdateHomeDashboardPresentation();
     }
 
@@ -3378,4 +4208,12 @@ public partial class MainWindowWorkflowViewModel
     private sealed record SeatFilterResult(
         SeatItemViewModel ViewModel,
         bool IsVisible);
+
+    private enum ReservationUsageState
+    {
+        None,
+        PendingCheckIn,
+        Studying,
+        Expired
+    }
 }

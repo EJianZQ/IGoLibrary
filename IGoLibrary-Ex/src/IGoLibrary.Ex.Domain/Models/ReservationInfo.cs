@@ -6,4 +6,10 @@ public sealed record ReservationInfo(
     string LibraryName,
     string SeatKey,
     string SeatName,
-    DateTimeOffset ExpirationTime);
+    DateTimeOffset ExpirationTime,
+    int? Status = null,
+    DateTimeOffset? ValidateTime = null,
+    DateTimeOffset? HoldTime = null)
+{
+    public bool IsCheckedIn => HoldTime.HasValue;
+}

@@ -1,5 +1,6 @@
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
+using IGoLibrary.Ex.Application.State;
 using IGoLibrary.Ex.Desktop;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
@@ -142,13 +143,16 @@ public sealed class MainWindowClipboardTests
         return new MainWindowViewModel(
             new SessionWorkflowService(apiClient, sessionService),
             new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
-            new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),
+            new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService, new AppRuntimeState()),
             new SettingsWorkflowService(settingsService),
             new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates("", "", "", "", "", "", ""))),
             taskAlertService,
+            taskAlertService,
             new FakeGrabSeatCoordinator(),
+            new FakeVenueAvailabilityCoordinator(),
             occupySeatCoordinator,
             new FakeTomorrowReservationCoordinator(),
+            new FakeCheckInGuardCoordinator(),
             activityLogService,
             new FakeNotificationService(),
             new FakeErrorDialogService(),

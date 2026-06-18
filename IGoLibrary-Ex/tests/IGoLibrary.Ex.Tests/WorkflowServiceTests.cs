@@ -1,5 +1,6 @@
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
+using IGoLibrary.Ex.Application.State;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 
@@ -150,7 +151,8 @@ public sealed class WorkflowServiceTests
             },
             apiClient,
             occupySeatCoordinator,
-            new ActivityLogService());
+            new ActivityLogService(),
+            new AppRuntimeState());
 
         var result = await service.CancelCurrentReservationAsync(reservation, stopOccupyFirst: true);
 
@@ -160,13 +162,39 @@ public sealed class WorkflowServiceTests
     }
 
     [Fact]
+    public async Task ReservationWorkflowService_RefreshReservationAsync_SynchronizesSharedReservationState()
+    {
+        var reservation = new ReservationInfo("token", 1, "馆", "seat-1", "1", DateTimeOffset.Now.AddMinutes(20));
+        var reservationState = new AppRuntimeState();
+        var service = new ReservationWorkflowService(
+            new FakeSessionService
+            {
+                CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+            },
+            new FakeTraceIntApiClient
+            {
+                OnGetReservationInfoAsync = (_, _) => Task.FromResult<ReservationInfo?>(reservation)
+            },
+            new FakeOccupySeatCoordinator(),
+            new ActivityLogService(),
+            reservationState);
+
+        var result = await service.RefreshReservationAsync();
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(reservation, result.Reservation);
+        Assert.Equal(reservation, reservationState.CurrentReservation);
+    }
+
+    [Fact]
     public async Task ReservationWorkflowService_RefreshReservationAsync_ReturnsNoSessionResult_WhenSessionMissing()
     {
         var service = new ReservationWorkflowService(
             new FakeSessionService(),
             new FakeTraceIntApiClient(),
             new FakeOccupySeatCoordinator(),
-            new ActivityLogService());
+            new ActivityLogService(),
+            new AppRuntimeState());
 
         var result = await service.RefreshReservationAsync();
 

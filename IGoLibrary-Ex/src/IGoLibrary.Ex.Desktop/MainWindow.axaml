@@ -338,9 +338,9 @@
                  BorderThickness="0" />
         
         <!-- Bottom Info -->
-        <StackPanel Grid.Row="2" Margin="24,24,24,32" Spacing="8" IsVisible="{Binding HasSidebarSessionExpiration}">
-          <TextBlock Text="Cookie 到期时间" FontSize="12" Opacity="0.5" FontWeight="Bold"/>
-          <TextBlock Text="{Binding SidebarSessionExpirationText}" FontSize="13" TextWrapping="Wrap" Foreground="{Binding SidebarSessionExpirationBrush}" Opacity="0.9"/>
+        <StackPanel Grid.Row="2" Margin="24,24,24,32" Spacing="8" IsVisible="{Binding HasSidebarCookieStatus}">
+          <TextBlock Text="Cookie 状态" FontSize="12" Opacity="0.5" FontWeight="Bold"/>
+          <TextBlock Text="{Binding SidebarCookieStatusText}" FontSize="13" TextWrapping="Wrap" Foreground="{Binding SidebarCookieStatusBrush}" Opacity="0.9"/>
         </StackPanel>
       </Grid>
     </Border>
@@ -543,6 +543,13 @@
                           <Run Text="剩余时间：" />
                           <Run Text="{Binding HomeReservationRemainingText}" />
                         </TextBlock>
+
+                        <TextBlock FontSize="16"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource SemiTextPrimaryBrush}">
+                          <Run Text="学习时长：" />
+                          <Run Text="{Binding ReservationUsageDurationText}" />
+                        </TextBlock>
                       </StackPanel>
                     </Grid>
 
@@ -601,6 +608,42 @@
                                  FontWeight="SemiBold"
                                  Foreground="{DynamicResource SemiTextPrimaryBrush}"
                                  Text="{Binding HomeEngineSummaryText}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="dashboard-info-row">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="dashboard-ticket-caption" Text="通知覆盖" />
+                      <TextBlock FontSize="16"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                 Text="{Binding HomeNotificationCoverageText}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="dashboard-info-row">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="dashboard-ticket-caption" Text="Cookie 保活" />
+                      <TextBlock FontSize="16"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                 Text="{Binding HomeCookieGuardText}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="dashboard-info-row">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="dashboard-ticket-caption" Text="健康检查" />
+                      <TextBlock FontSize="16"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                 Text="{Binding HomeHealthStatusText}"
+                                 TextWrapping="Wrap" />
+                      <TextBlock Classes="dashboard-detail"
+                                 Text="{Binding HomeHealthDetailText}"
                                  TextWrapping="Wrap" />
                     </StackPanel>
                   </Border>
@@ -912,7 +955,7 @@
         </ScrollViewer>
 
           <!-- Tab 2: Grab -->
-          <Grid RowDefinitions="Auto,Auto,*"
+          <Grid RowDefinitions="Auto,Auto,Auto,*"
                 RowSpacing="16"
                 Margin="0,0,16,0"
                 Background="Transparent">
@@ -1084,7 +1127,123 @@
               </Grid>
             </Border>
 
-            <Grid Grid.Row="2"
+            <Border Grid.Row="2"
+                    Classes="semi-card Shadow"
+                    Padding="20">
+              <Grid ColumnDefinitions="*,190,230"
+                    ColumnSpacing="20">
+                <StackPanel Spacing="12">
+                  <Grid ColumnDefinitions="*,Auto"
+                        ColumnSpacing="12">
+                    <StackPanel Spacing="4">
+                      <TextBlock Text="场馆空座追踪"
+                                 FontSize="18"
+                                 FontWeight="Bold" />
+                      <TextBlock Classes="helper-text"
+                                 Text="当前选择场馆满座后，持续守候下一次出现空座，只发送提醒，不自动预约。" />
+                    </StackPanel>
+                    <Border Grid.Column="1"
+                            Padding="10,5"
+                            CornerRadius="999"
+                            Background="{DynamicResource DashboardMutedSurfaceBrush}"
+                            BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                            BorderThickness="1"
+                            VerticalAlignment="Top">
+                      <TextBlock Text="只提醒"
+                                 FontSize="12"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource SemiAccentBrush}" />
+                    </Border>
+                  </Grid>
+
+                  <Border Background="{DynamicResource SemiColorFill0}"
+                          BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="14"
+                          Padding="12,10">
+                    <Grid ColumnDefinitions="*,Auto,Auto"
+                          ColumnSpacing="16">
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="当前状态"
+                                   Classes="grab-stat-title" />
+                        <TextBlock Text="{Binding VenueAvailabilityStatusText}"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource SemiAccentBrush}"
+                                   TextWrapping="Wrap" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1"
+                                  Spacing="2">
+                        <TextBlock Text="轮询"
+                                   Classes="grab-stat-title" />
+                        <TextBlock Text="{Binding VenueAvailabilityPollCount}"
+                                   FontSize="18"
+                                   FontWeight="Bold" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="2"
+                                  Spacing="2">
+                        <TextBlock Text="请求"
+                                   Classes="grab-stat-title" />
+                        <TextBlock Text="{Binding VenueAvailabilityRequestCount}"
+                                   FontSize="18"
+                                   FontWeight="Bold" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Spacing="8">
+                  <TextBlock Text="轮询间隔（秒）"
+                             Classes="field-label" />
+                  <NumericUpDown Minimum="5"
+                                 Maximum="3600"
+                                 Increment="5"
+                                 ClipValueToMinMax="True"
+                                 ParsingNumberStyle="Integer"
+                                 Value="{Binding VenueAvailabilityPollingIntervalSeconds}"
+                                 FormatString="0"
+                                 TextInput="OnUnsignedIntegerNumericUpDownTextInput"
+                                 KeyDown="OnUnsignedIntegerNumericUpDownKeyDown"
+                                 HorizontalAlignment="Stretch" />
+                  <TextBlock Classes="helper-text"
+                             Text="建议 15-60 秒；过短可能增加请求压力。" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2"
+                            Spacing="10">
+                  <Grid ColumnDefinitions="*,*"
+                        ColumnSpacing="8">
+                    <Button Content="开始追踪"
+                            Command="{Binding StartVenueAvailabilityCommand}"
+                            IsEnabled="{Binding IsVenueAvailabilityStopped}"
+                            Background="{DynamicResource SemiAccentBrush}"
+                            Foreground="{DynamicResource AppAccentForegroundBrush}"
+                            HorizontalContentAlignment="Center" />
+                    <Button Grid.Column="1"
+                            Content="停止"
+                            Command="{Binding StopVenueAvailabilityCommand}"
+                            IsEnabled="{Binding IsVenueAvailabilityRunning}"
+                            Classes="Danger"
+                            HorizontalContentAlignment="Center" />
+                  </Grid>
+                  <Border Background="{DynamicResource DashboardMutedSurfaceBrush}"
+                          CornerRadius="12"
+                          Padding="12,10">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="最近请求"
+                                 Classes="grab-stat-title" />
+                      <TextBlock Text="{Binding VenueAvailabilityLastRequestText}"
+                                 FontSize="16"
+                                 FontWeight="Bold"
+                                 Foreground="{DynamicResource SemiTextPrimaryBrush}" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Grid Grid.Row="3"
                   RowDefinitions="Auto,*"
                   RowSpacing="16">
               <Grid ColumnDefinitions="*,*,*,*"
@@ -1378,136 +1537,337 @@
           </Grid>
         </Grid>
 
-        <!-- Tab 4: Occupy -->
-        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="24" Margin="0,0,16,0" Background="Transparent">
-          <TextBlock Classes="page-title" Text="占座" Margin="0,0,0,16" />
+        <!-- Tab 4: Reservation Guard -->
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="24"
+                      Margin="0,0,16,0"
+                      Background="Transparent">
+            <TextBlock Classes="page-title" Text="预约守护" Margin="0" />
 
-          <Border Grid.Row="1"
-                  Classes="semi-card Shadow"
-                  Background="{DynamicResource SemiCardBackgroundBrush}"
-                  Padding="28">
-            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="32" RowSpacing="20">
-              <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Top">
-                <TextBlock Classes="hero-title" Text="{Binding ReservationHeroTitle}" VerticalAlignment="Center" />
-                <Label Content="运行中"
-                       Theme="{DynamicResource TagLabel}"
-                       Classes="Green"
-                       VerticalAlignment="Center"
-                       IsVisible="{Binding IsOccupyRunning}" />
-                <Label Content="已停止"
-                       Theme="{DynamicResource TagLabel}"
-                       Classes="Grey"
-                       VerticalAlignment="Center"
-                       IsVisible="{Binding IsOccupyStopped}" />
-              </StackPanel>
-
-              <WrapPanel Grid.Row="1"
-                         Grid.Column="1"
-                         Orientation="Horizontal"
-                         HorizontalAlignment="Right"
-                         VerticalAlignment="Bottom">
-                <Button Content="手动刷新"
-                        Command="{Binding RefreshReservationCommand}"
-                        Classes="Secondary"
-                        Margin="0,0,12,8"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center" />
-                <Button Content="停止占座"
-                        Command="{Binding StopOccupyCommand}"
-                        Classes="Danger"
-                        Margin="0,0,12,8"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center" />
-                <Button Content="开始占座"
-                        Command="{Binding StartOccupyCommand}"
-                        Background="{DynamicResource AppAccentBrush}"
-                        Foreground="{DynamicResource AppAccentForegroundBrush}"
-                        FontWeight="Bold"
-                        Margin="0,0,12,8"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center" />
-              </WrapPanel>
-
-              <Grid Grid.Row="1" Grid.Column="0" ColumnDefinitions="*,*" ColumnSpacing="28" VerticalAlignment="Bottom">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="座位过期时间"
-                             FontSize="12"
-                             Foreground="{DynamicResource SemiColorText2}" />
-                  <TextBlock Text="{Binding ReservationExpiryText}"
-                             FontSize="20"
-                             FontWeight="SemiBold"
-                             Foreground="{DynamicResource SemiColorText0}" />
+            <Border Classes="semi-card Shadow"
+                    Background="{DynamicResource SemiCardBackgroundBrush}"
+                    Padding="28">
+              <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="32" RowSpacing="20">
+                <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Top">
+                  <TextBlock Classes="hero-title" Text="{Binding ReservationHeroTitle}" VerticalAlignment="Center" />
+                  <Label Content="续占中"
+                         Theme="{DynamicResource TagLabel}"
+                         Classes="Green"
+                         VerticalAlignment="Center"
+                         IsVisible="{Binding IsOccupyRunning}" />
+                  <Label Content="签到防漏中"
+                         Theme="{DynamicResource TagLabel}"
+                         Classes="Green"
+                         VerticalAlignment="Center"
+                         IsVisible="{Binding IsCheckInGuardRunning}" />
+                  <Label Content="未运行"
+                         Theme="{DynamicResource TagLabel}"
+                         Classes="Grey"
+                         VerticalAlignment="Center"
+                         IsVisible="{Binding CanStartSelectedReservationGuard}" />
                 </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="4">
-                  <TextBlock Text="取消座位预约倒计时"
-                             FontSize="12"
-                             Foreground="{DynamicResource SemiColorText2}" />
-                  <TextBlock Text="{Binding ReservationCountdownText}"
-                             FontSize="20"
-                             FontWeight="SemiBold"
-                             Foreground="{DynamicResource SemiColorText0}" />
-                </StackPanel>
-              </Grid>
-            </Grid>
-          </Border>
 
-          <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="24" Background="Transparent">
-            <Border Classes="semi-card Shadow">
-              <Grid RowDefinitions="Auto,*" RowSpacing="16">
-                <TextBlock Classes="section-title" Text="策略设置" Margin="0" />
-                <StackPanel Grid.Row="1" Spacing="20">
-                  <StackPanel Spacing="0">
-                    <TextBlock Classes="field-label" Text="轮询刷新频率" />
-                    <ComboBox SelectedIndex="{Binding SelectedOccupyCheckIntervalModeIndex}"
-                              ItemsSource="{Binding OccupyCheckIntervalModes}"
-                              HorizontalAlignment="Stretch" />
+                <WrapPanel Grid.Row="1"
+                           Grid.Column="1"
+                           Orientation="Horizontal"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Bottom">
+                  <Button Content="手动刷新"
+                          Command="{Binding RefreshReservationCommand}"
+                          Classes="Secondary"
+                          Margin="0,0,12,8"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Center" />
+                  <Button Content="停止续占"
+                          Command="{Binding StopOccupyCommand}"
+                          Classes="Danger"
+                          IsVisible="{Binding IsOccupyRunning}"
+                          Margin="0,0,12,8"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Center" />
+                  <Button Content="停止签到防漏"
+                          Command="{Binding StopCheckInGuardCommand}"
+                          Classes="Danger"
+                          IsVisible="{Binding IsCheckInGuardRunning}"
+                          Margin="0,0,12,8"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Center" />
+                  <Button Content="开始续占"
+                          Command="{Binding StartOccupyCommand}"
+                          Background="{DynamicResource AppAccentBrush}"
+                          Foreground="{DynamicResource AppAccentForegroundBrush}"
+                          FontWeight="Bold"
+                          IsVisible="{Binding IsOccupyGuardModeActive}"
+                          IsEnabled="{Binding CanStartSelectedReservationGuard}"
+                          Margin="0,0,12,8"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Center" />
+                  <Button Content="开始签到防漏"
+                          Command="{Binding StartCheckInGuardCommand}"
+                          Background="{DynamicResource AppAccentBrush}"
+                          Foreground="{DynamicResource AppAccentForegroundBrush}"
+                          FontWeight="Bold"
+                          IsVisible="{Binding IsCheckInGuardModeActive}"
+                          IsEnabled="{Binding CanStartSelectedReservationGuard}"
+                          Margin="0,0,12,8"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Center" />
+                </WrapPanel>
+
+                <Grid Grid.Row="1" Grid.Column="0" ColumnDefinitions="*,*,*" ColumnSpacing="28" VerticalAlignment="Bottom">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="座位过期时间"
+                               FontSize="12"
+                               Foreground="{DynamicResource SemiColorText2}" />
+                    <TextBlock Text="{Binding ReservationExpiryText}"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource SemiColorText0}" />
                   </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Text="取消座位预约倒计时"
+                               FontSize="12"
+                               Foreground="{DynamicResource SemiColorText2}" />
+                    <TextBlock Text="{Binding ReservationCountdownText}"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource SemiColorText0}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Spacing="4">
+                    <TextBlock Text="签到状态"
+                               FontSize="12"
+                               Foreground="{DynamicResource SemiColorText2}" />
+                    <TextBlock FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="{Binding ReservationUsageBadgeBrush}"
+                               TextWrapping="Wrap">
+                      <Run Text="{Binding ReservationUsageStatusText}" />
+                      <Run Text=" · " />
+                      <Run Text="{Binding ReservationUsageDurationText}" />
+                    </TextBlock>
+                  </StackPanel>
+                </Grid>
+              </Grid>
+            </Border>
 
-                  <StackPanel Spacing="0">
-                    <TextBlock Classes="field-label" Text="重新预约间隔时间" />
-                    <Grid ColumnDefinitions="*,Auto"
-                          ColumnSpacing="10">
-                      <NumericUpDown Minimum="1"
-                                     Maximum="1800"
-                                     Increment="1"
-                                     ClipValueToMinMax="True"
-                                     ParsingNumberStyle="Integer"
-                                     Value="{Binding ReReserveDelaySeconds}"
-                                     FormatString="0"
-                                     TextInput="OnUnsignedIntegerNumericUpDownTextInput"
-                                     KeyDown="OnUnsignedIntegerNumericUpDownKeyDown"
-                                     HorizontalAlignment="Stretch" />
-                      <TextBlock Grid.Column="1"
-                                 Text="秒"
+            <Grid ColumnDefinitions="360,*" ColumnSpacing="24" Background="Transparent">
+              <Border Classes="semi-card Shadow">
+                <Grid RowDefinitions="Auto,*" RowSpacing="16">
+                  <TextBlock Classes="section-title" Text="预约守护策略" Margin="0" />
+                  <StackPanel Grid.Row="1" Spacing="20">
+                    <StackPanel Spacing="0">
+                      <TextBlock Classes="field-label" Text="守护模式" />
+                      <ComboBox SelectedIndex="{Binding SelectedReservationGuardModeIndex}"
+                                ItemsSource="{Binding ReservationGuardModes}"
+                                HorizontalAlignment="Stretch" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="20" IsVisible="{Binding IsOccupyGuardModeActive}">
+                      <StackPanel Spacing="0">
+                        <TextBlock Classes="field-label" Text="轮询刷新频率" />
+                        <ComboBox SelectedIndex="{Binding SelectedOccupyCheckIntervalModeIndex}"
+                                  ItemsSource="{Binding OccupyCheckIntervalModes}"
+                                  HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <StackPanel Spacing="0">
+                        <TextBlock Classes="field-label" Text="重新预约间隔时间" />
+                        <Grid ColumnDefinitions="*,Auto"
+                              ColumnSpacing="10">
+                          <NumericUpDown Minimum="1"
+                                         Maximum="1800"
+                                         Increment="1"
+                                         ClipValueToMinMax="True"
+                                         ParsingNumberStyle="Integer"
+                                         Value="{Binding ReReserveDelaySeconds}"
+                                         FormatString="0"
+                                         TextInput="OnUnsignedIntegerNumericUpDownTextInput"
+                                         KeyDown="OnUnsignedIntegerNumericUpDownKeyDown"
+                                         HorizontalAlignment="Stretch" />
+                          <TextBlock Grid.Column="1"
+                                     Text="秒"
+                                     FontSize="13"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                     VerticalAlignment="Center" />
+                        </Grid>
+                      </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Spacing="20" IsVisible="{Binding IsCheckInGuardModeActive}">
+                      <StackPanel Spacing="0">
+                        <TextBlock Classes="field-label" Text="签到截止时间" />
+                        <Border Background="{DynamicResource SemiColorFill0}"
+                                BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="14,12">
+                          <TextBlock Text="{Binding CheckInEffectiveDeadlineText}"
+                                     FontSize="13"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource SemiColorText0}"
+                                     TextWrapping="Wrap" />
+                        </Border>
+                      </StackPanel>
+
+                      <StackPanel Spacing="0">
+                        <TextBlock Classes="field-label" Text="预约后需签到时间" />
+                        <Grid ColumnDefinitions="*,Auto"
+                              ColumnSpacing="10">
+                          <NumericUpDown Minimum="1"
+                                         Maximum="240"
+                                         Increment="1"
+                                         ClipValueToMinMax="True"
+                                         ParsingNumberStyle="Integer"
+                                         Value="{Binding CheckInWindowMinutes}"
+                                         FormatString="0"
+                                         TextInput="OnUnsignedIntegerNumericUpDownTextInput"
+                                         KeyDown="OnUnsignedIntegerNumericUpDownKeyDown"
+                                         IsEnabled="{Binding IsCheckInGuardStopped}"
+                                         HorizontalAlignment="Stretch" />
+                          <TextBlock Grid.Column="1"
+                                     Text="分钟"
+                                     FontSize="13"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                     VerticalAlignment="Center" />
+                        </Grid>
+                      </StackPanel>
+
+                      <StackPanel Spacing="0">
+                        <TextBlock Classes="field-label" Text="提前提醒" />
+                        <Grid ColumnDefinitions="*,Auto"
+                              ColumnSpacing="10">
+                          <NumericUpDown Minimum="1"
+                                         Maximum="240"
+                                         Increment="1"
+                                         ClipValueToMinMax="True"
+                                         ParsingNumberStyle="Integer"
+                                         Value="{Binding CheckInReminderLeadMinutes}"
+                                         FormatString="0"
+                                         TextInput="OnUnsignedIntegerNumericUpDownTextInput"
+                                         KeyDown="OnUnsignedIntegerNumericUpDownKeyDown"
+                                         IsEnabled="{Binding IsCheckInGuardStopped}"
+                                         HorizontalAlignment="Stretch" />
+                          <TextBlock Grid.Column="1"
+                                     Text="分钟"
+                                     FontSize="13"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                     VerticalAlignment="Center" />
+                        </Grid>
+                      </StackPanel>
+
+                      <StackPanel Spacing="0">
+                        <TextBlock Classes="field-label" Text="到点后处理策略" />
+                        <ComboBox SelectedIndex="{Binding SelectedCheckInGuardMissedActionIndex}"
+                                  ItemsSource="{Binding CheckInGuardMissedActions}"
+                                  IsEnabled="{Binding IsCheckInGuardStopped}"
+                                  HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <StackPanel Spacing="0">
+                        <TextBlock Classes="field-label" Text="重新预约间隔时间" />
+                        <Grid ColumnDefinitions="*,Auto"
+                              ColumnSpacing="10">
+                          <NumericUpDown Minimum="1"
+                                         Maximum="1800"
+                                         Increment="1"
+                                         ClipValueToMinMax="True"
+                                         ParsingNumberStyle="Integer"
+                                         Value="{Binding CheckInReReserveDelaySeconds}"
+                                         FormatString="0"
+                                         TextInput="OnUnsignedIntegerNumericUpDownTextInput"
+                                         KeyDown="OnUnsignedIntegerNumericUpDownKeyDown"
+                                         IsEnabled="{Binding IsCheckInGuardStopped}"
+                                         HorizontalAlignment="Stretch" />
+                          <TextBlock Grid.Column="1"
+                                     Text="秒"
+                                     FontSize="13"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                     VerticalAlignment="Center" />
+                        </Grid>
+                      </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Spacing="8">
+                      <TextBlock Text="{Binding ReservationGuardStatusText}"
                                  FontSize="13"
-                                 FontWeight="SemiBold"
-                                 Foreground="{DynamicResource SemiTextSecondaryBrush}"
-                                 VerticalAlignment="Center" />
-                    </Grid>
+                                 Foreground="{DynamicResource SemiColorText2}"
+                                 TextWrapping="Wrap" />
+                      <WrapPanel>
+                        <Button Content="停止续占"
+                                Command="{Binding StopOccupyCommand}"
+                                Classes="Danger"
+                                IsVisible="{Binding IsOccupyRunning}"
+                                Margin="0,0,12,0"
+                                HorizontalContentAlignment="Center" />
+                        <Button Content="停止签到防漏"
+                                Command="{Binding StopCheckInGuardCommand}"
+                                Classes="Danger"
+                                IsVisible="{Binding IsCheckInGuardRunning}"
+                                Margin="0,0,12,0"
+                                HorizontalContentAlignment="Center" />
+                        <Button Content="开始续占"
+                                Command="{Binding StartOccupyCommand}"
+                                Background="{DynamicResource AppAccentBrush}"
+                                Foreground="{DynamicResource AppAccentForegroundBrush}"
+                                FontWeight="Bold"
+                                IsVisible="{Binding IsOccupyGuardModeActive}"
+                                IsEnabled="{Binding CanStartSelectedReservationGuard}"
+                                HorizontalContentAlignment="Center" />
+                        <Button Content="开始签到防漏"
+                                Command="{Binding StartCheckInGuardCommand}"
+                                Background="{DynamicResource AppAccentBrush}"
+                                Foreground="{DynamicResource AppAccentForegroundBrush}"
+                                FontWeight="Bold"
+                                IsVisible="{Binding IsCheckInGuardModeActive}"
+                                IsEnabled="{Binding CanStartSelectedReservationGuard}"
+                                HorizontalContentAlignment="Center" />
+                      </WrapPanel>
+                    </StackPanel>
                   </StackPanel>
-                </StackPanel>
-              </Grid>
-            </Border>
+                </Grid>
+              </Border>
 
-            <Border Grid.Column="1" Classes="semi-card Shadow">
-              <Grid RowDefinitions="Auto,*" RowSpacing="16">
-                <TextBlock Classes="section-title" Text="占座实时日志" Margin="0" />
-                <Border Grid.Row="1"
-                        Background="{DynamicResource SemiColorFill0}"
-                        CornerRadius="16"
-                        BorderBrush="{DynamicResource SemiCardBorderBrush}"
-                        BorderThickness="1"
-                        Padding="16">
-                  <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                VerticalScrollBarVisibility="Auto"
-                                x:Name="OccupyLogScrollViewer">
-                    <ItemsControl ItemsSource="{Binding OccupyLogLines}" />
-                  </ScrollViewer>
-                </Border>
-              </Grid>
-            </Border>
-          </Grid>
-        </Grid>
+              <Border Grid.Column="1" Classes="semi-card Shadow" MinHeight="360">
+                <Grid RowDefinitions="Auto,*" RowSpacing="16">
+                  <TextBlock Classes="section-title" Text="预约守护实时日志" Margin="0" />
+                  <Border Grid.Row="1"
+                          Background="{DynamicResource SemiColorFill0}"
+                          CornerRadius="16"
+                          BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                          BorderThickness="1"
+                          Padding="16">
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto"
+                                  x:Name="OccupyLogScrollViewer">
+                      <StackPanel Spacing="14">
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="续占守护日志"
+                                     FontSize="13"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource SemiColorText2}" />
+                          <ItemsControl ItemsSource="{Binding OccupyLogLines}" />
+                        </StackPanel>
+                        <Separator Background="{DynamicResource AppSeparatorBrush}" />
+                        <StackPanel Spacing="8">
+                          <TextBlock Text="签到防漏日志"
+                                     FontSize="13"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource SemiColorText2}" />
+                          <ItemsControl ItemsSource="{Binding CheckInLogLines}" />
+                        </StackPanel>
+                      </StackPanel>
+                    </ScrollViewer>
+                  </Border>
+                </Grid>
+              </Border>
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
 
         <!-- Tab 5: Notification Settings -->
         <ScrollViewer>
@@ -1516,7 +1876,7 @@
                       HorizontalAlignment="Stretch">
             <TextBlock Classes="page-title" Text="通知设置" Margin="0" />
             <Border Classes="semi-card Shadow">
-              <Grid RowDefinitions="Auto,Auto"
+              <Grid RowDefinitions="Auto,Auto,Auto"
                     RowSpacing="24">
                 <StackPanel Spacing="10">
                   <Border Background="{DynamicResource DashboardMutedSurfaceBrush}"
@@ -1526,7 +1886,7 @@
                           Padding="5"
                           Width="{Binding NotificationSegmentControlWidth}"
                           HorizontalAlignment="Center">
-                    <Grid ColumnDefinitions="*,*,*"
+                    <Grid ColumnDefinitions="*,*,*,*"
                           ColumnSpacing="6"
                           ClipToBounds="True">
                       <Border Background="{DynamicResource AppNotificationSegmentThumbBrush}"
@@ -1573,6 +1933,16 @@
                       <Grid Grid.Column="2">
                         <Button Classes="notification-segment"
                                 Background="Transparent"
+                                Foreground="{Binding BarkNotificationTabForegroundBrush}"
+                                BorderThickness="0"
+                                CornerRadius="16"
+                                Content="Bark 推送"
+                                Command="{Binding ShowBarkNotificationSettingsCommand}" />
+                      </Grid>
+
+                      <Grid Grid.Column="3">
+                        <Button Classes="notification-segment"
+                                Background="Transparent"
                                 Foreground="{Binding LocalNotificationTabForegroundBrush}"
                                 BorderThickness="0"
                                 CornerRadius="16"
@@ -1587,7 +1957,49 @@
                              Text="{Binding NotificationSettingsStatusText}" />
                 </StackPanel>
 
-                <Carousel Grid.Row="1"
+                <Grid Grid.Row="1"
+                      ColumnDefinitions="*,*,*"
+                      ColumnSpacing="14">
+                  <Border Classes="dashboard-info-row">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="dashboard-ticket-caption"
+                                 Text="当前覆盖" />
+                      <TextBlock Text="{Binding NotificationCoverageSummaryText}"
+                                 FontSize="15"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Grid.Column="1"
+                          Classes="dashboard-info-row">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="dashboard-ticket-caption"
+                                 Text="Bark 状态" />
+                      <TextBlock Text="{Binding BarkNotificationReadinessText}"
+                                 FontSize="15"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Grid.Column="2"
+                          Classes="dashboard-info-row">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="dashboard-ticket-caption"
+                                 Text="保活提醒" />
+                      <TextBlock Text="{Binding HomeCookieGuardText}"
+                                 FontSize="15"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </Grid>
+
+                <Carousel Grid.Row="2"
                           SelectedIndex="{Binding SelectedNotificationSettingsTabIndex}"
                           HorizontalAlignment="Stretch">
                   <Carousel.PageTransition>
@@ -1690,7 +2102,7 @@
                                          FontWeight="SemiBold"
                                          Text="开启邮件提醒" />
                               <TextBlock Classes="helper-text"
-                                         Text="Cookie 失效、抢座成功或任务失败时，会自动按上方 SMTP 参数向目标邮箱发送提醒邮件" />
+                                         Text="Cookie 失效、抢座成功、占座成功、明日预约成功、空座出现、签到提醒和任务失败时，会自动按上方 SMTP 参数向目标邮箱发送提醒邮件" />
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1"
                                           IsChecked="{Binding EmailAlertsEnabled}"
@@ -1757,7 +2169,7 @@
                                          FontWeight="SemiBold"
                                          Text="开启 Telegram 提醒" />
                               <TextBlock Classes="helper-text"
-                                         Text="Cookie 失效、抢座成功或任务失败时，会通过 Telegram Bot 向指定 Chat ID 发送文本提醒" />
+                                         Text="Cookie 失效、抢座成功、占座成功、明日预约成功、空座出现、签到提醒和任务失败时，会通过 Telegram Bot 向指定 Chat ID 发送文本提醒" />
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1"
                                           IsChecked="{Binding TelegramAlertsEnabled}"
@@ -1773,6 +2185,82 @@
                                 Background="{DynamicResource SemiAccentBrush}"
                                 Foreground="{DynamicResource AppAccentForegroundBrush}"
                                 MinWidth="176" />
+                      </Grid>
+                    </Grid>
+                  </Grid>
+
+                  <Grid HorizontalAlignment="Stretch">
+                    <Grid RowDefinitions="Auto,Auto,Auto"
+                          RowSpacing="18"
+                          HorizontalAlignment="Stretch">
+                      <StackPanel Grid.Row="0"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
+                                   Text="Bark 服务器地址" />
+                        <TextBox Text="{Binding BarkAlertServerUrl}"
+                                 Watermark="https://api.day.app"
+                                 HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <Grid Grid.Row="1"
+                            ColumnDefinitions="1.5*,*,*"
+                            ColumnSpacing="24">
+                        <StackPanel Grid.Column="0"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="Device Key" />
+                          <TextBox Text="{Binding BarkAlertDeviceKey}"
+                                   PasswordChar="●"
+                                   Watermark="从 Bark App 中复制 Device Key"
+                                   HorizontalAlignment="Stretch" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="提示音" />
+                          <TextBox Text="{Binding BarkAlertSound}"
+                                   Watermark="可选，例如 alarm"
+                                   HorizontalAlignment="Stretch" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="分组" />
+                          <TextBox Text="{Binding BarkAlertGroup}"
+                                   Watermark="IGoLibrary-Ex"
+                                   HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                      </Grid>
+
+                      <Grid Grid.Row="2"
+                            ColumnDefinitions="*,Auto"
+                            ColumnSpacing="16"
+                            Margin="0,8,0,0">
+                        <Border Classes="notify-toggle-card">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                            <StackPanel Spacing="4">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="开启 Bark 提醒" />
+                              <TextBlock Classes="helper-text"
+                                         Text="重要事件会通过 Bark 推送到手机，适合 Cookie 失效、抢座成功、明日预约成功、场馆出现空座、签到提醒和任务失败这类需要立即看到的提醒" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          IsChecked="{Binding BarkAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Button Grid.Column="1"
+                                Content="发送测试 Bark"
+                                Command="{Binding SendTestBarkAlertCommand}"
+                                Background="{DynamicResource SemiAccentBrush}"
+                                Foreground="{DynamicResource AppAccentForegroundBrush}"
+                                MinWidth="160" />
                       </Grid>
                     </Grid>
                   </Grid>
@@ -1853,7 +2341,7 @@
                   <StackPanel Spacing="16">
                     <TextBlock Classes="section-title" Text="常规体验" />
                     <CheckBox Content="屏幕右下角展示应用横幅通知" IsChecked="{Binding NotificationsEnabled}" />
-                    <CheckBox Content="当任务进行时，右上角关闭会最小化到托盘" IsChecked="{Binding MinimizeToTrayEnabled}" />
+                    <CheckBox Content="关闭窗口后保留在菜单栏/托盘" IsChecked="{Binding MinimizeToTrayEnabled}" />
                     <CheckBox Content="自定义接口地址和查询语法" IsChecked="{Binding TraceIntGraphQlOverridesEnabled}" FontWeight="Bold" Foreground="{DynamicResource SemiWarningTextBrush}"/>
                     
                     <Separator Background="{DynamicResource AppSeparatorBrush}" Margin="0,8"/>
@@ -1897,6 +2385,31 @@
                               HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Center" />
                     </Grid>
+                  </StackPanel>
+                </Border>
+
+                <Border Classes="card">
+                  <StackPanel Spacing="16">
+                    <TextBlock Classes="section-title" Text="健康检查与诊断" />
+                    <TextBlock Text="{Binding HealthCheckStatusText}"
+                               Classes="helper-text"
+                               TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                      <Button Content="刷新健康检查"
+                              Command="{Binding RefreshHealthSnapshotCommand}"
+                              Classes="Secondary"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Center" />
+                      <Button Grid.Column="1"
+                              Content="导出诊断包"
+                              Command="{Binding ExportDiagnosticsCommand}"
+                              IsEnabled="{Binding CanExportDiagnostics}"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Center" />
+                    </Grid>
+                    <TextBlock Text="{Binding DiagnosticExportStatusText}"
+                               Classes="helper-text"
+                               TextWrapping="Wrap" />
                   </StackPanel>
                 </Border>
               </StackPanel>
@@ -2290,6 +2803,3 @@
     </Grid>
   </Grid>
 </Window>
-
-
-

@@ -62,6 +62,31 @@ public sealed class SessionWorkflowService(
             StatusMessage: $"已恢复会话：{session.Source} / {session.SavedAt:yyyy-MM-dd HH:mm:ss}");
     }
 
+    public async Task<CookieValidationSnapshot> ValidateCurrentCookieAsync(CancellationToken cancellationToken = default)
+    {
+        var checkedAt = DateTimeOffset.Now;
+        var session = sessionService.CurrentSession;
+        if (session is null)
+        {
+            return CookieValidationSnapshot.Unknown(checkedAt);
+        }
+
+        var inferredExpirationTime = GetCookieExpirationTime(session.Cookie);
+        try
+        {
+            await apiClient.ValidateCookieAsync(session.Cookie, cancellationToken);
+            return CookieValidationSnapshot.Valid(checkedAt, inferredExpirationTime);
+        }
+        catch (Exception ex) when (SessionAuthFailureDetector.IsSessionInvalidException(ex))
+        {
+            return CookieValidationSnapshot.Invalid(checkedAt, ex.Message, inferredExpirationTime);
+        }
+        catch (Exception ex)
+        {
+            return CookieValidationSnapshot.CheckFailed(checkedAt, ex.Message, inferredExpirationTime);
+        }
+    }
+
     public Task SignOutAsync(CancellationToken cancellationToken = default)
     {
         return sessionService.SignOutAsync(cancellationToken);

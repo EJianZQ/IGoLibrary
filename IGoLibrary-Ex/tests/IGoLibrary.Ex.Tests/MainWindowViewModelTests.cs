@@ -1,8 +1,10 @@
 using System.Net;
 using System.Text;
+using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Application.Services;
+using IGoLibrary.Ex.Application.State;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 using Avalonia.Media;
@@ -57,7 +59,24 @@ public sealed class MainWindowViewModelTests
 
         var titles = viewModel.SidebarItems.Select(item => item.Title).ToArray();
 
-        Assert.Equal(["首页", "账户与场馆", "抢座", "明日预约", "占座", "通知设置", "系统设置"], titles);
+        Assert.Equal(["首页", "账户与场馆", "抢座", "明日预约", "预约守护", "通知设置", "系统设置"], titles);
+    }
+
+    [Fact]
+    public void ReservationGuardMode_DefaultsToOccupyAndSwitchesToCheckIn()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.Equal(0, viewModel.SelectedReservationGuardModeIndex);
+        Assert.True(viewModel.IsOccupyGuardModeActive);
+        Assert.False(viewModel.IsCheckInGuardModeActive);
+        Assert.Equal("续占守护未运行。", viewModel.ReservationGuardStatusText);
+
+        viewModel.SelectedReservationGuardModeIndex = 1;
+
+        Assert.False(viewModel.IsOccupyGuardModeActive);
+        Assert.True(viewModel.IsCheckInGuardModeActive);
+        Assert.Equal("签到防漏未运行。", viewModel.ReservationGuardStatusText);
     }
 
     [Fact]
@@ -170,6 +189,81 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_LoadsBarkNotificationSettings()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default,
+                LocalDesktopAlertSettings.Default,
+                TelegramAlertChannelSettings.Default,
+                new BarkAlertChannelSettings(true, "https://bark.example.com", "device-key", "alarm", "Library"))));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.BarkAlertsEnabled);
+        Assert.Equal("https://bark.example.com", viewModel.BarkAlertServerUrl);
+        Assert.Equal("device-key", viewModel.BarkAlertDeviceKey);
+        Assert.Equal("alarm", viewModel.BarkAlertSound);
+        Assert.Equal("Library", viewModel.BarkAlertGroup);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_DefaultsNullBarkNotificationStrings()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default,
+                LocalDesktopAlertSettings.Default,
+                TelegramAlertChannelSettings.Default,
+                new BarkAlertChannelSettings(true, null!, null!, null!, null!))));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.BarkAlertsEnabled);
+        Assert.Equal(BarkAlertChannelSettings.DefaultServerUrl, viewModel.BarkAlertServerUrl);
+        Assert.Equal(string.Empty, viewModel.BarkAlertDeviceKey);
+        Assert.Equal(string.Empty, viewModel.BarkAlertSound);
+        Assert.Equal(BarkAlertChannelSettings.Default.Group, viewModel.BarkAlertGroup);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_SummarizesNotificationCoverageAndBarkReadiness()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = true },
+                new LocalDesktopAlertSettings(true, true),
+                new TelegramAlertChannelSettings(true, "https://telegram.example.com", "token-1", "chat-1"),
+                new BarkAlertChannelSettings(true, "https://bark.example.com", "device-key", string.Empty, "Library"))));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal("邮件 / Telegram / Bark / 本地弹窗 / 提示音", viewModel.NotificationCoverageSummaryText);
+        Assert.Equal("通知：邮件 / Telegram / Bark / 本地弹窗 / 提示音", viewModel.HomeNotificationCoverageText);
+        Assert.Equal("Bark 已就绪 · Library", viewModel.BarkNotificationReadinessText);
+    }
+
+    [Fact]
+    public async Task NotificationSettingsSummary_WarnsWhenBarkIsEnabledWithoutDeviceKey()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default,
+                new BarkAlertChannelSettings(true, "https://bark.example.com", string.Empty, string.Empty, "Library"))));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal("Bark", viewModel.NotificationCoverageSummaryText);
+        Assert.Equal("Bark 已开启，缺少 Device Key", viewModel.BarkNotificationReadinessText);
+    }
+
+    [Fact]
     public async Task NotificationSettings_AutoSaveTelegramAlerts_WhenFieldsChange()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
@@ -190,6 +284,31 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("https://telegram.example.com", telegram.ApiBaseUrl);
         Assert.Equal("token-1", telegram.BotToken);
         Assert.Equal("chat-1", telegram.ChatId);
+    }
+
+    [Fact]
+    public async Task NotificationSettings_AutoSaveBarkAlerts_WhenFieldsChange()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.BarkAlertsEnabled = true;
+        viewModel.BarkAlertServerUrl = "https://bark.example.com/";
+        viewModel.BarkAlertDeviceKey = " device-key ";
+        viewModel.BarkAlertSound = " alarm ";
+        viewModel.BarkAlertGroup = " Library ";
+
+        await WaitForAsync(() =>
+            settingsService.SaveCalls > 0 &&
+            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Bark.DeviceKey == "device-key");
+
+        var bark = Assert.IsType<BarkAlertChannelSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Bark);
+        Assert.True(bark.Enabled);
+        Assert.Equal("https://bark.example.com", bark.ServerUrl);
+        Assert.Equal("device-key", bark.DeviceKey);
+        Assert.Equal("alarm", bark.Sound);
+        Assert.Equal("Library", bark.Group);
     }
 
     [Fact]
@@ -239,6 +358,53 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SendTestBarkAlertAsync_UsesCurrentNotificationSettingsSnapshot()
+    {
+        var alertService = new FakeTaskEventAlertDispatcher();
+        var viewModel = CreateViewModel(taskAlertService: alertService);
+        await viewModel.InitializeAsync();
+
+        viewModel.BarkAlertsEnabled = true;
+        viewModel.BarkAlertServerUrl = "https://bark.example.com/";
+        viewModel.BarkAlertDeviceKey = " device-key ";
+        viewModel.BarkAlertSound = " alarm ";
+        viewModel.BarkAlertGroup = " Library ";
+
+        await viewModel.SendTestBarkAlertCommand.ExecuteAsync(null);
+
+        var request = Assert.Single(alertService.TestBarkRequests);
+        Assert.True(request.Enabled);
+        Assert.Equal("https://bark.example.com", request.ServerUrl);
+        Assert.Equal("device-key", request.DeviceKey);
+        Assert.Equal("alarm", request.Sound);
+        Assert.Equal("Library", request.Group);
+    }
+
+    [Fact]
+    public async Task SendTestBarkAlertAsync_ShowsErrorDialog_WhenSendingFails()
+    {
+        var alertService = new FakeTaskEventAlertDispatcher
+        {
+            SendTestBarkException = new InvalidOperationException("bark send failed")
+        };
+        var errorDialogService = new FakeErrorDialogService();
+        var viewModel = CreateViewModel(
+            taskAlertService: alertService,
+            errorDialogService: errorDialogService);
+        await viewModel.InitializeAsync();
+
+        viewModel.BarkAlertServerUrl = "https://bark.example.com";
+        viewModel.BarkAlertDeviceKey = "device-key";
+
+        await viewModel.SendTestBarkAlertCommand.ExecuteAsync(null);
+
+        var error = Assert.Single(errorDialogService.Errors);
+        Assert.Equal("测试 Bark 发送失败", error.Title);
+        Assert.Equal(nameof(InvalidOperationException), error.ErrorType);
+        Assert.Equal("bark send failed", error.ErrorMessage);
+    }
+
+    [Fact]
     public async Task TryAutoParseClipboardLinkAsync_DoesNotConsumeSameCodeTwice()
     {
         var notificationService = new FakeNotificationService();
@@ -266,7 +432,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task TryAutoParseClipboardLinkAsync_ShowsCookieExpirationTime_WhenJwtCookieHasExpireAt()
+    public async Task TryAutoParseClipboardLinkAsync_ShowsInferredTokenTime_WhenJwtCookieHasExpireAt()
     {
         var notificationService = new FakeNotificationService();
         var expiresAt = new DateTimeOffset(2026, 5, 5, 16, 56, 0, DateTimeOffset.Now.Offset);
@@ -285,7 +451,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(result);
         var success = Assert.Single(notificationService.Successes, item => item.Title == "已成功获取 Cookie");
         Assert.Equal(
-            $"授权链接解析成功，Cookie 已填入{Environment.NewLine}Cookie 到期时间：5月5日 16:56",
+            $"授权链接解析成功，Cookie 已填入{Environment.NewLine}Token 推测时间：5月5日 16:56，实际状态以接口校验为准",
             success.Message);
     }
 
@@ -342,11 +508,11 @@ public sealed class MainWindowViewModelTests
         await viewModel.InitializeAsync();
 
         var success = Assert.Single(notificationService.Successes, item => item.Title == "已成功恢复上次的 Cookie");
-        Assert.Equal($"Cookie 到期时间：{expiresAt:M月d日 HH:mm}", success.Message);
+        Assert.Equal($"Token 推测时间：{expiresAt:M月d日 HH:mm}，实际状态以接口校验为准", success.Message);
     }
 
     [Fact]
-    public async Task InitializeAsync_ShowsWarningToast_WhenRestoredJwtCookieExpiresSoon()
+    public async Task InitializeAsync_ShowsSuccessToast_WhenRestoredJwtCookieExpiresSoonButApiValidationSucceeds()
     {
         var notificationService = new FakeNotificationService();
         var expiresAt = DateTimeOffset.Now.AddMinutes(20);
@@ -364,43 +530,73 @@ public sealed class MainWindowViewModelTests
 
         await viewModel.InitializeAsync();
 
-        var warning = Assert.Single(notificationService.Warnings, item => item.Title == "已成功恢复上次的 Cookie，注意到期时间");
-        Assert.Equal($"Cookie 到期时间：{expiresAt:M月d日 HH:mm}", warning.Message);
+        Assert.DoesNotContain(notificationService.Warnings, item => item.Title.Contains("注意到期时间", StringComparison.Ordinal));
+        var success = Assert.Single(notificationService.Successes, item => item.Title == "已成功恢复上次的 Cookie");
+        Assert.Equal($"Token 推测时间：{expiresAt:M月d日 HH:mm}，实际状态以接口校验为准", success.Message);
     }
 
     [Fact]
-    public async Task ValidateManualCookieAsync_ShowsSidebarCookieExpiration_WhenJwtCookieHasExpireAt()
+    public async Task ValidateManualCookieAsync_ShowsCookieValidState_WhenApiValidationSucceeds()
     {
-        var expiresAt = new DateTimeOffset(2026, 5, 5, 16, 56, 0, DateTimeOffset.Now.Offset);
+        var expiresAt = DateTimeOffset.Now.AddDays(-1);
         var viewModel = CreateViewModel();
         viewModel.ManualCookieText = BuildAuthorizationCookie(expiresAt);
 
         await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
 
-        Assert.True(viewModel.HasSidebarSessionExpiration);
-        Assert.Equal("5月5日 16:56", viewModel.SidebarSessionExpirationText);
+        Assert.True(viewModel.HasSidebarCookieStatus);
+        Assert.StartsWith("Cookie 有效", viewModel.SidebarCookieStatusText, StringComparison.Ordinal);
+        Assert.Contains("最近校验", viewModel.SidebarCookieStatusText);
+        Assert.Contains("Token 推测", viewModel.HomeCookieGuardText);
     }
 
     [Fact]
-    public async Task ValidateManualCookieAsync_UsesWarningBrush_WhenCookieExpiresWithinThirtyMinutes()
+    public async Task ValidateManualCookieAsync_MarksCookieInvalidAndNotifiesOnce_WhenApiRejectsAuthorization()
     {
-        var viewModel = CreateViewModel();
-        viewModel.ManualCookieText = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(20));
+        var alertDispatcher = new FakeTaskEventAlertDispatcher();
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnValidateCookieAsync = (_, _) => Task.FromException(
+                new TraceIntApiException("access denied!", 40001, "access denied!", isAuthorizationDenied: true))
+        };
+        var viewModel = CreateViewModel(
+            apiClient: apiClient,
+            taskAlertService: alertDispatcher);
+        viewModel.ManualCookieText = BuildAuthorizationCookie(DateTimeOffset.Now.AddDays(1));
 
         await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+        await viewModel.ValidateCurrentCookieStatusForTestsAsync();
 
-        Assert.Equal("#FFC27803", GetBrushColor(viewModel.SidebarSessionExpirationBrush).ToString(), ignoreCase: true);
+        Assert.True(viewModel.HasSidebarCookieStatus);
+        Assert.StartsWith("Cookie 已失效", viewModel.SidebarCookieStatusText, StringComparison.Ordinal);
+        var notification = Assert.Single(alertDispatcher.SessionInvalidNotifications);
+        Assert.Equal("Cookie 状态检测", notification.Source);
+
+        await viewModel.ValidateCurrentCookieStatusForTestsAsync();
+
+        Assert.Single(alertDispatcher.SessionInvalidNotifications);
     }
 
     [Fact]
-    public async Task ValidateManualCookieAsync_UsesFailureBrush_WhenCookieExpiresWithinTenMinutes()
+    public async Task ValidateManualCookieAsync_ShowsCheckFailedWithoutInvalidNotification_WhenValidationFailsTransiently()
     {
-        var viewModel = CreateViewModel();
-        viewModel.ManualCookieText = BuildAuthorizationCookie(DateTimeOffset.Now.AddMinutes(5));
+        var alertDispatcher = new FakeTaskEventAlertDispatcher();
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnValidateCookieAsync = (_, _) => Task.FromException(
+                new HttpRequestException("temporary", null, HttpStatusCode.ServiceUnavailable))
+        };
+        var viewModel = CreateViewModel(
+            apiClient: apiClient,
+            taskAlertService: alertDispatcher);
+        viewModel.ManualCookieText = BuildAuthorizationCookie(DateTimeOffset.Now.AddDays(-1));
 
         await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+        await viewModel.ValidateCurrentCookieStatusForTestsAsync();
 
-        Assert.Equal("#FFC93C37", GetBrushColor(viewModel.SidebarSessionExpirationBrush).ToString(), ignoreCase: true);
+        Assert.True(viewModel.HasSidebarCookieStatus);
+        Assert.StartsWith("Cookie 校验失败", viewModel.SidebarCookieStatusText, StringComparison.Ordinal);
+        Assert.Empty(alertDispatcher.SessionInvalidNotifications);
     }
 
     [Fact]
@@ -413,8 +609,8 @@ public sealed class MainWindowViewModelTests
 
         await viewModel.SignOutCommand.ExecuteAsync(null);
 
-        Assert.False(viewModel.HasSidebarSessionExpiration);
-        Assert.Equal(string.Empty, viewModel.SidebarSessionExpirationText);
+        Assert.False(viewModel.HasSidebarCookieStatus);
+        Assert.Equal(string.Empty, viewModel.SidebarCookieStatusText);
     }
 
     [Fact]
@@ -699,6 +895,83 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SaveSettingsAsync_PersistsBarkNotificationSettings()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.BarkAlertsEnabled = true;
+        viewModel.BarkAlertServerUrl = "https://bark.example.com/";
+        viewModel.BarkAlertDeviceKey = " device-key ";
+        viewModel.BarkAlertSound = " alarm ";
+        viewModel.BarkAlertGroup = " Library ";
+
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        var bark = Assert.IsType<BarkAlertChannelSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Bark);
+        Assert.True(bark.Enabled);
+        Assert.Equal("https://bark.example.com", bark.ServerUrl);
+        Assert.Equal("device-key", bark.DeviceKey);
+        Assert.Equal("alarm", bark.Sound);
+        Assert.Equal("Library", bark.Group);
+    }
+
+    [Fact]
+    public async Task StartVenueAvailabilityAsync_UsesSelectedLibraryAndPollingInterval()
+    {
+        var venueAvailabilityCoordinator = new FakeVenueAvailabilityCoordinator();
+        var viewModel = CreateViewModel(venueAvailabilityCoordinator: venueAvailabilityCoordinator);
+        viewModel.SelectedLibrary = new LibrarySummary(12, "自科阅览区一", "3层", true, 120, 120, 0);
+        viewModel.VenueAvailabilityPollingIntervalSeconds = 45;
+
+        await viewModel.StartVenueAvailabilityCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<VenueAvailabilityWatchPlan>(venueAvailabilityCoordinator.LastPlan);
+        Assert.Equal(12, plan.LibraryId);
+        Assert.Equal("自科阅览区一", plan.LibraryName);
+        Assert.Equal(TimeSpan.FromSeconds(45), plan.PollingInterval);
+        Assert.True(viewModel.IsVenueAvailabilityRunning);
+    }
+
+    [Fact]
+    public void ShouldHideToTrayOnClose_ReturnsTrue_WhenVenueAvailabilityIsRunning()
+    {
+        var venueAvailabilityCoordinator = new FakeVenueAvailabilityCoordinator();
+        var viewModel = CreateViewModel(venueAvailabilityCoordinator: venueAvailabilityCoordinator);
+
+        venueAvailabilityCoordinator.ApplyStatus(new CoordinatorStatus(
+            CoordinatorTaskState.Running,
+            "空座追踪",
+            "空座追踪运行中。",
+            DateTimeOffset.Now,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Running));
+
+        Assert.True(viewModel.ShouldHideToTrayOnClose);
+    }
+
+    [Fact]
+    public void ShouldHideToTrayOnClose_ReturnsTrue_WhenMinimizeToTrayIsEnabledWithoutRunningTask()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.MinimizeToTrayEnabled = true;
+
+        Assert.True(viewModel.ShouldHideToTrayOnClose);
+    }
+
+    [Fact]
+    public void ShouldHideToTrayOnClose_ReturnsFalse_WhenMinimizeToTrayIsDisabled()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.MinimizeToTrayEnabled = false;
+
+        Assert.False(viewModel.ShouldHideToTrayOnClose);
+    }
+
+    [Fact]
     public async Task SaveSettingsAsync_PersistsThemePreferences()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
@@ -775,6 +1048,81 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.HasNoCurrentReservation);
         Assert.Equal("--", viewModel.HomeReservationSeatNumberText);
         Assert.Contains(notifications.Successes, x => x.Title == "已取消预约");
+    }
+
+    [Fact]
+    public async Task RefreshReservationAsync_ShowsPendingCheckInUsageState_WhenHoldTimeMissing()
+    {
+        var viewModel = CreateReservationStateViewModel(new ReservationInfo(
+            "token-1",
+            1,
+            "自科阅览区一",
+            "seat-4",
+            "4",
+            DateTimeOffset.Now.AddMinutes(30)));
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+
+        Assert.Equal("待签到", viewModel.ReservationUsageStatusText);
+        Assert.Equal("尚未签到", viewModel.ReservationUsageDurationText);
+        Assert.Equal(viewModel.ReservationUsageStatusText, viewModel.HomeReservationBadgeText);
+    }
+
+    [Fact]
+    public async Task RefreshReservationAsync_ShowsStudyingUsageStateAndDuration_WhenHoldTimeExists()
+    {
+        var viewModel = CreateReservationStateViewModel(new ReservationInfo(
+            "token-1",
+            1,
+            "自科阅览区一",
+            "seat-4",
+            "4",
+            DateTimeOffset.Now.AddMinutes(30),
+            HoldTime: DateTimeOffset.Now.AddMinutes(-75)));
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+
+        Assert.Equal("学习中", viewModel.ReservationUsageStatusText);
+        Assert.Contains("1小时", viewModel.ReservationUsageDurationText);
+        Assert.Contains("15分钟", viewModel.ReservationUsageDurationText);
+        Assert.Equal(viewModel.ReservationUsageStatusText, viewModel.HomeReservationBadgeText);
+    }
+
+    [Fact]
+    public async Task RefreshReservationAsync_ShowsExpiredUsageState_WhenReservationExpired()
+    {
+        var viewModel = CreateReservationStateViewModel(new ReservationInfo(
+            "token-1",
+            1,
+            "自科阅览区一",
+            "seat-4",
+            "4",
+            DateTimeOffset.Now.AddMinutes(-1)));
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+
+        Assert.Equal("已到期", viewModel.ReservationUsageStatusText);
+        Assert.Equal("已到期", viewModel.ReservationUsageDurationText);
+        Assert.Equal("待刷新", viewModel.HomeReservationBadgeText);
+    }
+
+    [Fact]
+    public async Task RefreshReservationAsync_KeepsStudyingUsageState_WhenCheckedInReservationDeadlinePassed()
+    {
+        var viewModel = CreateReservationStateViewModel(new ReservationInfo(
+            "token-1",
+            1,
+            "自科阅览区一",
+            "seat-4",
+            "4",
+            DateTimeOffset.Now.AddMinutes(-1),
+            HoldTime: DateTimeOffset.Now.AddMinutes(-75)));
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+
+        Assert.Equal("学习中", viewModel.ReservationUsageStatusText);
+        Assert.Contains("1小时", viewModel.ReservationUsageDurationText);
+        Assert.Equal(viewModel.ReservationUsageStatusText, viewModel.HomeReservationBadgeText);
     }
 
     [Fact]
@@ -862,6 +1210,79 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(new SeatReference("seat-1", "1"), plan.Seat);
         Assert.Equal(new TimeOnly(22, 1, 2), plan.ScheduledStart);
         Assert.False(plan.ExecuteImmediately);
+    }
+
+    [Fact]
+    public async Task StartCheckInGuardAsync_UsesReservationValidateTimeAndSafetyLead()
+    {
+        var validateTime = DateTimeOffset.Now.AddMinutes(10);
+        var checkInGuardCoordinator = new FakeCheckInGuardCoordinator();
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            apiClient: new FakeTraceIntApiClient
+            {
+                OnGetReservationInfoAsync = (_, _) => Task.FromResult<ReservationInfo?>(new ReservationInfo(
+                    "token",
+                    1,
+                    "馆",
+                    "seat-1",
+                    "1",
+                    DateTimeOffset.Now.AddMinutes(20),
+                    ValidateTime: validateTime))
+            },
+            checkInGuardCoordinator: checkInGuardCoordinator,
+            healthCheckService: new FakeHealthCheckService());
+
+        viewModel.CheckInWindowMinutes = 30;
+
+        await viewModel.StartCheckInGuardCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<CheckInGuardPlan>(checkInGuardCoordinator.LastPlan);
+        Assert.Equal(validateTime, plan.Deadline);
+        Assert.Equal(TimeSpan.FromMinutes(30), plan.CheckInRequiredWithin);
+        Assert.Equal(TimeSpan.FromMinutes(1), plan.MissedActionLeadTime);
+    }
+
+    [Fact]
+    public async Task StartCheckInGuardAsync_DoesNotStart_WhenOccupyGuardIsRunning()
+    {
+        var notifications = new FakeNotificationService();
+        var checkInGuardCoordinator = new FakeCheckInGuardCoordinator();
+        var viewModel = CreateViewModel(
+            notificationService: notifications,
+            checkInGuardCoordinator: checkInGuardCoordinator,
+            healthCheckService: new FakeHealthCheckService());
+        viewModel.IsOccupyRunning = true;
+
+        await viewModel.StartCheckInGuardCommand.ExecuteAsync(null);
+
+        Assert.Null(checkInGuardCoordinator.LastPlan);
+        Assert.Contains(notifications.Warnings, warning =>
+            warning.Title == "预约守护正在运行" &&
+            warning.Message.Contains("续占守护", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task StartOccupyAsync_DoesNotStart_WhenCheckInGuardIsRunning()
+    {
+        var notifications = new FakeNotificationService();
+        var occupySeatCoordinator = new FakeOccupySeatCoordinator();
+        var viewModel = CreateViewModel(
+            notificationService: notifications,
+            occupySeatCoordinator: occupySeatCoordinator,
+            healthCheckService: new FakeHealthCheckService());
+        viewModel.IsCheckInGuardRunning = true;
+
+        await viewModel.StartOccupyCommand.ExecuteAsync(null);
+
+        Assert.Null(occupySeatCoordinator.LastPlan);
+        Assert.Contains(notifications.Warnings, warning =>
+            warning.Title == "预约守护正在运行" &&
+            warning.Message.Contains("签到防漏", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1005,6 +1426,31 @@ public sealed class MainWindowViewModelTests
 
         var plan = Assert.IsType<GrabSeatPlan>(coordinator.LastPlan);
         Assert.Equal(new TimeOnly(7, 59, 55), plan.ScheduledStart);
+    }
+
+    [Fact]
+    public async Task StartGrabAsync_DoesNotStart_WhenPreflightHasBlockingIssue()
+    {
+        var notifications = new FakeNotificationService();
+        var healthCheckService = new FakeHealthCheckService
+        {
+            RunPreflightResult = new PreflightResult(
+                PreflightTarget.Grab([]),
+                DateTimeOffset.Now,
+                [new HealthCheckItem("cookie", "Cookie 状态", "Cookie 已失效", HealthSeverity.Blocking)])
+        };
+        var (viewModel, coordinator) = await CreateBoundGrabViewModelAsync(
+            notificationService: notifications,
+            healthCheckService: healthCheckService);
+        viewModel.VisibleSeats[0].IsSelected = true;
+
+        await viewModel.StartGrabCommand.ExecuteAsync(null);
+
+        Assert.Null(coordinator.LastPlan);
+        Assert.Contains(healthCheckService.PreflightTargets, target => target.Kind == PreflightTaskKind.Grab);
+        Assert.Contains(notifications.Warnings, warning =>
+            warning.Title == "启动前检查未通过" &&
+            warning.Message.Contains("Cookie 已失效", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -1224,40 +1670,63 @@ public sealed class MainWindowViewModelTests
         FakeSettingsService? settingsService = null,
         FakeTraceIntApiClient? apiClient = null,
         FakeGrabSeatCoordinator? grabSeatCoordinator = null,
+        FakeVenueAvailabilityCoordinator? venueAvailabilityCoordinator = null,
         FakeOccupySeatCoordinator? occupySeatCoordinator = null,
         FakeTomorrowReservationCoordinator? tomorrowReservationCoordinator = null,
+        FakeCheckInGuardCoordinator? checkInGuardCoordinator = null,
         FakeNotificationService? notificationService = null,
         FakeTaskEventAlertDispatcher? taskAlertService = null,
         FakeErrorDialogService? errorDialogService = null,
         FakeAppThemeService? appThemeService = null,
         ActivityLogService? activityLogService = null,
-        FakeProtocolTemplateStore? protocolTemplateStore = null)
+        FakeProtocolTemplateStore? protocolTemplateStore = null,
+        FakeHealthCheckService? healthCheckService = null)
     {
         sessionService ??= new FakeSessionService();
         libraryService ??= new FakeLibraryService();
         settingsService ??= new FakeSettingsService(AppSettings.Default);
         apiClient ??= new FakeTraceIntApiClient();
         grabSeatCoordinator ??= new FakeGrabSeatCoordinator();
+        venueAvailabilityCoordinator ??= new FakeVenueAvailabilityCoordinator();
         occupySeatCoordinator ??= new FakeOccupySeatCoordinator();
         tomorrowReservationCoordinator ??= new FakeTomorrowReservationCoordinator();
+        checkInGuardCoordinator ??= new FakeCheckInGuardCoordinator();
         taskAlertService ??= new FakeTaskEventAlertDispatcher();
         activityLogService ??= new ActivityLogService();
 
         return new MainWindowViewModel(
             new SessionWorkflowService(apiClient, sessionService),
             new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
-            new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),
+            new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService, new AppRuntimeState()),
             new SettingsWorkflowService(settingsService),
             new ProtocolTemplateEditorService(protocolTemplateStore ?? new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates("", "", "", "", "", "", ""))),
             taskAlertService,
+            taskAlertService,
             grabSeatCoordinator,
+            venueAvailabilityCoordinator,
             occupySeatCoordinator,
             tomorrowReservationCoordinator,
+            checkInGuardCoordinator,
             activityLogService,
             notificationService ?? new FakeNotificationService(),
             errorDialogService ?? new FakeErrorDialogService(),
             appThemeService ?? new FakeAppThemeService(),
-            new AppWindowService());
+            new AppWindowService(),
+            healthCheckService);
+    }
+
+    private static MainWindowViewModel CreateReservationStateViewModel(ReservationInfo reservation)
+    {
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        return CreateViewModel(
+            sessionService: sessionService,
+            apiClient: new FakeTraceIntApiClient
+            {
+                OnGetReservationInfoAsync = (_, _) => Task.FromResult<ReservationInfo?>(reservation)
+            });
     }
 
     private static async Task<(MainWindowViewModel ViewModel, FakeTomorrowReservationCoordinator Coordinator)>
@@ -1276,13 +1745,15 @@ public sealed class MainWindowViewModelTests
 
     private static async Task<(MainWindowViewModel ViewModel, FakeGrabSeatCoordinator Coordinator)>
         CreateBoundGrabViewModelAsync(
-            FakeGrabSeatCoordinator? coordinator = null,
-            FakeNotificationService? notificationService = null)
+        FakeGrabSeatCoordinator? coordinator = null,
+        FakeNotificationService? notificationService = null,
+        FakeHealthCheckService? healthCheckService = null)
     {
         coordinator ??= new FakeGrabSeatCoordinator();
         var result = await CreateBoundSeatViewModelAsync(
             grabCoordinator: coordinator,
-            notificationService: notificationService);
+            notificationService: notificationService,
+            healthCheckService: healthCheckService);
 
         return (result.ViewModel, coordinator);
     }
@@ -1292,9 +1763,10 @@ public sealed class MainWindowViewModelTests
         FakeGrabSeatCoordinator GrabCoordinator,
         FakeTomorrowReservationCoordinator TomorrowCoordinator)>
         CreateBoundSeatViewModelAsync(
-            FakeGrabSeatCoordinator? grabCoordinator = null,
-            FakeTomorrowReservationCoordinator? tomorrowCoordinator = null,
-            FakeNotificationService? notificationService = null)
+        FakeGrabSeatCoordinator? grabCoordinator = null,
+        FakeTomorrowReservationCoordinator? tomorrowCoordinator = null,
+        FakeNotificationService? notificationService = null,
+        FakeHealthCheckService? healthCheckService = null)
     {
         var library = new LibrarySummary(117580, "自科阅览区一", "3层", true, 120, 20, 10);
         var sessionService = new FakeSessionService
@@ -1325,7 +1797,8 @@ public sealed class MainWindowViewModelTests
             libraryService: libraryService,
             grabSeatCoordinator: grabCoordinator,
             tomorrowReservationCoordinator: tomorrowCoordinator,
-            notificationService: notificationService);
+            notificationService: notificationService,
+            healthCheckService: healthCheckService);
 
         viewModel.IsAuthorized = true;
         viewModel.SelectedLibrary = library;

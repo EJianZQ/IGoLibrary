@@ -45,6 +45,14 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
 
     public List<(string LibraryName, string SeatName, string? Day)> TomorrowReservationSucceededNotifications { get; } = [];
 
+    public List<(string LibraryName, int AvailableSeats)> VenueAvailableNotifications { get; } = [];
+
+    public List<(string LibraryName, string SeatName, DateTimeOffset Deadline)> CheckInReminderNotifications { get; } = [];
+
+    public List<(string LibraryName, string SeatName, DateTimeOffset Deadline, string ActionText)> CheckInMissedNotifications { get; } = [];
+
+    public List<(string LibraryName, string SeatName)> CheckInAutoRescueSucceededNotifications { get; } = [];
+
     public List<(string TaskName, string Reason)> TaskFailedNotifications { get; } = [];
 
     public TaskCompletionSource? GrabSucceededCompletion { get; set; }
@@ -57,17 +65,23 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
 
     public Exception? NotifyTomorrowReservationSucceededException { get; set; }
 
+    public Exception? NotifyVenueAvailableException { get; set; }
+
     public Exception? NotifyTaskFailedException { get; set; }
 
     public List<EmailAlertChannelSettings> TestEmailRequests { get; } = [];
 
     public List<TelegramAlertChannelSettings> TestTelegramRequests { get; } = [];
 
+    public List<BarkAlertChannelSettings> TestBarkRequests { get; } = [];
+
     public List<LocalDesktopAlertSettings> TestLocalAlertRequests { get; } = [];
 
     public Exception? SendTestEmailException { get; set; }
 
     public Exception? SendTestTelegramException { get; set; }
+
+    public Exception? SendTestBarkException { get; set; }
 
     public Exception? SendTestLocalException { get; set; }
 
@@ -119,6 +133,47 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
         return Task.CompletedTask;
     }
 
+    public Task NotifyVenueAvailableAsync(string libraryName, int availableSeats, CancellationToken cancellationToken = default)
+    {
+        if (NotifyVenueAvailableException is not null)
+        {
+            throw NotifyVenueAvailableException;
+        }
+
+        VenueAvailableNotifications.Add((libraryName, availableSeats));
+        return Task.CompletedTask;
+    }
+
+    public Task NotifyCheckInReminderAsync(
+        string libraryName,
+        string seatName,
+        DateTimeOffset deadline,
+        CancellationToken cancellationToken = default)
+    {
+        CheckInReminderNotifications.Add((libraryName, seatName, deadline));
+        return Task.CompletedTask;
+    }
+
+    public Task NotifyCheckInMissedAsync(
+        string libraryName,
+        string seatName,
+        DateTimeOffset deadline,
+        string actionText,
+        CancellationToken cancellationToken = default)
+    {
+        CheckInMissedNotifications.Add((libraryName, seatName, deadline, actionText));
+        return Task.CompletedTask;
+    }
+
+    public Task NotifyCheckInAutoRescueSucceededAsync(
+        string libraryName,
+        string seatName,
+        CancellationToken cancellationToken = default)
+    {
+        CheckInAutoRescueSucceededNotifications.Add((libraryName, seatName));
+        return Task.CompletedTask;
+    }
+
     public Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default)
     {
         if (NotifyTaskFailedException is not null)
@@ -149,6 +204,17 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
         }
 
         TestTelegramRequests.Add(settings);
+        return Task.CompletedTask;
+    }
+
+    public Task SendTestBarkAsync(BarkAlertChannelSettings settings, CancellationToken cancellationToken = default)
+    {
+        if (SendTestBarkException is not null)
+        {
+            throw SendTestBarkException;
+        }
+
+        TestBarkRequests.Add(settings);
         return Task.CompletedTask;
     }
 
@@ -236,6 +302,30 @@ internal sealed class FakeTelegramAlertSender : ITelegramAlertSender
         }
 
         Requests.Add((settings, message));
+        return SendCompletion?.Task ?? Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeBarkAlertSender : IBarkAlertSender
+{
+    public List<(BarkAlertChannelSettings Settings, string Title, string Message)> Requests { get; } = [];
+
+    public Exception? SendException { get; set; }
+
+    public TaskCompletionSource? SendCompletion { get; set; }
+
+    public Task SendAsync(
+        BarkAlertChannelSettings settings,
+        string title,
+        string message,
+        CancellationToken cancellationToken = default)
+    {
+        if (SendException is not null)
+        {
+            throw SendException;
+        }
+
+        Requests.Add((settings, title, message));
         return SendCompletion?.Task ?? Task.CompletedTask;
     }
 }

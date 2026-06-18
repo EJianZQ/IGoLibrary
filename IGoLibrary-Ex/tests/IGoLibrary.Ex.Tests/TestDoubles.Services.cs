@@ -208,6 +208,40 @@ internal sealed class FakeCoordinatorRuntime : ICoordinatorRuntime
     }
 }
 
+internal sealed class FakeHealthCheckService : IHealthCheckService
+{
+    public PreflightResult RunPreflightResult { get; set; } = new(
+        PreflightTarget.Grab([]),
+        DateTimeOffset.Now,
+        []);
+
+    public SystemHealthSnapshot Snapshot { get; set; } = new(
+        DateTimeOffset.Now,
+        []);
+
+    public List<PreflightTarget> PreflightTargets { get; } = [];
+
+    public int SnapshotCalls { get; private set; }
+
+    public Task<SystemHealthSnapshot> BuildSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        SnapshotCalls++;
+        return Task.FromResult(Snapshot);
+    }
+
+    public Task<PreflightResult> RunPreflightAsync(
+        PreflightTarget target,
+        CancellationToken cancellationToken = default)
+    {
+        PreflightTargets.Add(target);
+        return Task.FromResult(RunPreflightResult with
+        {
+            Target = target,
+            CheckedAt = DateTimeOffset.Now
+        });
+    }
+}
+
 internal sealed class FakeSessionService : ISessionService
 {
     public SessionCredentials? CurrentSession { get; set; }
@@ -368,16 +402,61 @@ internal sealed class FakeGrabSeatCoordinator : IGrabSeatCoordinator
     public CoordinatorStatus GetStatus() => _status;
 }
 
+internal sealed class FakeVenueAvailabilityCoordinator : IVenueAvailabilityCoordinator
+{
+    private CoordinatorStatus _status = CoordinatorStatus.Idle("空座追踪");
+
+    public event EventHandler<CoordinatorStatus>? StatusChanged;
+
+    public VenueAvailabilityWatchPlan? LastPlan { get; private set; }
+
+    public Task StartAsync(VenueAvailabilityWatchPlan plan, CancellationToken cancellationToken = default)
+    {
+        LastPlan = plan;
+        ApplyStatus(new CoordinatorStatus(
+            CoordinatorTaskState.Running,
+            "空座追踪",
+            "空座追踪运行中。",
+            DateTimeOffset.Now,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Running));
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        ApplyStatus(new CoordinatorStatus(
+            CoordinatorTaskState.Completed,
+            "空座追踪",
+            "空座追踪任务已停止",
+            _status.StartedAt,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Stopped));
+        return Task.CompletedTask;
+    }
+
+    public CoordinatorStatus GetStatus() => _status;
+
+    public void ApplyStatus(CoordinatorStatus status)
+    {
+        _status = status;
+        StatusChanged?.Invoke(this, status);
+    }
+}
+
 internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
 {
     private CoordinatorStatus _status = CoordinatorStatus.Idle("占座");
 
     public event EventHandler<CoordinatorStatus>? StatusChanged;
 
+    public OccupySeatPlan? LastPlan { get; private set; }
+
     public int StopCalls { get; private set; }
 
     public Task StartAsync(OccupySeatPlan plan, CancellationToken cancellationToken = default)
     {
+        LastPlan = plan;
         _status = new CoordinatorStatus(
             CoordinatorTaskState.Running,
             "占座",
@@ -396,6 +475,47 @@ internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
             CoordinatorTaskState.Completed,
             "占座",
             "测试中的占座任务已停止",
+            _status.StartedAt,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Stopped);
+        StatusChanged?.Invoke(this, _status);
+        return Task.CompletedTask;
+    }
+
+    public CoordinatorStatus GetStatus() => _status;
+}
+
+internal sealed class FakeCheckInGuardCoordinator : ICheckInGuardCoordinator
+{
+    private CoordinatorStatus _status = CoordinatorStatus.Idle("签到守护");
+
+    public event EventHandler<CoordinatorStatus>? StatusChanged;
+
+    public CheckInGuardPlan? LastPlan { get; private set; }
+
+    public int StopCalls { get; private set; }
+
+    public Task StartAsync(CheckInGuardPlan plan, CancellationToken cancellationToken = default)
+    {
+        LastPlan = plan;
+        _status = new CoordinatorStatus(
+            CoordinatorTaskState.Running,
+            "签到守护",
+            "测试中的签到守护任务",
+            DateTimeOffset.Now,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Running);
+        StatusChanged?.Invoke(this, _status);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        StopCalls++;
+        _status = new CoordinatorStatus(
+            CoordinatorTaskState.Completed,
+            "签到守护",
+            "测试中的签到守护任务已停止",
             _status.StartedAt,
             DateTimeOffset.Now,
             Reason: CoordinatorStatusReason.Stopped);

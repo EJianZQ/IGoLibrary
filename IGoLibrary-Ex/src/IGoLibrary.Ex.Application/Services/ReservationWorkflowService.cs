@@ -1,4 +1,5 @@
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.State;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 
@@ -8,7 +9,8 @@ public sealed class ReservationWorkflowService(
     ISessionService sessionService,
     ITraceIntApiClient apiClient,
     IOccupySeatCoordinator occupySeatCoordinator,
-    IActivityLogService activityLogService) : IReservationWorkflowService
+    IActivityLogService activityLogService,
+    IReservationState reservationState) : IReservationWorkflowService
 {
     public async Task<ReservationOperationResult> RefreshReservationAsync(CancellationToken cancellationToken = default)
     {
@@ -22,6 +24,7 @@ public sealed class ReservationWorkflowService(
         }
 
         var reservation = await apiClient.GetReservationInfoAsync(session.Cookie, cancellationToken);
+        reservationState.CurrentReservation = reservation;
         return new ReservationOperationResult(
             Succeeded: true,
             Reservation: reservation);
@@ -55,14 +58,19 @@ public sealed class ReservationWorkflowService(
         }
 
         var cancelled = await apiClient.CancelReservationAsync(session.Cookie, reservation.ReservationToken, cancellationToken);
-        return cancelled
-            ? new ReservationOperationResult(
+        if (cancelled)
+        {
+            reservationState.CurrentReservation = null;
+            return new ReservationOperationResult(
                 Succeeded: true,
-                Reservation: null)
-            : new ReservationOperationResult(
-                Succeeded: false,
-                Reservation: reservation,
-                RemoteSucceeded: false,
-                FailureMessage: "接口未返回成功结果，请稍后重试。");
+                Reservation: null);
+        }
+
+        reservationState.CurrentReservation = reservation;
+        return new ReservationOperationResult(
+            Succeeded: false,
+            Reservation: reservation,
+            RemoteSucceeded: false,
+            FailureMessage: "接口未返回成功结果，请稍后重试。");
     }
 }

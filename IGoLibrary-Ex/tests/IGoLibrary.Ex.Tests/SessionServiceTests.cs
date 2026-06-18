@@ -54,6 +54,31 @@ public sealed class SessionServiceTests
     }
 
     [Fact]
+    public async Task AuthenticateFromCookieAsync_AcceptsExpiredJwt_WhenApiValidationSucceeds()
+    {
+        var validateCalls = 0;
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnValidateCookieAsync = (_, _) =>
+            {
+                validateCalls++;
+                return Task.CompletedTask;
+            }
+        };
+        var credentialStore = new FakeCredentialStore();
+        var runtimeState = new AppRuntimeState();
+        var service = CreateService(apiClient, credentialStore, runtimeState);
+        var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddDays(-1));
+
+        var session = await service.AuthenticateFromCookieAsync(cookie, remember: true);
+
+        Assert.Equal(cookie, session.Cookie);
+        Assert.Equal(session, runtimeState.Session);
+        Assert.Equal(1, validateCalls);
+        Assert.Equal(1, credentialStore.SaveCalls);
+    }
+
+    [Fact]
     public async Task AuthenticateFromCookieAsync_ClearsStoredSession_WhenRememberDisabled()
     {
         var apiClient = new FakeTraceIntApiClient();
@@ -74,7 +99,7 @@ public sealed class SessionServiceTests
     }
 
     [Fact]
-    public async Task RestoreAsync_ClearsStoredSession_WhenStoredJwtIsExpired_WithoutApiValidation()
+    public async Task RestoreAsync_RestoresStoredSession_WhenExpiredJwtPassesApiValidation()
     {
         var validateCalls = 0;
         var apiClient = new FakeTraceIntApiClient
@@ -98,10 +123,11 @@ public sealed class SessionServiceTests
 
         var restored = await service.RestoreAsync();
 
-        Assert.Null(restored);
-        Assert.Null(runtimeState.Session);
-        Assert.Equal(1, credentialStore.ClearCalls);
-        Assert.Equal(0, validateCalls);
+        Assert.NotNull(restored);
+        Assert.Equal(SessionSource.Restored, restored.Source);
+        Assert.Equal(restored, runtimeState.Session);
+        Assert.Equal(0, credentialStore.ClearCalls);
+        Assert.Equal(1, validateCalls);
     }
 
     [Fact]

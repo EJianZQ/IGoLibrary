@@ -150,6 +150,8 @@ internal static class TraceIntGraphQlResponseMapper
 
         var token = reserveNode.GetProperty("getSToken").GetString() ?? string.Empty;
         var expirationTimestamp = reservation.GetProperty("exp_date").GetInt64();
+        var validateTimestamp = TryReadUnixTimestamp(reservation, "validate_date");
+        var holdTimestamp = TryReadUnixTimestamp(reservation, "hold_date");
 
         return new ReservationInfo(
             token,
@@ -157,7 +159,40 @@ internal static class TraceIntGraphQlResponseMapper
             reservation.GetProperty("lib_name").GetString() ?? string.Empty,
             reservation.GetProperty("seat_key").GetString() ?? string.Empty,
             reservation.GetProperty("seat_name").GetString() ?? string.Empty,
-            ReservationTimeHelper.FromUnixSeconds(expirationTimestamp));
+            ReservationTimeHelper.FromUnixSeconds(expirationTimestamp),
+            TryReadIntProperty(reservation, "status"),
+            validateTimestamp.HasValue ? ReservationTimeHelper.FromUnixSeconds(validateTimestamp.Value) : null,
+            holdTimestamp.HasValue ? ReservationTimeHelper.FromUnixSeconds(holdTimestamp.Value) : null);
+    }
+
+    private static long? TryReadUnixTimestamp(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.Number when property.TryGetInt64(out var value) && value > 0 => value,
+            JsonValueKind.String when long.TryParse(property.GetString(), out var value) && value > 0 => value,
+            _ => null
+        };
+    }
+
+    private static int? TryReadIntProperty(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.Number when property.TryGetInt32(out var value) => value,
+            JsonValueKind.String when int.TryParse(property.GetString(), out var value) => value,
+            _ => null
+        };
     }
 
     public static bool MapReserveSeat(string raw)

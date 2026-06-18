@@ -224,7 +224,8 @@ public sealed class SqliteSettingsRepository(
                 TaskEventAlerts = new TaskEventAlertSettings(
                     alertSettings.Email ?? EmailAlertChannelSettings.Default,
                     alertSettings.Local ?? LocalDesktopAlertSettings.Default,
-                    alertSettings.Telegram ?? TelegramAlertChannelSettings.Default)
+                    alertSettings.Telegram ?? TelegramAlertChannelSettings.Default,
+                    alertSettings.Bark ?? BarkAlertChannelSettings.Default)
             },
             Ui = ui with
             {
@@ -338,6 +339,8 @@ public sealed class SqliteSettingsRepository(
         WriteLocalDesktopAlert(writer, ReadObject(alerts, "local"), defaults.Local);
         writer.WritePropertyName("telegram");
         WriteObjectOrDefault(writer, ReadObject(alerts, "telegram"), defaults.Telegram);
+        writer.WritePropertyName("bark");
+        WriteObjectOrDefault(writer, ReadObject(alerts, "bark"), defaults.Bark);
         writer.WriteEndObject();
     }
 

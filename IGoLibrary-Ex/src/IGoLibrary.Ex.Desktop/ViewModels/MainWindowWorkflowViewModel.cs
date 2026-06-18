@@ -24,23 +24,33 @@ public partial class MainWindowWorkflowViewModel(
     ISettingsWorkflowService settingsWorkflowService,
     IProtocolTemplateEditorService protocolTemplateEditorService,
     INotificationTestService notificationTestService,
+    ITaskEventAlertDispatcher taskEventAlertDispatcher,
     IGrabSeatCoordinator grabSeatCoordinator,
+    IVenueAvailabilityCoordinator venueAvailabilityCoordinator,
     IOccupySeatCoordinator occupySeatCoordinator,
     ITomorrowReservationCoordinator tomorrowReservationCoordinator,
+    ICheckInGuardCoordinator checkInGuardCoordinator,
     IActivityLogService activityLogService,
     INotificationService notificationService,
     IErrorDialogService errorDialogService,
     IAppThemeService appThemeService,
-    AppWindowService appWindowService) : ViewModelBase
+    AppWindowService appWindowService,
+    IHealthCheckService? healthCheckService = null,
+    IDiagnosticExportService? diagnosticExportService = null) : ViewModelBase
 {
     private readonly IAppThemeService _appThemeService = appThemeService;
     private readonly IActivityLogService _activityLogService = activityLogService;
     private readonly INotificationService _notificationService = notificationService;
+    private readonly ITaskEventAlertDispatcher _taskEventAlertDispatcher = taskEventAlertDispatcher;
     private readonly IErrorDialogService _errorDialogService = errorDialogService;
     private readonly AppWindowService _appWindowService = appWindowService;
+    private readonly IHealthCheckService _healthCheckService = healthCheckService ?? new NoOpHealthCheckService();
+    private readonly IDiagnosticExportService _diagnosticExportService = diagnosticExportService ?? new NoOpDiagnosticExportService();
     private readonly IGrabSeatCoordinator _grabSeatCoordinator = grabSeatCoordinator;
+    private readonly IVenueAvailabilityCoordinator _venueAvailabilityCoordinator = venueAvailabilityCoordinator;
     private readonly IOccupySeatCoordinator _occupySeatCoordinator = occupySeatCoordinator;
     private readonly ITomorrowReservationCoordinator _tomorrowReservationCoordinator = tomorrowReservationCoordinator;
+    private readonly ICheckInGuardCoordinator _checkInGuardCoordinator = checkInGuardCoordinator;
     private readonly ObservableCollection<SeatItemViewModel> _allSeats = [];
     private readonly ObservableCollection<SeatItemViewModel> _tomorrowSeats = [];
     private readonly object _filterGate = new();
@@ -48,6 +58,9 @@ public partial class MainWindowWorkflowViewModel(
     private CancellationTokenSource? _filteringCts;
     private ReservationInfo? _currentReservation;
     private DateTimeOffset? _sidebarSessionExpirationTime;
+    private CookieValidationSnapshot _cookieValidationSnapshot = CookieValidationSnapshot.Unknown(DateTimeOffset.Now);
+    private DateTimeOffset _nextCookieValidationAt = DateTimeOffset.MinValue;
+    private bool _isCookieValidationInFlight;
     private bool _reservationCountdownTimerInitialized;
     private LibrarySummary? _lockedLibrarySummary;
     private string _lockedVenueStatusText = "未绑定";
@@ -62,6 +75,7 @@ public partial class MainWindowWorkflowViewModel(
     private const int OccupyTabIndex = 4;
     private const int NotificationSettingsTabIndex = 5;
     private const int SystemSettingsTabIndex = 6;
+    private static readonly TimeSpan CookieValidationInterval = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan DefaultGrabScheduledStartTime = GrabTaskSettings.Default.DefaultScheduledStartTime;
     private static readonly TimeSpan DefaultTomorrowScheduledStartTime =
         TomorrowReservationTaskSettings.Default.DefaultScheduledStartTime;
@@ -83,7 +97,7 @@ public partial class MainWindowWorkflowViewModel(
         "M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z");
     private static readonly SidebarNavigationItem OccupySidebarItem = new(
         OccupyTabIndex,
-        "占座",
+        "预约守护",
         "M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z");
     private static readonly SidebarNavigationItem NotificationSettingsSidebarItem = new(
         NotificationSettingsTabIndex,
@@ -121,17 +135,19 @@ public partial class MainWindowWorkflowViewModel(
     private static readonly IBrush NotificationSegmentInactiveBrush = Brushes.Transparent;
     private IBrush NotificationSegmentActiveTextBrush = appThemeService.CurrentPalette.NotificationSegmentActiveTextBrush;
     private IBrush NotificationSegmentInactiveTextBrush = appThemeService.CurrentPalette.NotificationSegmentInactiveTextBrush;
-    private const double NotificationSegmentControlWidthValue = 560d;
-    private const double NotificationSegmentSliderWidthValue = 174d;
-    private const double NotificationSegmentSliderOffsetValue = 180d;
+    private const double NotificationSegmentControlWidthValue = 680d;
+    private const double NotificationSegmentSliderWidthValue = 164d;
+    private const double NotificationSegmentSliderOffsetValue = 168d;
     private readonly HashSet<string> _committedSelectedSeatKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _draftSelectedSeatKeys = new(StringComparer.Ordinal);
     private bool _isSynchronizingSeatSelection;
     private CoordinatorTaskState _grabTaskState = CoordinatorTaskState.Idle;
     private CoordinatorStatusReason _grabStatusReason = CoordinatorStatusReason.None;
+    private CoordinatorTaskState _venueAvailabilityTaskState = CoordinatorTaskState.Idle;
     private CoordinatorTaskState _tomorrowTaskState = CoordinatorTaskState.Idle;
     private CoordinatorStatusReason _tomorrowStatusReason = CoordinatorStatusReason.None;
     private DateTimeOffset? _grabLastRequestAt;
+    private DateTimeOffset? _venueAvailabilityLastRequestAt;
     private DateTimeOffset? _tomorrowLastRequestAt;
     private DateTimeOffset? _grabRuntimeStartedAt;
     private int _historicalSuccessCount;
@@ -187,9 +203,21 @@ public partial class MainWindowWorkflowViewModel(
 
     public ObservableCollection<LogLineViewModel> OccupyLogLines { get; } = [];
 
+    public ObservableCollection<LogLineViewModel> CheckInLogLines { get; } = [];
+
     public string[] GrabPollingModes { get; } = ["极限速度", "随机延迟", "延迟 5 秒"];
 
     public string[] OccupyCheckIntervalModes { get; } = ["固定间隔 10 秒", "随机 10~20 秒"];
+
+    public string[] ReservationGuardModes { get; } = ["续占守护", "签到防漏"];
+
+    public string[] CheckInGuardMissedActions { get; } =
+    [
+        "仅提醒，不退座",
+        "到点自动退座",
+        "退座后重约原座",
+        "原座失败时随机约锁定场馆"
+    ];
 
     public string[] GrabReservationStrategies { get; } = ["先获取列表判断状态", "直接发送预约请求"];
 
@@ -245,6 +273,15 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private IBrush sidebarSessionExpirationBrush = appThemeService.CurrentPalette.LogDefaultBrush;
+
+    [ObservableProperty]
+    private bool hasSidebarCookieStatus;
+
+    [ObservableProperty]
+    private string sidebarCookieStatusText = string.Empty;
+
+    [ObservableProperty]
+    private IBrush sidebarCookieStatusBrush = appThemeService.CurrentPalette.LogDefaultBrush;
 
     public string AuthorizationStatusText => IsAuthorized ? "已授权" : "未授权";
 
@@ -305,6 +342,18 @@ public partial class MainWindowWorkflowViewModel(
     private string homeEngineSummaryText = "等待授权";
 
     [ObservableProperty]
+    private string homeNotificationCoverageText = "通知：本地弹窗";
+
+    [ObservableProperty]
+    private string homeCookieGuardText = "等待授权";
+
+    [ObservableProperty]
+    private string homeHealthStatusText = "尚未检查";
+
+    [ObservableProperty]
+    private string homeHealthDetailText = "启动后会自动刷新健康状态";
+
+    [ObservableProperty]
     private string homeMemoryUsageText = "--";
 
     [ObservableProperty]
@@ -327,6 +376,18 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private string homeReservationRemainingText = "--";
+
+    [ObservableProperty]
+    private string reservationUsageStatusText = "暂无预约";
+
+    [ObservableProperty]
+    private string reservationUsageDurationText = "--";
+
+    [ObservableProperty]
+    private IBrush reservationUsageBadgeBrush = appThemeService.CurrentPalette.IdleBrush;
+
+    [ObservableProperty]
+    private IBrush reservationUsageBadgeBackgroundBrush = appThemeService.CurrentPalette.NeutralSoftBrush;
 
     [ObservableProperty]
     private bool isCancellingCurrentReservation;
@@ -471,6 +532,26 @@ public partial class MainWindowWorkflowViewModel(
     private string grabRuntimeText = "00:00:00";
 
     [ObservableProperty]
+    private string venueAvailabilityStatusText = "未运行";
+
+    [ObservableProperty]
+    private bool isVenueAvailabilityRunning;
+
+    public bool IsVenueAvailabilityStopped => !IsVenueAvailabilityRunning;
+
+    [ObservableProperty]
+    private int venueAvailabilityPollingIntervalSeconds = 30;
+
+    [ObservableProperty]
+    private int venueAvailabilityPollCount;
+
+    [ObservableProperty]
+    private int venueAvailabilityRequestCount;
+
+    [ObservableProperty]
+    private string venueAvailabilityLastRequestText = "无";
+
+    [ObservableProperty]
     private string tomorrowStatusText = "未运行";
 
     [ObservableProperty]
@@ -494,7 +575,57 @@ public partial class MainWindowWorkflowViewModel(
     public bool IsOccupyStopped => !IsOccupyRunning;
 
     [ObservableProperty]
+    private string checkInGuardStatusText = "未运行";
+
+    [ObservableProperty]
+    private bool isCheckInGuardRunning;
+
+    public bool IsCheckInGuardStopped => !IsCheckInGuardRunning;
+
+    [ObservableProperty]
+    private int checkInWindowMinutes = 20;
+
+    [ObservableProperty]
+    private string checkInEffectiveDeadlineText = "等待读取当前预约";
+
+    [ObservableProperty]
+    private int checkInReminderLeadMinutes = 5;
+
+    [ObservableProperty]
+    private int selectedCheckInGuardMissedActionIndex = 3;
+
+    [ObservableProperty]
+    private int selectedReservationGuardModeIndex;
+
+    public ReservationGuardMode SelectedReservationGuardMode =>
+        SelectedReservationGuardModeIndex == (int)ReservationGuardMode.CheckIn
+            ? ReservationGuardMode.CheckIn
+            : ReservationGuardMode.Occupy;
+
+    public bool IsOccupyGuardModeActive => SelectedReservationGuardMode == ReservationGuardMode.Occupy;
+
+    public bool IsCheckInGuardModeActive => SelectedReservationGuardMode == ReservationGuardMode.CheckIn;
+
+    public bool CanStartSelectedReservationGuard =>
+        SelectedReservationGuardMode switch
+        {
+            ReservationGuardMode.Occupy => !IsOccupyRunning && !IsCheckInGuardRunning,
+            ReservationGuardMode.CheckIn => !IsCheckInGuardRunning && !IsOccupyRunning,
+            _ => false
+        };
+
+    public string ReservationGuardStatusText =>
+        SelectedReservationGuardMode switch
+        {
+            ReservationGuardMode.CheckIn => IsCheckInGuardRunning ? CheckInGuardStatusText : "签到防漏未运行。",
+            _ => IsOccupyRunning ? OccupyStatusText : "续占守护未运行。"
+        };
+
+    [ObservableProperty]
     private int reReserveDelaySeconds = 60;
+
+    [ObservableProperty]
+    private int checkInReReserveDelaySeconds = 60;
 
     [ObservableProperty]
     private int selectedOccupyCheckIntervalModeIndex;
@@ -570,6 +701,21 @@ public partial class MainWindowWorkflowViewModel(
     private string telegramAlertChatId = string.Empty;
 
     [ObservableProperty]
+    private bool barkAlertsEnabled;
+
+    [ObservableProperty]
+    private string barkAlertServerUrl = BarkAlertChannelSettings.DefaultServerUrl;
+
+    [ObservableProperty]
+    private string barkAlertDeviceKey = string.Empty;
+
+    [ObservableProperty]
+    private string barkAlertSound = string.Empty;
+
+    [ObservableProperty]
+    private string barkAlertGroup = BarkAlertChannelSettings.Default.Group;
+
+    [ObservableProperty]
     private bool localToastAlertsEnabled = true;
 
     [ObservableProperty]
@@ -577,6 +723,28 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private string notificationSettingsStatusText = "更改后会自动保存。";
+
+    [ObservableProperty]
+    private string healthCheckStatusText = "尚未运行健康检查。";
+
+    [ObservableProperty]
+    private string diagnosticExportStatusText = "诊断包会自动脱敏 Cookie、Token、密码和推送密钥。";
+
+    [ObservableProperty]
+    private bool isExportingDiagnostics;
+
+    public bool CanExportDiagnostics => !IsExportingDiagnostics;
+
+    partial void OnIsExportingDiagnosticsChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanExportDiagnostics));
+    }
+
+    [ObservableProperty]
+    private string notificationCoverageSummaryText = "本地弹窗已开启";
+
+    [ObservableProperty]
+    private string barkNotificationReadinessText = "Bark 未开启";
 
     [ObservableProperty]
     private string allLogsText = string.Empty;
@@ -629,4 +797,28 @@ public partial class MainWindowWorkflowViewModel(
     [ObservableProperty]
     private SeatReference? selectedTomorrowSeat;
 
+    private sealed class NoOpHealthCheckService : IHealthCheckService
+    {
+        public Task<SystemHealthSnapshot> BuildSnapshotAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new SystemHealthSnapshot(
+                DateTimeOffset.Now,
+                [new HealthCheckItem("health", "健康检查", "健康检查服务未配置。", HealthSeverity.Warning)]));
+        }
+
+        public Task<PreflightResult> RunPreflightAsync(
+            PreflightTarget target,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new PreflightResult(target, DateTimeOffset.Now, []));
+        }
+    }
+
+    private sealed class NoOpDiagnosticExportService : IDiagnosticExportService
+    {
+        public Task<DiagnosticExportResult> ExportAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new DiagnosticExportResult(string.Empty, DateTimeOffset.Now));
+        }
+    }
 }
