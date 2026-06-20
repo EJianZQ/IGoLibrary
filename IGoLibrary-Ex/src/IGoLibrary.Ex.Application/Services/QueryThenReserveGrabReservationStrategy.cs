@@ -58,11 +58,13 @@ internal sealed class QueryThenReserveGrabReservationStrategy(
     {
         context.MarkRequestSent();
         var libraries = await apiClient.GetLibrariesAsync(context.Cookie, cancellationToken);
+        LibraryLayout? latestLayout = null;
 
         foreach (var library in libraries.Where(item => item.IsOpen))
         {
             context.MarkRequestSent();
             var layout = await apiClient.GetLibraryLayoutAsync(context.Cookie, library.LibraryId, cancellationToken);
+            latestLayout = layout;
             var availableSeat = layout.Seats.FirstOrDefault(seat => seat.IsAvailable);
             if (availableSeat is null)
             {
@@ -87,6 +89,6 @@ internal sealed class QueryThenReserveGrabReservationStrategy(
                 : new GrabReservationAttemptResult(null, true, false, 0, layout);
         }
 
-        return new GrabReservationAttemptResult(null, false, false, 0);
+        return new GrabReservationAttemptResult(null, latestLayout is not null, false, 0, latestLayout);
     }
 }

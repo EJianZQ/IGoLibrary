@@ -61,7 +61,9 @@ internal sealed class DirectReserveGrabReservationStrategy(
                     seat,
                     true,
                     false,
-                    (index + 1) % context.Plan.Seats.Count);
+                    (index + 1) % context.Plan.Seats.Count,
+                    null,
+                    context.Plan.LibraryName);
             }
 
             await DelayBeforeNextAttemptAsync(

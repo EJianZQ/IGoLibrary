@@ -71,7 +71,17 @@ internal sealed class GrabSeatWorkflowRunner(
                 if (reservationResult.ReservedSeat is not null)
                 {
                     var reservedSeatName = reservationResult.ReservedSeat.SeatName;
-                    var reservedLibraryName = reservationResult.ReservedLibraryName ?? plan.LibraryName;
+                    var reservedLibraryName = reservationResult.ReservedLibraryName;
+                    if (string.IsNullOrWhiteSpace(reservedLibraryName))
+                    {
+                        if (plan.Seats.Count == 0)
+                        {
+                            throw new InvalidOperationException("捡漏模式预约成功但未返回场馆信息。");
+                        }
+
+                        reservedLibraryName = plan.LibraryName;
+                    }
+
                     activityLogService.Write(LogEntryKind.Success, "Grab", $"{reservedLibraryName} 的 {reservedSeatName} 预约成功。");
                     context.Complete("已成功预约到座位。", CoordinatorStatusReason.GrabSucceeded);
                     _ = PublishCoordinatorEventSafelyAsync(
@@ -88,11 +98,13 @@ internal sealed class GrabSeatWorkflowRunner(
                     continue;
                 }
 
-                if (!reservationResult.HadReservationAttempt)
+                if (plan.Seats.Count == 0 && reservationResult.ReservedSeat is null)
                 {
-                    var missMessage = plan.Seats.Count == 0
-                        ? $"第 {cycle} 次轮询：全馆暂未发现可预约座位。"
-                        : reservationStrategy == GrabReservationStrategy.ReserveDirectly
+                    activityLogService.Write(LogEntryKind.Info, "Grab", $"第 {cycle} 次轮询：全馆暂未发现可预约座位。");
+                }
+                else if (!reservationResult.HadReservationAttempt)
+                {
+                    var missMessage = reservationStrategy == GrabReservationStrategy.ReserveDirectly
                         ? $"第 {cycle} 次轮询：直接预约未命中目标座位。"
                         : $"第 {cycle} 次轮询：目标座位仍不可用。";
                     activityLogService.Write(LogEntryKind.Info, "Grab", missMessage);
