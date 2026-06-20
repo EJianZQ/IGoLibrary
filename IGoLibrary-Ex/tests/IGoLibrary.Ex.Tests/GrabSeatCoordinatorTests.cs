@@ -300,6 +300,67 @@ public sealed class GrabSeatCoordinatorTests
     }
 
     [Fact]
+    public async Task StartAsync_WithoutTargets_UsesLeakModeAcrossLibraries()
+    {
+        var eventPublisher = new FakeCoordinatorEventPublisher();
+        var checkedLibraryIds = new List<int>();
+        var reserveRequests = new List<(int LibraryId, string SeatKey)>();
+        var runtimeState = new AppRuntimeState
+        {
+            Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetLibrariesAsync = (_, _) => Task.FromResult<IReadOnlyList<LibrarySummary>>(
+            [
+                new LibrarySummary(1, "自科阅览区一", "3层", true),
+                new LibrarySummary(2, "社科阅览区", "2层", true)
+            ]),
+            OnGetLibraryLayoutAsync = (_, libraryId, _) =>
+            {
+                checkedLibraryIds.Add(libraryId);
+                return Task.FromResult(
+                    libraryId == 1
+                        ? new LibraryLayout(1, "自科阅览区一", "3层", true, 10, 10, 0, [new SeatSnapshot("seat-1", "1号座", true, 0, 0)])
+                        : new LibraryLayout(2, "社科阅览区", "2层", true, 10, 9, 0, [new SeatSnapshot("seat-2", "2号座", false, 1, 0)]));
+            },
+            OnReserveSeatAsync = (_, libraryId, seatKey, _) =>
+            {
+                reserveRequests.Add((libraryId, seatKey));
+                return Task.FromResult(true);
+            }
+        };
+
+        var coordinator = CreateCoordinator(
+            apiClient,
+            AppSettings.Default with { Tasks = new TaskExecutionSettings(GrabReservationStrategy.ReserveDirectly) },
+            eventPublisher: eventPublisher,
+            runtimeState: runtimeState);
+
+        var plan = new GrabSeatPlan(
+            1,
+            "自科阅览区一",
+            [],
+            GrabPollingMode.Aggressive,
+            GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
+            null);
+
+        await coordinator.StartAsync(plan);
+        await WaitForStatusAsync(coordinator, CoordinatorTaskState.Completed);
+        await WaitForAsync(() => eventPublisher.EventsOf<GrabSucceededCoordinatorEvent>().Count == 1);
+
+        Assert.Equal(new[] { 1, 2 }, checkedLibraryIds);
+        Assert.Equal([(2, "seat-2")], reserveRequests);
+        Assert.Equal(CoordinatorTaskState.Completed, coordinator.GetStatus().State);
+        var successEvent = Assert.Single(eventPublisher.EventsOf<GrabSucceededCoordinatorEvent>());
+        Assert.Equal("社科阅览区", successEvent.LibraryName);
+        Assert.Equal("2号座", successEvent.SeatName);
+        Assert.NotNull(runtimeState.CurrentLayout);
+        Assert.Equal(2, runtimeState.CurrentLayout!.LibraryId);
+    }
+
+    [Fact]
     public async Task StartAsync_NotifiesSessionInvalid_WhenPollingReceivesUnauthorized()
     {
         var eventPublisher = new FakeCoordinatorEventPublisher();

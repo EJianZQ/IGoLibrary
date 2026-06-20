@@ -144,6 +144,44 @@ public sealed class GrabReservationAttemptStrategyTests
     }
 
     [Fact]
+    public async Task QueryThenReserve_WithoutTargets_ReservesFirstAvailableSeatAcrossLibraries()
+    {
+        var checkedLibraryIds = new List<int>();
+        var reserveRequests = new List<(int LibraryId, string SeatKey)>();
+        var requestCount = 0;
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetLibrariesAsync = (_, _) => Task.FromResult<IReadOnlyList<LibrarySummary>>(
+            [
+                new LibrarySummary(11, "一馆", "1层", true),
+                new LibrarySummary(22, "二馆", "2层", true)
+            ]),
+            OnGetLibraryLayoutAsync = (_, libraryId, _) =>
+            {
+                checkedLibraryIds.Add(libraryId);
+                return Task.FromResult(
+                    libraryId == 11
+                        ? new LibraryLayout(11, "一馆", "1层", true, 2, 2, 0, [new SeatSnapshot("a-1", "A1", true, 0, 0)])
+                        : new LibraryLayout(22, "二馆", "2层", true, 2, 1, 0, [new SeatSnapshot("b-1", "B1", false, 0, 0)]));
+            },
+            OnReserveSeatAsync = (_, libraryId, seatKey, _) =>
+            {
+                reserveRequests.Add((libraryId, seatKey));
+                return Task.FromResult(true);
+            }
+        };
+        var strategy = new QueryThenReserveGrabReservationStrategy(apiClient, new ActivityLogService());
+
+        var result = await strategy.TryReserveAsync(CreateContext([], () => requestCount++), CancellationToken.None);
+
+        Assert.Equal(new[] { 11, 22 }, checkedLibraryIds);
+        Assert.Equal([(22, "b-1")], reserveRequests);
+        Assert.Equal(4, requestCount);
+        Assert.Equal("b-1", result.ReservedSeat?.SeatKey);
+        Assert.Equal("二馆", result.ReservedLibraryName);
+    }
+
+    [Fact]
     public void Selector_ReturnsStrategyForConfiguredMode()
     {
         var apiClient = new FakeTraceIntApiClient();

@@ -7,4 +7,5 @@ internal sealed record GrabReservationAttemptResult(
     bool HadReservationAttempt,
     bool RateLimitTriggered,
     int NextSeatStartIndex,
-    LibraryLayout? LatestLayout = null);
+    LibraryLayout? LatestLayout = null,
+    string? ReservedLibraryName = null);

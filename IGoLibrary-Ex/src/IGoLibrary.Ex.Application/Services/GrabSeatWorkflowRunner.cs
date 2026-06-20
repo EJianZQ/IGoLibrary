@@ -27,13 +27,22 @@ internal sealed class GrabSeatWorkflowRunner(
             }
 
             context.SetRunning("抢座任务已启动。");
-            activityLogService.Write(LogEntryKind.Info, "Grab", $"开始监控 {plan.Seats.Count} 个目标座位。");
+            if (plan.Seats.Count == 0)
+            {
+                activityLogService.Write(LogEntryKind.Info, "Grab", "未配置目标座位，进入全馆捡漏模式。");
+            }
+            else
+            {
+                activityLogService.Write(LogEntryKind.Info, "Grab", $"开始监控 {plan.Seats.Count} 个目标座位。");
+            }
 
             var cycle = 0;
             var requestCount = 0;
             DateTimeOffset? lastRequestAt = null;
             var settings = await settingsService.LoadAsync(cancellationToken);
-            var reservationStrategy = settings.Tasks.Grab.ReservationStrategy;
+            var reservationStrategy = plan.Seats.Count == 0
+                ? GrabReservationStrategy.QueryThenReserve
+                : settings.Tasks.Grab.ReservationStrategy;
             var reservationAttemptStrategy = strategySelector.Select(reservationStrategy);
             var directReservationStartIndex = 0;
             activityLogService.Write(LogEntryKind.Info, "Grab", $"当前执行策略：{GetReservationStrategyText(reservationStrategy)}。");
@@ -62,10 +71,11 @@ internal sealed class GrabSeatWorkflowRunner(
                 if (reservationResult.ReservedSeat is not null)
                 {
                     var reservedSeatName = reservationResult.ReservedSeat.SeatName;
-                    activityLogService.Write(LogEntryKind.Success, "Grab", $"{reservedSeatName} 预约成功。");
-                    context.Complete("已成功预约到目标座位。", CoordinatorStatusReason.GrabSucceeded);
+                    var reservedLibraryName = reservationResult.ReservedLibraryName ?? plan.LibraryName;
+                    activityLogService.Write(LogEntryKind.Success, "Grab", $"{reservedLibraryName} 的 {reservedSeatName} 预约成功。");
+                    context.Complete("已成功预约到座位。", CoordinatorStatusReason.GrabSucceeded);
                     _ = PublishCoordinatorEventSafelyAsync(
-                        new GrabSucceededCoordinatorEvent(plan.LibraryName, reservedSeatName),
+                        new GrabSucceededCoordinatorEvent(reservedLibraryName, reservedSeatName),
                         "发送抢座成功提醒失败");
                     return;
                 }
@@ -80,7 +90,9 @@ internal sealed class GrabSeatWorkflowRunner(
 
                 if (!reservationResult.HadReservationAttempt)
                 {
-                    var missMessage = reservationStrategy == GrabReservationStrategy.ReserveDirectly
+                    var missMessage = plan.Seats.Count == 0
+                        ? $"第 {cycle} 次轮询：全馆暂未发现可预约座位。"
+                        : reservationStrategy == GrabReservationStrategy.ReserveDirectly
                         ? $"第 {cycle} 次轮询：直接预约未命中目标座位。"
                         : $"第 {cycle} 次轮询：目标座位仍不可用。";
                     activityLogService.Write(LogEntryKind.Info, "Grab", missMessage);

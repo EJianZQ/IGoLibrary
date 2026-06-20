@@ -995,17 +995,16 @@ public partial class MainWindowWorkflowViewModel
         }
 
         var selectedSeats = SelectedSeats.ToList();
-        if (selectedSeats.Count == 0)
-        {
-            await _notificationService.ShowWarningAsync("未选择座位", "请至少选中一个目标座位");
-            return;
-        }
 
         try
         {
             var mode = (GrabPollingMode)SelectedGrabPollingModeIndex;
             var scheduledStart = ParseScheduledTime();
             await PersistGrabReservationStrategyAsync();
+            if (selectedSeats.Count == 0)
+            {
+                await _notificationService.ShowInfoAsync("已启用捡漏模式", "未选择目标座位，将在所有场馆监控空闲座位并尝试预约。");
+            }
             var plan = new GrabSeatPlan(
                 SelectedLibrary.LibraryId,
                 SelectedLibrary.Name,
