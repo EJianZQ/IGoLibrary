@@ -21,6 +21,19 @@ public sealed class DesktopCoordinatorEventPublisherTests
     }
 
     [Fact]
+    public async Task PublishAsync_MapsGlobalLeakSucceededEventToTaskEventAlertDispatcher()
+    {
+        var taskAlertService = new FakeTaskEventAlertDispatcher();
+        var publisher = CreatePublisher(taskAlertService);
+
+        await publisher.PublishAsync(new GlobalLeakSucceededCoordinatorEvent("自科阅览区一", "1号座"));
+
+        Assert.Contains(
+            taskAlertService.GlobalLeakSucceededNotifications,
+            item => item.LibraryName == "自科阅览区一" && item.SeatName == "1号座");
+    }
+
+    [Fact]
     public async Task PublishAsync_MapsSessionInvalidEventToTaskEventAlertDispatcher()
     {
         var taskAlertService = new FakeTaskEventAlertDispatcher();

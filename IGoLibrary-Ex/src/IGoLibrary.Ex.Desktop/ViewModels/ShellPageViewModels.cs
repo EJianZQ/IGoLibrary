@@ -142,6 +142,20 @@ public sealed partial class OccupyPageViewModel(
     }
 }
 
+public sealed partial class GlobalLeakPageViewModel(
+    IGlobalLeakCoordinator globalLeakCoordinator) : ViewModelBase
+{
+    public Task StartAsync(GlobalLeakPlan plan, CancellationToken cancellationToken = default)
+    {
+        return globalLeakCoordinator.StartAsync(plan, cancellationToken);
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        return globalLeakCoordinator.StopAsync(cancellationToken);
+    }
+}
+
 public sealed partial class TomorrowReservationPageViewModel(
     ITomorrowReservationCoordinator tomorrowReservationCoordinator) : ViewModelBase
 {

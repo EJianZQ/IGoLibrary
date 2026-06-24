@@ -14,6 +14,10 @@ public sealed record TomorrowReservationSucceededCoordinatorEvent(
     string SeatName,
     string? Day) : CoordinatorEvent;
 
+public sealed record GlobalLeakSucceededCoordinatorEvent(
+    string LibraryName,
+    string SeatName) : CoordinatorEvent;
+
 public sealed record SessionInvalidCoordinatorEvent(
     string Source,
     string Reason) : CoordinatorEvent;

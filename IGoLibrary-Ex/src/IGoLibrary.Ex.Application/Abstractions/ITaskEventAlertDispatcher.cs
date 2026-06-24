@@ -14,5 +14,7 @@ public interface ITaskEventAlertDispatcher
         string? day,
         CancellationToken cancellationToken = default);
 
+    Task NotifyGlobalLeakSucceededAsync(string libraryName, string seatName, CancellationToken cancellationToken = default);
+
     Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default);
 }

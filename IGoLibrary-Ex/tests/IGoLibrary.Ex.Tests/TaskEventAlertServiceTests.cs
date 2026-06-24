@@ -222,6 +222,48 @@ public sealed class TaskEventAlertServiceTests
     }
 
     [Fact]
+    public async Task NotifyGlobalLeakSucceededAsync_SendsEmailTelegramAndInAppFallback()
+    {
+        var emailSender = new FakeEmailAlertSender();
+        var telegramSender = new FakeTelegramAlertSender();
+        var notificationService = new FakeNotificationService();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                new EmailAlertChannelSettings(
+                    Enabled: true,
+                    SmtpHost: "smtp.example.com",
+                    Port: 587,
+                    SecurityMode: EmailSecurityMode.Tls,
+                    Username: "tester",
+                    Password: "secret",
+                    FromAddress: "sender@example.com",
+                    ToAddress: "receiver@example.com"),
+                new LocalDesktopAlertSettings(false, false),
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
+        var service = CreateService(
+            settingsService,
+            emailSender,
+            notificationService: notificationService,
+            telegramSender: telegramSender);
+
+        await service.NotifyGlobalLeakSucceededAsync("自科阅览区一", "2号座");
+
+        var emailRequest = Assert.Single(emailSender.Requests);
+        Assert.Equal("IGoLibrary-Ex 全域捡漏成功提醒", emailRequest.Subject);
+        Assert.Contains("目标场馆：自科阅览区一", emailRequest.Body);
+        Assert.Contains("目标座位：2号座", emailRequest.Body);
+
+        var telegramRequest = Assert.Single(telegramSender.Requests);
+        Assert.Contains("IGoLibrary-Ex 全域捡漏成功", telegramRequest.Message);
+        Assert.Contains("目标场馆：自科阅览区一", telegramRequest.Message);
+        Assert.Contains("目标座位：2号座", telegramRequest.Message);
+
+        var success = Assert.Single(notificationService.Successes);
+        Assert.Equal("全域捡漏成功", success.Title);
+        Assert.Contains("自科阅览区一 · 2号座", success.Message);
+    }
+
+    [Fact]
     public async Task NotifyTaskFailedAsync_SendsTelegramUsingPersistedSettings()
     {
         var telegramSender = new FakeTelegramAlertSender();

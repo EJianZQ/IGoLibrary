@@ -25,6 +25,7 @@ public partial class MainWindowWorkflowViewModel(
     IProtocolTemplateEditorService protocolTemplateEditorService,
     INotificationTestService notificationTestService,
     IGrabSeatCoordinator grabSeatCoordinator,
+    IGlobalLeakCoordinator globalLeakCoordinator,
     IOccupySeatCoordinator occupySeatCoordinator,
     ITomorrowReservationCoordinator tomorrowReservationCoordinator,
     IActivityLogService activityLogService,
@@ -45,6 +46,7 @@ public partial class MainWindowWorkflowViewModel(
     private readonly IExternalLinkService _externalLinkService = externalLinkService;
     private readonly AppWindowService _appWindowService = appWindowService;
     private readonly IGrabSeatCoordinator _grabSeatCoordinator = grabSeatCoordinator;
+    private readonly IGlobalLeakCoordinator _globalLeakCoordinator = globalLeakCoordinator;
     private readonly IOccupySeatCoordinator _occupySeatCoordinator = occupySeatCoordinator;
     private readonly ITomorrowReservationCoordinator _tomorrowReservationCoordinator = tomorrowReservationCoordinator;
     private readonly ObservableCollection<SeatItemViewModel> _allSeats = [];
@@ -65,10 +67,11 @@ public partial class MainWindowWorkflowViewModel(
     private string _lockedVenueOpenTimeText = "--";
     private string _lockedVenueCloseTimeText = "--";
     private static readonly CultureInfo DashboardCulture = CultureInfo.GetCultureInfo("zh-CN");
-    private const int TomorrowReservationTabIndex = 3;
-    private const int OccupyTabIndex = 4;
-    private const int NotificationSettingsTabIndex = 5;
-    private const int SystemSettingsTabIndex = 6;
+    private const int GlobalLeakTabIndex = 3;
+    private const int TomorrowReservationTabIndex = 4;
+    private const int OccupyTabIndex = 5;
+    private const int NotificationSettingsTabIndex = 6;
+    private const int SystemSettingsTabIndex = 7;
     private static readonly TimeSpan DefaultGrabScheduledStartTime = GrabTaskSettings.Default.DefaultScheduledStartTime;
     private static readonly TimeSpan DefaultTomorrowScheduledStartTime =
         TomorrowReservationTaskSettings.Default.DefaultScheduledStartTime;
@@ -84,6 +87,10 @@ public partial class MainWindowWorkflowViewModel(
         2,
         "抢座",
         "M7 2v11h3v9l7-12h-4l4-8z");
+    private static readonly SidebarNavigationItem GlobalLeakSidebarItem = new(
+        GlobalLeakTabIndex,
+        "全域捡漏",
+        "M9.5 3a6.5 6.5 0 0 1 5.17 10.43l4.45 4.45-1.41 1.41-4.45-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm9.5-1h2v5h-2V4zm0 7h2v2h-2v-2z");
     private static readonly SidebarNavigationItem TomorrowReservationSidebarItem = new(
         TomorrowReservationTabIndex,
         "明日预约",
@@ -110,6 +117,7 @@ public partial class MainWindowWorkflowViewModel(
         HomeSidebarItem,
         AccountAndVenueSidebarItem,
         GrabSidebarItem,
+        GlobalLeakSidebarItem,
         TomorrowReservationSidebarItem,
         OccupySidebarItem,
         NotificationSettingsSidebarItem,
@@ -134,17 +142,25 @@ public partial class MainWindowWorkflowViewModel(
     private readonly HashSet<string> _committedSelectedSeatKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _draftSelectedSeatKeys = new(StringComparer.Ordinal);
     private bool _isSynchronizingSeatSelection;
+    private readonly HashSet<int> _committedGlobalLeakLibraryIds = [];
+    private readonly HashSet<int> _draftGlobalLeakLibraryIds = [];
+    private bool _isSynchronizingGlobalLeakLibrarySelection;
     private CoordinatorTaskState _grabTaskState = CoordinatorTaskState.Idle;
     private CoordinatorStatusReason _grabStatusReason = CoordinatorStatusReason.None;
+    private CoordinatorTaskState _globalLeakTaskState = CoordinatorTaskState.Idle;
+    private CoordinatorStatusReason _globalLeakStatusReason = CoordinatorStatusReason.None;
     private CoordinatorTaskState _tomorrowTaskState = CoordinatorTaskState.Idle;
     private CoordinatorStatusReason _tomorrowStatusReason = CoordinatorStatusReason.None;
     private DateTimeOffset? _grabLastRequestAt;
+    private DateTimeOffset? _globalLeakLastRequestAt;
     private DateTimeOffset? _tomorrowLastRequestAt;
     private DateTimeOffset? _grabRuntimeStartedAt;
+    private DateTimeOffset? _globalLeakRuntimeStartedAt;
     private int _historicalSuccessCount;
     private long _totalGuardSeconds;
     private DateTimeOffset? _guardTrackingStartedAt;
     private DateTimeOffset? _lastRecordedGrabSuccessAt;
+    private DateTimeOffset? _lastRecordedGlobalLeakSuccessAt;
     private DateTimeOffset? _lastRecordedOccupySuccessAt;
     private DateTimeOffset? _lastRecordedTomorrowSuccessAt;
     private bool _isSynchronizingSidebarSelection;
@@ -170,6 +186,8 @@ public partial class MainWindowWorkflowViewModel(
 
     public GrabPageViewModel GrabPage { get; } = new(grabSeatCoordinator, settingsWorkflowService);
 
+    public GlobalLeakPageViewModel GlobalLeakPage { get; } = new(globalLeakCoordinator);
+
     public OccupyPageViewModel OccupyPage { get; } = new(occupySeatCoordinator, reservationWorkflowService);
 
     public TomorrowReservationPageViewModel TomorrowReservationPage { get; } = new(tomorrowReservationCoordinator);
@@ -191,6 +209,10 @@ public partial class MainWindowWorkflowViewModel(
     public ObservableCollection<SeatItemViewModel> TomorrowVisibleSeats { get; } = [];
 
     public ObservableCollection<SeatReference> SelectedSeats { get; } = [];
+
+    public ObservableCollection<GlobalLeakLibraryItemViewModel> GlobalLeakLibraries { get; } = [];
+
+    public ObservableCollection<GlobalLeakLibraryTarget> SelectedGlobalLeakLibraries { get; } = [];
 
     public ObservableCollection<LogLineViewModel> OccupyLogLines { get; } = [];
 
@@ -439,6 +461,9 @@ public partial class MainWindowWorkflowViewModel(
     private bool isTomorrowSeatSelectionOverlayOpen;
 
     [ObservableProperty]
+    private bool isGlobalLeakLibraryPickerOpen;
+
+    [ObservableProperty]
     private bool isApplyingSeatFilter;
 
     [ObservableProperty]
@@ -476,6 +501,30 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private string grabRuntimeText = "00:00:00";
+
+    [ObservableProperty]
+    private string globalLeakStatusText = "未运行";
+
+    [ObservableProperty]
+    private bool isGlobalLeakTaskActive;
+
+    [ObservableProperty]
+    private int globalLeakScanRoundCount;
+
+    [ObservableProperty]
+    private int globalLeakRequestCount;
+
+    [ObservableProperty]
+    private string globalLeakLastRequestText = "无";
+
+    [ObservableProperty]
+    private string globalLeakRuntimeText = "00:00:00";
+
+    [ObservableProperty]
+    private int globalLeakScanIntervalSeconds = 10;
+
+    [ObservableProperty]
+    private string globalLeakLogsText = string.Empty;
 
     [ObservableProperty]
     private string tomorrowStatusText = "未运行";

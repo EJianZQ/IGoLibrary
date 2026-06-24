@@ -31,6 +31,12 @@ public sealed class DesktopCoordinatorEventPublisher(
                         tomorrowSucceeded.Day,
                         cancellationToken);
                     break;
+                case GlobalLeakSucceededCoordinatorEvent globalLeakSucceeded:
+                    await taskEventAlertDispatcher.NotifyGlobalLeakSucceededAsync(
+                        globalLeakSucceeded.LibraryName,
+                        globalLeakSucceeded.SeatName,
+                        cancellationToken);
+                    break;
                 case SessionInvalidCoordinatorEvent sessionInvalid:
                     await taskEventAlertDispatcher.NotifySessionInvalidAsync(
                         sessionInvalid.Source,

@@ -443,6 +443,53 @@ internal sealed class FakeGrabSeatCoordinator : IGrabSeatCoordinator
     public CoordinatorStatus GetStatus() => _status;
 }
 
+internal sealed class FakeGlobalLeakCoordinator : IGlobalLeakCoordinator
+{
+    private CoordinatorStatus _status = CoordinatorStatus.Idle("全域捡漏");
+
+    public event EventHandler<CoordinatorStatus>? StatusChanged;
+
+    public GlobalLeakPlan? LastPlan { get; private set; }
+
+    public int StopCalls { get; private set; }
+
+    public Task StartAsync(GlobalLeakPlan plan, CancellationToken cancellationToken = default)
+    {
+        LastPlan = plan;
+        _status = new CoordinatorStatus(
+            CoordinatorTaskState.Running,
+            "全域捡漏",
+            "测试中的全域捡漏任务",
+            DateTimeOffset.Now,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Running);
+        StatusChanged?.Invoke(this, _status);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        StopCalls++;
+        _status = new CoordinatorStatus(
+            CoordinatorTaskState.Completed,
+            "全域捡漏",
+            "测试中的全域捡漏任务已停止",
+            _status.StartedAt,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Stopped);
+        StatusChanged?.Invoke(this, _status);
+        return Task.CompletedTask;
+    }
+
+    public void EmitStatus(CoordinatorStatus status)
+    {
+        _status = status;
+        StatusChanged?.Invoke(this, _status);
+    }
+
+    public CoordinatorStatus GetStatus() => _status;
+}
+
 internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
 {
     private CoordinatorStatus _status = CoordinatorStatus.Idle("占座");

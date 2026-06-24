@@ -147,6 +147,7 @@ public sealed class MainWindowClipboardTests
             new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates("", "", "", "", "", "", ""))),
             taskAlertService,
             new FakeGrabSeatCoordinator(),
+            new FakeGlobalLeakCoordinator(),
             occupySeatCoordinator,
             new FakeTomorrowReservationCoordinator(),
             activityLogService,

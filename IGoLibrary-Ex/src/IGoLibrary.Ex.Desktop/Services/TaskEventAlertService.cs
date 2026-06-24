@@ -117,6 +117,29 @@ public sealed class TaskEventAlertService(
             cancellationToken);
     }
 
+    public async Task NotifyGlobalLeakSucceededAsync(string libraryName, string seatName, CancellationToken cancellationToken = default)
+    {
+        var normalizedLibraryName = NormalizeLibraryName(libraryName);
+        var normalizedSeatName = NormalizeSeatName(seatName);
+        if (ShouldSuppress($"global-leak-success|{normalizedLibraryName}|{normalizedSeatName}"))
+        {
+            return;
+        }
+
+        await DispatchAlertAsync(
+            emailLabel: "全域捡漏成功提醒",
+            telegramLabel: "全域捡漏成功提醒",
+            localLabel: "全域捡漏成功提醒",
+            emailSubject: "IGoLibrary-Ex 全域捡漏成功提醒",
+            emailBody: BuildGlobalLeakSucceededEmailBody(normalizedLibraryName, normalizedSeatName),
+            telegramMessage: BuildGlobalLeakSucceededTelegramMessage(normalizedLibraryName, normalizedSeatName),
+            toastKind: ToastVisualKind.Success,
+            toastTitle: "全域捡漏成功",
+            toastMessage: $"{normalizedLibraryName} · {normalizedSeatName} 已成功预约",
+            enableInAppFallback: true,
+            cancellationToken);
+    }
+
     public async Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default)
     {
         var normalizedTaskName = NormalizeTaskName(taskName);
@@ -357,6 +380,19 @@ public sealed class TaskEventAlertService(
         return builder.ToString();
     }
 
+    private static string BuildGlobalLeakSucceededEmailBody(string libraryName, string seatName)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 已通过全域捡漏预约到空座");
+        builder.AppendLine();
+        builder.AppendLine($"目标场馆：{libraryName}");
+        builder.AppendLine($"目标座位：{seatName}");
+        builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine();
+        builder.AppendLine("你可以返回应用查看最新预约状态");
+        return builder.ToString();
+    }
+
     private static string BuildTaskFailedEmailBody(string taskName, string reason)
     {
         var builder = new StringBuilder();
@@ -419,6 +455,17 @@ public sealed class TaskEventAlertService(
         builder.AppendLine($"目标座位：{seatName}");
         builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
         builder.AppendLine("你可以返回应用查看明日预约任务状态");
+        return builder.ToString();
+    }
+
+    private static string BuildGlobalLeakSucceededTelegramMessage(string libraryName, string seatName)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 全域捡漏成功");
+        builder.AppendLine($"目标场馆：{libraryName}");
+        builder.AppendLine($"目标座位：{seatName}");
+        builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine("你可以返回应用查看最新预约状态。");
         return builder.ToString();
     }
 

@@ -58,8 +58,162 @@ public sealed class MainWindowViewModelTests
         viewModel.IsAuthorized = true;
 
         var titles = viewModel.SidebarItems.Select(item => item.Title).ToArray();
+        var pageIndexes = viewModel.SidebarItems.Select(item => item.PageIndex).ToArray();
 
-        Assert.Equal(["首页", "账户与场馆", "抢座", "明日预约", "占座", "通知设置", "系统设置"], titles);
+        Assert.Equal(["首页", "账户与场馆", "抢座", "全域捡漏", "明日预约", "占座", "通知设置", "系统设置"], titles);
+        Assert.Equal([0, 1, 2, 3, 4, 5, 6, 7], pageIndexes);
+    }
+
+    [Fact]
+    public async Task StartGlobalLeakAsync_BuildsMultiLibraryPlan_WithDefaultScanInterval()
+    {
+        var coordinator = new FakeGlobalLeakCoordinator();
+        var viewModel = CreateGlobalLeakViewModel(globalLeakCoordinator: coordinator);
+        await viewModel.InitializeAsync();
+
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        viewModel.GlobalLeakLibraries[0].IsSelected = true;
+        viewModel.GlobalLeakLibraries[2].IsSelected = true;
+        viewModel.ConfirmGlobalLeakLibrariesCommand.Execute(null);
+
+        await viewModel.StartGlobalLeakCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<GlobalLeakPlan>(coordinator.LastPlan);
+        Assert.Equal(TimeSpan.FromSeconds(10), plan.ScanInterval);
+        Assert.Equal([1, 3], plan.Libraries.Select(library => library.LibraryId).ToArray());
+        Assert.Equal(["场馆A", "场馆C"], plan.Libraries.Select(library => library.LibraryName).ToArray());
+    }
+
+    [Fact]
+    public async Task GlobalLeakLibraryPicker_UsesDraftSelection_UntilConfirmed()
+    {
+        var viewModel = CreateGlobalLeakViewModel();
+
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        viewModel.GlobalLeakLibraries[0].IsSelected = true;
+
+        Assert.True(viewModel.IsGlobalLeakLibraryPickerOpen);
+        Assert.Empty(viewModel.SelectedGlobalLeakLibraries);
+        Assert.Equal("本次已勾选 1 个场馆", viewModel.DraftGlobalLeakLibrarySummaryText);
+
+        viewModel.CancelGlobalLeakLibrariesCommand.Execute(null);
+
+        Assert.False(viewModel.IsGlobalLeakLibraryPickerOpen);
+        Assert.Empty(viewModel.SelectedGlobalLeakLibraries);
+
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        viewModel.SelectAllGlobalLeakLibrariesCommand.Execute(null);
+        viewModel.ClearDraftGlobalLeakLibrariesCommand.Execute(null);
+
+        Assert.Equal("本次尚未勾选场馆", viewModel.DraftGlobalLeakLibrarySummaryText);
+    }
+
+    [Fact]
+    public async Task GlobalLeakRunning_DisablesConfiguration_AndStopCallsCoordinator()
+    {
+        var coordinator = new FakeGlobalLeakCoordinator();
+        var viewModel = CreateGlobalLeakViewModel(globalLeakCoordinator: coordinator);
+        await viewModel.InitializeAsync();
+
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        viewModel.GlobalLeakLibraries[0].IsSelected = true;
+        viewModel.ConfirmGlobalLeakLibrariesCommand.Execute(null);
+        await viewModel.StartGlobalLeakCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(viewModel.IsGlobalLeakTaskActive);
+        Assert.False(viewModel.CanEditGlobalLeakConfiguration);
+        Assert.True(viewModel.ShouldHideToTrayOnClose);
+
+        await viewModel.StopGlobalLeakCommand.ExecuteAsync(null);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, coordinator.StopCalls);
+        Assert.False(viewModel.IsGlobalLeakTaskActive);
+    }
+
+    [Fact]
+    public async Task GlobalLeakStatusAndLogs_UpdateDashboardFields()
+    {
+        var coordinator = new FakeGlobalLeakCoordinator();
+        var activityLogService = new ActivityLogService();
+        var viewModel = CreateGlobalLeakViewModel(
+            globalLeakCoordinator: coordinator,
+            activityLogService: activityLogService);
+        await viewModel.InitializeAsync();
+
+        var timestamp = DateTimeOffset.Now.AddSeconds(-3);
+        coordinator.EmitStatus(new CoordinatorStatus(
+            CoordinatorTaskState.Running,
+            "全域捡漏",
+            "第 2 轮扫描中",
+            timestamp,
+            timestamp,
+            PollCount: 2,
+            RequestCount: 7,
+            LastRequestAt: timestamp,
+            Reason: CoordinatorStatusReason.Running));
+        activityLogService.Write(LogEntryKind.Info, "GlobalLeak", "场馆A 暂无空座。");
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("第 2 轮扫描中", viewModel.GlobalLeakStatusText);
+        Assert.True(viewModel.IsGlobalLeakTaskActive);
+        Assert.Equal(2, viewModel.GlobalLeakScanRoundCount);
+        Assert.Equal(7, viewModel.GlobalLeakRequestCount);
+        Assert.NotEqual("无", viewModel.GlobalLeakLastRequestText);
+        Assert.Contains("GlobalLeak: 场馆A 暂无空座", viewModel.GlobalLeakLogsText);
+        Assert.Contains("全域捡漏运行中", viewModel.HomeEngineSummaryText);
+    }
+
+    [Fact]
+    public async Task GlobalLeakSuccess_RefreshesReservation_AndRecordsDashboardMetrics()
+    {
+        var settingsService = new FakeSettingsService(WithDashboard(0, 0));
+        var coordinator = new FakeGlobalLeakCoordinator();
+        var reservationInfoCalls = 0;
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) =>
+            {
+                reservationInfoCalls++;
+                return Task.FromResult<ReservationInfo?>(new ReservationInfo(
+                    "reservation-token",
+                    1,
+                    "场馆A",
+                    "seat-1",
+                    "001",
+                    DateTimeOffset.Now.AddMinutes(30)));
+            }
+        };
+        var viewModel = CreateGlobalLeakViewModel(
+            settingsService: settingsService,
+            apiClient: apiClient,
+            globalLeakCoordinator: coordinator);
+        await viewModel.InitializeAsync();
+
+        var timestamp = DateTimeOffset.Now;
+        coordinator.EmitStatus(new CoordinatorStatus(
+            CoordinatorTaskState.Completed,
+            "全域捡漏",
+            "已成功捡漏预约到空座",
+            timestamp.AddSeconds(-2),
+            timestamp,
+            Reason: CoordinatorStatusReason.GlobalLeakSucceeded));
+        Dispatcher.UIThread.RunJobs();
+
+        await WaitForAsync(() =>
+        {
+            Dispatcher.UIThread.RunJobs();
+            return settingsService.CurrentSettings.Dashboard.SuccessfulReservationCount == 1;
+        });
+        await WaitForAsync(() =>
+        {
+            Dispatcher.UIThread.RunJobs();
+            return reservationInfoCalls > 0;
+        });
+
+        Assert.Equal(1, viewModel.HomeHistoricalSuccessCount);
+        Assert.Contains("场馆A", viewModel.ReservationHeroTitle);
     }
 
     [Fact]
@@ -423,9 +577,11 @@ public sealed class MainWindowViewModelTests
     public async Task SignOutAsync_ClearsStoredLastLibrarySelection()
     {
         var settingsService = new FakeSettingsService(WithVenue(1, "场馆A"));
+        var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
         var sessionService = new FakeSessionService
         {
-            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+            CurrentSession = session,
+            RestoreResult = session
         };
         var viewModel = CreateViewModel(
             sessionService: sessionService,
@@ -450,9 +606,11 @@ public sealed class MainWindowViewModelTests
     {
         var libraryA = new LibrarySummary(1, "场馆A", "3层", true, 120, 20, 10);
         var libraryB = new LibrarySummary(2, "场馆B", "5层", true, 80, 10, 5);
+        var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
         var sessionService = new FakeSessionService
         {
-            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+            CurrentSession = session,
+            RestoreResult = session
         };
         var settingsService = new FakeSettingsService(WithVenue(libraryB.LibraryId, libraryB.Name));
         var libraryService = new FakeLibraryService
@@ -1366,6 +1524,7 @@ public sealed class MainWindowViewModelTests
         FakeSettingsService? settingsService = null,
         FakeTraceIntApiClient? apiClient = null,
         FakeGrabSeatCoordinator? grabSeatCoordinator = null,
+        FakeGlobalLeakCoordinator? globalLeakCoordinator = null,
         FakeOccupySeatCoordinator? occupySeatCoordinator = null,
         FakeTomorrowReservationCoordinator? tomorrowReservationCoordinator = null,
         FakeNotificationService? notificationService = null,
@@ -1383,6 +1542,7 @@ public sealed class MainWindowViewModelTests
         settingsService ??= new FakeSettingsService(AppSettings.Default);
         apiClient ??= new FakeTraceIntApiClient();
         grabSeatCoordinator ??= new FakeGrabSeatCoordinator();
+        globalLeakCoordinator ??= new FakeGlobalLeakCoordinator();
         occupySeatCoordinator ??= new FakeOccupySeatCoordinator();
         tomorrowReservationCoordinator ??= new FakeTomorrowReservationCoordinator();
         taskAlertService ??= new FakeTaskEventAlertDispatcher();
@@ -1396,6 +1556,7 @@ public sealed class MainWindowViewModelTests
             new ProtocolTemplateEditorService(protocolTemplateStore ?? new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates("", "", "", "", "", "", ""))),
             taskAlertService,
             grabSeatCoordinator,
+            globalLeakCoordinator,
             occupySeatCoordinator,
             tomorrowReservationCoordinator,
             activityLogService,
@@ -1446,6 +1607,39 @@ public sealed class MainWindowViewModelTests
             notificationService: notificationService);
 
         return (result.ViewModel, coordinator);
+    }
+
+    private static MainWindowViewModel CreateGlobalLeakViewModel(
+        FakeSettingsService? settingsService = null,
+        FakeTraceIntApiClient? apiClient = null,
+        FakeGlobalLeakCoordinator? globalLeakCoordinator = null,
+        ActivityLogService? activityLogService = null)
+    {
+        var libraries = new[]
+        {
+            new LibrarySummary(1, "场馆A", "3层", true, 120, 20, 10),
+            new LibrarySummary(2, "场馆B", "5层", true, 80, 10, 5),
+            new LibrarySummary(3, "场馆C", "7层", false, 60, 30, 10)
+        };
+        var globalLeakSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = globalLeakSession,
+            RestoreResult = globalLeakSession
+        };
+        var libraryService = new FakeLibraryService
+        {
+            LibrariesToLoad = libraries
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            libraryService: libraryService,
+            settingsService: settingsService,
+            apiClient: apiClient,
+            globalLeakCoordinator: globalLeakCoordinator,
+            activityLogService: activityLogService);
+        viewModel.IsAuthorized = true;
+        return viewModel;
     }
 
     private static async Task<(

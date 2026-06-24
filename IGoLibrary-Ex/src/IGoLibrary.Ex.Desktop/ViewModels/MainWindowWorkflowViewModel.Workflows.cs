@@ -22,6 +22,7 @@ public partial class MainWindowWorkflowViewModel
     public bool ShouldHideToTrayOnClose =>
         MinimizeToTrayEnabled &&
         (IsTaskActive(_grabSeatCoordinator.GetStatus()) ||
+         IsTaskActive(_globalLeakCoordinator.GetStatus()) ||
          IsTaskActive(_occupySeatCoordinator.GetStatus()) ||
          IsTaskActive(_tomorrowReservationCoordinator.GetStatus()));
 
@@ -31,9 +32,21 @@ public partial class MainWindowWorkflowViewModel
 
     public bool HasNoSelectedSeats => !HasSelectedSeats;
 
+    public bool HasGlobalLeakLibraries => GlobalLeakLibraries.Count > 0;
+
+    public bool HasNoGlobalLeakLibraries => !HasGlobalLeakLibraries;
+
     public bool CanEditGrabConfiguration => !IsGrabTaskActive;
 
     public bool CanEditGrabScheduledStartTime => CanEditGrabConfiguration && IsGrabScheduledStartEnabled;
+
+    public int SelectedGlobalLeakLibraryCount => SelectedGlobalLeakLibraries.Count;
+
+    public bool HasSelectedGlobalLeakLibraries => SelectedGlobalLeakLibraryCount > 0;
+
+    public bool HasNoSelectedGlobalLeakLibraries => !HasSelectedGlobalLeakLibraries;
+
+    public bool CanEditGlobalLeakConfiguration => !IsGlobalLeakTaskActive;
 
     public bool CanEditTomorrowConfiguration => !IsTomorrowTaskActive && !HasActiveVenuePreview;
 
@@ -122,6 +135,16 @@ public partial class MainWindowWorkflowViewModel
         ? $"本次已勾选 {DraftSelectedSeatCount} 个目标座位"
         : "本次尚未勾选目标座位";
 
+    public string SelectedGlobalLeakLibrarySummaryText => HasSelectedGlobalLeakLibraries
+        ? $"已选 {SelectedGlobalLeakLibraryCount} 个扫描场馆"
+        : "尚未选择扫描场馆";
+
+    public int DraftGlobalLeakLibraryCount => _draftGlobalLeakLibraryIds.Count;
+
+    public string DraftGlobalLeakLibrarySummaryText => DraftGlobalLeakLibraryCount > 0
+        ? $"本次已勾选 {DraftGlobalLeakLibraryCount} 个场馆"
+        : "本次尚未勾选场馆";
+
     public string GrabDashboardStatusText => _grabTaskState switch
     {
         CoordinatorTaskState.Starting => "启动中",
@@ -139,6 +162,28 @@ public partial class MainWindowWorkflowViewModel
         CoordinatorTaskState.Running => GrabStateRunningBrush,
         CoordinatorTaskState.Stopping => GrabStateWarningBrush,
         CoordinatorTaskState.Completed when _grabStatusReason == CoordinatorStatusReason.Stopped => GrabStateFailureBrush,
+        CoordinatorTaskState.Completed => GrabStateSuccessBrush,
+        CoordinatorTaskState.Failed => GrabStateFailureBrush,
+        _ => GrabStateIdleBrush
+    };
+
+    public string GlobalLeakDashboardStatusText => _globalLeakTaskState switch
+    {
+        CoordinatorTaskState.Starting => "启动中",
+        CoordinatorTaskState.Running => "运行中",
+        CoordinatorTaskState.Stopping => "停止中",
+        CoordinatorTaskState.Completed when _globalLeakStatusReason == CoordinatorStatusReason.Stopped => "已停止",
+        CoordinatorTaskState.Completed => "已完成",
+        CoordinatorTaskState.Failed => "异常",
+        _ => "未运行"
+    };
+
+    public IBrush GlobalLeakDashboardStatusBrush => _globalLeakTaskState switch
+    {
+        CoordinatorTaskState.Starting => GrabStateWarningBrush,
+        CoordinatorTaskState.Running => GrabStateRunningBrush,
+        CoordinatorTaskState.Stopping => GrabStateWarningBrush,
+        CoordinatorTaskState.Completed when _globalLeakStatusReason == CoordinatorStatusReason.Stopped => GrabStateFailureBrush,
         CoordinatorTaskState.Completed => GrabStateSuccessBrush,
         CoordinatorTaskState.Failed => GrabStateFailureBrush,
         _ => GrabStateIdleBrush
@@ -180,6 +225,20 @@ public partial class MainWindowWorkflowViewModel
     {
         OnPropertyChanged(nameof(CanEditGrabConfiguration));
         OnPropertyChanged(nameof(CanEditGrabScheduledStartTime));
+    }
+
+    partial void OnIsGlobalLeakTaskActiveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanEditGlobalLeakConfiguration));
+    }
+
+    partial void OnGlobalLeakScanIntervalSecondsChanged(int value)
+    {
+        var normalized = Math.Clamp(value, 1, 3600);
+        if (normalized != value)
+        {
+            GlobalLeakScanIntervalSeconds = normalized;
+        }
     }
 
     partial void OnIsGrabScheduledStartEnabledChanged(bool value)
@@ -330,9 +389,11 @@ public partial class MainWindowWorkflowViewModel
 
         _activityLogService.EntryWritten += OnLogEntryWritten;
         _grabSeatCoordinator.StatusChanged += OnGrabStatusChanged;
+        _globalLeakCoordinator.StatusChanged += OnGlobalLeakStatusChanged;
         _occupySeatCoordinator.StatusChanged += OnOccupyStatusChanged;
         _tomorrowReservationCoordinator.StatusChanged += OnTomorrowStatusChanged;
         ApplyGrabStatus(_grabSeatCoordinator.GetStatus());
+        ApplyGlobalLeakStatus(_globalLeakCoordinator.GetStatus());
         ApplyOccupyStatus(_occupySeatCoordinator.GetStatus());
         ApplyTomorrowStatus(_tomorrowReservationCoordinator.GetStatus());
 
@@ -682,10 +743,15 @@ public partial class MainWindowWorkflowViewModel
         CancelFiltering();
         IsGrabSeatSelectionOverlayOpen = false;
         IsTomorrowSeatSelectionOverlayOpen = false;
+        IsGlobalLeakLibraryPickerOpen = false;
         _draftSelectedSeatKeys.Clear();
         _draftTomorrowSeatKey = null;
+        _draftGlobalLeakLibraryIds.Clear();
         _committedSelectedSeatKeys.Clear();
+        _committedGlobalLeakLibraryIds.Clear();
         AvailableLibraries.Clear();
+        ClearGlobalLeakLibraries();
+        RefreshSelectedGlobalLeakLibrariesPresentation();
         _allSeats.Clear();
         ClearTomorrowSeats();
         VisibleSeats.Clear();
@@ -697,6 +763,7 @@ public partial class MainWindowWorkflowViewModel
         OnPropertyChanged(nameof(HasVisibleTomorrowSeatResults));
         OnPropertyChanged(nameof(ShowTomorrowSeatFilterEmptyState));
         OnPropertyChanged(nameof(DraftSelectedTomorrowSeatSummaryText));
+        OnPropertyChanged(nameof(DraftGlobalLeakLibrarySummaryText));
         RefreshSelectedSeatsPresentation();
         UpdateDraftSelectionPresentation();
         VisibleSeatResultCount = 0;
@@ -734,6 +801,7 @@ public partial class MainWindowWorkflowViewModel
         UpdateHomeSystemInfoPresentation();
         UpdateReservationPresentation(null);
         ApplyGrabStatus(CoordinatorStatus.Idle("抢座"));
+        ApplyGlobalLeakStatus(CoordinatorStatus.Idle("全域捡漏"));
     }
 
     [RelayCommand]
@@ -755,6 +823,7 @@ public partial class MainWindowWorkflowViewModel
                 AvailableLibraries.Add(library);
             }
 
+            PopulateGlobalLeakLibraries(result.Libraries);
             SelectedLibrary = result.SelectedLibrary;
         }
         catch (Exception ex)
@@ -1033,6 +1102,191 @@ public partial class MainWindowWorkflowViewModel
         {
             _activityLogService.Write(LogEntryKind.Error, "Grab", $"停止抢座失败：{ex.Message}");
             await _notificationService.ShowWarningAsync("停止抢座失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task OpenGlobalLeakLibraryPickerAsync()
+    {
+        if (!CanEditGlobalLeakConfiguration)
+        {
+            return;
+        }
+
+        if (!IsAuthorized)
+        {
+            await _notificationService.ShowWarningAsync("未登录", "请先授权后再选择扫描场馆");
+            return;
+        }
+
+        await LoadLibrariesAsync(restorePreferredSelection: false);
+
+        if (GlobalLeakLibraries.Count == 0)
+        {
+            await _notificationService.ShowInfoAsync("暂无场馆数据", "当前账号还没有可用场馆列表");
+            return;
+        }
+
+        BeginGlobalLeakLibrarySelectionDraft();
+        IsGlobalLeakLibraryPickerOpen = true;
+    }
+
+    [RelayCommand]
+    private async Task RefreshGlobalLeakLibrariesAsync()
+    {
+        if (!CanEditGlobalLeakConfiguration)
+        {
+            return;
+        }
+
+        await LoadLibrariesAsync(restorePreferredSelection: false);
+        if (IsGlobalLeakLibraryPickerOpen)
+        {
+            ApplyGlobalLeakLibrarySelectionToItems(_draftGlobalLeakLibraryIds);
+            UpdateDraftGlobalLeakLibrarySelectionPresentation();
+        }
+    }
+
+    [RelayCommand]
+    private void ConfirmGlobalLeakLibraries()
+    {
+        CommitGlobalLeakLibrarySelection();
+        IsGlobalLeakLibraryPickerOpen = false;
+    }
+
+    [RelayCommand]
+    private void CancelGlobalLeakLibraries()
+    {
+        RestoreCommittedGlobalLeakLibrarySelection();
+        IsGlobalLeakLibraryPickerOpen = false;
+    }
+
+    [RelayCommand]
+    private void SelectAllGlobalLeakLibraries()
+    {
+        if (!CanEditGlobalLeakConfiguration)
+        {
+            return;
+        }
+
+        _isSynchronizingGlobalLeakLibrarySelection = true;
+        try
+        {
+            foreach (var library in GlobalLeakLibraries)
+            {
+                library.IsSelected = true;
+            }
+        }
+        finally
+        {
+            _isSynchronizingGlobalLeakLibrarySelection = false;
+        }
+
+        if (IsGlobalLeakLibraryPickerOpen)
+        {
+            RefreshDraftGlobalLeakLibrarySelectionFromItems();
+            return;
+        }
+
+        RefreshCommittedGlobalLeakLibrarySelectionFromItems();
+    }
+
+    [RelayCommand]
+    private void ClearGlobalLeakLibrarySelection()
+    {
+        if (!CanEditGlobalLeakConfiguration)
+        {
+            return;
+        }
+
+        _draftGlobalLeakLibraryIds.Clear();
+        _committedGlobalLeakLibraryIds.Clear();
+        ApplyGlobalLeakLibrarySelectionToItems(Array.Empty<int>());
+        RefreshSelectedGlobalLeakLibrariesPresentation();
+        UpdateDraftGlobalLeakLibrarySelectionPresentation();
+    }
+
+    [RelayCommand]
+    private void ClearDraftGlobalLeakLibraries()
+    {
+        if (!CanEditGlobalLeakConfiguration)
+        {
+            return;
+        }
+
+        if (!IsGlobalLeakLibraryPickerOpen)
+        {
+            ClearGlobalLeakLibrarySelection();
+            return;
+        }
+
+        _draftGlobalLeakLibraryIds.Clear();
+        ApplyGlobalLeakLibrarySelectionToItems(_draftGlobalLeakLibraryIds);
+        UpdateDraftGlobalLeakLibrarySelectionPresentation();
+    }
+
+    [RelayCommand]
+    private void RemoveSelectedGlobalLeakLibrary(GlobalLeakLibraryTarget? target)
+    {
+        if (target is null || !CanEditGlobalLeakConfiguration)
+        {
+            return;
+        }
+
+        if (!_committedGlobalLeakLibraryIds.Remove(target.LibraryId))
+        {
+            return;
+        }
+
+        RefreshSelectedGlobalLeakLibrariesPresentation();
+        if (!IsGlobalLeakLibraryPickerOpen)
+        {
+            ApplyGlobalLeakLibrarySelectionToItems(_committedGlobalLeakLibraryIds);
+        }
+    }
+
+    [RelayCommand]
+    private async Task StartGlobalLeakAsync()
+    {
+        if (IsGlobalLeakTaskActive)
+        {
+            return;
+        }
+
+        var selectedLibraries = SelectedGlobalLeakLibraries.ToList();
+        if (selectedLibraries.Count == 0)
+        {
+            await _notificationService.ShowWarningAsync("未选择场馆", "请至少选择一个全域捡漏扫描场馆");
+            return;
+        }
+
+        try
+        {
+            var intervalSeconds = Math.Clamp(GlobalLeakScanIntervalSeconds, 1, 3600);
+            GlobalLeakScanIntervalSeconds = intervalSeconds;
+            var plan = new GlobalLeakPlan(
+                selectedLibraries,
+                TimeSpan.FromSeconds(intervalSeconds));
+            await GlobalLeakPage.StartAsync(plan);
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Error, "GlobalLeak", $"启动全域捡漏失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("启动全域捡漏失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task StopGlobalLeakAsync()
+    {
+        try
+        {
+            await GlobalLeakPage.StopAsync();
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Error, "GlobalLeak", $"停止全域捡漏失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("停止全域捡漏失败", ex.Message);
         }
     }
 
@@ -1947,6 +2201,56 @@ public partial class MainWindowWorkflowViewModel
         OnPropertyChanged(nameof(DraftSelectedTomorrowSeatSummaryText));
     }
 
+    private void PopulateGlobalLeakLibraries(IEnumerable<LibrarySummary> libraries)
+    {
+        var selectedIdsToRestore = IsGlobalLeakLibraryPickerOpen
+            ? _draftGlobalLeakLibraryIds.ToArray()
+            : _committedGlobalLeakLibraryIds.ToArray();
+
+        ClearGlobalLeakLibraries();
+        _isSynchronizingGlobalLeakLibrarySelection = true;
+        try
+        {
+            foreach (var library in libraries)
+            {
+                var item = new GlobalLeakLibraryItemViewModel(library)
+                {
+                    IsSelected = selectedIdsToRestore.Contains(library.LibraryId)
+                };
+                item.PropertyChanged += OnGlobalLeakLibraryItemPropertyChanged;
+                GlobalLeakLibraries.Add(item);
+            }
+        }
+        finally
+        {
+            _isSynchronizingGlobalLeakLibrarySelection = false;
+        }
+
+        if (IsGlobalLeakLibraryPickerOpen)
+        {
+            RefreshDraftGlobalLeakLibrarySelectionFromItems();
+        }
+        else
+        {
+            RefreshSelectedGlobalLeakLibrariesPresentation();
+        }
+
+        OnPropertyChanged(nameof(HasGlobalLeakLibraries));
+        OnPropertyChanged(nameof(HasNoGlobalLeakLibraries));
+    }
+
+    private void ClearGlobalLeakLibraries()
+    {
+        foreach (var library in GlobalLeakLibraries)
+        {
+            library.PropertyChanged -= OnGlobalLeakLibraryItemPropertyChanged;
+        }
+
+        GlobalLeakLibraries.Clear();
+        OnPropertyChanged(nameof(HasGlobalLeakLibraries));
+        OnPropertyChanged(nameof(HasNoGlobalLeakLibraries));
+    }
+
     private async Task ApplySeatFilterAsync()
     {
         CancellationTokenSource cts;
@@ -2087,6 +2391,23 @@ public partial class MainWindowWorkflowViewModel
         ApplyTomorrowSeatSelection(changedSeat.SeatKey);
     }
 
+    private void OnGlobalLeakLibraryItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_isSynchronizingGlobalLeakLibrarySelection ||
+            e.PropertyName != nameof(GlobalLeakLibraryItemViewModel.IsSelected))
+        {
+            return;
+        }
+
+        if (IsGlobalLeakLibraryPickerOpen)
+        {
+            RefreshDraftGlobalLeakLibrarySelectionFromItems();
+            return;
+        }
+
+        RefreshCommittedGlobalLeakLibrarySelectionFromItems();
+    }
+
     private void BeginTomorrowSeatSelectionDraft()
     {
         _draftTomorrowSeatKey = SelectedTomorrowSeat?.SeatKey;
@@ -2146,6 +2467,101 @@ public partial class MainWindowWorkflowViewModel
     private void UpdateDraftTomorrowSeatSelectionPresentation()
     {
         OnPropertyChanged(nameof(DraftSelectedTomorrowSeatSummaryText));
+    }
+
+    private void BeginGlobalLeakLibrarySelectionDraft()
+    {
+        _draftGlobalLeakLibraryIds.Clear();
+        foreach (var libraryId in _committedGlobalLeakLibraryIds)
+        {
+            _draftGlobalLeakLibraryIds.Add(libraryId);
+        }
+
+        ApplyGlobalLeakLibrarySelectionToItems(_draftGlobalLeakLibraryIds);
+        UpdateDraftGlobalLeakLibrarySelectionPresentation();
+    }
+
+    private void CommitGlobalLeakLibrarySelection()
+    {
+        RefreshCommittedGlobalLeakLibrarySelectionFromItems();
+        _draftGlobalLeakLibraryIds.Clear();
+        UpdateDraftGlobalLeakLibrarySelectionPresentation();
+    }
+
+    private void RestoreCommittedGlobalLeakLibrarySelection()
+    {
+        _draftGlobalLeakLibraryIds.Clear();
+        ApplyGlobalLeakLibrarySelectionToItems(_committedGlobalLeakLibraryIds);
+        UpdateDraftGlobalLeakLibrarySelectionPresentation();
+    }
+
+    private void RefreshDraftGlobalLeakLibrarySelectionFromItems()
+    {
+        _draftGlobalLeakLibraryIds.Clear();
+        foreach (var libraryId in GlobalLeakLibraries.Where(static library => library.IsSelected).Select(static library => library.LibraryId))
+        {
+            _draftGlobalLeakLibraryIds.Add(libraryId);
+        }
+
+        UpdateDraftGlobalLeakLibrarySelectionPresentation();
+    }
+
+    private void RefreshCommittedGlobalLeakLibrarySelectionFromItems()
+    {
+        _committedGlobalLeakLibraryIds.Clear();
+        foreach (var libraryId in GlobalLeakLibraries.Where(static library => library.IsSelected).Select(static library => library.LibraryId))
+        {
+            _committedGlobalLeakLibraryIds.Add(libraryId);
+        }
+
+        RefreshSelectedGlobalLeakLibrariesPresentation();
+    }
+
+    private void RefreshSelectedGlobalLeakLibrariesPresentation()
+    {
+        SelectedGlobalLeakLibraries.Clear();
+        foreach (var library in EnumerateSelectedGlobalLeakLibraries(_committedGlobalLeakLibraryIds))
+        {
+            SelectedGlobalLeakLibraries.Add(library);
+        }
+
+        OnPropertyChanged(nameof(SelectedGlobalLeakLibraryCount));
+        OnPropertyChanged(nameof(HasSelectedGlobalLeakLibraries));
+        OnPropertyChanged(nameof(HasNoSelectedGlobalLeakLibraries));
+        OnPropertyChanged(nameof(SelectedGlobalLeakLibrarySummaryText));
+    }
+
+    private void UpdateDraftGlobalLeakLibrarySelectionPresentation()
+    {
+        OnPropertyChanged(nameof(DraftGlobalLeakLibraryCount));
+        OnPropertyChanged(nameof(DraftGlobalLeakLibrarySummaryText));
+    }
+
+    private IEnumerable<GlobalLeakLibraryTarget> EnumerateSelectedGlobalLeakLibraries(IReadOnlySet<int> selectedLibraryIds)
+    {
+        return GlobalLeakLibraries
+            .Where(library => selectedLibraryIds.Contains(library.LibraryId))
+            .Select(static library => new GlobalLeakLibraryTarget(
+                library.LibraryId,
+                library.LibraryName,
+                library.Floor));
+    }
+
+    private void ApplyGlobalLeakLibrarySelectionToItems(IEnumerable<int> selectedLibraryIds)
+    {
+        var selectedIds = selectedLibraryIds as IReadOnlySet<int> ?? new HashSet<int>(selectedLibraryIds);
+        _isSynchronizingGlobalLeakLibrarySelection = true;
+        try
+        {
+            foreach (var library in GlobalLeakLibraries)
+            {
+                library.IsSelected = selectedIds.Contains(library.LibraryId);
+            }
+        }
+        finally
+        {
+            _isSynchronizingGlobalLeakLibrarySelection = false;
+        }
     }
 
     private void BeginGrabSeatSelectionDraft()
@@ -2331,6 +2747,11 @@ public partial class MainWindowWorkflowViewModel
                 GrabLogsText = AppendLine(GrabLogsText, line);
             }
 
+            if (entry.Category is "GlobalLeak" or "Auth")
+            {
+                GlobalLeakLogsText = AppendLine(GlobalLeakLogsText, line);
+            }
+
             if (entry.Category is "Tomorrow" or "Library" or "Auth")
             {
                 TomorrowLogsText = AppendLine(TomorrowLogsText, line);
@@ -2408,6 +2829,32 @@ public partial class MainWindowWorkflowViewModel
         }
     }
 
+    private void OnGlobalLeakStatusChanged(object? sender, CoordinatorStatus status)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            ApplyGlobalLeakStatus(status);
+            TryRecordGlobalLeakSuccess(status);
+            if (status.State == CoordinatorTaskState.Completed &&
+                status.Reason == CoordinatorStatusReason.GlobalLeakSucceeded)
+            {
+                _ = RefreshGlobalLeakSuccessReservationAsync();
+            }
+        });
+    }
+
+    private async Task RefreshGlobalLeakSuccessReservationAsync()
+    {
+        try
+        {
+            await RefreshReservationAsync(showNotificationOnError: false);
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "GlobalLeak", $"全域捡漏成功后刷新预约状态失败：{ex.Message}");
+        }
+    }
+
     private void OnOccupyStatusChanged(object? sender, CoordinatorStatus status)
     {
         Dispatcher.UIThread.Post(() => ApplyOccupyStatus(status));
@@ -2426,8 +2873,10 @@ public partial class MainWindowWorkflowViewModel
     {
         UpdateReservationCountdown();
         UpdateGrabLastRequestText();
+        UpdateGlobalLeakLastRequestText();
         UpdateTomorrowLastRequestText();
         UpdateGrabRuntimeClock();
+        UpdateGlobalLeakRuntimeClock();
         RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);
         UpdateHomeDashboardClock();
     }
@@ -2448,6 +2897,24 @@ public partial class MainWindowWorkflowViewModel
         UpdateHomeSystemInfoPresentation();
         OnPropertyChanged(nameof(GrabDashboardStatusText));
         OnPropertyChanged(nameof(GrabDashboardStatusBrush));
+    }
+
+    private void ApplyGlobalLeakStatus(CoordinatorStatus status)
+    {
+        GlobalLeakStatusText = status.Message;
+        IsGlobalLeakTaskActive = IsTaskActive(status);
+        GlobalLeakScanRoundCount = status.PollCount;
+        GlobalLeakRequestCount = status.RequestCount;
+        _globalLeakLastRequestAt = status.LastRequestAt;
+        _globalLeakTaskState = status.State;
+        _globalLeakStatusReason = status.Reason;
+        UpdateGlobalLeakLastRequestText();
+        ApplyGlobalLeakRuntime(status);
+        UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
+        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeSystemInfoPresentation();
+        OnPropertyChanged(nameof(GlobalLeakDashboardStatusText));
+        OnPropertyChanged(nameof(GlobalLeakDashboardStatusBrush));
     }
 
     private void ApplyOccupyStatus(CoordinatorStatus status)
@@ -2502,6 +2969,25 @@ public partial class MainWindowWorkflowViewModel
         }
 
         GrabLastRequestText = elapsed < TimeSpan.FromSeconds(1)
+            ? "刚刚"
+            : $"{Math.Max(1, (int)Math.Floor(elapsed.TotalSeconds))} 秒前";
+    }
+
+    private void UpdateGlobalLeakLastRequestText()
+    {
+        if (_globalLeakLastRequestAt is null)
+        {
+            GlobalLeakLastRequestText = "无";
+            return;
+        }
+
+        var elapsed = DateTimeOffset.Now - _globalLeakLastRequestAt.Value;
+        if (elapsed < TimeSpan.Zero)
+        {
+            elapsed = TimeSpan.Zero;
+        }
+
+        GlobalLeakLastRequestText = elapsed < TimeSpan.FromSeconds(1)
             ? "刚刚"
             : $"{Math.Max(1, (int)Math.Floor(elapsed.TotalSeconds))} 秒前";
     }
@@ -2583,6 +3069,64 @@ public partial class MainWindowWorkflowViewModel
         GrabRuntimeText = FormatElapsedClock(timestamp - _grabRuntimeStartedAt.Value);
     }
 
+    private void ApplyGlobalLeakRuntime(CoordinatorStatus status)
+    {
+        switch (status.State)
+        {
+            case CoordinatorTaskState.Idle:
+            case CoordinatorTaskState.Starting:
+                ResetGlobalLeakRuntime();
+                return;
+            case CoordinatorTaskState.Running:
+                _globalLeakRuntimeStartedAt ??= status.LastUpdatedAt ?? DateTimeOffset.Now;
+                UpdateGlobalLeakRuntimeText(DateTimeOffset.Now);
+                return;
+            case CoordinatorTaskState.Stopping:
+            case CoordinatorTaskState.Completed:
+            case CoordinatorTaskState.Failed:
+                FreezeGlobalLeakRuntime(status.LastUpdatedAt);
+                return;
+        }
+    }
+
+    private void UpdateGlobalLeakRuntimeClock()
+    {
+        if (_globalLeakRuntimeStartedAt is null)
+        {
+            return;
+        }
+
+        UpdateGlobalLeakRuntimeText(DateTimeOffset.Now);
+    }
+
+    private void FreezeGlobalLeakRuntime(DateTimeOffset? stoppedAt)
+    {
+        if (_globalLeakRuntimeStartedAt is null)
+        {
+            return;
+        }
+
+        UpdateGlobalLeakRuntimeText(stoppedAt ?? DateTimeOffset.Now);
+        _globalLeakRuntimeStartedAt = null;
+    }
+
+    private void ResetGlobalLeakRuntime()
+    {
+        _globalLeakRuntimeStartedAt = null;
+        GlobalLeakRuntimeText = "00:00:00";
+    }
+
+    private void UpdateGlobalLeakRuntimeText(DateTimeOffset timestamp)
+    {
+        if (_globalLeakRuntimeStartedAt is null)
+        {
+            GlobalLeakRuntimeText = "00:00:00";
+            return;
+        }
+
+        GlobalLeakRuntimeText = FormatElapsedClock(timestamp - _globalLeakRuntimeStartedAt.Value);
+    }
+
     private void UpdateHomeDashboardPresentation()
     {
         var now = DateTimeOffset.Now;
@@ -2624,7 +3168,7 @@ public partial class MainWindowWorkflowViewModel
             return ("等待授权", "完成登录与场馆绑定后即可启用全部引擎。", GrabStateWarningBrush, DashboardWarningSoftBrush);
         }
 
-        var activeTaskCount = new[] { IsGrabTaskActive, IsTomorrowTaskActive, IsOccupyRunning }.Count(static active => active);
+        var activeTaskCount = new[] { IsGrabTaskActive, IsGlobalLeakTaskActive, IsTomorrowTaskActive, IsOccupyRunning }.Count(static active => active);
         if (activeTaskCount >= 2)
         {
             return ("多任务协同中", "后台任务正在稳定运行，请保持程序常驻。", GrabStateRunningBrush, DashboardRunningSoftBrush);
@@ -2633,6 +3177,11 @@ public partial class MainWindowWorkflowViewModel
         if (IsGrabTaskActive)
         {
             return ("抢座任务运行中", "已进入实时监控阶段，请保持程序常驻。", GrabStateRunningBrush, DashboardRunningSoftBrush);
+        }
+
+        if (IsGlobalLeakTaskActive)
+        {
+            return ("全域捡漏运行中", "正在按轮扫描多个场馆，请保持程序常驻。", GrabStateRunningBrush, DashboardRunningSoftBrush);
         }
 
         if (IsTomorrowTaskActive)
@@ -2726,10 +3275,15 @@ public partial class MainWindowWorkflowViewModel
             return "等待授权";
         }
 
-        var activeTasks = new List<string>(3);
+        var activeTasks = new List<string>(4);
         if (IsGrabTaskActive)
         {
             activeTasks.Add("抢座运行中");
+        }
+
+        if (IsGlobalLeakTaskActive)
+        {
+            activeTasks.Add("全域捡漏运行中");
         }
 
         if (IsTomorrowTaskActive)
@@ -2752,7 +3306,7 @@ public partial class MainWindowWorkflowViewModel
 
     private void UpdateGuardTracking(DateTimeOffset timestamp)
     {
-        if (IsGrabTaskActive || IsTomorrowTaskActive || IsOccupyRunning)
+        if (IsGrabTaskActive || IsGlobalLeakTaskActive || IsTomorrowTaskActive || IsOccupyRunning)
         {
             _guardTrackingStartedAt ??= timestamp;
             UpdateHomeGuardDurationPresentation(timestamp);
@@ -2808,6 +3362,24 @@ public partial class MainWindowWorkflowViewModel
         }
 
         _lastRecordedGrabSuccessAt = recordedAt;
+        _ = RecordSuccessfulReservationAsync();
+    }
+
+    private void TryRecordGlobalLeakSuccess(CoordinatorStatus status)
+    {
+        if (status.State != CoordinatorTaskState.Completed ||
+            status.Reason != CoordinatorStatusReason.GlobalLeakSucceeded)
+        {
+            return;
+        }
+
+        var recordedAt = status.LastUpdatedAt ?? DateTimeOffset.Now;
+        if (_lastRecordedGlobalLeakSuccessAt == recordedAt)
+        {
+            return;
+        }
+
+        _lastRecordedGlobalLeakSuccessAt = recordedAt;
         _ = RecordSuccessfulReservationAsync();
     }
 

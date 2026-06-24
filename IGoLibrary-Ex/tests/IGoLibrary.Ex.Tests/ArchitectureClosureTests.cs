@@ -77,6 +77,7 @@ public sealed class ArchitectureClosureTests
         var stateMachineFiles = new[]
         {
             Path.Combine(appServicesRoot, "GrabSeatStateMachine.cs"),
+            Path.Combine(appServicesRoot, "GlobalLeakStateMachine.cs"),
             Path.Combine(appServicesRoot, "OccupySeatStateMachine.cs")
         };
         var bannedTerms = new[]

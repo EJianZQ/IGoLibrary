@@ -9,7 +9,7 @@
         x:DataType="vm:MainWindowViewModel"
         Title="IGoLibrary-Ex"
         Width="1188"
-        Height="774"
+        Height="840"
         MinWidth="1000"
         MinHeight="680"
         ExtendClientAreaToDecorationsHint="True"
@@ -1177,7 +1177,263 @@
             </Grid>
           </Grid>
 
-        <!-- Tab 3: Tomorrow Reservation -->
+        <!-- Tab 3: Global Leak -->
+        <ScrollViewer>
+          <Grid RowDefinitions="Auto,Auto,Auto"
+                RowSpacing="16"
+                Margin="0,0,16,0"
+                Background="Transparent">
+            <Grid ColumnDefinitions="*,Auto"
+                  ColumnSpacing="16">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="page-title"
+                           Text="全域捡漏"
+                           Margin="0" />
+              </StackPanel>
+
+              <Border Grid.Column="1"
+                      Padding="14,10"
+                      CornerRadius="16"
+                      Background="{DynamicResource SemiAccentGlowBrush}"
+                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                      BorderThickness="1"
+                      VerticalAlignment="Center">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="扫描范围"
+                             Classes="grab-stat-title" />
+                  <TextBlock Text="{Binding SelectedGlobalLeakLibrarySummaryText}"
+                             FontSize="14"
+                             FontWeight="SemiBold"
+                             Foreground="{DynamicResource SemiTextPrimaryBrush}" />
+                </StackPanel>
+              </Border>
+            </Grid>
+
+          <Border Grid.Row="1"
+                  Classes="semi-card Shadow"
+                  Padding="20">
+            <Grid ColumnDefinitions="*,Auto"
+                  ColumnSpacing="24">
+              <StackPanel Spacing="18">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="任务配置"
+                             FontSize="18"
+                             FontWeight="Bold" />
+                  <Grid ColumnDefinitions="Auto,*"
+                        ColumnSpacing="14">
+                    <Button Content="🏛️ 选择扫描场馆"
+                            Command="{Binding OpenGlobalLeakLibraryPickerCommand}"
+                            IsEnabled="{Binding CanEditGlobalLeakConfiguration}"
+                            Background="{DynamicResource AppAccentBrush}"
+                            Foreground="{DynamicResource AppAccentForegroundBrush}"
+                            FontWeight="Bold"
+                            MinWidth="160"
+                            HorizontalContentAlignment="Center"
+                            VerticalAlignment="Top" />
+
+                    <Border Grid.Column="1"
+                            Background="{DynamicResource SemiColorFill0}"
+                            BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="12">
+                      <Grid>
+                        <ItemsControl ItemsSource="{Binding SelectedGlobalLeakLibraries}"
+                                      IsVisible="{Binding HasSelectedGlobalLeakLibraries}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Border Margin="0,0,8,8"
+                                      Padding="10,6"
+                                      CornerRadius="999"
+                                      Background="{DynamicResource SemiAccentSoftBrush}"
+                                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                                      BorderThickness="1">
+                                <StackPanel Orientation="Horizontal"
+                                            Spacing="8">
+                                  <TextBlock FontSize="12"
+                                             FontWeight="SemiBold"
+                                             Foreground="{DynamicResource SemiAccentBrush}">
+                                    <Run Text="{Binding LibraryName}" />
+                                    <Run Text=" · " />
+                                    <Run Text="{Binding Floor}" />
+                                  </TextBlock>
+                                  <Button Content="✕"
+                                          Command="{Binding DataContext.RemoveSelectedGlobalLeakLibraryCommand, ElementName=MainWindowRoot}"
+                                          CommandParameter="{Binding .}"
+                                          Classes="chip-close"
+                                          IsEnabled="{Binding DataContext.CanEditGlobalLeakConfiguration, ElementName=MainWindowRoot}"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          Foreground="{DynamicResource SemiAccentBrush}"
+                                          FontSize="11"
+                                          FontWeight="Bold"
+                                          VerticalAlignment="Center" />
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="尚未选择扫描场馆"
+                                   Classes="helper-text"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding HasNoSelectedGlobalLeakLibraries}" />
+                      </Grid>
+                    </Border>
+                  </Grid>
+                </StackPanel>
+
+                <Grid ColumnDefinitions="220">
+                  <StackPanel Spacing="0">
+                    <TextBlock Text="扫描间隔"
+                               Classes="field-label" />
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="10">
+                      <NumericUpDown Minimum="1"
+                                     Maximum="3600"
+                                     Increment="1"
+                                     ClipValueToMinMax="True"
+                                     ParsingNumberStyle="Integer"
+                                     Value="{Binding GlobalLeakScanIntervalSeconds}"
+                                     FormatString="0"
+                                     IsEnabled="{Binding CanEditGlobalLeakConfiguration}"
+                                     TextInput="OnUnsignedIntegerNumericUpDownTextInput"
+                                     KeyDown="OnUnsignedIntegerNumericUpDownKeyDown"
+                                     HorizontalAlignment="Stretch" />
+                      <TextBlock Grid.Column="1"
+                                 Text="秒"
+                                 FontSize="13"
+                                 FontWeight="SemiBold"
+                                 Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                 VerticalAlignment="Center" />
+                    </Grid>
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
+
+              <StackPanel Grid.Column="1"
+                          Spacing="10"
+                          Width="168">
+                <TextBlock Text="执行控制"
+                           Classes="field-label" />
+                <Button Content="开始捡漏"
+                        Command="{Binding StartGlobalLeakCommand}"
+                        IsEnabled="{Binding CanEditGlobalLeakConfiguration}"
+                        Background="{DynamicResource AppAccentBrush}"
+                        Foreground="{DynamicResource AppAccentForegroundBrush}"
+                        FontWeight="Bold"
+                        HorizontalContentAlignment="Center" />
+                <Button Content="停止任务"
+                        Command="{Binding StopGlobalLeakCommand}"
+                        IsEnabled="{Binding IsGlobalLeakTaskActive}"
+                        Classes="Danger"
+                        HorizontalContentAlignment="Center" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Grid Grid.Row="2"
+                RowDefinitions="Auto,*"
+                RowSpacing="16">
+            <Grid ColumnDefinitions="*,*,*,*"
+                  ColumnSpacing="14">
+              <Border Classes="grab-stat-card Shadow">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="扫描轮次"
+                             Classes="grab-stat-title" />
+                  <TextBlock Text="{Binding GlobalLeakScanRoundCount}"
+                             Classes="grab-stat-value" />
+                </StackPanel>
+              </Border>
+
+              <Border Grid.Column="1"
+                      Classes="grab-stat-card Shadow">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="已发请求数"
+                             Classes="grab-stat-title" />
+                  <TextBlock Text="{Binding GlobalLeakRequestCount}"
+                             Classes="grab-stat-value" />
+                </StackPanel>
+              </Border>
+
+              <Border Grid.Column="2"
+                      Classes="grab-stat-card Shadow">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="最近一次请求"
+                             Classes="grab-stat-title" />
+                  <TextBlock Text="{Binding GlobalLeakLastRequestText}"
+                             Classes="grab-stat-value"
+                             FontSize="24" />
+                </StackPanel>
+              </Border>
+
+              <Border Grid.Column="3"
+                      Classes="grab-stat-card Shadow">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="任务运行时长"
+                             Classes="grab-stat-title" />
+                  <TextBlock Text="{Binding GlobalLeakRuntimeText}"
+                             Classes="grab-stat-value" />
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <Border Grid.Row="1"
+                    Classes="semi-card Shadow"
+                    Padding="20">
+              <Grid RowDefinitions="Auto,*"
+                    RowSpacing="12">
+                <Grid ColumnDefinitions="*,Auto"
+                      ColumnSpacing="12">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="全域捡漏实时日志"
+                               FontSize="18"
+                               FontWeight="Bold" />
+                  </StackPanel>
+                  <Border Grid.Column="1"
+                          Padding="10,6"
+                          CornerRadius="999"
+                          Background="{DynamicResource SemiColorFill0}"
+                          BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                          BorderThickness="1"
+                          VerticalAlignment="Center">
+                    <TextBlock Text="{Binding GlobalLeakDashboardStatusText}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{Binding GlobalLeakDashboardStatusBrush}" />
+                  </Border>
+                </Grid>
+
+                <Border Grid.Row="1"
+                        Background="{DynamicResource SemiColorFill0}"
+                        BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="16">
+                  <ScrollViewer x:Name="GlobalLeakLogScrollViewer"
+                                MinHeight="220"
+                                MaxHeight="360"
+                                HorizontalScrollBarVisibility="Disabled"
+                                VerticalScrollBarVisibility="Auto">
+                    <SelectableTextBlock Text="{Binding GlobalLeakLogsText}"
+                                         TextWrapping="Wrap"
+                                         Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                         FontFamily="Consolas, Cascadia Mono, Monaco, monospace"
+                                         FontSize="12.5" />
+                  </ScrollViewer>
+                </Border>
+              </Grid>
+            </Border>
+          </Grid>
+          </Grid>
+        </ScrollViewer>
+
+        <!-- Tab 4: Tomorrow Reservation -->
         <Grid RowDefinitions="Auto,Auto,*"
               RowSpacing="16"
               Margin="0,0,16,0"
@@ -1378,7 +1634,7 @@
           </Grid>
         </Grid>
 
-        <!-- Tab 4: Occupy -->
+        <!-- Tab 5: Occupy -->
         <Grid RowDefinitions="Auto,Auto,*" RowSpacing="24" Margin="0,0,16,0" Background="Transparent">
           <TextBlock Classes="page-title" Text="占座" Margin="0,0,0,16" />
 
@@ -1509,7 +1765,7 @@
           </Grid>
         </Grid>
 
-        <!-- Tab 5: Notification Settings -->
+        <!-- Tab 6: Notification Settings -->
         <ScrollViewer>
           <StackPanel Spacing="24"
                       Margin="0,0,16,0"
@@ -1842,7 +2098,7 @@
           </StackPanel>
         </ScrollViewer>
 
-        <!-- Tab 6: Settings -->
+        <!-- Tab 7: Settings -->
         <ScrollViewer>
           <StackPanel Spacing="24" Margin="0,0,16,0">
             <TextBlock Classes="page-title" Text="系统设置" />
@@ -2087,6 +2343,149 @@
                 <Button Grid.Column="1"
                         Content="确认完成"
                         Command="{Binding ConfirmGrabSeatSelectionCommand}"
+                        Background="{DynamicResource AppAccentBrush}"
+                        Foreground="{DynamicResource AppAccentForegroundBrush}"
+                        FontWeight="Bold"
+                        HorizontalContentAlignment="Center" />
+              </Grid>
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="1"
+              ZIndex="30"
+              IsVisible="{Binding IsGlobalLeakLibraryPickerOpen}"
+              Background="{DynamicResource AppModalOverlayBrush}"
+              PointerPressed="OnGlobalLeakLibraryOverlayPointerPressed">
+        <Grid Margin="28,16,28,28">
+          <Border Classes="semi-card Shadow"
+                  MaxWidth="920"
+                  MaxHeight="760"
+                  Padding="24"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  PointerPressed="OnGlobalLeakLibraryModalPointerPressed">
+            <Grid RowDefinitions="Auto,Auto,*,Auto"
+                  RowSpacing="18">
+              <Grid ColumnDefinitions="*,Auto"
+                    ColumnSpacing="12">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="选择扫描场馆"
+                             FontSize="22"
+                             FontWeight="Bold" />
+                  <TextBlock Text="{Binding DraftGlobalLeakLibrarySummaryText}"
+                             Classes="helper-text" />
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Content="关闭 (X)"
+                        Command="{Binding CancelGlobalLeakLibrariesCommand}"
+                        Classes="Secondary"
+                        HorizontalContentAlignment="Center" />
+              </Grid>
+
+              <Grid Grid.Row="1"
+                    ColumnDefinitions="*,Auto,Auto,Auto"
+                    ColumnSpacing="12">
+                <TextBlock Text="多选场馆后按确认同步到全域捡漏任务。"
+                           Classes="helper-text"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Content="刷新"
+                        Command="{Binding RefreshGlobalLeakLibrariesCommand}"
+                        Classes="Secondary"
+                        HorizontalContentAlignment="Center" />
+                <Button Grid.Column="2"
+                        Content="全选"
+                        Command="{Binding SelectAllGlobalLeakLibrariesCommand}"
+                        Classes="Secondary"
+                        HorizontalContentAlignment="Center" />
+                <Button Grid.Column="3"
+                        Content="清空"
+                        Command="{Binding ClearDraftGlobalLeakLibrariesCommand}"
+                        Classes="Secondary"
+                        HorizontalContentAlignment="Center" />
+              </Grid>
+
+              <Border Grid.Row="2"
+                      Background="{DynamicResource SemiColorFill0}"
+                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="18"
+                      Padding="16">
+                <Grid>
+                  <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding GlobalLeakLibraries}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Border Margin="0,0,0,10"
+                                  Padding="14"
+                                  CornerRadius="14"
+                                  Background="{DynamicResource SemiCardBackgroundBrush}"
+                                  BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                                  BorderThickness="1">
+                            <CheckBox IsChecked="{Binding IsSelected}"
+                                      HorizontalAlignment="Stretch"
+                                      VerticalAlignment="Center">
+                              <Grid ColumnDefinitions="*,Auto"
+                                    ColumnSpacing="16">
+                                <StackPanel Spacing="4">
+                                  <TextBlock Text="{Binding LibraryName}"
+                                             FontSize="15"
+                                             FontWeight="SemiBold"
+                                             Foreground="{DynamicResource SemiTextPrimaryBrush}" />
+                                  <TextBlock Text="{Binding Floor}"
+                                             FontSize="12"
+                                             Foreground="{DynamicResource SemiColorText2}" />
+                                  <TextBlock Text="{Binding SeatSummary}"
+                                             FontSize="12"
+                                             Foreground="{DynamicResource SemiColorText2}" />
+                                </StackPanel>
+                                <Border Grid.Column="1"
+                                        Padding="10,5"
+                                        CornerRadius="999"
+                                        Background="{DynamicResource SemiAccentSoftBrush}"
+                                        BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                                        BorderThickness="1"
+                                        VerticalAlignment="Center">
+                                  <TextBlock Text="{Binding OpenStatusText}"
+                                             FontSize="12"
+                                             FontWeight="SemiBold"
+                                             Foreground="{DynamicResource SemiAccentBrush}" />
+                                </Border>
+                              </Grid>
+                            </CheckBox>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+
+                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
+                          CornerRadius="14"
+                          Padding="24"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          IsVisible="{Binding HasNoGlobalLeakLibraries}">
+                    <TextBlock Text="当前账号暂无可选择的场馆，请刷新后重试。"
+                               Classes="helper-text"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center" />
+                  </Border>
+                </Grid>
+              </Border>
+
+              <Grid Grid.Row="3"
+                    ColumnDefinitions="*,Auto"
+                    ColumnSpacing="12">
+                <TextBlock Text="选择顺序以当前列表顺序为准；任务运行时不能修改扫描范围。"
+                           Classes="helper-text"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Content="确认完成"
+                        Command="{Binding ConfirmGlobalLeakLibrariesCommand}"
                         Background="{DynamicResource AppAccentBrush}"
                         Foreground="{DynamicResource AppAccentForegroundBrush}"
                         FontWeight="Bold"
