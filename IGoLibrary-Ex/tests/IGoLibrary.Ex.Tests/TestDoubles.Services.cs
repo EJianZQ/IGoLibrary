@@ -171,11 +171,20 @@ internal sealed class FakeSettingsService(AppSettings settings) : ISettingsServi
 
     public int SaveCalls { get; private set; }
 
+    public Queue<Exception> LoadExceptions { get; } = [];
+
+    public Queue<Exception> UpdateExceptions { get; } = [];
+
     public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
         await _settingsGate.WaitAsync(cancellationToken);
         try
         {
+            if (LoadExceptions.Count > 0)
+            {
+                throw LoadExceptions.Dequeue();
+            }
+
             return CurrentSettings;
         }
         finally
@@ -205,6 +214,11 @@ internal sealed class FakeSettingsService(AppSettings settings) : ISettingsServi
         await _settingsGate.WaitAsync(cancellationToken);
         try
         {
+            if (UpdateExceptions.Count > 0)
+            {
+                throw UpdateExceptions.Dequeue();
+            }
+
             var updated = update(CurrentSettings);
             if (updated != CurrentSettings)
             {

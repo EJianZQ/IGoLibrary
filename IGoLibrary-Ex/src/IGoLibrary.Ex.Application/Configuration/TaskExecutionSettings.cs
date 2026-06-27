@@ -10,6 +10,8 @@ public sealed record TaskExecutionSettings
 
     public TomorrowReservationTaskSettings TomorrowReservation { get; init; } = TomorrowReservationTaskSettings.Default;
 
+    public GlobalLeakTaskSettings GlobalLeak { get; init; } = GlobalLeakTaskSettings.Default;
+
     public TaskExecutionSettings()
     {
     }
@@ -17,11 +19,13 @@ public sealed record TaskExecutionSettings
     public TaskExecutionSettings(
         GrabTaskSettings grab,
         OccupyTaskSettings occupy,
-        TomorrowReservationTaskSettings? tomorrowReservation = null)
+        TomorrowReservationTaskSettings? tomorrowReservation = null,
+        GlobalLeakTaskSettings? globalLeak = null)
     {
         Grab = grab;
         Occupy = occupy;
         TomorrowReservation = tomorrowReservation ?? TomorrowReservationTaskSettings.Default;
+        GlobalLeak = globalLeak ?? GlobalLeakTaskSettings.Default;
     }
 
     public TaskExecutionSettings(GrabReservationStrategy grabReservationStrategy)
@@ -87,3 +91,24 @@ public sealed record TomorrowReservationTaskSettings
 
     public static TomorrowReservationTaskSettings Default { get; } = new();
 }
+
+public sealed record GlobalLeakTaskSettings
+{
+    public IReadOnlyList<GlobalLeakLibrarySelectionSettings> SelectedLibraries { get; init; } = [];
+
+    public GlobalLeakTaskSettings()
+    {
+    }
+
+    public GlobalLeakTaskSettings(IReadOnlyList<GlobalLeakLibrarySelectionSettings>? selectedLibraries)
+    {
+        SelectedLibraries = selectedLibraries ?? [];
+    }
+
+    public static GlobalLeakTaskSettings Default { get; } = new();
+}
+
+public sealed record GlobalLeakLibrarySelectionSettings(
+    int LibraryId,
+    string LibraryName,
+    string Floor);

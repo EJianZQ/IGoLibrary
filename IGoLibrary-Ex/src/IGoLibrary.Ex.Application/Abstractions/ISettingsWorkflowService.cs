@@ -27,6 +27,10 @@ public interface ISettingsWorkflowService
         TimeSpan value,
         CancellationToken cancellationToken = default);
 
+    Task SaveGlobalLeakSelectedLibrariesAsync(
+        IReadOnlyList<GlobalLeakLibraryTarget> libraries,
+        CancellationToken cancellationToken = default);
+
     Task ClearStoredLibrarySelectionAsync(CancellationToken cancellationToken = default);
 
     Task SaveDashboardMetricsAsync(

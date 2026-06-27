@@ -145,6 +145,7 @@ public partial class MainWindowWorkflowViewModel(
     private readonly HashSet<int> _committedGlobalLeakLibraryIds = [];
     private readonly HashSet<int> _draftGlobalLeakLibraryIds = [];
     private bool _isSynchronizingGlobalLeakLibrarySelection;
+    private bool _globalLeakSelectionRestoredForCurrentSession;
     private CoordinatorTaskState _grabTaskState = CoordinatorTaskState.Idle;
     private CoordinatorStatusReason _grabStatusReason = CoordinatorStatusReason.None;
     private CoordinatorTaskState _globalLeakTaskState = CoordinatorTaskState.Idle;

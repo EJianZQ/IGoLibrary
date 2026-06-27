@@ -274,6 +274,69 @@ public sealed class WorkflowServiceTests
     }
 
     [Fact]
+    public async Task SettingsWorkflowService_SaveGlobalLeakSelectedLibrariesAsync_UpdatesSelection()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveGlobalLeakSelectedLibrariesAsync(
+            [
+                new GlobalLeakLibraryTarget(1, "场馆A", "3层"),
+                new GlobalLeakLibraryTarget(2, "场馆B", "5层")
+            ]);
+
+        Assert.Equal(1, settingsService.SaveCalls);
+        Assert.Equal([1, 2], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal(["场馆A", "场馆B"], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryName).ToArray());
+        Assert.Equal(["3层", "5层"], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.Floor).ToArray());
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_SaveGlobalLeakSelectedLibrariesAsync_DoesNotSave_WhenSelectionUnchanged()
+    {
+        var selectedLibraries = new[]
+        {
+            new GlobalLeakLibrarySelectionSettings(1, "场馆A", "3层")
+        };
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            Tasks = AppSettings.Default.Tasks with
+            {
+                GlobalLeak = new GlobalLeakTaskSettings(selectedLibraries)
+            }
+        });
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveGlobalLeakSelectedLibrariesAsync(
+            [
+                new GlobalLeakLibraryTarget(1, "场馆A", "3层")
+            ]);
+
+        Assert.Equal(0, settingsService.SaveCalls);
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_SaveGlobalLeakSelectedLibrariesAsync_ClearsSelection()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            Tasks = AppSettings.Default.Tasks with
+            {
+                GlobalLeak = new GlobalLeakTaskSettings(
+                [
+                    new GlobalLeakLibrarySelectionSettings(1, "场馆A", "3层")
+                ])
+            }
+        });
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveGlobalLeakSelectedLibrariesAsync([]);
+
+        Assert.Equal(1, settingsService.SaveCalls);
+        Assert.Empty(settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries);
+    }
+
+    [Fact]
     public async Task SettingsWorkflowService_ScheduledStartDefaults_IgnoresOutOfRangeValues()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);

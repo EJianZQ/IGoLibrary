@@ -238,6 +238,13 @@ public sealed partial class SystemSettingsViewModel(
         return settingsWorkflowService.SaveTomorrowScheduledStartDefaultAsync(value, cancellationToken);
     }
 
+    public Task SaveGlobalLeakSelectedLibrariesAsync(
+        IReadOnlyList<GlobalLeakLibraryTarget> libraries,
+        CancellationToken cancellationToken = default)
+    {
+        return settingsWorkflowService.SaveGlobalLeakSelectedLibrariesAsync(libraries, cancellationToken);
+    }
+
     public Task SaveDashboardMetricsAsync(
         DashboardMetrics metrics,
         CancellationToken cancellationToken = default)

@@ -217,6 +217,198 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_RestoresStoredGlobalLeakLibraries_WhenSessionRestored()
+    {
+        var settingsService = new FakeSettingsService(WithGlobalLeakSelectedLibraries(
+            new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层"),
+            new GlobalLeakLibrarySelectionSettings(99, "旧场馆", "旧楼层")));
+        var viewModel = CreateGlobalLeakViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal([2], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal(["场馆B"], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryName).ToArray());
+        Assert.Equal(0, settingsService.SaveCalls);
+    }
+
+    [Fact]
+    public async Task ValidateManualCookieAsync_RestoresStoredGlobalLeakLibraries_AfterFreshAuthorization()
+    {
+        var settingsService = new FakeSettingsService(WithGlobalLeakSelectedLibraries(
+            new GlobalLeakLibrarySelectionSettings(1, "场馆A", "3层")));
+        var libraryService = new FakeLibraryService
+        {
+            LibrariesToLoad =
+            [
+                new LibrarySummary(1, "场馆A", "3层", true, 120, 20, 10),
+                new LibrarySummary(2, "场馆B", "5层", true, 80, 10, 5)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            sessionService: new FakeSessionService(),
+            libraryService: libraryService,
+            settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+        Assert.False(viewModel.IsAuthorized);
+        Assert.Empty(viewModel.SelectedGlobalLeakLibraries);
+
+        viewModel.ManualCookieText = "Authorization=a; SERVERID=b";
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        Assert.Equal([1], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+    }
+
+    [Fact]
+    public async Task ValidateManualCookieAsync_RestoresStoredGlobalLeakLibraries_WhenAlreadyAuthorized()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateGlobalLeakViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+        Assert.Empty(viewModel.SelectedGlobalLeakLibraries);
+
+        await settingsService.SaveAsync(WithGlobalLeakSelectedLibraries(
+            new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层")));
+
+        viewModel.ManualCookieText = "Authorization=fresh; SERVERID=b";
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        Assert.Equal([2], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+    }
+
+    [Fact]
+    public async Task ValidateManualCookieAsync_RetriesGlobalLeakRestore_AfterSettingsLoadFailure()
+    {
+        var settingsService = new FakeSettingsService(WithGlobalLeakSelectedLibraries(
+            new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层")));
+        var libraryService = new FakeLibraryService
+        {
+            LibrariesToLoad =
+            [
+                new LibrarySummary(1, "场馆A", "3层", true, 120, 20, 10),
+                new LibrarySummary(2, "场馆B", "5层", true, 80, 10, 5)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            sessionService: new FakeSessionService(),
+            libraryService: libraryService,
+            settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        settingsService.LoadExceptions.Enqueue(new InvalidOperationException("database busy"));
+        viewModel.ManualCookieText = "Authorization=a; SERVERID=b";
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        Assert.Empty(viewModel.SelectedGlobalLeakLibraries);
+
+        await viewModel.LoadLibrariesCommand.ExecuteAsync(null);
+
+        Assert.Equal([2], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+    }
+
+    [Fact]
+    public async Task GlobalLeakLibraryPicker_CancelDoesNotPersistDraftSelection()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateGlobalLeakViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        viewModel.GlobalLeakLibraries[0].IsSelected = true;
+        viewModel.CancelGlobalLeakLibrariesCommand.Execute(null);
+
+        Assert.Empty(viewModel.SelectedGlobalLeakLibraries);
+        Assert.Empty(settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries);
+        Assert.Equal(0, settingsService.SaveCalls);
+    }
+
+    [Fact]
+    public async Task ConfirmGlobalLeakLibrariesAsync_PersistsSelection()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateGlobalLeakViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        viewModel.GlobalLeakLibraries[0].IsSelected = true;
+        viewModel.GlobalLeakLibraries[2].IsSelected = true;
+        await viewModel.ConfirmGlobalLeakLibrariesCommand.ExecuteAsync(null);
+
+        Assert.Equal([1, 3], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal([1, 3], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal(1, settingsService.SaveCalls);
+    }
+
+    [Fact]
+    public async Task ConfirmGlobalLeakLibrariesAsync_KeepsDraftOpen_WhenPersistFails()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var notificationService = new FakeNotificationService();
+        var viewModel = CreateGlobalLeakViewModel(
+            settingsService: settingsService,
+            notificationService: notificationService);
+        await viewModel.InitializeAsync();
+
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        viewModel.GlobalLeakLibraries[0].IsSelected = true;
+        settingsService.UpdateExceptions.Enqueue(new InvalidOperationException("database locked"));
+
+        await viewModel.ConfirmGlobalLeakLibrariesCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsGlobalLeakLibraryPickerOpen);
+        Assert.Empty(viewModel.SelectedGlobalLeakLibraries);
+        Assert.Empty(settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries);
+        Assert.Contains(notificationService.Warnings, warning => warning.Title == "保存扫描场馆失败");
+    }
+
+    [Fact]
+    public async Task RemoveAndClearSelectedGlobalLeakLibraries_PersistSelection()
+    {
+        var settingsService = new FakeSettingsService(WithGlobalLeakSelectedLibraries(
+            new GlobalLeakLibrarySelectionSettings(1, "场馆A", "3层"),
+            new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层")));
+        var viewModel = CreateGlobalLeakViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        await viewModel.RemoveSelectedGlobalLeakLibraryCommand.ExecuteAsync(viewModel.SelectedGlobalLeakLibraries[0]);
+
+        Assert.Equal([2], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal([2], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
+
+        await viewModel.ClearGlobalLeakLibrarySelectionCommand.ExecuteAsync(null);
+
+        Assert.Empty(viewModel.SelectedGlobalLeakLibraries);
+        Assert.Empty(settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries);
+        Assert.Equal(2, settingsService.SaveCalls);
+    }
+
+    [Fact]
+    public async Task RemoveAndClearSelectedGlobalLeakLibraries_KeepSelection_WhenPersistFails()
+    {
+        var settingsService = new FakeSettingsService(WithGlobalLeakSelectedLibraries(
+            new GlobalLeakLibrarySelectionSettings(1, "场馆A", "3层"),
+            new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层")));
+        var notificationService = new FakeNotificationService();
+        var viewModel = CreateGlobalLeakViewModel(
+            settingsService: settingsService,
+            notificationService: notificationService);
+        await viewModel.InitializeAsync();
+
+        settingsService.UpdateExceptions.Enqueue(new InvalidOperationException("remove failed"));
+        await viewModel.RemoveSelectedGlobalLeakLibraryCommand.ExecuteAsync(viewModel.SelectedGlobalLeakLibraries[0]);
+
+        Assert.Equal([1, 2], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal([1, 2], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
+
+        settingsService.UpdateExceptions.Enqueue(new InvalidOperationException("clear failed"));
+        await viewModel.ClearGlobalLeakLibrarySelectionCommand.ExecuteAsync(null);
+
+        Assert.Equal([1, 2], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal([1, 2], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal(2, notificationService.Warnings.Count(warning => warning.Title == "保存扫描场馆失败"));
+    }
+
+    [Fact]
     public async Task NotificationSettings_AutoSaveTaskEventAlerts_WhenFieldsChange()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
@@ -1613,6 +1805,7 @@ public sealed class MainWindowViewModelTests
         FakeSettingsService? settingsService = null,
         FakeTraceIntApiClient? apiClient = null,
         FakeGlobalLeakCoordinator? globalLeakCoordinator = null,
+        FakeNotificationService? notificationService = null,
         ActivityLogService? activityLogService = null)
     {
         var libraries = new[]
@@ -1637,6 +1830,7 @@ public sealed class MainWindowViewModelTests
             settingsService: settingsService,
             apiClient: apiClient,
             globalLeakCoordinator: globalLeakCoordinator,
+            notificationService: notificationService,
             activityLogService: activityLogService);
         viewModel.IsAuthorized = true;
         return viewModel;
@@ -1699,6 +1893,16 @@ public sealed class MainWindowViewModelTests
         => AppSettings.Default with
         {
             Dashboard = new DashboardMetrics(successfulReservationCount, totalGuardSeconds)
+        };
+
+    private static AppSettings WithGlobalLeakSelectedLibraries(
+        params GlobalLeakLibrarySelectionSettings[] selectedLibraries)
+        => AppSettings.Default with
+        {
+            Tasks = AppSettings.Default.Tasks with
+            {
+                GlobalLeak = new GlobalLeakTaskSettings(selectedLibraries)
+            }
         };
 
     private static AppSettings WithTaskEventAlerts(TaskEventAlertSettings alerts)

@@ -326,6 +326,11 @@ public partial class MainWindowWorkflowViewModel
             SelectedTabIndex = AccountAndVenueTabIndex;
         }
 
+        if (!value)
+        {
+            _globalLeakSelectionRestoredForCurrentSession = false;
+        }
+
         UpdateSidebarItems();
 
         OnPropertyChanged(nameof(AuthorizationStatusText));
@@ -649,6 +654,7 @@ public partial class MainWindowWorkflowViewModel
                 UpdateSidebarSessionExpiration(result.CookieExpirationTime, result.Session.Cookie);
                 if (result.ShouldLoadLibraries)
                 {
+                    _globalLeakSelectionRestoredForCurrentSession = false;
                     await LoadLibrariesAsync(restorePreferredSelection: false);
                 }
             }
@@ -695,6 +701,7 @@ public partial class MainWindowWorkflowViewModel
             UpdateSidebarSessionExpiration(result.CookieExpirationTime, session.Cookie);
             if (result.ShouldLoadLibraries)
             {
+                _globalLeakSelectionRestoredForCurrentSession = false;
                 await LoadLibrariesAsync(restorePreferredSelection: false);
             }
             SelectedTabIndex = 1;
@@ -725,6 +732,7 @@ public partial class MainWindowWorkflowViewModel
             await NotifySessionRestoredAsync(result.Cookie ?? result.Session.Cookie);
             if (result.ShouldLoadLibraries)
             {
+                _globalLeakSelectionRestoredForCurrentSession = false;
                 await LoadLibrariesAsync(restorePreferredSelection: false);
             }
         }
@@ -770,6 +778,7 @@ public partial class MainWindowWorkflowViewModel
         SelectedTomorrowSeat = null;
         SelectedLibrary = null;
         IsAuthorized = false;
+        _globalLeakSelectionRestoredForCurrentSession = false;
         SessionSummary = "未登录";
         ClearSidebarSessionExpiration();
         LibrarySummary = "未绑定场馆";
@@ -824,6 +833,11 @@ public partial class MainWindowWorkflowViewModel
             }
 
             PopulateGlobalLeakLibraries(result.Libraries);
+            if (!IsGlobalLeakLibraryPickerOpen)
+            {
+                await RestoreGlobalLeakLibrarySelectionAsync();
+            }
+
             SelectedLibrary = result.SelectedLibrary;
         }
         catch (Exception ex)
@@ -1148,8 +1162,19 @@ public partial class MainWindowWorkflowViewModel
     }
 
     [RelayCommand]
-    private void ConfirmGlobalLeakLibraries()
+    private async Task ConfirmGlobalLeakLibrariesAsync()
     {
+        if (!CanEditGlobalLeakConfiguration)
+        {
+            return;
+        }
+
+        var selectedLibraries = CreateGlobalLeakLibrarySelectionSnapshotFromItems();
+        if (!await TryPersistGlobalLeakLibrarySelectionAsync(selectedLibraries))
+        {
+            return;
+        }
+
         CommitGlobalLeakLibrarySelection();
         IsGlobalLeakLibraryPickerOpen = false;
     }
@@ -1162,11 +1187,25 @@ public partial class MainWindowWorkflowViewModel
     }
 
     [RelayCommand]
-    private void SelectAllGlobalLeakLibraries()
+    private async Task SelectAllGlobalLeakLibrariesAsync()
     {
         if (!CanEditGlobalLeakConfiguration)
         {
             return;
+        }
+
+        if (!IsGlobalLeakLibraryPickerOpen)
+        {
+            var selectedLibraries = GlobalLeakLibraries
+                .Select(static library => new GlobalLeakLibraryTarget(
+                    library.LibraryId,
+                    library.LibraryName,
+                    library.Floor))
+                .ToArray();
+            if (!await TryPersistGlobalLeakLibrarySelectionAsync(selectedLibraries))
+            {
+                return;
+            }
         }
 
         _isSynchronizingGlobalLeakLibrarySelection = true;
@@ -1192,9 +1231,14 @@ public partial class MainWindowWorkflowViewModel
     }
 
     [RelayCommand]
-    private void ClearGlobalLeakLibrarySelection()
+    private async Task ClearGlobalLeakLibrarySelectionAsync()
     {
         if (!CanEditGlobalLeakConfiguration)
+        {
+            return;
+        }
+
+        if (!await TryPersistGlobalLeakLibrarySelectionAsync(Array.Empty<GlobalLeakLibraryTarget>()))
         {
             return;
         }
@@ -1207,7 +1251,7 @@ public partial class MainWindowWorkflowViewModel
     }
 
     [RelayCommand]
-    private void ClearDraftGlobalLeakLibraries()
+    private async Task ClearDraftGlobalLeakLibrariesAsync()
     {
         if (!CanEditGlobalLeakConfiguration)
         {
@@ -1216,7 +1260,7 @@ public partial class MainWindowWorkflowViewModel
 
         if (!IsGlobalLeakLibraryPickerOpen)
         {
-            ClearGlobalLeakLibrarySelection();
+            await ClearGlobalLeakLibrarySelectionAsync();
             return;
         }
 
@@ -1226,7 +1270,7 @@ public partial class MainWindowWorkflowViewModel
     }
 
     [RelayCommand]
-    private void RemoveSelectedGlobalLeakLibrary(GlobalLeakLibraryTarget? target)
+    private async Task RemoveSelectedGlobalLeakLibraryAsync(GlobalLeakLibraryTarget? target)
     {
         if (target is null || !CanEditGlobalLeakConfiguration)
         {
@@ -1235,6 +1279,13 @@ public partial class MainWindowWorkflowViewModel
 
         if (!_committedGlobalLeakLibraryIds.Remove(target.LibraryId))
         {
+            return;
+        }
+
+        var nextLibraries = CreateGlobalLeakLibrarySelectionSnapshot(_committedGlobalLeakLibraryIds);
+        if (!await TryPersistGlobalLeakLibrarySelectionAsync(nextLibraries))
+        {
+            _committedGlobalLeakLibraryIds.Add(target.LibraryId);
             return;
         }
 
@@ -2406,6 +2457,7 @@ public partial class MainWindowWorkflowViewModel
         }
 
         RefreshCommittedGlobalLeakLibrarySelectionFromItems();
+        _ = PersistGlobalLeakLibrarySelectionSafelyAsync();
     }
 
     private void BeginTomorrowSeatSelectionDraft()
@@ -2467,6 +2519,111 @@ public partial class MainWindowWorkflowViewModel
     private void UpdateDraftTomorrowSeatSelectionPresentation()
     {
         OnPropertyChanged(nameof(DraftSelectedTomorrowSeatSummaryText));
+    }
+
+    private async Task RestoreGlobalLeakLibrarySelectionAsync()
+    {
+        if (_globalLeakSelectionRestoredForCurrentSession)
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = await SystemSettings.LoadSettingsAsync();
+            var storedLibraries = settings.Tasks.GlobalLeak.SelectedLibraries;
+            if (storedLibraries.Count == 0)
+            {
+                _committedGlobalLeakLibraryIds.Clear();
+                ApplyGlobalLeakLibrarySelectionToItems(Array.Empty<int>());
+                RefreshSelectedGlobalLeakLibrariesPresentation();
+                _globalLeakSelectionRestoredForCurrentSession = true;
+                return;
+            }
+
+            var availableLibraryIds = GlobalLeakLibraries
+                .Select(static library => library.LibraryId)
+                .ToHashSet();
+            var restoredIds = storedLibraries
+                .Select(static library => library.LibraryId)
+                .Where(availableLibraryIds.Contains)
+                .Distinct()
+                .ToArray();
+            var skippedCount = storedLibraries
+                .Select(static library => library.LibraryId)
+                .Distinct()
+                .Count(libraryId => !availableLibraryIds.Contains(libraryId));
+
+            _committedGlobalLeakLibraryIds.Clear();
+            foreach (var libraryId in restoredIds)
+            {
+                _committedGlobalLeakLibraryIds.Add(libraryId);
+            }
+
+            ApplyGlobalLeakLibrarySelectionToItems(_committedGlobalLeakLibraryIds);
+            RefreshSelectedGlobalLeakLibrariesPresentation();
+            UpdateDraftGlobalLeakLibrarySelectionPresentation();
+
+            if (restoredIds.Length > 0)
+            {
+                _activityLogService.Write(LogEntryKind.Info, "GlobalLeak", $"已恢复 {restoredIds.Length} 个全域捡漏扫描场馆。");
+            }
+
+            if (skippedCount > 0)
+            {
+                _activityLogService.Write(LogEntryKind.Info, "GlobalLeak", $"有 {skippedCount} 个历史全域捡漏场馆不在当前账号场馆列表中，已跳过。");
+            }
+
+            _globalLeakSelectionRestoredForCurrentSession = true;
+        }
+        catch (Exception ex)
+        {
+            _globalLeakSelectionRestoredForCurrentSession = false;
+            _activityLogService.Write(LogEntryKind.Warning, "GlobalLeak", $"恢复全域捡漏扫描场馆失败：{ex.Message}");
+        }
+    }
+
+    private async Task PersistGlobalLeakLibrarySelectionAsync(CancellationToken cancellationToken = default)
+    {
+        await PersistGlobalLeakLibrarySelectionAsync(
+            SelectedGlobalLeakLibraries.ToArray(),
+            cancellationToken);
+    }
+
+    private async Task PersistGlobalLeakLibrarySelectionAsync(
+        IReadOnlyList<GlobalLeakLibraryTarget> selectedLibraries,
+        CancellationToken cancellationToken = default)
+    {
+        await SystemSettings.SaveGlobalLeakSelectedLibrariesAsync(selectedLibraries, cancellationToken);
+    }
+
+    private async Task<bool> TryPersistGlobalLeakLibrarySelectionAsync(
+        IReadOnlyList<GlobalLeakLibraryTarget> selectedLibraries,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await PersistGlobalLeakLibrarySelectionAsync(selectedLibraries, cancellationToken);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "GlobalLeak", $"保存全域捡漏扫描场馆失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("保存扫描场馆失败", ex.Message, cancellationToken);
+            return false;
+        }
+    }
+
+    private async Task PersistGlobalLeakLibrarySelectionSafelyAsync()
+    {
+        try
+        {
+            await PersistGlobalLeakLibrarySelectionAsync();
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "GlobalLeak", $"保存全域捡漏扫描场馆失败：{ex.Message}");
+        }
     }
 
     private void BeginGlobalLeakLibrarySelectionDraft()
@@ -2545,6 +2702,23 @@ public partial class MainWindowWorkflowViewModel
                 library.LibraryId,
                 library.LibraryName,
                 library.Floor));
+    }
+
+    private GlobalLeakLibraryTarget[] CreateGlobalLeakLibrarySelectionSnapshot(IEnumerable<int> selectedLibraryIds)
+    {
+        var selectedIds = selectedLibraryIds as IReadOnlySet<int> ?? new HashSet<int>(selectedLibraryIds);
+        return EnumerateSelectedGlobalLeakLibraries(selectedIds).ToArray();
+    }
+
+    private GlobalLeakLibraryTarget[] CreateGlobalLeakLibrarySelectionSnapshotFromItems()
+    {
+        return GlobalLeakLibraries
+            .Where(static library => library.IsSelected)
+            .Select(static library => new GlobalLeakLibraryTarget(
+                library.LibraryId,
+                library.LibraryName,
+                library.Floor))
+            .ToArray();
     }
 
     private void ApplyGlobalLeakLibrarySelectionToItems(IEnumerable<int> selectedLibraryIds)

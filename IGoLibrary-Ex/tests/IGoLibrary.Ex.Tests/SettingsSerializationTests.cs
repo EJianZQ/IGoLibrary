@@ -196,6 +196,7 @@ public sealed class SettingsSerializationTests
         Assert.Equal(TimeSpan.Zero, settings.Tasks.Grab.DefaultScheduledStartTime);
         Assert.Equal(4, settings.Tasks.Occupy.ReReservationMaxAttempts);
         Assert.Equal(new TimeSpan(20, 0, 0), settings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
+        Assert.Empty(settings.Tasks.GlobalLeak.SelectedLibraries);
         Assert.True(settings.Updates.CheckOnStartup);
     }
 
@@ -220,6 +221,8 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"grab\":", json);
         Assert.Contains("\"occupy\":", json);
         Assert.Contains("\"tomorrowReservation\":", json);
+        Assert.Contains("\"globalLeak\":", json);
+        Assert.Contains("\"selectedLibraries\":", json);
         Assert.Contains("\"defaultScheduledStartTime\":", json);
         Assert.Contains("\"venue\":", json);
         Assert.Contains("\"dashboard\":", json);
@@ -262,6 +265,30 @@ public sealed class SettingsSerializationTests
 
         Assert.Contains("\"updates\":", migratedJson);
         Assert.Contains("\"checkOnStartup\": true", migratedJson);
+        Assert.Contains("\"globalLeak\":", migratedJson);
+        Assert.Contains("\"selectedLibraries\": []", migratedJson);
+    }
+
+    [Fact]
+    public void AppSettingsSerialization_PreservesGlobalLeakSelectedLibraries()
+    {
+        var json = JsonSerializer.Serialize(AppSettings.Default with
+        {
+            Tasks = AppSettings.Default.Tasks with
+            {
+                GlobalLeak = new GlobalLeakTaskSettings(
+                [
+                    new GlobalLeakLibrarySelectionSettings(1, "场馆A", "3层"),
+                    new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层")
+                ])
+            }
+        }, AppJson.Default);
+
+        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
+
+        Assert.Equal([1, 2], settings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal(["场馆A", "场馆B"], settings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryName).ToArray());
+        Assert.Equal(["3层", "5层"], settings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.Floor).ToArray());
     }
 
     [Fact]

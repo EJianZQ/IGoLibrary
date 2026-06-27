@@ -1,5 +1,6 @@
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Domain.Enums;
+using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Application.Services;
 
@@ -142,6 +143,37 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
         }, cancellationToken);
     }
 
+    public async Task SaveGlobalLeakSelectedLibrariesAsync(
+        IReadOnlyList<GlobalLeakLibraryTarget> libraries,
+        CancellationToken cancellationToken = default)
+    {
+        var selectedLibraries = libraries
+            .Select(static library => new GlobalLeakLibrarySelectionSettings(
+                library.LibraryId,
+                library.LibraryName,
+                library.Floor))
+            .ToArray();
+
+        await settingsService.UpdateAsync(current =>
+        {
+            if (AreGlobalLeakSelectionsEqual(current.Tasks.GlobalLeak.SelectedLibraries, selectedLibraries))
+            {
+                return current;
+            }
+
+            return current with
+            {
+                Tasks = current.Tasks with
+                {
+                    GlobalLeak = current.Tasks.GlobalLeak with
+                    {
+                        SelectedLibraries = selectedLibraries
+                    }
+                }
+            };
+        }, cancellationToken);
+    }
+
     public async Task ClearStoredLibrarySelectionAsync(CancellationToken cancellationToken = default)
     {
         await settingsService.UpdateAsync(current =>
@@ -179,5 +211,25 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
     private static bool IsTimeOfDay(TimeSpan value)
     {
         return value >= TimeSpan.Zero && value < TimeSpan.FromDays(1);
+    }
+
+    private static bool AreGlobalLeakSelectionsEqual(
+        IReadOnlyList<GlobalLeakLibrarySelectionSettings> current,
+        IReadOnlyList<GlobalLeakLibrarySelectionSettings> updated)
+    {
+        if (current.Count != updated.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < current.Count; index++)
+        {
+            if (current[index] != updated[index])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

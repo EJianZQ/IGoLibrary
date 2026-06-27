@@ -83,6 +83,7 @@ public sealed class SqliteSettingsRepository(
         var grab = ReadObject(tasks, "grab");
         var occupy = ReadObject(tasks, "occupy");
         var tomorrowReservation = ReadObject(tasks, "tomorrowReservation");
+        var globalLeak = ReadObject(tasks, "globalLeak");
         var updates = ReadObject(root, "updates");
 
         var legacyRetryCount = ReadInt(root, "retryCount")
@@ -181,6 +182,20 @@ public sealed class SqliteSettingsRepository(
                 ReadTimeSpan(tomorrowReservation, "defaultScheduledStartTime"),
                 defaults.Tasks.TomorrowReservation.DefaultScheduledStartTime).ToString("c"));
         writer.WriteEndObject();
+        writer.WritePropertyName("globalLeak");
+        writer.WriteStartObject();
+        writer.WritePropertyName("selectedLibraries");
+        var selectedLibraries = ReadArray(globalLeak, "selectedLibraries");
+        if (selectedLibraries.ValueKind == JsonValueKind.Array)
+        {
+            selectedLibraries.WriteTo(writer);
+        }
+        else
+        {
+            writer.WriteStartArray();
+            writer.WriteEndArray();
+        }
+        writer.WriteEndObject();
         writer.WriteEndObject();
 
         writer.WritePropertyName("venue");
@@ -229,6 +244,7 @@ public sealed class SqliteSettingsRepository(
         var grab = tasks.Grab ?? GrabTaskSettings.Default;
         var occupy = tasks.Occupy ?? OccupyTaskSettings.Default;
         var tomorrowReservation = tasks.TomorrowReservation ?? TomorrowReservationTaskSettings.Default;
+        var globalLeak = tasks.GlobalLeak ?? GlobalLeakTaskSettings.Default;
         var updates = settings.Updates ?? UpdateCheckSettings.Default;
         return settings with
         {
@@ -259,6 +275,10 @@ public sealed class SqliteSettingsRepository(
                     DefaultScheduledStartTime = NormalizeTimeOfDay(
                         tomorrowReservation.DefaultScheduledStartTime,
                         TomorrowReservationTaskSettings.Default.DefaultScheduledStartTime)
+                },
+                GlobalLeak = globalLeak with
+                {
+                    SelectedLibraries = NormalizeGlobalLeakSelectedLibraries(globalLeak.SelectedLibraries)
                 }
             },
             Venue = settings.Venue ?? VenueSelectionSettings.Default,
@@ -281,6 +301,7 @@ public sealed class SqliteSettingsRepository(
                tasks.TryGetProperty("grab", out _) &&
                tasks.TryGetProperty("occupy", out _) &&
                tasks.TryGetProperty("tomorrowReservation", out _) &&
+               tasks.TryGetProperty("globalLeak", out _) &&
                root.TryGetProperty("updates", out _);
     }
 
@@ -301,6 +322,7 @@ public sealed class SqliteSettingsRepository(
                HasAnyProperty(ReadObject(root, "tasks"), "grabReservationStrategy") ||
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "grab"), "defaultScheduledStartTime") ||
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "tomorrowReservation"), "defaultScheduledStartTime") ||
+               !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "globalLeak"), "selectedLibraries") ||
                HasAnyProperty(
                    ReadObject(
                        ReadObject(
@@ -392,6 +414,15 @@ public sealed class SqliteSettingsRepository(
         return parent.ValueKind == JsonValueKind.Object &&
                parent.TryGetProperty(propertyName, out var property) &&
                property.ValueKind == JsonValueKind.Object
+            ? property
+            : default;
+    }
+
+    private static JsonElement ReadArray(JsonElement parent, string propertyName)
+    {
+        return parent.ValueKind == JsonValueKind.Object &&
+               parent.TryGetProperty(propertyName, out var property) &&
+               property.ValueKind == JsonValueKind.Array
             ? property
             : default;
     }
@@ -496,6 +527,22 @@ public sealed class SqliteSettingsRepository(
     private static bool IsTimeOfDay(TimeSpan value)
     {
         return value >= TimeSpan.Zero && value < TimeSpan.FromDays(1);
+    }
+
+    private static IReadOnlyList<GlobalLeakLibrarySelectionSettings> NormalizeGlobalLeakSelectedLibraries(
+        IReadOnlyList<GlobalLeakLibrarySelectionSettings>? selectedLibraries)
+    {
+        if (selectedLibraries is null || selectedLibraries.Count == 0)
+        {
+            return [];
+        }
+
+        return selectedLibraries
+            .Select(static library => new GlobalLeakLibrarySelectionSettings(
+                library.LibraryId,
+                library.LibraryName ?? string.Empty,
+                library.Floor ?? string.Empty))
+            .ToArray();
     }
 
     private static void WriteNullableInt(
