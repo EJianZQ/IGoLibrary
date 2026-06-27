@@ -1,16 +1,20 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Styling;
 using AvaloniaApplication = Avalonia.Application;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Desktop.Services;
+using Markdown.Avalonia.Full;
 
 namespace IGoLibrary.Ex.Desktop;
 
 public sealed class UpdateReleaseWindow : Window
 {
+    private const double ReleaseBodyScrollBarContentInset = 20;
+    private const string MarkdownDocumentClass = "Markdown_Avalonia_MarkdownViewer";
+
     public UpdateReleaseWindow(
         ReleaseUpdateInfo release,
         string currentVersionText)
@@ -51,10 +55,6 @@ public sealed class UpdateReleaseWindow : Window
             HorizontalContentAlignment = HorizontalAlignment.Center
         };
         laterButton.Click += (_, _) => Close(UpdateDialogResult.Later);
-
-        var releaseBody = string.IsNullOrWhiteSpace(release.Body)
-            ? "此版本没有填写更新说明。"
-            : release.Body.Trim();
 
         Content = new Border
         {
@@ -103,21 +103,7 @@ public sealed class UpdateReleaseWindow : Window
                         Background = ResolveBrush("AppErrorDetailBackgroundBrush", "#FFF8FAFC"),
                         CornerRadius = new CornerRadius(10),
                         Padding = new Thickness(12, 10),
-                        Child = new ScrollViewer
-                        {
-                            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                            Content = new SelectableTextBlock
-                            {
-                                Text = releaseBody,
-                                TextWrapping = TextWrapping.Wrap,
-                                FontFamily = FontFamily.Parse("Consolas, Cascadia Mono, Monaco, monospace"),
-                                FontSize = 13,
-                                Foreground = ResolveBrush("AppErrorPrimaryTextBrush", "#FF1F2937"),
-                                SelectionBrush = ResolveBrush("AppErrorSelectionBrush", "#2B2563EB"),
-                                SelectionForegroundBrush = ResolveBrush("AppErrorSelectionForegroundBrush", "#FF111827")
-                            }
-                        },
+                        Child = CreateReleaseBodyViewer(release.Body),
                         [Grid.RowProperty] = 2
                     },
                     new StackPanel
@@ -149,6 +135,34 @@ public sealed class UpdateReleaseWindow : Window
         }
 
         return $"发现新版本 - 当前版本号 v{normalizedVersion}";
+    }
+
+    internal static MarkdownScrollViewer CreateReleaseBodyViewer(string? body)
+    {
+        var releaseBody = string.IsNullOrWhiteSpace(body)
+            ? "此版本没有填写更新说明。"
+            : body.Trim();
+
+        var viewer = new MarkdownScrollViewer
+        {
+            Markdown = releaseBody,
+            SelectionEnabled = true,
+            SelectionBrush = ResolveBrush("AppErrorSelectionBrush", "#2B2563EB")
+        };
+        viewer.Styles.Add(CreateMarkdownDocumentInsetStyle());
+
+        return viewer;
+    }
+
+    internal static Style CreateMarkdownDocumentInsetStyle()
+    {
+        return new Style(selector => selector.OfType<Control>().Class(MarkdownDocumentClass))
+        {
+            Setters =
+            {
+                new Setter(Layoutable.MarginProperty, new Thickness(0, 0, ReleaseBodyScrollBarContentInset, 0))
+            }
+        };
     }
 
     private static string BuildReleaseSubtitle(ReleaseUpdateInfo release)
