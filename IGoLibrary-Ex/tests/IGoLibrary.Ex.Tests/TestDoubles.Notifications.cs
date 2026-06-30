@@ -67,11 +67,15 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
 
     public List<TelegramAlertChannelSettings> TestTelegramRequests { get; } = [];
 
+    public List<BarkAlertChannelSettings> TestBarkRequests { get; } = [];
+
     public List<LocalDesktopAlertSettings> TestLocalAlertRequests { get; } = [];
 
     public Exception? SendTestEmailException { get; set; }
 
     public Exception? SendTestTelegramException { get; set; }
+
+    public Exception? SendTestBarkException { get; set; }
 
     public Exception? SendTestLocalException { get; set; }
 
@@ -167,6 +171,17 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
         return Task.CompletedTask;
     }
 
+    public Task SendTestBarkAsync(BarkAlertChannelSettings settings, CancellationToken cancellationToken = default)
+    {
+        if (SendTestBarkException is not null)
+        {
+            throw SendTestBarkException;
+        }
+
+        TestBarkRequests.Add(settings);
+        return Task.CompletedTask;
+    }
+
     public Task SendTestLocalAlertAsync(LocalDesktopAlertSettings settings, CancellationToken cancellationToken = default)
     {
         if (SendTestLocalException is not null)
@@ -252,6 +267,28 @@ internal sealed class FakeTelegramAlertSender : ITelegramAlertSender
 
         Requests.Add((settings, message));
         return SendCompletion?.Task ?? Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeBarkAlertSender : IBarkAlertSender
+{
+    public List<(BarkAlertChannelSettings Settings, string Title, string Message)> Requests { get; } = [];
+
+    public Exception? SendException { get; set; }
+
+    public Task SendAsync(
+        BarkAlertChannelSettings settings,
+        string title,
+        string message,
+        CancellationToken cancellationToken = default)
+    {
+        if (SendException is not null)
+        {
+            throw SendException;
+        }
+
+        Requests.Add((settings, title, message));
+        return Task.CompletedTask;
     }
 }
 

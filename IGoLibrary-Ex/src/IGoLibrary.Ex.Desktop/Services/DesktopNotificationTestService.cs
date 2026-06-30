@@ -6,6 +6,7 @@ namespace IGoLibrary.Ex.Desktop.Services;
 public sealed class DesktopNotificationTestService(
     IEmailAlertSender emailAlertSender,
     ITelegramAlertSender telegramAlertSender,
+    IBarkAlertSender barkAlertSender,
     ToastNotificationService toastNotificationService,
     AlertSoundService alertSoundService) : INotificationTestService
 {
@@ -37,6 +38,22 @@ public sealed class DesktopNotificationTestService(
             这是一条来自 IGoLibrary-Ex 的 Telegram 测试消息。
 
             如果你收到了这条消息，说明当前 Bot Token、Chat ID 和 API 地址已经可以正常工作，
+            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒。
+            """,
+            cancellationToken);
+    }
+
+    public Task SendTestBarkAsync(
+        BarkAlertChannelSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        return barkAlertSender.SendAsync(
+            settings,
+            "IGoLibrary-Ex Bark 测试",
+            """
+            这是一条来自 IGoLibrary-Ex 的 Bark 测试消息。
+
+            如果你收到了这条消息，说明当前 Bark 地址和 Device Key 已经可以正常工作，
             可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒。
             """,
             cancellationToken);

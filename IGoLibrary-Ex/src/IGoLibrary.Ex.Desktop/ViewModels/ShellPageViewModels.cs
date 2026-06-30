@@ -195,6 +195,13 @@ public sealed partial class NotificationSettingsViewModel(
         return notificationTestService.SendTestTelegramAsync(settings, cancellationToken);
     }
 
+    public Task SendTestBarkAsync(
+        BarkAlertChannelSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        return notificationTestService.SendTestBarkAsync(settings, cancellationToken);
+    }
+
     public Task SendTestLocalAlertAsync(
         LocalDesktopAlertSettings settings,
         CancellationToken cancellationToken = default)

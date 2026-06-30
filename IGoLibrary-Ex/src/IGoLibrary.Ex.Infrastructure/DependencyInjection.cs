@@ -31,6 +31,10 @@ public static class DependencyInjection
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
         });
+        services.AddHttpClient<IBarkAlertSender, BarkAlertSender>(client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        });
         services.AddHttpClient<IGitHubReleaseClient, GitHubReleaseClient>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;

@@ -136,7 +136,7 @@ public partial class MainWindowWorkflowViewModel(
     private static readonly IBrush NotificationSegmentInactiveBrush = Brushes.Transparent;
     private IBrush NotificationSegmentActiveTextBrush = appThemeService.CurrentPalette.NotificationSegmentActiveTextBrush;
     private IBrush NotificationSegmentInactiveTextBrush = appThemeService.CurrentPalette.NotificationSegmentInactiveTextBrush;
-    private const double NotificationSegmentControlWidthValue = 560d;
+    private const double NotificationSegmentControlWidthValue = 720d;
     private const double NotificationSegmentSliderWidthValue = 174d;
     private const double NotificationSegmentSliderOffsetValue = 180d;
     private readonly HashSet<string> _committedSelectedSeatKeys = new(StringComparer.Ordinal);
@@ -641,6 +641,21 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private string telegramAlertChatId = string.Empty;
+
+    [ObservableProperty]
+    private bool barkAlertsEnabled;
+
+    [ObservableProperty]
+    private string barkAlertServerUrl = BarkAlertChannelSettings.DefaultServerUrl;
+
+    [ObservableProperty]
+    private string barkAlertDeviceKey = string.Empty;
+
+    [ObservableProperty]
+    private string barkAlertSound = string.Empty;
+
+    [ObservableProperty]
+    private string barkAlertGroup = BarkAlertChannelSettings.Default.Group;
 
     [ObservableProperty]
     private bool localToastAlertsEnabled = true;

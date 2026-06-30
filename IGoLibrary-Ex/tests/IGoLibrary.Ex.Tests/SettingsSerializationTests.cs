@@ -92,6 +92,7 @@ public sealed class SettingsSerializationTests
         Assert.True(alerts.Local.PopupEnabled);
         Assert.False(alerts.Local.SoundEnabled);
         Assert.Equal(TelegramAlertChannelSettings.Default, alerts.Telegram);
+        Assert.Equal(BarkAlertChannelSettings.Default, alerts.Bark);
     }
 
     [Fact]
@@ -228,6 +229,7 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"dashboard\":", json);
         Assert.Contains("\"updates\":", json);
         Assert.Contains("\"taskEventAlerts\":", json);
+        Assert.Contains("\"bark\":", json);
         Assert.Contains("\"graphQlOverridesEnabled\": true", json);
     }
 
