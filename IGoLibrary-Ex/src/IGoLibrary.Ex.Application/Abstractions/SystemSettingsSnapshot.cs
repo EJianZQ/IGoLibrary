@@ -3,7 +3,6 @@ using IGoLibrary.Ex.Domain.Enums;
 namespace IGoLibrary.Ex.Application.Abstractions;
 
 public sealed record SystemSettingsSnapshot(
-    bool AppBannerNotificationsEnabled,
     bool MinimizeToTray,
     bool TraceIntGraphQlOverridesEnabled,
     bool CheckUpdatesOnStartup,

@@ -19,7 +19,6 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
         {
             Notifications = current.Notifications with
             {
-                AppBannerNotificationsEnabled = snapshot.AppBannerNotificationsEnabled,
                 TaskEventAlerts = snapshot.TaskEventAlerts
             },
             Ui = current.Ui with

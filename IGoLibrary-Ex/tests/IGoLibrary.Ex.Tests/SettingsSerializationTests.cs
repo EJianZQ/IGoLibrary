@@ -29,7 +29,6 @@ public sealed class SettingsSerializationTests
             }
             """);
 
-        Assert.False(settings.Notifications.AppBannerNotificationsEnabled);
         Assert.False(settings.Ui.MinimizeToTray);
         Assert.Equal(AppThemeMode.Dark, settings.Ui.Theme?.Mode);
         Assert.False(settings.Ui.Theme?.UseSystemAccent);
@@ -132,6 +131,7 @@ public sealed class SettingsSerializationTests
         Assert.True(alerts.Local.PopupEnabled);
         Assert.False(alerts.Local.SoundEnabled);
         Assert.DoesNotContain("toastEnabled", migratedJson);
+        Assert.DoesNotContain("appBannerNotificationsEnabled", migratedJson);
         Assert.Contains("\"popupEnabled\": true", migratedJson);
     }
 
@@ -185,7 +185,6 @@ public sealed class SettingsSerializationTests
             """,
             AppJson.Default));
 
-        Assert.True(settings.Notifications.AppBannerNotificationsEnabled);
         Assert.Equal(TaskEventAlertSettings.Default, settings.Notifications.TaskEventAlerts);
         Assert.True(settings.Ui.MinimizeToTray);
         Assert.Equal(AppThemeMode.FollowSystem, settings.Ui.Theme?.Mode);
@@ -207,7 +206,6 @@ public sealed class SettingsSerializationTests
         {
             Notifications = AppSettings.Default.Notifications with
             {
-                AppBannerNotificationsEnabled = false,
                 TaskEventAlerts = TaskEventAlertSettings.Default
             },
             TraceIntProtocol = new TraceIntProtocolSettings(true)
@@ -228,6 +226,7 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"dashboard\":", json);
         Assert.Contains("\"updates\":", json);
         Assert.Contains("\"taskEventAlerts\":", json);
+        Assert.DoesNotContain("appBannerNotificationsEnabled", json);
         Assert.Contains("\"graphQlOverridesEnabled\": true", json);
     }
 
@@ -308,6 +307,7 @@ public sealed class SettingsSerializationTests
         Assert.DoesNotContain("advancedMode", json);
         Assert.DoesNotContain("cookieExpiryAlerts", json);
         Assert.DoesNotContain("notificationsEnabled", json);
+        Assert.DoesNotContain("appBannerNotificationsEnabled", json);
         Assert.DoesNotContain("apiTimeoutSeconds", json);
         Assert.DoesNotContain("retryCount", json);
         Assert.DoesNotContain("requestPolicy", json);

@@ -560,9 +560,6 @@ public partial class MainWindowWorkflowViewModel(
     private int selectedNotificationSettingsTabIndex;
 
     [ObservableProperty]
-    private bool notificationsEnabled = true;
-
-    [ObservableProperty]
     private bool minimizeToTrayEnabled = true;
 
     [ObservableProperty]

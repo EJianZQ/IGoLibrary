@@ -10,7 +10,6 @@ using Microsoft.Extensions.Logging;
 namespace IGoLibrary.Ex.Desktop.Services;
 
 public sealed class ToastNotificationService(
-    ISettingsService settingsService,
     AppWindowService appWindowService,
     IAppLogWriter? logWriter = null) : INotificationService
 {
@@ -33,14 +32,14 @@ public sealed class ToastNotificationService(
         => ShowAsync(ToastVisualKind.Success, title, message, cancellationToken);
 
     public Task ShowPreviewAsync(string title, string message, CancellationToken cancellationToken = default)
-        => ShowCoreAsync(ToastVisualKind.Info, title, message, skipSettingsCheck: true, cancellationToken);
+        => ShowCoreAsync(ToastVisualKind.Info, title, message, cancellationToken);
 
     public Task ShowForcedAsync(
         ToastVisualKind kind,
         string title,
         string message,
         CancellationToken cancellationToken = default)
-        => ShowCoreAsync(kind, title, message, skipSettingsCheck: true, cancellationToken);
+        => ShowCoreAsync(kind, title, message, cancellationToken);
 
     private async Task ShowAsync(
         ToastVisualKind kind,
@@ -48,21 +47,15 @@ public sealed class ToastNotificationService(
         string message,
         CancellationToken cancellationToken)
     {
-        await ShowCoreAsync(kind, title, message, skipSettingsCheck: false, cancellationToken);
+        await ShowCoreAsync(kind, title, message, cancellationToken);
     }
 
     private async Task ShowCoreAsync(
         ToastVisualKind kind,
         string title,
         string message,
-        bool skipSettingsCheck,
         CancellationToken cancellationToken)
     {
-        if (!skipSettingsCheck && !await IsEnabledAsync(cancellationToken))
-        {
-            return;
-        }
-
         message = TrimTrailingSentencePeriod(message);
 
         await Dispatcher.UIThread.InvokeAsync(() =>
@@ -143,12 +136,6 @@ public sealed class ToastNotificationService(
                 CleanupToastState(toast);
             }
         }
-    }
-
-    private async Task<bool> IsEnabledAsync(CancellationToken cancellationToken)
-    {
-        var settings = await settingsService.LoadAsync(cancellationToken);
-        return settings.Notifications.AppBannerNotificationsEnabled;
     }
 
     private async Task AutoDismissAsync(ToastWindow toast)

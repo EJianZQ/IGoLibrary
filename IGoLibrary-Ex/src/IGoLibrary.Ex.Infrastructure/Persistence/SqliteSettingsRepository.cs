@@ -93,11 +93,6 @@ public sealed class SqliteSettingsRepository(
 
         writer.WritePropertyName("notifications");
         writer.WriteStartObject();
-        writer.WriteBoolean(
-            "appBannerNotificationsEnabled",
-            ReadBool(notifications, "appBannerNotificationsEnabled")
-            ?? ReadBool(root, "notificationsEnabled")
-            ?? defaults.Notifications.AppBannerNotificationsEnabled);
         writer.WritePropertyName("taskEventAlerts");
         WriteTaskEventAlerts(writer, root, notifications, defaults.Notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default);
         writer.WriteEndObject();
@@ -317,6 +312,7 @@ public sealed class SqliteSettingsRepository(
                    "retryCount",
                    "grabReservationStrategy",
                    "themeMode") ||
+               HasAnyProperty(ReadObject(root, "notifications"), "appBannerNotificationsEnabled") ||
                HasAnyProperty(ReadObject(root, "protocol"), "templateOverridesEnabled") ||
                HasAnyProperty(ReadObject(root, "requestPolicy"), "timeoutSeconds", "retryCount") ||
                HasAnyProperty(ReadObject(root, "tasks"), "grabReservationStrategy") ||

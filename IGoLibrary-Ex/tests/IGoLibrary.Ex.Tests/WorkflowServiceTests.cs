@@ -187,7 +187,6 @@ public sealed class WorkflowServiceTests
         var service = new SettingsWorkflowService(settingsService);
 
         await service.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
-            AppBannerNotificationsEnabled: false,
             MinimizeToTray: false,
             TraceIntGraphQlOverridesEnabled: true,
             CheckUpdatesOnStartup: false,
@@ -210,7 +209,7 @@ public sealed class WorkflowServiceTests
     {
         var initial = AppSettings.Default with
         {
-            Notifications = new NotificationSettings(true, TaskEventAlertSettings.Default),
+            Notifications = new NotificationSettings(TaskEventAlertSettings.Default),
             Ui = new UiPreferences(false, new ThemePreferences(AppThemeMode.Dark, false))
         };
         var settingsService = new FakeSettingsService(initial);
@@ -223,7 +222,6 @@ public sealed class WorkflowServiceTests
         await service.SaveNotificationSettingsAsync(alerts);
 
         Assert.Equal(alerts, settingsService.CurrentSettings.Notifications.TaskEventAlerts);
-        Assert.Equal(initial.Notifications.AppBannerNotificationsEnabled, settingsService.CurrentSettings.Notifications.AppBannerNotificationsEnabled);
         Assert.Equal(initial.Ui, settingsService.CurrentSettings.Ui);
     }
 

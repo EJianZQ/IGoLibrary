@@ -1623,7 +1623,6 @@ public partial class MainWindowWorkflowViewModel
             (AppThemeMode)Math.Clamp(SelectedAppThemeModeIndex, 0, ThemeModes.Length - 1),
             UseSystemAccent);
         await SystemSettings.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
-            NotificationsEnabled,
             MinimizeToTrayEnabled,
             TraceIntGraphQlOverridesEnabled,
             CheckUpdatesOnStartup,
@@ -1846,7 +1845,6 @@ public partial class MainWindowWorkflowViewModel
             var theme = ui.Theme ?? ThemePreferences.Default;
             var alertSettings = notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
 
-            NotificationsEnabled = notifications.AppBannerNotificationsEnabled;
             MinimizeToTrayEnabled = ui.MinimizeToTray;
             TraceIntGraphQlOverridesEnabled = settings.TraceIntProtocol.GraphQlOverridesEnabled;
             CheckUpdatesOnStartup = settings.Updates.CheckOnStartup;

@@ -15,7 +15,7 @@ public sealed class TaskEventAlertServiceTests
         var service = new DesktopNotificationTestService(
             new FakeEmailAlertSender(),
             new FakeTelegramAlertSender(),
-            new ToastNotificationService(settingsService, new AppWindowService()),
+            new ToastNotificationService(new AppWindowService()),
             new AlertSoundService());
         var settings = new EmailAlertChannelSettings(
             Enabled: true,
@@ -371,7 +371,7 @@ public sealed class TaskEventAlertServiceTests
         FakeTelegramAlertSender? telegramSender = null)
     {
         settingsService ??= new FakeSettingsService(AppSettings.Default);
-        var toastService = new ToastNotificationService(settingsService, new AppWindowService());
+        var toastService = new ToastNotificationService(new AppWindowService());
 
         return new TaskEventAlertService(
             settingsService,
