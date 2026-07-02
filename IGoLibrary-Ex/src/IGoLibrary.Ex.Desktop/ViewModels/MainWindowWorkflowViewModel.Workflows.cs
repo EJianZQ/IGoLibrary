@@ -90,39 +90,6 @@ public partial class MainWindowWorkflowViewModel
 
     public bool ShowSeatFilterEmptyState => HasSeatLayout && HasNoVisibleSeatResults;
 
-    public bool IsEmailNotificationTabActive => SelectedNotificationSettingsTabIndex == 0;
-
-    public bool IsTelegramNotificationTabActive => SelectedNotificationSettingsTabIndex == 1;
-
-    public bool IsLocalNotificationTabActive => SelectedNotificationSettingsTabIndex == 2;
-
-    public double NotificationSegmentControlWidth => NotificationSegmentControlWidthValue;
-
-    public double NotificationSegmentSliderWidth => NotificationSegmentSliderWidthValue;
-
-    public double NotificationSegmentSliderOffset => Math.Clamp(SelectedNotificationSettingsTabIndex, 0, 2) *
-                                                     NotificationSegmentSliderOffsetValue;
-
-    public IBrush EmailNotificationTabBackgroundBrush => IsEmailNotificationTabActive
-        ? NotificationSegmentActiveBrush
-        : NotificationSegmentInactiveBrush;
-
-    public IBrush LocalNotificationTabBackgroundBrush => IsLocalNotificationTabActive
-        ? NotificationSegmentActiveBrush
-        : NotificationSegmentInactiveBrush;
-
-    public IBrush TelegramNotificationTabForegroundBrush => IsTelegramNotificationTabActive
-        ? NotificationSegmentActiveTextBrush
-        : NotificationSegmentInactiveTextBrush;
-
-    public IBrush EmailNotificationTabForegroundBrush => IsEmailNotificationTabActive
-        ? NotificationSegmentActiveTextBrush
-        : NotificationSegmentInactiveTextBrush;
-
-    public IBrush LocalNotificationTabForegroundBrush => IsLocalNotificationTabActive
-        ? NotificationSegmentActiveTextBrush
-        : NotificationSegmentInactiveTextBrush;
-
     public string SelectedSeatSummaryText => HasSelectedSeats
         ? $"已选 {SelectedSeatCount} 个目标座位"
         : "尚未选择目标座位";
@@ -304,19 +271,6 @@ public partial class MainWindowWorkflowViewModel
         OnPropertyChanged(nameof(HasVisibleSeatResults));
         OnPropertyChanged(nameof(HasNoVisibleSeatResults));
         OnPropertyChanged(nameof(ShowSeatFilterEmptyState));
-    }
-
-    partial void OnSelectedNotificationSettingsTabIndexChanged(int value)
-    {
-        OnPropertyChanged(nameof(IsEmailNotificationTabActive));
-        OnPropertyChanged(nameof(IsTelegramNotificationTabActive));
-        OnPropertyChanged(nameof(IsLocalNotificationTabActive));
-        OnPropertyChanged(nameof(NotificationSegmentSliderOffset));
-        OnPropertyChanged(nameof(EmailNotificationTabBackgroundBrush));
-        OnPropertyChanged(nameof(LocalNotificationTabBackgroundBrush));
-        OnPropertyChanged(nameof(EmailNotificationTabForegroundBrush));
-        OnPropertyChanged(nameof(TelegramNotificationTabForegroundBrush));
-        OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
     }
 
     partial void OnIsAuthorizedChanged(bool value)
@@ -600,24 +554,6 @@ public partial class MainWindowWorkflowViewModel
     private void OpenSystemSettings()
     {
         SelectedTabIndex = SystemSettingsTabIndex;
-    }
-
-    [RelayCommand]
-    private void ShowEmailNotificationSettings()
-    {
-        SelectedNotificationSettingsTabIndex = 0;
-    }
-
-    [RelayCommand]
-    private void ShowTelegramNotificationSettings()
-    {
-        SelectedNotificationSettingsTabIndex = 1;
-    }
-
-    [RelayCommand]
-    private void ShowLocalNotificationSettings()
-    {
-        SelectedNotificationSettingsTabIndex = 2;
     }
 
     [RelayCommand]
@@ -1723,12 +1659,10 @@ public partial class MainWindowWorkflowViewModel
             CancelPendingNotificationSettingsAutoSave();
             await PersistNotificationSettingsSnapshotAsync();
             await NotificationSettings.SendTestEmailAsync(BuildTaskEventAlertSettingsSnapshot().Email);
-            NotificationSettingsStatusText = $"测试邮件已发送于 {DateTime.Now:HH:mm:ss}。";
             await _notificationService.ShowSuccessAsync("测试邮件已发送", "请检查收件箱，确认当前 SMTP 配置可用");
         }
         catch (Exception ex)
         {
-            NotificationSettingsStatusText = $"测试邮件发送失败：{ex.Message}";
             _activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试邮件失败：{ex.Message}");
             await _errorDialogService.ShowErrorAsync("测试邮件发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
         }
@@ -1742,12 +1676,10 @@ public partial class MainWindowWorkflowViewModel
             CancelPendingNotificationSettingsAutoSave();
             await PersistNotificationSettingsSnapshotAsync();
             await NotificationSettings.SendTestTelegramAsync(BuildTaskEventAlertSettingsSnapshot().Telegram);
-            NotificationSettingsStatusText = $"测试 Telegram 已发送于 {DateTime.Now:HH:mm:ss}。";
             await _notificationService.ShowSuccessAsync("测试 Telegram 已发送", "请检查 Telegram，确认当前 Bot 配置可用");
         }
         catch (Exception ex)
         {
-            NotificationSettingsStatusText = $"测试 Telegram 发送失败：{ex.Message}";
             _activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Telegram 失败：{ex.Message}");
             await _errorDialogService.ShowErrorAsync("测试 Telegram 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
         }
@@ -1761,11 +1693,9 @@ public partial class MainWindowWorkflowViewModel
             CancelPendingNotificationSettingsAutoSave();
             await PersistNotificationSettingsSnapshotAsync();
             await NotificationSettings.SendTestLocalAlertAsync(BuildTaskEventAlertSettingsSnapshot().Local);
-            NotificationSettingsStatusText = $"测试通知已触发于 {DateTime.Now:HH:mm:ss}。";
         }
         catch (Exception ex)
         {
-            NotificationSettingsStatusText = $"测试通知发送失败：{ex.Message}";
             _activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试通知失败：{ex.Message}");
             await _notificationService.ShowWarningAsync("测试通知发送失败", ex.Message);
         }
@@ -1951,7 +1881,6 @@ public partial class MainWindowWorkflowViewModel
             TelegramAlertChatId = alertSettings.Telegram.ChatId ?? string.Empty;
             LocalToastAlertsEnabled = alertSettings.Local.PopupEnabled;
             LocalSoundAlertsEnabled = alertSettings.Local.SoundEnabled;
-            NotificationSettingsStatusText = "更改后会自动保存。";
 
             _historicalSuccessCount = Math.Max(0, settings.Dashboard.SuccessfulReservationCount);
             _totalGuardSeconds = Math.Max(0, settings.Dashboard.TotalGuardSeconds);
@@ -4138,7 +4067,6 @@ public partial class MainWindowWorkflowViewModel
         }
 
         CancelPendingNotificationSettingsAutoSave();
-        NotificationSettingsStatusText = "正在自动保存...";
         _notificationSettingsAutoSaveCts = new CancellationTokenSource();
         _ = AutoSaveNotificationSettingsAsync(_notificationSettingsAutoSaveCts.Token);
     }
@@ -4149,14 +4077,12 @@ public partial class MainWindowWorkflowViewModel
         {
             await Task.Delay(TimeSpan.FromMilliseconds(450), cancellationToken);
             await PersistNotificationSettingsSnapshotAsync(cancellationToken);
-            NotificationSettingsStatusText = $"已自动保存于 {DateTime.Now:HH:mm:ss}。";
         }
         catch (OperationCanceledException)
         {
         }
         catch (Exception ex)
         {
-            NotificationSettingsStatusText = $"自动保存失败：{ex.Message}";
             _activityLogService.Write(LogEntryKind.Warning, "Alert", $"自动保存通知设置失败：{ex.Message}");
         }
     }
@@ -4388,17 +4314,11 @@ public partial class MainWindowWorkflowViewModel
         DashboardSuccessSoftBrush = palette.SuccessSoftBrush;
         DashboardWarningSoftBrush = palette.WarningSoftBrush;
         DashboardNeutralSoftBrush = palette.NeutralSoftBrush;
-        NotificationSegmentActiveTextBrush = palette.NotificationSegmentActiveTextBrush;
-        NotificationSegmentInactiveTextBrush = palette.NotificationSegmentInactiveTextBrush;
-
         foreach (var logLine in OccupyLogLines)
         {
             logLine.RefreshTheme();
         }
 
-        OnPropertyChanged(nameof(EmailNotificationTabForegroundBrush));
-        OnPropertyChanged(nameof(TelegramNotificationTabForegroundBrush));
-        OnPropertyChanged(nameof(LocalNotificationTabForegroundBrush));
         OnPropertyChanged(nameof(GrabDashboardStatusBrush));
         OnPropertyChanged(nameof(TomorrowDashboardStatusBrush));
         RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);

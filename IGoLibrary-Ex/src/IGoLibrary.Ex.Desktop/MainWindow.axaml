@@ -20,6 +20,46 @@
         Icon="/Assets/main.ico">
 
   <Window.Resources>
+    <ControlTheme x:Key="SettingsCenterTabStripItemTheme"
+                  TargetType="primitives:TabStripItem">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiTextSecondaryBrush}" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid RowDefinitions="*,2"
+                Background="{TemplateBinding Background}">
+            <ContentPresenter Grid.Row="0"
+                              Margin="{TemplateBinding Padding}"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                              RecognizesAccessKey="True" />
+            <Border x:Name="PART_SettingsAccentLine"
+                    Grid.Row="1"
+                    Height="2"
+                    Background="Transparent" />
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+
+      <Style Selector="^:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
+      </Style>
+      <Style Selector="^:selected">
+        <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
+      </Style>
+      <Style Selector="^:selected /template/ Border#PART_SettingsAccentLine">
+        <Setter Property="Background" Value="{DynamicResource SemiAccentBrush}" />
+      </Style>
+    </ControlTheme>
+
     <PathGeometry x:Key="IconHome">M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z</PathGeometry>
     <PathGeometry x:Key="IconLogin">M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z</PathGeometry>
     <PathGeometry x:Key="IconGrab">M7 2v11h3v9l7-12h-4l4-8z</PathGeometry>
@@ -56,6 +96,7 @@
     </Style>
     <Style Selector="primitives|TabStrip.settings-center-tabs">
       <Setter Property="MinHeight" Value="44" />
+      <Setter Property="ItemContainerTheme" Value="{StaticResource SettingsCenterTabStripItemTheme}" />
     </Style>
     <Style Selector="primitives|TabStrip.settings-center-tabs primitives|TabStripItem">
       <Setter Property="MinHeight" Value="44" />
@@ -194,55 +235,6 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="22" />
       <Setter Property="Padding" Value="18" />
-    </Style>
-    <Style Selector="Button.notification-segment">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="CornerRadius" Value="16" />
-      <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="Padding" Value="16,10" />
-      <Setter Property="MinHeight" Value="42" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Opacity" Value="0.92" />
-    </Style>
-    <Style Selector="Button.notification-segment:pointerover">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="Opacity" Value="1" />
-    </Style>
-    <Style Selector="Button.notification-segment:pressed">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="Opacity" Value="1" />
-    </Style>
-    <Style Selector="Button.notification-segment /template/ ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="BoxShadow" Value="0 0 0 0 #00000000" />
-      <Setter Property="CornerRadius" Value="16" />
-      <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="VerticalAlignment" Value="Stretch" />
-    </Style>
-    <Style Selector="Button.notification-segment:pointerover /template/ ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource AppInteractiveHoverBrush}" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="BoxShadow" Value="0 0 0 0 #00000000" />
-    </Style>
-    <Style Selector="Button.notification-segment:pressed /template/ ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource AppInteractivePressedBrush}" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="BoxShadow" Value="0 0 0 0 #00000000" />
-    </Style>
-    <Style Selector="Button.notification-segment:focus /template/ ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource AppInteractiveHoverBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource SemiCardBorderBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BoxShadow" Value="0 0 0 0 #00000000" />
     </Style>
   </Window.Styles>
 
@@ -1775,104 +1767,43 @@
 
         <!-- Tab 6: Notification Settings -->
         <ScrollViewer>
-          <StackPanel Spacing="24"
-                      Margin="0,0,16,0"
-                      HorizontalAlignment="Stretch">
+          <Grid RowDefinitions="Auto,*"
+                RowSpacing="18"
+                Margin="0,0,16,0"
+                HorizontalAlignment="Stretch">
             <TextBlock Classes="page-title" Text="通知设置" Margin="0" />
-            <Border Classes="semi-card Shadow">
-              <Grid RowDefinitions="Auto,Auto"
-                    RowSpacing="24">
-                <StackPanel Spacing="10">
-                  <Border Background="{DynamicResource DashboardMutedSurfaceBrush}"
-                          BorderBrush="{DynamicResource SemiCardBorderBrush}"
-                          BorderThickness="1"
-                          CornerRadius="999"
-                          Padding="5"
-                          Width="{Binding NotificationSegmentControlWidth}"
-                          HorizontalAlignment="Center">
-                    <Grid ColumnDefinitions="*,*,*"
-                          ColumnSpacing="6"
-                          ClipToBounds="True">
-                      <Border Background="{DynamicResource AppNotificationSegmentThumbBrush}"
-                              Width="{Binding NotificationSegmentSliderWidth}"
-                              CornerRadius="16"
-                              BorderBrush="{DynamicResource SemiCardBorderBrush}"
-                              BorderThickness="1"
-                              HorizontalAlignment="Left"
-                              VerticalAlignment="Stretch"
-                              IsHitTestVisible="False">
-                        <Border.RenderTransform>
-                          <TranslateTransform X="{Binding NotificationSegmentSliderOffset}">
-                            <TranslateTransform.Transitions>
-                              <Transitions>
-                                <DoubleTransition Property="X"
-                                                  Duration="0:0:0.26"
-                                                  Easing="CircularEaseOut" />
-                              </Transitions>
-                            </TranslateTransform.Transitions>
-                          </TranslateTransform>
-                        </Border.RenderTransform>
-                      </Border>
 
-                      <Grid Grid.Column="0">
-                        <Button Classes="notification-segment"
-                                Background="Transparent"
-                                Foreground="{Binding EmailNotificationTabForegroundBrush}"
-                                BorderThickness="0"
-                                CornerRadius="16"
-                                Content="邮件提醒配置"
-                                Command="{Binding ShowEmailNotificationSettingsCommand}" />
-                      </Grid>
+            <Grid Grid.Row="1"
+                  RowDefinitions="Auto,Auto"
+                  RowSpacing="18">
+              <primitives:TabStrip Classes="settings-center-tabs"
+                                   ItemsSource="{Binding NotificationSettingsCategories}"
+                                   SelectedIndex="{Binding SelectedNotificationSettingsTabIndex}"
+                                   HorizontalAlignment="Left" />
 
-                      <Grid Grid.Column="1">
-                        <Button Classes="notification-segment"
-                                Background="Transparent"
-                                Foreground="{Binding TelegramNotificationTabForegroundBrush}"
-                                BorderThickness="0"
-                                CornerRadius="16"
-                                Content="Telegram Bot"
-                                Command="{Binding ShowTelegramNotificationSettingsCommand}" />
-                      </Grid>
-
-                      <Grid Grid.Column="2">
-                        <Button Classes="notification-segment"
-                                Background="Transparent"
-                                Foreground="{Binding LocalNotificationTabForegroundBrush}"
-                                BorderThickness="0"
-                                CornerRadius="16"
-                                Content="本地弹窗提醒"
-                                Command="{Binding ShowLocalNotificationSettingsCommand}" />
-                      </Grid>
-                    </Grid>
-                  </Border>
-
-                  <TextBlock Classes="helper-text"
-                             HorizontalAlignment="Center"
-                             Text="{Binding NotificationSettingsStatusText}" />
-                </StackPanel>
-
-                <Carousel Grid.Row="1"
-                          SelectedIndex="{Binding SelectedNotificationSettingsTabIndex}"
+              <Border Grid.Row="1"
+                      Classes="semi-card Shadow">
+                <Carousel SelectedIndex="{Binding SelectedNotificationSettingsTabIndex}"
                           HorizontalAlignment="Stretch">
-                  <Carousel.PageTransition>
-                    <CrossFade Duration="0:0:0.25" />
-                  </Carousel.PageTransition>
+                    <Carousel.PageTransition>
+                      <CrossFade Duration="0:0:0.22" />
+                    </Carousel.PageTransition>
 
-                  <Grid HorizontalAlignment="Stretch">
-                    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
-                          ColumnDefinitions="*,*"
-                          RowSpacing="18"
-                          ColumnSpacing="24"
-                          HorizontalAlignment="Stretch">
-                      <StackPanel Grid.Row="0"
-                                  Grid.ColumnSpan="2"
-                                  Spacing="0">
-                        <TextBlock Classes="field-label"
-                                   Text="SMTP 服务器地址（主机名）" />
-                        <TextBox Text="{Binding EmailAlertSmtpHost}"
-                                 Watermark="smtp.example.com"
-                                 HorizontalAlignment="Stretch" />
-                      </StackPanel>
+                    <Grid HorizontalAlignment="Stretch">
+                      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                            ColumnDefinitions="*,*"
+                            RowSpacing="18"
+                            ColumnSpacing="24"
+                            HorizontalAlignment="Stretch">
+                        <StackPanel Grid.Row="0"
+                                    Grid.ColumnSpan="2"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="SMTP 服务器地址（主机名）" />
+                          <TextBox Text="{Binding EmailAlertSmtpHost}"
+                                   Watermark="smtp.example.com"
+                                   HorizontalAlignment="Stretch" />
+                        </StackPanel>
 
                       <StackPanel Grid.Row="1"
                                   Grid.Column="0"
@@ -2101,9 +2032,9 @@
                     </StackPanel>
                   </Grid>
                 </Carousel>
-              </Grid>
             </Border>
-          </StackPanel>
+            </Grid>
+          </Grid>
         </ScrollViewer>
 
         <!-- Tab 7: Settings -->

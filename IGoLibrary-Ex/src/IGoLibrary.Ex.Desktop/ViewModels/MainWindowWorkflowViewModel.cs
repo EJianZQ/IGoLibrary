@@ -134,13 +134,6 @@ public partial class MainWindowWorkflowViewModel(
     private IBrush DashboardSuccessSoftBrush = appThemeService.CurrentPalette.SuccessSoftBrush;
     private IBrush DashboardWarningSoftBrush = appThemeService.CurrentPalette.WarningSoftBrush;
     private IBrush DashboardNeutralSoftBrush = appThemeService.CurrentPalette.NeutralSoftBrush;
-    private static readonly IBrush NotificationSegmentActiveBrush = Brushes.White;
-    private static readonly IBrush NotificationSegmentInactiveBrush = Brushes.Transparent;
-    private IBrush NotificationSegmentActiveTextBrush = appThemeService.CurrentPalette.NotificationSegmentActiveTextBrush;
-    private IBrush NotificationSegmentInactiveTextBrush = appThemeService.CurrentPalette.NotificationSegmentInactiveTextBrush;
-    private const double NotificationSegmentControlWidthValue = 560d;
-    private const double NotificationSegmentSliderWidthValue = 174d;
-    private const double NotificationSegmentSliderOffsetValue = 180d;
     private readonly HashSet<string> _committedSelectedSeatKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _draftSelectedSeatKeys = new(StringComparer.Ordinal);
     private bool _isSynchronizingSeatSelection;
@@ -234,6 +227,8 @@ public partial class MainWindowWorkflowViewModel(
     public string[] ThemeModes { get; } = ["跟随系统", "浅色", "深色"];
 
     public string[] SystemSettingsCategories { get; } = ["常规", "外观", "网络与接口", "存储与更新"];
+
+    public string[] NotificationSettingsCategories { get; } = ["邮件提醒配置", "Telegram Bot", "本地弹窗提醒"];
 
     public string CurrentAppVersionText { get; } = $"v{appVersionProvider.CurrentVersionText}";
 
@@ -710,9 +705,6 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private bool localSoundAlertsEnabled;
-
-    [ObservableProperty]
-    private string notificationSettingsStatusText = "更改后会自动保存。";
 
     [ObservableProperty]
     private string allLogsText = string.Empty;

@@ -14,6 +14,17 @@ namespace IGoLibrary.Ex.Desktop.Services;
 public sealed class AppThemeService(ISettingsService settingsService) : IAppThemeService
 {
     private static readonly Color DefaultAccentColor = Color.Parse("#0077FA");
+    private static readonly string[] FluentAccentColorResourceKeys =
+    [
+        "SystemAccentColor",
+        "SystemAccentColorDark1",
+        "SystemAccentColorDark2",
+        "SystemAccentColorDark3",
+        "SystemAccentColorLight1",
+        "SystemAccentColorLight2",
+        "SystemAccentColorLight3"
+    ];
+
     private static readonly Color LightSuccessColor = Color.Parse("#14804A");
     private static readonly Color DarkSuccessColor = Color.Parse("#4ADE80");
     private static readonly Color LightWarningColor = Color.Parse("#C27803");
@@ -132,6 +143,7 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
         var isDarkTheme = ResolveIsDarkTheme(app);
         var accentColor = ResolveAccentColor();
 
+        UpdateFluentAccentColorResources(app, accentColor);
         UpdateBrushResource(app, "SemiAccentBrush", accentColor);
         UpdateBrushResource(app, "AppAccentBrush", accentColor);
         UpdateBrushResource(app, "SemiAccentSoftBrush", BuildAccentSurface(accentColor, isDarkTheme, 0.18, 0.12));
@@ -173,6 +185,27 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
     private static void UpdateBrushResource(AvaloniaApplication app, string key, Color color)
     {
         app.Resources[key] = new SolidColorBrush(color);
+    }
+
+    private static void UpdateColorResource(AvaloniaApplication app, string key, Color color)
+    {
+        app.Resources[key] = color;
+    }
+
+    private static void UpdateFluentAccentColorResources(AvaloniaApplication app, Color accentColor)
+    {
+        var palette = new Avalonia.Themes.Fluent.ColorPaletteResources
+        {
+            Accent = accentColor
+        };
+
+        foreach (var key in FluentAccentColorResourceKeys)
+        {
+            if (palette.TryGetResource(key, ThemeVariant.Default, out var value) && value is Color color)
+            {
+                UpdateColorResource(app, key, color);
+            }
+        }
     }
 
     private static AppThemePalette CreatePalette(bool isDarkTheme, Color accentColor)

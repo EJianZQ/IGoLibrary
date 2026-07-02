@@ -95,6 +95,14 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void NotificationSettingsCategories_ExposeTabStripItems()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.Equal(["邮件提醒配置", "Telegram Bot", "本地弹窗提醒"], viewModel.NotificationSettingsCategories);
+    }
+
+    [Fact]
     public async Task StartGlobalLeakAsync_BuildsMultiLibraryPlan_WithDefaultScanInterval()
     {
         var coordinator = new FakeGlobalLeakCoordinator();
