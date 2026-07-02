@@ -321,7 +321,7 @@ public partial class MainWindowWorkflowViewModel
 
     partial void OnIsAuthorizedChanged(bool value)
     {
-        if (!value && SelectedTabIndex > AccountAndVenueTabIndex)
+        if (!value && !IsTabAvailableWithoutAuthorization(SelectedTabIndex))
         {
             SelectedTabIndex = AccountAndVenueTabIndex;
         }
@@ -453,9 +453,37 @@ public partial class MainWindowWorkflowViewModel
     {
         var pendingGrab = _pendingGrabScheduledStartDefault;
         var pendingTomorrow = _pendingTomorrowScheduledStartDefault;
+        var hasPendingSystemSettings = _systemSettingsAutoSaveCts is not null;
+        var hasPendingProtocolTemplates = _protocolTemplateAutoSaveCts is not null;
 
+        CancelPendingSystemSettingsAutoSave();
+        CancelPendingProtocolTemplateAutoSave();
         CancelPendingGrabScheduledStartDefaultAutoSave();
         CancelPendingTomorrowScheduledStartDefaultAutoSave();
+
+        if (hasPendingSystemSettings)
+        {
+            try
+            {
+                await PersistSystemSettingsAsync(showNotification: false, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存系统设置失败：{ex.Message}");
+            }
+        }
+
+        if (hasPendingProtocolTemplates)
+        {
+            try
+            {
+                await PersistProtocolOverridesAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存接口模板失败：{ex.Message}");
+            }
+        }
 
         if (pendingGrab is not null)
         {
@@ -495,6 +523,28 @@ public partial class MainWindowWorkflowViewModel
     partial void OnShowAvailableOnlyChanged(bool value) => _ = ApplySeatFilterAsync();
 
     partial void OnTomorrowSeatFilterTextChanged(string value) => ApplyTomorrowSeatFilter();
+
+    partial void OnGetCookieTemplateTextChanged(string value) => ScheduleProtocolTemplateAutoSave();
+
+    partial void OnQueryLibrariesTemplateTextChanged(string value) => ScheduleProtocolTemplateAutoSave();
+
+    partial void OnQueryLibraryLayoutTemplateTextChanged(string value) => ScheduleProtocolTemplateAutoSave();
+
+    partial void OnQueryLibraryRuleTemplateTextChanged(string value) => ScheduleProtocolTemplateAutoSave();
+
+    partial void OnQueryReservationInfoTemplateTextChanged(string value) => ScheduleProtocolTemplateAutoSave();
+
+    partial void OnReserveSeatTemplateTextChanged(string value) => ScheduleProtocolTemplateAutoSave();
+
+    partial void OnCancelReservationTemplateTextChanged(string value) => ScheduleProtocolTemplateAutoSave();
+
+    partial void OnTomorrowReservationQueueUrlTemplateTextChanged(string value) => ScheduleProtocolTemplateAutoSave();
+
+    partial void OnTomorrowReservationWarmUpTemplateTextChanged(string value) => ScheduleProtocolTemplateAutoSave();
+
+    partial void OnTomorrowReservationSaveTemplateTextChanged(string value) => ScheduleProtocolTemplateAutoSave();
+
+    partial void OnTomorrowReservationInfoTemplateTextChanged(string value) => ScheduleProtocolTemplateAutoSave();
 
     partial void OnEmailAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
 
@@ -1614,7 +1664,15 @@ public partial class MainWindowWorkflowViewModel
     [RelayCommand]
     private async Task SaveSettingsAsync()
     {
+        CancelPendingSystemSettingsAutoSave();
         CancelPendingNotificationSettingsAutoSave();
+        await PersistSystemSettingsAsync(showNotification: true);
+    }
+
+    private async Task PersistSystemSettingsAsync(
+        bool showNotification,
+        CancellationToken cancellationToken = default)
+    {
         var grabReservationStrategy = (GrabReservationStrategy)Math.Clamp(
             SelectedGrabReservationStrategyIndex,
             0,
@@ -1626,13 +1684,17 @@ public partial class MainWindowWorkflowViewModel
             MinimizeToTrayEnabled,
             TraceIntGraphQlOverridesEnabled,
             CheckUpdatesOnStartup,
-            RequestTimeoutSeconds,
-            NetworkMaxRetries,
+            Math.Clamp(RequestTimeoutSeconds, 3, 60),
+            Math.Clamp(NetworkMaxRetries, 0, 10),
             theme,
             grabReservationStrategy,
-            BuildTaskEventAlertSettingsSnapshot()));
-        await _appThemeService.ApplyThemeAsync(theme);
-        await _notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库");
+            BuildTaskEventAlertSettingsSnapshot()),
+            cancellationToken);
+        await _appThemeService.ApplyThemeAsync(theme, cancellationToken);
+        if (showNotification)
+        {
+            await _notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库");
+        }
     }
 
     [RelayCommand]
@@ -1712,7 +1774,28 @@ public partial class MainWindowWorkflowViewModel
     [RelayCommand]
     private async Task SaveProtocolOverridesAsync()
     {
-        var overrides = new TraceIntGraphQlTemplateOverrides(
+        CancelPendingProtocolTemplateAutoSave();
+        await PersistProtocolOverridesAsync();
+        await _notificationService.ShowSuccessAsync("协议模板已保存", "高级协议覆盖已写入数据库");
+    }
+
+    [RelayCommand]
+    private async Task ResetProtocolOverridesAsync()
+    {
+        CancelPendingProtocolTemplateAutoSave();
+        await SystemSettings.ResetProtocolOverridesAsync();
+        await LoadProtocolTemplatesAsync();
+        await _notificationService.ShowSuccessAsync("协议模板已重置", "已恢复内置默认模板");
+    }
+
+    private Task PersistProtocolOverridesAsync(CancellationToken cancellationToken = default)
+    {
+        return SystemSettings.SaveProtocolOverridesAsync(BuildProtocolOverridesSnapshot(), cancellationToken);
+    }
+
+    private TraceIntGraphQlTemplateOverrides BuildProtocolOverridesSnapshot()
+    {
+        return new TraceIntGraphQlTemplateOverrides(
             GetCookieTemplateText,
             QueryLibrariesTemplateText,
             QueryLibraryLayoutTemplateText,
@@ -1724,16 +1807,6 @@ public partial class MainWindowWorkflowViewModel
             TomorrowReservationWarmUpTemplateText,
             TomorrowReservationSaveTemplateText,
             TomorrowReservationInfoTemplateText);
-        await SystemSettings.SaveProtocolOverridesAsync(overrides);
-        await _notificationService.ShowSuccessAsync("协议模板已保存", "高级协议覆盖已写入数据库");
-    }
-
-    [RelayCommand]
-    private async Task ResetProtocolOverridesAsync()
-    {
-        await SystemSettings.ResetProtocolOverridesAsync();
-        await LoadProtocolTemplatesAsync();
-        await _notificationService.ShowSuccessAsync("协议模板已重置", "已恢复内置默认模板");
     }
 
     private async Task RunStartupUpdateCheckAsync()
@@ -1918,18 +1991,26 @@ public partial class MainWindowWorkflowViewModel
 
     private async Task LoadProtocolTemplatesAsync()
     {
-        var templates = await SystemSettings.LoadProtocolTemplatesAsync();
-        GetCookieTemplateText = templates.GetCookieUrlTemplate;
-        QueryLibrariesTemplateText = templates.QueryLibrariesTemplate;
-        QueryLibraryLayoutTemplateText = templates.QueryLibraryLayoutTemplate;
-        QueryLibraryRuleTemplateText = templates.QueryLibraryRuleTemplate;
-        QueryReservationInfoTemplateText = templates.QueryReservationInfoTemplate;
-        ReserveSeatTemplateText = templates.ReserveSeatTemplate;
-        CancelReservationTemplateText = templates.CancelReservationTemplate;
-        TomorrowReservationQueueUrlTemplateText = templates.TomorrowReservationQueueUrlTemplate;
-        TomorrowReservationWarmUpTemplateText = templates.TomorrowReservationWarmUpTemplate;
-        TomorrowReservationSaveTemplateText = templates.TomorrowReservationSaveTemplate;
-        TomorrowReservationInfoTemplateText = templates.TomorrowReservationInfoTemplate;
+        _isLoadingProtocolTemplates = true;
+        try
+        {
+            var templates = await SystemSettings.LoadProtocolTemplatesAsync();
+            GetCookieTemplateText = templates.GetCookieUrlTemplate;
+            QueryLibrariesTemplateText = templates.QueryLibrariesTemplate;
+            QueryLibraryLayoutTemplateText = templates.QueryLibraryLayoutTemplate;
+            QueryLibraryRuleTemplateText = templates.QueryLibraryRuleTemplate;
+            QueryReservationInfoTemplateText = templates.QueryReservationInfoTemplate;
+            ReserveSeatTemplateText = templates.ReserveSeatTemplate;
+            CancelReservationTemplateText = templates.CancelReservationTemplate;
+            TomorrowReservationQueueUrlTemplateText = templates.TomorrowReservationQueueUrlTemplate;
+            TomorrowReservationWarmUpTemplateText = templates.TomorrowReservationWarmUpTemplate;
+            TomorrowReservationSaveTemplateText = templates.TomorrowReservationSaveTemplate;
+            TomorrowReservationInfoTemplateText = templates.TomorrowReservationInfoTemplate;
+        }
+        finally
+        {
+            _isLoadingProtocolTemplates = false;
+        }
     }
 
     private async Task ClearStoredLibrarySelectionAsync()
@@ -3982,6 +4063,73 @@ public partial class MainWindowWorkflowViewModel
         return builder.ToString();
     }
 
+    private void ScheduleSystemSettingsAutoSave()
+    {
+        if (_isLoadingSettings || !IsInitializationComplete)
+        {
+            return;
+        }
+
+        CancelPendingSystemSettingsAutoSave();
+        var cts = new CancellationTokenSource();
+        _systemSettingsAutoSaveCts = cts;
+        _ = AutoSaveSystemSettingsAsync(cts, cts.Token);
+    }
+
+    private async Task AutoSaveSystemSettingsAsync(
+        CancellationTokenSource cancellationTokenSource,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(300), cancellationToken);
+            await PersistSystemSettingsAsync(showNotification: false, cancellationToken);
+            ClearCompletedSystemSettingsAutoSave(cancellationTokenSource);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存系统设置失败：{ex.Message}");
+        }
+    }
+
+    private void ScheduleProtocolTemplateAutoSave()
+    {
+        if (_isLoadingSettings ||
+            _isLoadingProtocolTemplates ||
+            !IsInitializationComplete ||
+            !TraceIntGraphQlOverridesEnabled)
+        {
+            return;
+        }
+
+        CancelPendingProtocolTemplateAutoSave();
+        var cts = new CancellationTokenSource();
+        _protocolTemplateAutoSaveCts = cts;
+        _ = AutoSaveProtocolTemplatesAsync(cts, cts.Token);
+    }
+
+    private async Task AutoSaveProtocolTemplatesAsync(
+        CancellationTokenSource cancellationTokenSource,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(450), cancellationToken);
+            await PersistProtocolOverridesAsync(cancellationToken);
+            ClearCompletedProtocolTemplateAutoSave(cancellationTokenSource);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存接口模板失败：{ex.Message}");
+        }
+    }
+
     private void ScheduleNotificationSettingsAutoSave()
     {
         if (_isLoadingSettings || !_notificationSettingsLoaded || !IsInitializationComplete)
@@ -4100,6 +4248,52 @@ public partial class MainWindowWorkflowViewModel
         CancellationToken cancellationToken = default)
     {
         return SystemSettings.SaveTomorrowScheduledStartDefaultAsync(value, cancellationToken);
+    }
+
+    private void CancelPendingSystemSettingsAutoSave()
+    {
+        if (_systemSettingsAutoSaveCts is null)
+        {
+            return;
+        }
+
+        _systemSettingsAutoSaveCts.Cancel();
+        _systemSettingsAutoSaveCts.Dispose();
+        _systemSettingsAutoSaveCts = null;
+    }
+
+    private void ClearCompletedSystemSettingsAutoSave(CancellationTokenSource cancellationTokenSource)
+    {
+        if (!ReferenceEquals(_systemSettingsAutoSaveCts, cancellationTokenSource))
+        {
+            return;
+        }
+
+        _systemSettingsAutoSaveCts.Dispose();
+        _systemSettingsAutoSaveCts = null;
+    }
+
+    private void CancelPendingProtocolTemplateAutoSave()
+    {
+        if (_protocolTemplateAutoSaveCts is null)
+        {
+            return;
+        }
+
+        _protocolTemplateAutoSaveCts.Cancel();
+        _protocolTemplateAutoSaveCts.Dispose();
+        _protocolTemplateAutoSaveCts = null;
+    }
+
+    private void ClearCompletedProtocolTemplateAutoSave(CancellationTokenSource cancellationTokenSource)
+    {
+        if (!ReferenceEquals(_protocolTemplateAutoSaveCts, cancellationTokenSource))
+        {
+            return;
+        }
+
+        _protocolTemplateAutoSaveCts.Dispose();
+        _protocolTemplateAutoSaveCts = null;
     }
 
     private void CancelPendingNotificationSettingsAutoSave()

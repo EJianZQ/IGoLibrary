@@ -156,6 +156,7 @@ public sealed class MainWindowClipboardTests
             new FakeUpdateCheckService(),
             new FakeUpdateDialogService(),
             new FakeExternalLinkService(),
+            new FakeAppVersionProvider(),
             new FakeAppThemeService(),
             new AppWindowService());
     }

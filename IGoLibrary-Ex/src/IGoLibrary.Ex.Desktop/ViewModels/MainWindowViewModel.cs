@@ -21,6 +21,7 @@ public sealed class MainWindowViewModel(
     IUpdateCheckService updateCheckService,
     IUpdateDialogService updateDialogService,
     IExternalLinkService externalLinkService,
+    IAppVersionProvider appVersionProvider,
     IAppThemeService appThemeService,
     AppWindowService appWindowService)
     : MainWindowWorkflowViewModel(
@@ -40,5 +41,6 @@ public sealed class MainWindowViewModel(
         updateCheckService,
         updateDialogService,
         externalLinkService,
+        appVersionProvider,
         appThemeService,
         appWindowService);

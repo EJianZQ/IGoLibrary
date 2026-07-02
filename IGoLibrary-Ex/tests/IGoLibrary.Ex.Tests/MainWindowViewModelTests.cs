@@ -41,13 +41,29 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void SidebarItems_OnlyExposeHomeAndAccount_WhenUnauthorized()
+    public void SidebarItems_ExposeSystemSettings_WhenUnauthorized()
     {
         var viewModel = CreateViewModel();
 
         var titles = viewModel.SidebarItems.Select(item => item.Title).ToArray();
+        var pageIndexes = viewModel.SidebarItems.Select(item => item.PageIndex).ToArray();
 
-        Assert.Equal(["首页", "账户与场馆"], titles);
+        Assert.Equal(["首页", "账户与场馆", "系统设置"], titles);
+        Assert.Equal([0, 1, 7], pageIndexes);
+    }
+
+    [Fact]
+    public void SelectedTabIndex_AllowsSystemSettings_WhenUnauthorized()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.SelectedTabIndex = 7;
+
+        Assert.Equal(7, viewModel.SelectedTabIndex);
+
+        viewModel.SelectedTabIndex = 2;
+
+        Assert.Equal(1, viewModel.SelectedTabIndex);
     }
 
     [Fact]
@@ -62,6 +78,20 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(["首页", "账户与场馆", "抢座", "全域捡漏", "明日预约", "占座", "通知设置", "系统设置"], titles);
         Assert.Equal([0, 1, 2, 3, 4, 5, 6, 7], pageIndexes);
+    }
+
+    [Fact]
+    public void SystemSettingsCategories_ExposeSettingsCenterBuckets()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.Equal(["常规", "外观", "网络与接口", "存储与更新"], viewModel.SystemSettingsCategories);
+        Assert.True(viewModel.IsSystemSettingsGeneralActive);
+
+        viewModel.SelectedSystemSettingsCategoryIndex = 2;
+
+        Assert.False(viewModel.IsSystemSettingsGeneralActive);
+        Assert.True(viewModel.IsSystemSettingsNetworkActive);
     }
 
     [Fact]
@@ -1051,7 +1081,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task SaveSettingsAsync_PersistsThemePreferences()
+    public async Task ThemeSettings_AutoSavePreferences()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
         var themeService = new FakeAppThemeService();
@@ -1063,13 +1093,13 @@ public sealed class MainWindowViewModelTests
         viewModel.SelectedAppThemeModeIndex = 2;
         viewModel.UseSystemAccent = false;
 
-        await WaitForAsync(() => themeService.ApplySettingsCalls == 2);
-
-        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+        await WaitForAsync(() =>
+            settingsService.CurrentSettings.Ui.Theme?.Mode == AppThemeMode.Dark &&
+            settingsService.CurrentSettings.Ui.Theme?.UseSystemAccent == false);
 
         Assert.Equal(AppThemeMode.Dark, settingsService.CurrentSettings.Ui.Theme?.Mode);
         Assert.False(settingsService.CurrentSettings.Ui.Theme?.UseSystemAccent);
-        Assert.Equal(3, themeService.ApplySettingsCalls);
+        Assert.True(themeService.ApplySettingsCalls >= 2);
         Assert.Equal(AppThemeMode.Dark, themeService.LastAppliedTheme?.Mode);
         Assert.False(themeService.LastAppliedTheme?.UseSystemAccent);
     }
@@ -1215,7 +1245,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task ThemePreview_UpdatesImmediately_WithoutSavingSettings()
+    public async Task ThemePreview_UpdatesImmediately_ThenAutoSavesSettings()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
         var themeService = new FakeAppThemeService();
@@ -1228,13 +1258,14 @@ public sealed class MainWindowViewModelTests
         viewModel.UseSystemAccent = false;
 
         await WaitForAsync(() =>
-            themeService.ApplySettingsCalls == 2 &&
+            themeService.ApplySettingsCalls >= 2 &&
             themeService.LastAppliedTheme?.Mode == AppThemeMode.Dark &&
             themeService.LastAppliedTheme?.UseSystemAccent == false);
 
-        Assert.Equal(0, settingsService.SaveCalls);
-        Assert.Equal(AppThemeMode.FollowSystem, settingsService.CurrentSettings.Ui.Theme?.Mode);
-        Assert.True(settingsService.CurrentSettings.Ui.Theme?.UseSystemAccent);
+        await WaitForAsync(() =>
+            settingsService.SaveCalls > 0 &&
+            settingsService.CurrentSettings.Ui.Theme?.Mode == AppThemeMode.Dark &&
+            settingsService.CurrentSettings.Ui.Theme?.UseSystemAccent == false);
     }
 
     [Fact]
@@ -1680,6 +1711,37 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task ProtocolTemplateChanges_AutoSaveOverrides_WhenCustomProtocolEnabled()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings() with
+        {
+            TraceIntProtocol = new TraceIntProtocolSettings(true)
+        });
+        var protocolTemplateStore = new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates(
+            "cookie-default",
+            "libraries-default",
+            "layout-default",
+            "rule-default",
+            "reservation-default",
+            "reserve-default",
+            "cancel-default",
+            "queue-default",
+            "warm-default",
+            "save-default",
+            "info-default"));
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            protocolTemplateStore: protocolTemplateStore);
+        await viewModel.InitializeAsync();
+
+        viewModel.TomorrowReservationSaveTemplateText = "save-override";
+
+        await WaitForAsync(() =>
+            protocolTemplateStore.SaveCalls > 0 &&
+            protocolTemplateStore.LastOverrides?.TomorrowReservationSaveTemplate == "save-override");
+    }
+
+    [Fact]
     public async Task SaveProtocolOverridesAsync_IncludesTomorrowReservationTemplates()
     {
         var protocolTemplateStore = new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates(
@@ -1757,6 +1819,7 @@ public sealed class MainWindowViewModelTests
             updateCheckService ?? new FakeUpdateCheckService(),
             updateDialogService ?? new FakeUpdateDialogService(),
             externalLinkService ?? new FakeExternalLinkService(),
+            new FakeAppVersionProvider(),
             appThemeService ?? new FakeAppThemeService(),
             new AppWindowService());
     }

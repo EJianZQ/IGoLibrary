@@ -34,6 +34,7 @@ public partial class MainWindowWorkflowViewModel(
     IUpdateCheckService updateCheckService,
     IUpdateDialogService updateDialogService,
     IExternalLinkService externalLinkService,
+    IAppVersionProvider appVersionProvider,
     IAppThemeService appThemeService,
     AppWindowService appWindowService) : ViewModelBase
 {
@@ -110,7 +111,8 @@ public partial class MainWindowWorkflowViewModel(
     private static readonly SidebarNavigationItem[] UnauthorizedSidebarItems =
     [
         HomeSidebarItem,
-        AccountAndVenueSidebarItem
+        AccountAndVenueSidebarItem,
+        SettingsSidebarItem
     ];
     private static readonly SidebarNavigationItem[] AuthorizedSidebarItems =
     [
@@ -176,6 +178,9 @@ public partial class MainWindowWorkflowViewModel(
     private string? _draftTomorrowSeatKey;
     private bool _notificationSettingsLoaded;
     private CancellationTokenSource? _notificationSettingsAutoSaveCts;
+    private CancellationTokenSource? _systemSettingsAutoSaveCts;
+    private CancellationTokenSource? _protocolTemplateAutoSaveCts;
+    private bool _isLoadingProtocolTemplates;
     private bool _themePaletteSubscribed;
     private readonly object _processedAuthCodesGate = new();
     private readonly HashSet<string> _processedAuthCodes = new(StringComparer.OrdinalIgnoreCase);
@@ -202,7 +207,8 @@ public partial class MainWindowWorkflowViewModel(
     public ObservableCollection<SidebarNavigationItem> SidebarItems { get; } =
     [
         HomeSidebarItem,
-        AccountAndVenueSidebarItem
+        AccountAndVenueSidebarItem,
+        SettingsSidebarItem
     ];
 
     public ObservableCollection<SeatItemViewModel> VisibleSeats { get; } = [];
@@ -227,6 +233,10 @@ public partial class MainWindowWorkflowViewModel(
 
     public string[] ThemeModes { get; } = ["跟随系统", "浅色", "深色"];
 
+    public string[] SystemSettingsCategories { get; } = ["常规", "外观", "网络与接口", "存储与更新"];
+
+    public string CurrentAppVersionText { get; } = $"v{appVersionProvider.CurrentVersionText}";
+
     public const int AccountAndVenueTabIndex = 1;
 
     [ObservableProperty]
@@ -239,7 +249,7 @@ public partial class MainWindowWorkflowViewModel(
 
     partial void OnSelectedTabIndexChanged(int value)
     {
-        if (!IsAuthorized && value > AccountAndVenueTabIndex)
+        if (!IsAuthorized && !IsTabAvailableWithoutAuthorization(value))
         {
             SelectedTabIndex = AccountAndVenueTabIndex;
             return;
@@ -259,6 +269,11 @@ public partial class MainWindowWorkflowViewModel(
         {
             SelectedTabIndex = value.PageIndex;
         }
+    }
+
+    private static bool IsTabAvailableWithoutAuthorization(int tabIndex)
+    {
+        return tabIndex <= AccountAndVenueTabIndex || tabIndex == SystemSettingsTabIndex;
     }
 
     [ObservableProperty]
@@ -560,19 +575,68 @@ public partial class MainWindowWorkflowViewModel(
     private int selectedNotificationSettingsTabIndex;
 
     [ObservableProperty]
+    private int selectedSystemSettingsCategoryIndex;
+
+    public bool IsSystemSettingsGeneralActive => SelectedSystemSettingsCategoryIndex == 0;
+
+    public bool IsSystemSettingsAppearanceActive => SelectedSystemSettingsCategoryIndex == 1;
+
+    public bool IsSystemSettingsNetworkActive => SelectedSystemSettingsCategoryIndex == 2;
+
+    public bool IsSystemSettingsStorageUpdateActive => SelectedSystemSettingsCategoryIndex == 3;
+
+    partial void OnSelectedSystemSettingsCategoryIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsSystemSettingsGeneralActive));
+        OnPropertyChanged(nameof(IsSystemSettingsAppearanceActive));
+        OnPropertyChanged(nameof(IsSystemSettingsNetworkActive));
+        OnPropertyChanged(nameof(IsSystemSettingsStorageUpdateActive));
+    }
+
+    [ObservableProperty]
     private bool minimizeToTrayEnabled = true;
+
+    partial void OnMinimizeToTrayEnabledChanged(bool value) => ScheduleSystemSettingsAutoSave();
 
     [ObservableProperty]
     private bool traceIntGraphQlOverridesEnabled;
 
+    partial void OnTraceIntGraphQlOverridesEnabledChanged(bool value) => ScheduleSystemSettingsAutoSave();
+
     [ObservableProperty]
     private bool checkUpdatesOnStartup = true;
+
+    partial void OnCheckUpdatesOnStartupChanged(bool value) => ScheduleSystemSettingsAutoSave();
 
     [ObservableProperty]
     private int requestTimeoutSeconds = 5;
 
+    partial void OnRequestTimeoutSecondsChanged(int value)
+    {
+        var normalized = Math.Clamp(value, 3, 60);
+        if (normalized != value)
+        {
+            RequestTimeoutSeconds = normalized;
+            return;
+        }
+
+        ScheduleSystemSettingsAutoSave();
+    }
+
     [ObservableProperty]
     private int networkMaxRetries = 3;
+
+    partial void OnNetworkMaxRetriesChanged(int value)
+    {
+        var normalized = Math.Clamp(value, 0, 10);
+        if (normalized != value)
+        {
+            NetworkMaxRetries = normalized;
+            return;
+        }
+
+        ScheduleSystemSettingsAutoSave();
+    }
 
     [ObservableProperty]
     private int selectedAppThemeModeIndex;
@@ -593,6 +657,7 @@ public partial class MainWindowWorkflowViewModel(
     partial void OnSelectedAppThemeModeIndexChanged(int value)
     {
         PreviewThemePreferences();
+        ScheduleSystemSettingsAutoSave();
     }
 
     [ObservableProperty]
@@ -601,6 +666,7 @@ public partial class MainWindowWorkflowViewModel(
     partial void OnUseSystemAccentChanged(bool value)
     {
         PreviewThemePreferences();
+        ScheduleSystemSettingsAutoSave();
     }
 
     [ObservableProperty]

@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:IGoLibrary.Ex.Desktop.ViewModels"
+        xmlns:primitives="using:Avalonia.Controls.Primitives"
         mc:Ignorable="d"
         x:Class="IGoLibrary.Ex.Desktop.MainWindow"
         x:Name="MainWindowRoot"
@@ -52,6 +53,13 @@
       <Setter Property="Padding" Value="16,12" />
       <Setter Property="Margin" Value="16,4" />
       <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="primitives|TabStrip.settings-center-tabs">
+      <Setter Property="MinHeight" Value="44" />
+    </Style>
+    <Style Selector="primitives|TabStrip.settings-center-tabs primitives|TabStripItem">
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
     <Style Selector="Border.semi-card">
       <Setter Property="Background" Value="{DynamicResource SemiCardBackgroundBrush}" />
@@ -2099,122 +2107,214 @@
         </ScrollViewer>
 
         <!-- Tab 7: Settings -->
-        <ScrollViewer>
-          <StackPanel Spacing="24" Margin="0,0,16,0">
-            <TextBlock Classes="page-title" Text="系统设置" />
-            
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
-              <StackPanel Spacing="24">
-                <Border Classes="card">
-                  <StackPanel Spacing="16">
-                    <TextBlock Classes="section-title" Text="常规体验" />
-                    <CheckBox Content="当任务进行时，右上角关闭会最小化到托盘" IsChecked="{Binding MinimizeToTrayEnabled}" />
-                    <CheckBox Content="启动时检查应用版本更新" IsChecked="{Binding CheckUpdatesOnStartup}" />
-                    <CheckBox Content="自定义接口地址和查询语法" IsChecked="{Binding TraceIntGraphQlOverridesEnabled}" FontWeight="Bold" Foreground="{DynamicResource SemiWarningTextBrush}"/>
-                    
-                    <Separator Background="{DynamicResource AppSeparatorBrush}" Margin="0,8"/>
-                    
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
-                      <StackPanel Spacing="8">
-                        <TextBlock Text="网络 API 超时阈值（秒）" FontSize="13" Opacity="0.8"/>
-                        <NumericUpDown Minimum="3" Maximum="60" Value="{Binding RequestTimeoutSeconds}" HorizontalAlignment="Stretch"/>
-                      </StackPanel>
-                      <StackPanel Grid.Column="1" Spacing="8">
-                        <TextBlock Text="断线恢复重试次数（次）" FontSize="13" Opacity="0.8"/>
-                        <NumericUpDown Minimum="0" Maximum="10" Value="{Binding NetworkMaxRetries}" HorizontalAlignment="Stretch"/>
-                      </StackPanel>
-                    </Grid>
+        <Grid RowDefinitions="Auto,*"
+              RowSpacing="18"
+              Margin="0,0,16,0">
+          <StackPanel Spacing="4">
+            <TextBlock Classes="page-title"
+                       Margin="0"
+                       Text="系统设置" />
+          </StackPanel>
 
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
-                      <StackPanel Spacing="8">
-                        <TextBlock Classes="field-label" Text="界面主题" />
-                        <ComboBox ItemsSource="{Binding ThemeModes}"
-                                  SelectedIndex="{Binding SelectedAppThemeModeIndex}" />
+          <Grid Grid.Row="1"
+                RowDefinitions="Auto,*"
+                MinHeight="560">
+            <primitives:TabStrip Classes="settings-center-tabs"
+                                 ItemsSource="{Binding SystemSettingsCategories}"
+                                 SelectedIndex="{Binding SelectedSystemSettingsCategoryIndex}"
+                                 HorizontalAlignment="Left" />
+
+            <Carousel Grid.Row="1"
+                      SelectedIndex="{Binding SelectedSystemSettingsCategoryIndex}">
+              <Carousel.PageTransition>
+                <CrossFade Duration="0:0:0.22" />
+              </Carousel.PageTransition>
+
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="16"
+                            Margin="0,18,12,0">
+                  <Border Classes="card">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="16">
+                      <StackPanel Spacing="6">
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Text="任务进行时关闭窗口最小化到托盘" />
+                        <TextBlock Classes="helper-text"
+                                   Text="有抢座、占座、明日预约或全域捡漏任务运行时，点击右下角关闭按钮后保持后台运行。" />
                       </StackPanel>
-                      <StackPanel Grid.Column="1" Spacing="8">
-                        <TextBlock Classes="field-label" Text="强调色来源" />
-                        <CheckBox Content="跟随系统主题色"
+                      <ToggleSwitch Grid.Column="1"
+                                    IsChecked="{Binding MinimizeToTrayEnabled}"
+                                    OnContent="开"
+                                    OffContent="关"
+                                    VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="16"
+                            Margin="0,18,12,0">
+                  <Border Classes="card">
+                    <Grid ColumnDefinitions="*,*"
+                          ColumnSpacing="20">
+                      <StackPanel Spacing="8">
+                        <TextBlock Classes="field-label"
+                                   Text="界面主题" />
+                        <ComboBox ItemsSource="{Binding ThemeModes}"
+                                  SelectedIndex="{Binding SelectedAppThemeModeIndex}"
+                                  HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <StackPanel Grid.Column="1"
+                                  Spacing="8">
+                        <TextBlock Classes="field-label"
+                                   Text="强调色来源" />
+                        <CheckBox Content="启用系统强调色来源"
                                   IsChecked="{Binding UseSystemAccent}" />
                       </StackPanel>
                     </Grid>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
 
-                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12" Margin="0,16,0,0">
-                      <Button Content="💾 保存设置"
-                              Command="{Binding SaveSettingsCommand}"
-                              Background="{DynamicResource AppAccentBrush}"
-                              Foreground="{DynamicResource AppAccentForegroundBrush}"
-                              FontWeight="Bold"
-                              HorizontalAlignment="Stretch"
-                              HorizontalContentAlignment="Center" />
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="16"
+                            Margin="0,18,12,0">
+                  <Border Classes="card">
+                    <Grid ColumnDefinitions="*,*"
+                          ColumnSpacing="20">
+                      <StackPanel Spacing="8">
+                        <TextBlock Classes="field-label"
+                                   Text="网络 API 超时阈值（秒）" />
+                        <NumericUpDown Minimum="3"
+                                       Maximum="60"
+                                       Value="{Binding RequestTimeoutSeconds}"
+                                       HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <StackPanel Grid.Column="1"
+                                  Spacing="8">
+                        <TextBlock Classes="field-label"
+                                   Text="瞬时失败重试次数（次）" />
+                        <NumericUpDown Minimum="0"
+                                       Maximum="10"
+                                       Value="{Binding NetworkMaxRetries}"
+                                       HorizontalAlignment="Stretch" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+
+                  <Border Classes="card">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="16">
+                      <StackPanel Spacing="6">
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Text="自定义接口地址和查询语法" />
+                        <TextBlock Classes="helper-text"
+                                   Text="启用后会使用下方模板覆盖内置接口模板，适合学校自建或接口变体场景。" />
+                      </StackPanel>
+                      <ToggleSwitch Grid.Column="1"
+                                    IsChecked="{Binding TraceIntGraphQlOverridesEnabled}"
+                                    OnContent="开"
+                                    OffContent="关"
+                                    VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+
+                  <Border Classes="card"
+                          IsVisible="{Binding TraceIntGraphQlOverridesEnabled}"
+                          BorderBrush="{DynamicResource AppWarningBorderBrush}">
+                    <StackPanel Spacing="16">
+                      <Grid ColumnDefinitions="*,Auto"
+                            ColumnSpacing="16">
+                        <StackPanel Spacing="4">
+                          <TextBlock Classes="section-title"
+                                     Margin="0"
+                                     Text="模板填写"
+                                     Foreground="{DynamicResource SemiWarningTextBrush}" />
+                          <TextBlock Classes="helper-text"
+                                     Text="模板内容会在停止输入后自动保存到本地数据库。" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1"
+                                Content="恢复默认"
+                                Command="{Binding ResetProtocolOverridesCommand}"
+                                Classes="Secondary"
+                                HorizontalContentAlignment="Center"
+                                VerticalAlignment="Center" />
+                      </Grid>
+
+                      <StackPanel Spacing="16">
+                        <TextBlock Text="获取 Cookie 地址（替换模板中的 ReplaceMeByCode）" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding GetCookieTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="列出所有可用场馆模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding QueryLibrariesTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="获取指定场馆所有座位信息模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding QueryLibraryLayoutTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="查询指定场馆规则模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding QueryLibraryRuleTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="获取当前预约信息模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding QueryReservationInfoTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="100" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="预约指定座位模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding ReserveSeatTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="取消当前预约模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding CancelReservationTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="明日预约排队 WebSocket 地址" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding TomorrowReservationQueueUrlTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="56" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="明日预约预热模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding TomorrowReservationWarmUpTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="明日预约保存模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding TomorrowReservationSaveTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+
+                        <TextBlock Text="明日预约结果验证模板" FontSize="13" FontWeight="SemiBold"/>
+                        <TextBox Text="{Binding TomorrowReservationInfoTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="16"
+                            Margin="0,18,12,0">
+                  <Border Classes="card">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="16">
+                      <StackPanel Spacing="6">
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Text="当前版本" />
+                        <TextBlock Classes="helper-text"
+                                   Text="{Binding CurrentAppVersionText}" />
+                      </StackPanel>
+
                       <Button Grid.Column="1"
                               Content="{Binding CheckForUpdatesButtonText}"
                               Command="{Binding CheckForUpdatesCommand}"
                               Classes="Secondary"
                               IsEnabled="{Binding CanCheckForUpdates}"
-                              HorizontalAlignment="Stretch"
-                              HorizontalContentAlignment="Center" />
-                      <Button Grid.Column="2"
-                              Content="测试Toast通知"
-                              Command="{Binding TestToastCommand}"
-                              Classes="Secondary"
-                              HorizontalAlignment="Stretch"
-                              HorizontalContentAlignment="Center" />
+                              HorizontalContentAlignment="Center"
+                              VerticalAlignment="Center"
+                              MinWidth="136" />
                     </Grid>
-                  </StackPanel>
-                </Border>
-              </StackPanel>
-
-              <Border Classes="card" Grid.Column="1" IsVisible="{Binding TraceIntGraphQlOverridesEnabled}" BorderBrush="{DynamicResource AppWarningBorderBrush}">
-                <StackPanel Spacing="16">
-                  <TextBlock Classes="section-title" Text="⚠️ 自定义接口地址和查询语法" Foreground="{DynamicResource SemiWarningTextBrush}" />
-                  <TextBlock Text="如果你使用的不是官方地址，如学校自建等，请自行抓包替换" FontSize="13" Opacity="0.7" TextWrapping="Wrap" />
-                  
-                  <ScrollViewer MaxHeight="400">
-                     <StackPanel Spacing="16" Margin="0,0,16,0">
-                        <TextBlock Text="获取Cookie地址 (替换模板中的ReplaceMeByCode)" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding GetCookieTemplateText}" AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
-                        
-                        <TextBlock Text="列出所有可用场馆模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding QueryLibrariesTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
-                        
-                        <TextBlock Text="获取指定场馆所有座位信息模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding QueryLibraryLayoutTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
-
-                        <TextBlock Text="查询指定场馆规则模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding QueryLibraryRuleTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
-                        
-                        <TextBlock Text="获取当前预约信息模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding QueryReservationInfoTemplateText}" AcceptsReturn="True" MinHeight="100" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
-                        
-                        <TextBlock Text="预约指定座位模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding ReserveSeatTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
-                        
-                        <TextBlock Text="取消当前预约模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding CancelReservationTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
-
-                        <TextBlock Text="明日预约排队 WebSocket 地址" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding TomorrowReservationQueueUrlTemplateText}" AcceptsReturn="True" MinHeight="56" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
-
-                        <TextBlock Text="明日预约预热模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding TomorrowReservationWarmUpTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
-
-                        <TextBlock Text="明日预约保存模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding TomorrowReservationSaveTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
-
-                        <TextBlock Text="明日预约结果验证模板" FontSize="13" FontWeight="SemiBold"/>
-                        <TextBox Text="{Binding TomorrowReservationInfoTemplateText}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
-                     </StackPanel>
-                  </ScrollViewer>
-
-                  <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,8,0,0">
-                    <Button Content="✅ 应用至程序" Command="{Binding SaveProtocolOverridesCommand}" Background="{DynamicResource SemiWarningSoftBrush}" Foreground="{DynamicResource SemiWarningTextBrush}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                    <Button Grid.Column="1" Content="🔄 恢复默认" Command="{Binding ResetProtocolOverridesCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-                  </Grid>
+                  </Border>
                 </StackPanel>
-              </Border>
-            </Grid>
-          </StackPanel>
-        </ScrollViewer>
+              </ScrollViewer>
+            </Carousel>
+          </Grid>
+        </Grid>
       </Carousel>
 
       <Border Grid.Row="1"

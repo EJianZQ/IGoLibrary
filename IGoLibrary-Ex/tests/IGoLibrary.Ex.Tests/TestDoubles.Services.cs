@@ -97,6 +97,13 @@ internal sealed class FakeExternalLinkService : IExternalLinkService
     }
 }
 
+internal sealed class FakeAppVersionProvider(ReleaseVersion? currentVersion = null) : IAppVersionProvider
+{
+    public ReleaseVersion CurrentVersion { get; } = currentVersion ?? new ReleaseVersion(1, 0, 0);
+
+    public string CurrentVersionText => CurrentVersion.ToString();
+}
+
 internal sealed class FakeAppThemeService : IAppThemeService
 {
     private static readonly AppThemePalette LightPalette = new(
