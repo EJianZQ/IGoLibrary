@@ -82,6 +82,7 @@ public sealed class SqliteSettingsRepository(
         var tasks = ReadObject(root, "tasks");
         var grab = ReadObject(tasks, "grab");
         var occupy = ReadObject(tasks, "occupy");
+        var autoRelease = ReadObject(tasks, "autoRelease");
         var tomorrowReservation = ReadObject(tasks, "tomorrowReservation");
         var globalLeak = ReadObject(tasks, "globalLeak");
         var updates = ReadObject(root, "updates");
@@ -169,6 +170,18 @@ public sealed class SqliteSettingsRepository(
             ?? (legacyRetryCount.HasValue ? legacyRetryCount.Value + 1 : (int?)null)
             ?? defaults.Tasks.Occupy.ReReservationMaxAttempts);
         writer.WriteEndObject();
+        writer.WritePropertyName("autoRelease");
+        writer.WriteStartObject();
+        writer.WriteBoolean(
+            "enabled",
+            ReadBool(autoRelease, "enabled")
+            ?? defaults.Tasks.AutoRelease.Enabled);
+        writer.WriteNumber(
+            "leadSeconds",
+            NormalizeAutoReleaseLeadSeconds(
+                ReadInt(autoRelease, "leadSeconds"),
+                defaults.Tasks.AutoRelease.LeadSeconds));
+        writer.WriteEndObject();
         writer.WritePropertyName("tomorrowReservation");
         writer.WriteStartObject();
         writer.WriteString(
@@ -238,6 +251,7 @@ public sealed class SqliteSettingsRepository(
         var tasks = settings.Tasks ?? TaskExecutionSettings.Default;
         var grab = tasks.Grab ?? GrabTaskSettings.Default;
         var occupy = tasks.Occupy ?? OccupyTaskSettings.Default;
+        var autoRelease = tasks.AutoRelease ?? AutoReleaseTaskSettings.Default;
         var tomorrowReservation = tasks.TomorrowReservation ?? TomorrowReservationTaskSettings.Default;
         var globalLeak = tasks.GlobalLeak ?? GlobalLeakTaskSettings.Default;
         var updates = settings.Updates ?? UpdateCheckSettings.Default;
@@ -265,6 +279,10 @@ public sealed class SqliteSettingsRepository(
                         GrabTaskSettings.Default.DefaultScheduledStartTime)
                 },
                 Occupy = occupy,
+                AutoRelease = autoRelease with
+                {
+                    LeadSeconds = AutoReleaseTaskSettings.NormalizeLeadSeconds(autoRelease.LeadSeconds)
+                },
                 TomorrowReservation = tomorrowReservation with
                 {
                     DefaultScheduledStartTime = NormalizeTimeOfDay(
@@ -295,6 +313,7 @@ public sealed class SqliteSettingsRepository(
                tasks.ValueKind == JsonValueKind.Object &&
                tasks.TryGetProperty("grab", out _) &&
                tasks.TryGetProperty("occupy", out _) &&
+               tasks.TryGetProperty("autoRelease", out _) &&
                tasks.TryGetProperty("tomorrowReservation", out _) &&
                tasks.TryGetProperty("globalLeak", out _) &&
                root.TryGetProperty("updates", out _);
@@ -317,6 +336,8 @@ public sealed class SqliteSettingsRepository(
                HasAnyProperty(ReadObject(root, "requestPolicy"), "timeoutSeconds", "retryCount") ||
                HasAnyProperty(ReadObject(root, "tasks"), "grabReservationStrategy") ||
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "grab"), "defaultScheduledStartTime") ||
+               !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "autoRelease"), "enabled") ||
+               !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "autoRelease"), "leadSeconds") ||
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "tomorrowReservation"), "defaultScheduledStartTime") ||
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "globalLeak"), "selectedLibraries") ||
                HasAnyProperty(
@@ -518,6 +539,11 @@ public sealed class SqliteSettingsRepository(
     private static TimeSpan NormalizeTimeOfDay(TimeSpan value, TimeSpan fallback)
     {
         return IsTimeOfDay(value) ? value : fallback;
+    }
+
+    private static int NormalizeAutoReleaseLeadSeconds(int? value, int fallback)
+    {
+        return AutoReleaseTaskSettings.NormalizeLeadSeconds(value ?? fallback);
     }
 
     private static bool IsTimeOfDay(TimeSpan value)

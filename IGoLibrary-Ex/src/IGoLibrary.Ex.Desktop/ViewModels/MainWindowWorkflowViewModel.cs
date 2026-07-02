@@ -57,6 +57,9 @@ public partial class MainWindowWorkflowViewModel(
     private readonly DispatcherTimer _reservationCountdownTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private CancellationTokenSource? _filteringCts;
     private ReservationInfo? _currentReservation;
+    private bool _isAutoReleaseRefreshingReservation;
+    private string? _lastAutoReleaseFailedReservationToken;
+    private DateTimeOffset? _lastAutoReleaseFailedAt;
     private DateTimeOffset? _sidebarSessionExpirationTime;
     private bool _reservationCountdownTimerInitialized;
     private LibrarySummary? _lockedLibrarySummary;
@@ -604,6 +607,35 @@ public partial class MainWindowWorkflowViewModel(
     private bool minimizeToTrayEnabled = true;
 
     partial void OnMinimizeToTrayEnabledChanged(bool value) => ScheduleSystemSettingsAutoSave();
+
+    [ObservableProperty]
+    private bool autoReleaseReservationEnabled;
+
+    partial void OnAutoReleaseReservationEnabledChanged(bool value)
+    {
+        ScheduleSystemSettingsAutoSave();
+        OnPropertyChanged(nameof(AutoReleaseStatusText));
+        QueueAutoReleaseReservationRefresh();
+        QueueAutoReleaseCheck();
+    }
+
+    [ObservableProperty]
+    private int autoReleaseLeadSeconds = AutoReleaseTaskSettings.DefaultLeadSeconds;
+
+    partial void OnAutoReleaseLeadSecondsChanged(int value)
+    {
+        var normalized = AutoReleaseTaskSettings.NormalizeLeadSeconds(value);
+        if (normalized != value)
+        {
+            AutoReleaseLeadSeconds = normalized;
+            return;
+        }
+
+        ScheduleSystemSettingsAutoSave();
+        OnPropertyChanged(nameof(AutoReleaseStatusText));
+        QueueAutoReleaseReservationRefresh();
+        QueueAutoReleaseCheck();
+    }
 
     [ObservableProperty]
     private bool traceIntGraphQlOverridesEnabled;

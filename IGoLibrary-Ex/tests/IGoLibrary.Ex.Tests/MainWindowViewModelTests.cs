@@ -1309,6 +1309,308 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_LoadsAutoReleaseSettings()
+    {
+        var viewModel = CreateViewModel(
+            settingsService: new FakeSettingsService(WithAutoRelease(enabled: true, leadSeconds: 120)));
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.AutoReleaseReservationEnabled);
+        Assert.Equal(120, viewModel.AutoReleaseLeadSeconds);
+        Assert.Contains("120", viewModel.AutoReleaseStatusText);
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_PersistsAutoReleaseSettings()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.AutoReleaseReservationEnabled = true;
+        viewModel.AutoReleaseLeadSeconds = 75;
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        Assert.True(settingsService.CurrentSettings.Tasks.AutoRelease.Enabled);
+        Assert.Equal(75, settingsService.CurrentSettings.Tasks.AutoRelease.LeadSeconds);
+    }
+
+    [Fact]
+    public async Task AutoRelease_CancelsCurrentReservation_WhenInsideLeadWindow()
+    {
+        var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = session,
+            RestoreResult = session
+        };
+        var cancelCalls = 0;
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) => Task.FromResult<ReservationInfo?>(cancelCalls == 0
+                ? CreateReservation(
+                    "token-auto",
+                    DateTimeOffset.Now.AddSeconds(30))
+                : null),
+            OnCancelReservationAsync = (_, _, _) =>
+            {
+                cancelCalls++;
+                return Task.FromResult(true);
+            }
+        };
+        var notifications = new FakeNotificationService();
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            settingsService: new FakeSettingsService(WithAutoRelease(enabled: false, leadSeconds: 60)),
+            apiClient: apiClient,
+            notificationService: notifications);
+        await viewModel.InitializeAsync();
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+        viewModel.AutoReleaseReservationEnabled = true;
+
+        await WaitForAsync(() =>
+        {
+            Dispatcher.UIThread.RunJobs();
+            return cancelCalls == 1 && viewModel.HasNoCurrentReservation;
+        });
+        Assert.Contains(notifications.Successes, x => x.Title == "已自动退座");
+    }
+
+    [Fact]
+    public async Task AutoRelease_RefreshesCurrentReservationAfterInitialization_WhenNoVenueIsBound()
+    {
+        var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = session,
+            RestoreResult = session
+        };
+        var libraryService = new FakeLibraryService();
+        var reservationInfoCalls = 0;
+        var cancelCalls = 0;
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) =>
+            {
+                reservationInfoCalls++;
+                return Task.FromResult<ReservationInfo?>(CreateReservation(
+                    "token-startup",
+                    DateTimeOffset.Now.AddSeconds(30)));
+            },
+            OnCancelReservationAsync = (_, _, _) =>
+            {
+                cancelCalls++;
+                return Task.FromResult(true);
+            }
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            libraryService: libraryService,
+            settingsService: new FakeSettingsService(WithAutoRelease(enabled: true, leadSeconds: 60)),
+            apiClient: apiClient);
+
+        await viewModel.InitializeAsync();
+
+        await WaitForAsync(() =>
+        {
+            Dispatcher.UIThread.RunJobs();
+            return reservationInfoCalls >= 1 &&
+                   cancelCalls == 1 &&
+                   viewModel.HasNoCurrentReservation;
+        });
+        Assert.Equal(0, libraryService.BindLibraryCalls);
+    }
+
+    [Fact]
+    public async Task AutoRelease_RefreshesCurrentReservationAfterManualAuthorization()
+    {
+        var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
+        var sessionService = new FakeSessionService
+        {
+            AuthenticateFromCookieResult = session
+        };
+        var reservationInfoCalls = 0;
+        var cancelCalls = 0;
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) =>
+            {
+                reservationInfoCalls++;
+                return Task.FromResult<ReservationInfo?>(CreateReservation(
+                    "token-manual-auth",
+                    DateTimeOffset.Now.AddSeconds(30)));
+            },
+            OnCancelReservationAsync = (_, _, _) =>
+            {
+                cancelCalls++;
+                return Task.FromResult(true);
+            }
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            settingsService: new FakeSettingsService(WithAutoRelease(enabled: true, leadSeconds: 60)),
+            apiClient: apiClient);
+        await viewModel.InitializeAsync();
+
+        viewModel.ManualCookieText = "cookie";
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        await WaitForAsync(() =>
+        {
+            Dispatcher.UIThread.RunJobs();
+            return reservationInfoCalls >= 1 &&
+                   cancelCalls == 1 &&
+                   viewModel.HasNoCurrentReservation;
+        });
+    }
+
+    [Fact]
+    public async Task AutoRelease_SuccessNotificationFailure_DoesNotRecordCancellationFailure()
+    {
+        var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = session,
+            RestoreResult = session
+        };
+        var activityLogService = new ActivityLogService();
+        var notifications = new FakeNotificationService
+        {
+            ShowSuccessException = new InvalidOperationException("toast failed")
+        };
+        var cancelCalls = 0;
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) => Task.FromResult<ReservationInfo?>(CreateReservation(
+                "token-toast",
+                DateTimeOffset.Now.AddSeconds(30))),
+            OnCancelReservationAsync = (_, _, _) =>
+            {
+                cancelCalls++;
+                return Task.FromResult(true);
+            }
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            settingsService: new FakeSettingsService(WithAutoRelease(enabled: true, leadSeconds: 60)),
+            apiClient: apiClient,
+            activityLogService: activityLogService,
+            notificationService: notifications);
+
+        await viewModel.InitializeAsync();
+
+        await WaitForAsync(() =>
+        {
+            Dispatcher.UIThread.RunJobs();
+            return cancelCalls == 1 && viewModel.HasNoCurrentReservation;
+        });
+        Assert.Contains(
+            activityLogService.Entries,
+            entry => entry.Kind == LogEntryKind.Success &&
+                     entry.Category == "AutoRelease" &&
+                     entry.Message.Contains("已自动退座", StringComparison.Ordinal));
+        Assert.Contains(
+            activityLogService.Entries,
+            entry => entry.Kind == LogEntryKind.Warning &&
+                     entry.Category == "AutoRelease" &&
+                     entry.Message.Contains("自动退座成功通知失败", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            activityLogService.Entries,
+            entry => entry.Kind == LogEntryKind.Warning &&
+                     entry.Category == "AutoRelease" &&
+                     entry.Message.StartsWith("自动退座失败", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AutoRelease_DoesNotCancel_WhenOccupyIsStarting()
+    {
+        var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = session,
+            RestoreResult = session
+        };
+        var occupyCoordinator = new FakeOccupySeatCoordinator();
+        var cancelCalls = 0;
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) => Task.FromResult<ReservationInfo?>(CreateReservation(
+                "token-occupy",
+                DateTimeOffset.Now.AddSeconds(30))),
+            OnCancelReservationAsync = (_, _, _) =>
+            {
+                cancelCalls++;
+                return Task.FromResult(true);
+            }
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            settingsService: new FakeSettingsService(WithAutoRelease(enabled: true, leadSeconds: 60)),
+            apiClient: apiClient,
+            occupySeatCoordinator: occupyCoordinator);
+        occupyCoordinator.EmitStatus(new CoordinatorStatus(
+            CoordinatorTaskState.Starting,
+            "占座",
+            "占座启动中",
+            DateTimeOffset.Now,
+            DateTimeOffset.Now,
+            Reason: CoordinatorStatusReason.Running));
+        Dispatcher.UIThread.RunJobs();
+        await viewModel.InitializeAsync();
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+        await Task.Delay(100);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(0, cancelCalls);
+        Assert.True(viewModel.HasCurrentReservation);
+        Assert.True(viewModel.IsAutoReleaseSuppressedByOccupy);
+        Assert.Contains("暂停", viewModel.AutoReleaseStatusText);
+    }
+
+    [Fact]
+    public async Task AutoRelease_FailureKeepsReservation_AndWritesWarning()
+    {
+        var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = session,
+            RestoreResult = session
+        };
+        var activityLogService = new ActivityLogService();
+        var cancelCalls = 0;
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) => Task.FromResult<ReservationInfo?>(CreateReservation(
+                "token-fail",
+                DateTimeOffset.Now.AddSeconds(30))),
+            OnCancelReservationAsync = (_, _, _) =>
+            {
+                cancelCalls++;
+                return Task.FromResult(false);
+            }
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            settingsService: new FakeSettingsService(WithAutoRelease(enabled: true, leadSeconds: 60)),
+            apiClient: apiClient,
+            activityLogService: activityLogService);
+        await viewModel.InitializeAsync();
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+
+        await WaitForAsync(() => cancelCalls == 1);
+        Assert.True(viewModel.HasCurrentReservation);
+        Assert.Contains(
+            activityLogService.Entries,
+            entry => entry.Kind == LogEntryKind.Warning &&
+                     entry.Category == "AutoRelease" &&
+                     entry.Message.Contains("自动退座失败", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task TomorrowSeatSelection_IsSingleChoice_AndDoesNotMutateGrabSelection()
     {
         var (viewModel, _) = await CreateBoundTomorrowViewModelAsync();
@@ -1976,6 +2278,15 @@ public sealed class MainWindowViewModelTests
             }
         };
 
+    private static AppSettings WithAutoRelease(bool enabled, int leadSeconds)
+        => AppSettings.Default with
+        {
+            Tasks = AppSettings.Default.Tasks with
+            {
+                AutoRelease = new AutoReleaseTaskSettings(enabled, leadSeconds)
+            }
+        };
+
     private static AppSettings WithTaskEventAlerts(TaskEventAlertSettings alerts)
         => AppSettings.Default with
         {
@@ -1984,6 +2295,17 @@ public sealed class MainWindowViewModelTests
                 TaskEventAlerts = alerts
             }
         };
+
+    private static ReservationInfo CreateReservation(string token, DateTimeOffset expirationTime)
+    {
+        return new ReservationInfo(
+            token,
+            1,
+            "自科阅览区一",
+            "seat-1",
+            "1",
+            expirationTime);
+    }
 
     private static string BuildAuthorizationCookie(DateTimeOffset expiresAt)
     {

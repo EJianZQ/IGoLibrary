@@ -8,6 +8,8 @@ public sealed record TaskExecutionSettings
 
     public OccupyTaskSettings Occupy { get; init; } = OccupyTaskSettings.Default;
 
+    public AutoReleaseTaskSettings AutoRelease { get; init; } = AutoReleaseTaskSettings.Default;
+
     public TomorrowReservationTaskSettings TomorrowReservation { get; init; } = TomorrowReservationTaskSettings.Default;
 
     public GlobalLeakTaskSettings GlobalLeak { get; init; } = GlobalLeakTaskSettings.Default;
@@ -20,10 +22,12 @@ public sealed record TaskExecutionSettings
         GrabTaskSettings grab,
         OccupyTaskSettings occupy,
         TomorrowReservationTaskSettings? tomorrowReservation = null,
-        GlobalLeakTaskSettings? globalLeak = null)
+        GlobalLeakTaskSettings? globalLeak = null,
+        AutoReleaseTaskSettings? autoRelease = null)
     {
         Grab = grab;
         Occupy = occupy;
+        AutoRelease = autoRelease ?? AutoReleaseTaskSettings.Default;
         TomorrowReservation = tomorrowReservation ?? TomorrowReservationTaskSettings.Default;
         GlobalLeak = globalLeak ?? GlobalLeakTaskSettings.Default;
     }
@@ -74,6 +78,34 @@ public sealed record OccupyTaskSettings
     }
 
     public static OccupyTaskSettings Default { get; } = new();
+}
+
+public sealed record AutoReleaseTaskSettings
+{
+    public const int DefaultLeadSeconds = 60;
+    public const int MinLeadSeconds = 1;
+    public const int MaxLeadSeconds = 3600;
+
+    public bool Enabled { get; init; }
+
+    public int LeadSeconds { get; init; } = DefaultLeadSeconds;
+
+    public AutoReleaseTaskSettings()
+    {
+    }
+
+    public AutoReleaseTaskSettings(bool enabled, int leadSeconds)
+    {
+        Enabled = enabled;
+        LeadSeconds = NormalizeLeadSeconds(leadSeconds);
+    }
+
+    public static int NormalizeLeadSeconds(int value)
+    {
+        return Math.Clamp(value, MinLeadSeconds, MaxLeadSeconds);
+    }
+
+    public static AutoReleaseTaskSettings Default { get; } = new();
 }
 
 public sealed record TomorrowReservationTaskSettings

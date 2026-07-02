@@ -38,6 +38,8 @@ public sealed class SettingsSerializationTests
         Assert.Equal(GrabReservationStrategy.ReserveDirectly, settings.Tasks.Grab.ReservationStrategy);
         Assert.Equal(TimeSpan.Zero, settings.Tasks.Grab.DefaultScheduledStartTime);
         Assert.Equal(5, settings.Tasks.Occupy.ReReservationMaxAttempts);
+        Assert.False(settings.Tasks.AutoRelease.Enabled);
+        Assert.Equal(AutoReleaseTaskSettings.DefaultLeadSeconds, settings.Tasks.AutoRelease.LeadSeconds);
         Assert.Equal(new TimeSpan(20, 0, 0), settings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
         Assert.Equal(12, settings.Venue.LastLibraryId);
         Assert.Equal("自科阅览区一", settings.Venue.LastLibraryName);
@@ -194,6 +196,8 @@ public sealed class SettingsSerializationTests
         Assert.Equal(GrabReservationStrategy.QueryThenReserve, settings.Tasks.Grab.ReservationStrategy);
         Assert.Equal(TimeSpan.Zero, settings.Tasks.Grab.DefaultScheduledStartTime);
         Assert.Equal(4, settings.Tasks.Occupy.ReReservationMaxAttempts);
+        Assert.False(settings.Tasks.AutoRelease.Enabled);
+        Assert.Equal(AutoReleaseTaskSettings.DefaultLeadSeconds, settings.Tasks.AutoRelease.LeadSeconds);
         Assert.Equal(new TimeSpan(20, 0, 0), settings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
         Assert.Empty(settings.Tasks.GlobalLeak.SelectedLibraries);
         Assert.True(settings.Updates.CheckOnStartup);
@@ -218,6 +222,8 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"tasks\":", json);
         Assert.Contains("\"grab\":", json);
         Assert.Contains("\"occupy\":", json);
+        Assert.Contains("\"autoRelease\":", json);
+        Assert.Contains("\"leadSeconds\": 60", json);
         Assert.Contains("\"tomorrowReservation\":", json);
         Assert.Contains("\"globalLeak\":", json);
         Assert.Contains("\"selectedLibraries\":", json);
@@ -264,8 +270,33 @@ public sealed class SettingsSerializationTests
 
         Assert.Contains("\"updates\":", migratedJson);
         Assert.Contains("\"checkOnStartup\": true", migratedJson);
+        Assert.Contains("\"autoRelease\":", migratedJson);
+        Assert.Contains("\"leadSeconds\": 60", migratedJson);
         Assert.Contains("\"globalLeak\":", migratedJson);
         Assert.Contains("\"selectedLibraries\": []", migratedJson);
+    }
+
+    [Theory]
+    [InlineData(0, AutoReleaseTaskSettings.MinLeadSeconds)]
+    [InlineData(4000, AutoReleaseTaskSettings.MaxLeadSeconds)]
+    public void AppSettingsNormalization_ClampsAutoReleaseLeadSeconds(
+        int leadSeconds,
+        int expectedLeadSeconds)
+    {
+        var settings = Normalize(AppSettings.Default with
+        {
+            Tasks = AppSettings.Default.Tasks with
+            {
+                AutoRelease = AutoReleaseTaskSettings.Default with
+                {
+                    Enabled = true,
+                    LeadSeconds = leadSeconds
+                }
+            }
+        });
+
+        Assert.True(settings.Tasks.AutoRelease.Enabled);
+        Assert.Equal(expectedLeadSeconds, settings.Tasks.AutoRelease.LeadSeconds);
     }
 
     [Fact]
@@ -329,5 +360,14 @@ public sealed class SettingsSerializationTests
             BindingFlags.Static | BindingFlags.NonPublic);
 
         return Assert.IsType<string>(method?.Invoke(null, [json]));
+    }
+
+    private static AppSettings Normalize(AppSettings settings)
+    {
+        var method = typeof(SqliteSettingsRepository).GetMethod(
+            "Normalize",
+            BindingFlags.Static | BindingFlags.NonPublic);
+
+        return Assert.IsType<AppSettings>(method?.Invoke(null, [settings]));
     }
 }

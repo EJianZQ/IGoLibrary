@@ -194,6 +194,8 @@ public sealed class WorkflowServiceTests
             NetworkMaxRetries: 0,
             Theme: new ThemePreferences(AppThemeMode.Dark, useSystemAccent: false),
             GrabReservationStrategy: GrabReservationStrategy.ReserveDirectly,
+            AutoReleaseEnabled: true,
+            AutoReleaseLeadSeconds: 90,
             TaskEventAlerts: TaskEventAlertSettings.Default));
 
         Assert.Equal(initial.Venue, settingsService.CurrentSettings.Venue);
@@ -202,6 +204,34 @@ public sealed class WorkflowServiceTests
         Assert.Equal(0, settingsService.CurrentSettings.Network.MaxRetries);
         Assert.False(settingsService.CurrentSettings.Updates.CheckOnStartup);
         Assert.Equal(GrabReservationStrategy.ReserveDirectly, settingsService.CurrentSettings.Tasks.Grab.ReservationStrategy);
+        Assert.True(settingsService.CurrentSettings.Tasks.AutoRelease.Enabled);
+        Assert.Equal(90, settingsService.CurrentSettings.Tasks.AutoRelease.LeadSeconds);
+    }
+
+    [Theory]
+    [InlineData(0, AutoReleaseTaskSettings.MinLeadSeconds)]
+    [InlineData(4000, AutoReleaseTaskSettings.MaxLeadSeconds)]
+    public async Task SettingsWorkflowService_SaveSystemSettingsAsync_ClampsAutoReleaseLeadSeconds(
+        int requestedLeadSeconds,
+        int expectedLeadSeconds)
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
+            MinimizeToTray: true,
+            TraceIntGraphQlOverridesEnabled: false,
+            CheckUpdatesOnStartup: true,
+            RequestTimeoutSeconds: 5,
+            NetworkMaxRetries: 3,
+            Theme: ThemePreferences.Default,
+            GrabReservationStrategy: GrabReservationStrategy.QueryThenReserve,
+            AutoReleaseEnabled: true,
+            AutoReleaseLeadSeconds: requestedLeadSeconds,
+            TaskEventAlerts: TaskEventAlertSettings.Default));
+
+        Assert.True(settingsService.CurrentSettings.Tasks.AutoRelease.Enabled);
+        Assert.Equal(expectedLeadSeconds, settingsService.CurrentSettings.Tasks.AutoRelease.LeadSeconds);
     }
 
     [Fact]

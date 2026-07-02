@@ -2081,6 +2081,44 @@
                                     VerticalAlignment="Center" />
                     </Grid>
                   </Border>
+
+                  <Border Classes="card">
+                    <Grid RowDefinitions="Auto,Auto"
+                          RowSpacing="14">
+                      <Grid ColumnDefinitions="*,Auto"
+                            ColumnSpacing="16">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="15"
+                                     FontWeight="SemiBold"
+                                     Text="自动退座" />
+                          <TextBlock Classes="helper-text"
+                                     Text="启用后会在当前预约到期前指定秒数自动取消预约；占座运行时会自动暂停。" />
+                          <TextBlock Classes="helper-text"
+                                     Text="{Binding AutoReleaseStatusText}" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1"
+                                      IsChecked="{Binding AutoReleaseReservationEnabled}"
+                                      OnContent="开"
+                                      OffContent="关"
+                                      VerticalAlignment="Center" />
+                      </Grid>
+
+                      <Grid Grid.Row="1"
+                            ColumnDefinitions="Auto,160"
+                            ColumnSpacing="12">
+                        <TextBlock Classes="field-label"
+                                   Text="提前取消预约秒数"
+                                   VerticalAlignment="Center" />
+                        <NumericUpDown Grid.Column="1"
+                                       Minimum="1"
+                                       Maximum="3600"
+                                       Increment="1"
+                                       FormatString="0"
+                                       Value="{Binding AutoReleaseLeadSeconds}"
+                                       HorizontalAlignment="Stretch" />
+                      </Grid>
+                    </Grid>
+                  </Border>
                 </StackPanel>
               </ScrollViewer>
 

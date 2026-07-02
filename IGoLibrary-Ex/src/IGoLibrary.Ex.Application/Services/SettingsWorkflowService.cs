@@ -42,6 +42,11 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
                 Grab = current.Tasks.Grab with
                 {
                     ReservationStrategy = snapshot.GrabReservationStrategy
+                },
+                AutoRelease = current.Tasks.AutoRelease with
+                {
+                    Enabled = snapshot.AutoReleaseEnabled,
+                    LeadSeconds = AutoReleaseTaskSettings.NormalizeLeadSeconds(snapshot.AutoReleaseLeadSeconds)
                 }
             }
         }, cancellationToken);

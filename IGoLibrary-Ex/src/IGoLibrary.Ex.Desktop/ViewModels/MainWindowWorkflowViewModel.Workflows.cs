@@ -41,6 +41,28 @@ public partial class MainWindowWorkflowViewModel
 
     public bool CanEditGrabScheduledStartTime => CanEditGrabConfiguration && IsGrabScheduledStartEnabled;
 
+    public bool IsAutoReleaseSuppressedByOccupy => IsOccupyRunning;
+
+    public string AutoReleaseStatusText
+    {
+        get
+        {
+            if (!AutoReleaseReservationEnabled)
+            {
+                return "自动退座未启用";
+            }
+
+            if (IsAutoReleaseSuppressedByOccupy)
+            {
+                return "占座运行中，自动退座已暂停";
+            }
+
+            return HasCurrentReservation
+                ? $"已启用：将在到期前 {AutoReleaseLeadSeconds} 秒自动退座"
+                : $"已启用：当前暂无预约，到期前 {AutoReleaseLeadSeconds} 秒将自动退座";
+        }
+    }
+
     public int SelectedGlobalLeakLibraryCount => SelectedGlobalLeakLibraries.Count;
 
     public bool HasSelectedGlobalLeakLibraries => SelectedGlobalLeakLibraryCount > 0;
@@ -182,11 +204,19 @@ public partial class MainWindowWorkflowViewModel
     partial void OnIsOccupyRunningChanged(bool value)
     {
         OnPropertyChanged(nameof(IsOccupyStopped));
+        OnPropertyChanged(nameof(IsAutoReleaseSuppressedByOccupy));
+        OnPropertyChanged(nameof(AutoReleaseStatusText));
+        if (!value)
+        {
+            QueueAutoReleaseReservationRefresh();
+            QueueAutoReleaseCheck();
+        }
     }
 
     partial void OnIsCancellingCurrentReservationChanged(bool value)
     {
         OnPropertyChanged(nameof(CanCancelCurrentReservation));
+        OnPropertyChanged(nameof(AutoReleaseStatusText));
     }
 
     partial void OnIsGrabTaskActiveChanged(bool value)
@@ -402,6 +432,8 @@ public partial class MainWindowWorkflowViewModel
         {
             IsInitializationComplete = true;
             UpdateHomeDashboardPresentation();
+            QueueAutoReleaseReservationRefresh();
+            QueueAutoReleaseCheck();
             _ = RunStartupUpdateCheckAsync();
         }
     }
@@ -677,6 +709,9 @@ public partial class MainWindowWorkflowViewModel
                     _globalLeakSelectionRestoredForCurrentSession = false;
                     await LoadLibrariesAsync(restorePreferredSelection: false);
                 }
+
+                QueueAutoReleaseReservationRefresh();
+                QueueAutoReleaseCheck();
             }
             else if (!string.IsNullOrWhiteSpace(result.AuthenticationFailureMessage))
             {
@@ -724,6 +759,9 @@ public partial class MainWindowWorkflowViewModel
                 _globalLeakSelectionRestoredForCurrentSession = false;
                 await LoadLibrariesAsync(restorePreferredSelection: false);
             }
+
+            QueueAutoReleaseReservationRefresh();
+            QueueAutoReleaseCheck();
             SelectedTabIndex = 1;
         }
         catch (Exception ex)
@@ -755,6 +793,9 @@ public partial class MainWindowWorkflowViewModel
                 _globalLeakSelectionRestoredForCurrentSession = false;
                 await LoadLibrariesAsync(restorePreferredSelection: false);
             }
+
+            QueueAutoReleaseReservationRefresh();
+            QueueAutoReleaseCheck();
         }
         catch (Exception ex)
         {
@@ -1559,6 +1600,15 @@ public partial class MainWindowWorkflowViewModel
     [RelayCommand]
     private async Task CancelCurrentReservationAsync()
     {
+        await CancelCurrentReservationCoreAsync(
+            isAutomatic: false,
+            stopOccupyFirst: IsOccupyRunning);
+    }
+
+    private async Task CancelCurrentReservationCoreAsync(
+        bool isAutomatic,
+        bool stopOccupyFirst)
+    {
         if (_currentReservation is null || IsCancellingCurrentReservation)
         {
             return;
@@ -1571,33 +1621,155 @@ public partial class MainWindowWorkflowViewModel
         {
             var result = await OccupyPage.CancelCurrentReservationAsync(
                 reservation,
-                stopOccupyFirst: IsOccupyRunning);
+                stopOccupyFirst);
             if (!result.HasSession)
             {
-                await _notificationService.ShowWarningAsync("未登录", "当前会话已失效，请重新授权后再操作");
+                if (isAutomatic)
+                {
+                    RecordAutoReleaseFailure(reservation);
+                    _activityLogService.Write(LogEntryKind.Warning, "AutoRelease", "自动退座失败：当前会话已失效。");
+                }
+                else
+                {
+                    await _notificationService.ShowWarningAsync("未登录", "当前会话已失效，请重新授权后再操作");
+                }
+
                 return;
             }
 
             if (!result.RemoteSucceeded)
             {
-                _activityLogService.Write(LogEntryKind.Warning, "Occupy", $"{reservation.SeatName} 取消预约失败，接口未返回成功结果。");
-                await _notificationService.ShowWarningAsync("取消预约失败", "接口未返回成功结果，请稍后重试");
+                if (isAutomatic)
+                {
+                    RecordAutoReleaseFailure(reservation);
+                    _activityLogService.Write(LogEntryKind.Warning, "AutoRelease", $"{reservation.SeatName} 自动退座失败，接口未返回成功结果。");
+                }
+                else
+                {
+                    _activityLogService.Write(LogEntryKind.Warning, "Occupy", $"{reservation.SeatName} 取消预约失败，接口未返回成功结果。");
+                    await _notificationService.ShowWarningAsync("取消预约失败", "接口未返回成功结果，请稍后重试");
+                }
+
                 return;
             }
 
-            _activityLogService.Write(LogEntryKind.Success, "Occupy", $"{reservation.SeatName} 已手动取消预约。");
+            ClearAutoReleaseFailure();
             UpdateReservationPresentation(result.Reservation);
-            await _notificationService.ShowSuccessAsync("已取消预约", $"{reservation.SeatName} 已取消预约");
+            if (isAutomatic)
+            {
+                _activityLogService.Write(LogEntryKind.Success, "AutoRelease", $"{reservation.SeatName} 已自动退座。");
+                try
+                {
+                    await _notificationService.ShowSuccessAsync("已自动退座", $"{reservation.SeatName} 已自动取消预约");
+                }
+                catch (Exception ex)
+                {
+                    _activityLogService.Write(LogEntryKind.Warning, "AutoRelease", $"自动退座成功通知失败：{ex.Message}");
+                }
+            }
+            else
+            {
+                _activityLogService.Write(LogEntryKind.Success, "Occupy", $"{reservation.SeatName} 已手动取消预约。");
+                await _notificationService.ShowSuccessAsync("已取消预约", $"{reservation.SeatName} 已取消预约");
+            }
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Occupy", $"取消预约失败：{ex.Message}");
-            await _notificationService.ShowWarningAsync("取消预约失败", ex.Message);
+            if (isAutomatic)
+            {
+                RecordAutoReleaseFailure(reservation);
+                _activityLogService.Write(LogEntryKind.Warning, "AutoRelease", $"自动退座失败：{ex.Message}");
+            }
+            else
+            {
+                _activityLogService.Write(LogEntryKind.Error, "Occupy", $"取消预约失败：{ex.Message}");
+                await _notificationService.ShowWarningAsync("取消预约失败", ex.Message);
+            }
         }
         finally
         {
             IsCancellingCurrentReservation = false;
         }
+    }
+
+    private void QueueAutoReleaseReservationRefresh()
+    {
+        if (_isLoadingSettings ||
+            !IsInitializationComplete ||
+            !AutoReleaseReservationEnabled ||
+            IsAutoReleaseSuppressedByOccupy ||
+            _isAutoReleaseRefreshingReservation)
+        {
+            return;
+        }
+
+        _ = RefreshReservationForAutoReleaseAsync();
+    }
+
+    private async Task RefreshReservationForAutoReleaseAsync()
+    {
+        if (_isAutoReleaseRefreshingReservation)
+        {
+            return;
+        }
+
+        _isAutoReleaseRefreshingReservation = true;
+        try
+        {
+            await RefreshReservationAsync(showNotificationOnError: false);
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "AutoRelease", $"自动退座刷新当前预约失败：{ex.Message}");
+        }
+        finally
+        {
+            _isAutoReleaseRefreshingReservation = false;
+        }
+    }
+
+    private void QueueAutoReleaseCheck()
+    {
+        if (_isLoadingSettings || !IsInitializationComplete)
+        {
+            return;
+        }
+
+        _ = TryAutoReleaseCurrentReservationAsync();
+    }
+
+    private async Task TryAutoReleaseCurrentReservationAsync()
+    {
+        var now = DateTimeOffset.Now;
+        if (!AutoReleaseReservationPolicy.ShouldCancel(
+                _currentReservation,
+                AutoReleaseReservationEnabled,
+                AutoReleaseLeadSeconds,
+                IsCancellingCurrentReservation,
+                IsAutoReleaseSuppressedByOccupy,
+                _lastAutoReleaseFailedReservationToken,
+                _lastAutoReleaseFailedAt,
+                now))
+        {
+            OnPropertyChanged(nameof(AutoReleaseStatusText));
+            return;
+        }
+
+        await CancelCurrentReservationCoreAsync(
+            isAutomatic: true,
+            stopOccupyFirst: false);
+    }
+
+    private void RecordAutoReleaseFailure(ReservationInfo reservation)
+    {
+        _lastAutoReleaseFailedReservationToken = reservation.ReservationToken;
+        _lastAutoReleaseFailedAt = DateTimeOffset.Now;
+    }
+
+    private void ClearAutoReleaseFailure()
+    {
+        _lastAutoReleaseFailedReservationToken = null;
+        _lastAutoReleaseFailedAt = null;
     }
 
     [RelayCommand]
@@ -1608,10 +1780,12 @@ public partial class MainWindowWorkflowViewModel
             var plan = new OccupySeatPlan(
                 TimeSpan.FromSeconds(Math.Max(1, ReReserveDelaySeconds)),
                 (OccupyCheckIntervalMode)SelectedOccupyCheckIntervalModeIndex);
+            IsOccupyRunning = true;
             await OccupyPage.StartAsync(plan);
         }
         catch (Exception ex)
         {
+            ApplyOccupyStatus(_occupySeatCoordinator.GetStatus());
             _activityLogService.Write(LogEntryKind.Error, "Occupy", $"启动占座失败：{ex.Message}");
             await _notificationService.ShowWarningAsync("启动占座失败", ex.Message);
         }
@@ -1658,6 +1832,8 @@ public partial class MainWindowWorkflowViewModel
             Math.Clamp(NetworkMaxRetries, 0, 10),
             theme,
             grabReservationStrategy,
+            AutoReleaseReservationEnabled,
+            AutoReleaseTaskSettings.NormalizeLeadSeconds(AutoReleaseLeadSeconds),
             BuildTaskEventAlertSettingsSnapshot()),
             cancellationToken);
         await _appThemeService.ApplyThemeAsync(theme, cancellationToken);
@@ -1924,6 +2100,8 @@ public partial class MainWindowWorkflowViewModel
             SelectedAppThemeModeIndex = (int)theme.Mode;
             UseSystemAccent = theme.UseSystemAccent;
             SelectedGrabReservationStrategyIndex = (int)settings.Tasks.Grab.ReservationStrategy;
+            AutoReleaseReservationEnabled = settings.Tasks.AutoRelease.Enabled;
+            AutoReleaseLeadSeconds = AutoReleaseTaskSettings.NormalizeLeadSeconds(settings.Tasks.AutoRelease.LeadSeconds);
             _grabScheduledStartDefault = NormalizeTimeOfDay(
                 settings.Tasks.Grab.DefaultScheduledStartTime,
                 DefaultGrabScheduledStartTime);
@@ -3122,6 +3300,7 @@ public partial class MainWindowWorkflowViewModel
     private void OnReservationCountdownTick(object? sender, EventArgs e)
     {
         UpdateReservationCountdown();
+        QueueAutoReleaseCheck();
         UpdateGrabLastRequestText();
         UpdateGlobalLeakLastRequestText();
         UpdateTomorrowLastRequestText();
@@ -3862,10 +4041,18 @@ public partial class MainWindowWorkflowViewModel
 
     private void UpdateReservationPresentation(ReservationInfo? info)
     {
+        var previousReservationToken = _currentReservation?.ReservationToken;
         _currentReservation = info;
+        if (info is null ||
+            !string.Equals(previousReservationToken, info.ReservationToken, StringComparison.Ordinal))
+        {
+            ClearAutoReleaseFailure();
+        }
+
         OnPropertyChanged(nameof(HasCurrentReservation));
         OnPropertyChanged(nameof(HasNoCurrentReservation));
         OnPropertyChanged(nameof(CanCancelCurrentReservation));
+        OnPropertyChanged(nameof(AutoReleaseStatusText));
 
         if (info is null)
         {
@@ -3875,6 +4062,7 @@ public partial class MainWindowWorkflowViewModel
             ReservationCountdownText = "等待建立预约状态";
             UpdateHomeReservationCardPresentation(DateTimeOffset.Now);
             UpdateHomeSystemInfoPresentation();
+            QueueAutoReleaseCheck();
             return;
         }
 
@@ -3883,6 +4071,7 @@ public partial class MainWindowWorkflowViewModel
         UpdateReservationCountdown();
         UpdateHomeReservationCardPresentation(DateTimeOffset.Now);
         UpdateHomeSystemInfoPresentation();
+        QueueAutoReleaseCheck();
     }
 
     private void UpdateReservationCountdown()

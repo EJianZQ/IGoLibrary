@@ -10,4 +10,6 @@ public sealed record SystemSettingsSnapshot(
     int NetworkMaxRetries,
     ThemePreferences Theme,
     GrabReservationStrategy GrabReservationStrategy,
+    bool AutoReleaseEnabled,
+    int AutoReleaseLeadSeconds,
     TaskEventAlertSettings TaskEventAlerts);

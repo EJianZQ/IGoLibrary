@@ -16,6 +16,8 @@ internal sealed class FakeNotificationService : INotificationService
     public List<(string Title, string Message)> Warnings { get; } = [];
     public List<(string Title, string Message)> Successes { get; } = [];
 
+    public Exception? ShowSuccessException { get; set; }
+
     public Task ShowInfoAsync(string title, string message, CancellationToken cancellationToken = default)
     {
         Infos.Add((title, message));
@@ -30,6 +32,11 @@ internal sealed class FakeNotificationService : INotificationService
 
     public Task ShowSuccessAsync(string title, string message, CancellationToken cancellationToken = default)
     {
+        if (ShowSuccessException is not null)
+        {
+            throw ShowSuccessException;
+        }
+
         Successes.Add((title, message));
         return Task.CompletedTask;
     }

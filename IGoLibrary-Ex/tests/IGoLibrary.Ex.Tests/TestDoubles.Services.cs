@@ -546,6 +546,12 @@ internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
         return Task.CompletedTask;
     }
 
+    public void EmitStatus(CoordinatorStatus status)
+    {
+        _status = status;
+        StatusChanged?.Invoke(this, _status);
+    }
+
     public CoordinatorStatus GetStatus() => _status;
 }
 
