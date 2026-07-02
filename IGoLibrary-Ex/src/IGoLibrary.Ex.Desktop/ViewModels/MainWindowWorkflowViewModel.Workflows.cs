@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Text;
 using Avalonia.Threading;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IGoLibrary.Ex.Application.Abstractions;
@@ -346,6 +347,8 @@ public partial class MainWindowWorkflowViewModel
             ApplyThemePalette(_appThemeService.CurrentPalette);
         }
 
+        _ = LoadProjectAuthorAvatarAsync();
+
         _activityLogService.EntryWritten += OnLogEntryWritten;
         _grabSeatCoordinator.StatusChanged += OnGrabStatusChanged;
         _globalLeakCoordinator.StatusChanged += OnGlobalLeakStatusChanged;
@@ -584,6 +587,37 @@ public partial class MainWindowWorkflowViewModel
         {
             UseShellExecute = true
         });
+    }
+
+    [RelayCommand]
+    private async Task OpenProjectGitHubPageAsync()
+    {
+        try
+        {
+            await _externalLinkService.OpenAsync(new Uri(ProjectGitHubUrl));
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "About", $"打开项目 GitHub 地址失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("打开 GitHub 失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task OpenAuthorSponsorPageAsync()
+    {
+        try
+        {
+            await _externalLinkService.OpenAsync(new Uri(AuthorSponsorUrl));
+            await _notificationService.ShowInfoAsync(
+                "赞赏作者提示",
+                "已打开作者项目博客\n滚动到页面底部点击打赏按钮");
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "About", $"打开作者赞赏页面失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("打开赞赏页面失败", ex.Message);
+        }
     }
 
     [RelayCommand]
@@ -1824,6 +1858,40 @@ public partial class MainWindowWorkflowViewModel
         {
             _activityLogService.Write(LogEntryKind.Warning, "Update", $"打开 Release 页面失败：{ex.Message}");
             await _notificationService.ShowWarningAsync("打开 Release 页面失败", ex.Message);
+        }
+    }
+
+    private async Task LoadProjectAuthorAvatarAsync()
+    {
+        if (ProjectAuthorAvatar is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "IGoLibrary-Ex");
+
+            var bytes = await httpClient.GetByteArrayAsync(ProjectAuthorAvatarUrl, cancellationTokenSource.Token);
+            using var stream = new MemoryStream(bytes);
+            var avatar = new Bitmap(stream);
+
+            if (Dispatcher.UIThread.CheckAccess())
+            {
+                ProjectAuthorAvatar = avatar;
+                return;
+            }
+
+            Dispatcher.UIThread.Post(() => ProjectAuthorAvatar = avatar);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "About", $"加载作者头像失败：{ex.Message}");
         }
     }
 

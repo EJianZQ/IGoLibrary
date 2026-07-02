@@ -232,6 +232,18 @@ public partial class MainWindowWorkflowViewModel(
 
     public string CurrentAppVersionText { get; } = $"v{appVersionProvider.CurrentVersionText}";
 
+    public const string ProjectGitHubUrl = "https://github.com/EJianZQ/IGoLibrary";
+
+    public const string AuthorSponsorUrl = "https://latiao.vip/%E9%A1%B9%E7%9B%AE%E5%8F%91%E5%B8%83/14.html";
+
+    public const string ProjectAuthorName = "EJianZQ";
+
+    public const string ProjectAuthorAvatarUrl = "https://avatars.githubusercontent.com/u/52780714";
+
+    public bool HasProjectAuthorAvatar => ProjectAuthorAvatar is not null;
+
+    public bool HasNoProjectAuthorAvatar => !HasProjectAuthorAvatar;
+
     public const int AccountAndVenueTabIndex = 1;
 
     [ObservableProperty]
@@ -638,6 +650,15 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private bool isCheckingForUpdates;
+
+    [ObservableProperty]
+    private IImage? projectAuthorAvatar;
+
+    partial void OnProjectAuthorAvatarChanged(IImage? value)
+    {
+        OnPropertyChanged(nameof(HasProjectAuthorAvatar));
+        OnPropertyChanged(nameof(HasNoProjectAuthorAvatar));
+    }
 
     public bool CanCheckForUpdates => !IsCheckingForUpdates;
 
