@@ -8,4 +8,9 @@
     <Version>0.9.9</Version>
     <InformationalVersion>$(Version)</InformationalVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- RestSharp 108.0.3 is intentionally pinned for compatibility; suppress only this accepted advisory. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-4rr6-2v9v-wcpc" />
+  </ItemGroup>
 </Project>
