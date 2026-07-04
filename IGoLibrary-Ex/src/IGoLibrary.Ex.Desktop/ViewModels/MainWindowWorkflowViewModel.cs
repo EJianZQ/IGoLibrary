@@ -105,7 +105,7 @@ public partial class MainWindowWorkflowViewModel(
         "M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z");
     private static readonly SidebarNavigationItem NotificationSettingsSidebarItem = new(
         NotificationSettingsTabIndex,
-        "通知设置",
+        "自动通知",
         "M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2z");
     private static readonly SidebarNavigationItem SettingsSidebarItem = new(
         SystemSettingsTabIndex,
@@ -231,7 +231,7 @@ public partial class MainWindowWorkflowViewModel(
 
     public string[] SystemSettingsCategories { get; } = ["常规", "外观", "网络与接口", "存储与更新"];
 
-    public string[] NotificationSettingsCategories { get; } = ["设置通知事件", "邮件提醒配置", "Telegram Bot", "本地弹窗提醒"];
+    public string[] NotificationSettingsCategories { get; } = ["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "弹窗提醒配置"];
 
     public string CurrentAppVersionText { get; } = $"v{appVersionProvider.CurrentVersionText}";
 

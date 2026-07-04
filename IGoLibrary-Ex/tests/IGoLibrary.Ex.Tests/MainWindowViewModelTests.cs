@@ -76,7 +76,7 @@ public sealed class MainWindowViewModelTests
         var titles = viewModel.SidebarItems.Select(item => item.Title).ToArray();
         var pageIndexes = viewModel.SidebarItems.Select(item => item.PageIndex).ToArray();
 
-        Assert.Equal(["首页", "账户与场馆", "抢座", "全域捡漏", "明日预约", "占座", "通知设置", "系统设置"], titles);
+        Assert.Equal(["首页", "账户与场馆", "抢座", "全域捡漏", "明日预约", "占座", "自动通知", "系统设置"], titles);
         Assert.Equal([0, 1, 2, 3, 4, 5, 6, 7], pageIndexes);
     }
 
@@ -99,7 +99,7 @@ public sealed class MainWindowViewModelTests
     {
         var viewModel = CreateViewModel();
 
-        Assert.Equal(["设置通知事件", "邮件提醒配置", "Telegram Bot", "本地弹窗提醒"], viewModel.NotificationSettingsCategories);
+        Assert.Equal(["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "弹窗提醒配置"], viewModel.NotificationSettingsCategories);
     }
 
     [Fact]
