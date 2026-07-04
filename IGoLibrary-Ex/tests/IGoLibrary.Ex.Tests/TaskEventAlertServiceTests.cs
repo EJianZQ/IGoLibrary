@@ -163,6 +163,57 @@ public sealed class TaskEventAlertServiceTests
         Assert.Contains("预约请求超时", warning.Message);
     }
 
+    [Theory]
+    [InlineData(TaskAlertTestEvent.SessionInvalid)]
+    [InlineData(TaskAlertTestEvent.GrabSucceeded)]
+    [InlineData(TaskAlertTestEvent.OccupyReReserveSucceeded)]
+    [InlineData(TaskAlertTestEvent.TomorrowReservationSucceeded)]
+    [InlineData(TaskAlertTestEvent.GlobalLeakSucceeded)]
+    [InlineData(TaskAlertTestEvent.TaskFailed)]
+    public async Task NotifyAsync_DoesNotSendAnyChannel_WhenEventIsDisabled(TaskAlertTestEvent eventKind)
+    {
+        var emailSender = new FakeEmailAlertSender();
+        var telegramSender = new FakeTelegramAlertSender();
+        var notificationService = new FakeNotificationService();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            CreateAllChannelsEnabledSettings(DisableEvent(eventKind))));
+        var service = CreateService(
+            settingsService,
+            emailSender,
+            notificationService: notificationService,
+            telegramSender: telegramSender);
+
+        await NotifyEventAsync(service, eventKind);
+
+        Assert.Empty(emailSender.Requests);
+        Assert.Empty(telegramSender.Requests);
+        Assert.Empty(notificationService.Successes);
+        Assert.Empty(notificationService.Warnings);
+        Assert.Empty(notificationService.Infos);
+    }
+
+    [Fact]
+    public async Task NotifyAsync_DisabledEventDoesNotSuppressEnabledEvent()
+    {
+        var notificationService = new FakeNotificationService();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default with
+                {
+                    GrabSucceeded = false
+                })));
+        var service = CreateService(settingsService: settingsService, notificationService: notificationService);
+
+        await service.NotifyGrabSucceededAsync("自科阅览区一", "2号座");
+        await service.NotifyGlobalLeakSucceededAsync("自科阅览区一", "2号座");
+
+        var success = Assert.Single(notificationService.Successes);
+        Assert.Equal("全域捡漏成功", success.Title);
+    }
+
     [Fact]
     public async Task NotifyGrabSucceededAsync_DoesNotSuppressDifferentLibraries_WithSameSeatName()
     {
@@ -391,6 +442,61 @@ public sealed class TaskEventAlertServiceTests
                 TaskEventAlerts = alerts
             }
         };
+
+    private static TaskEventAlertSettings CreateAllChannelsEnabledSettings(TaskEventAlertEventSettings events)
+    {
+        return new TaskEventAlertSettings(
+            new EmailAlertChannelSettings(
+                Enabled: true,
+                SmtpHost: "smtp.example.com",
+                Port: 587,
+                SecurityMode: EmailSecurityMode.Tls,
+                Username: "tester",
+                Password: "secret",
+                FromAddress: "sender@example.com",
+                ToAddress: "receiver@example.com"),
+            new LocalDesktopAlertSettings(false, false),
+            new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"),
+            events);
+    }
+
+    private static TaskEventAlertEventSettings DisableEvent(TaskAlertTestEvent eventKind)
+    {
+        return eventKind switch
+        {
+            TaskAlertTestEvent.SessionInvalid => TaskEventAlertEventSettings.Default with { SessionInvalid = false },
+            TaskAlertTestEvent.GrabSucceeded => TaskEventAlertEventSettings.Default with { GrabSucceeded = false },
+            TaskAlertTestEvent.OccupyReReserveSucceeded => TaskEventAlertEventSettings.Default with { OccupyReReserveSucceeded = false },
+            TaskAlertTestEvent.TomorrowReservationSucceeded => TaskEventAlertEventSettings.Default with { TomorrowReservationSucceeded = false },
+            TaskAlertTestEvent.GlobalLeakSucceeded => TaskEventAlertEventSettings.Default with { GlobalLeakSucceeded = false },
+            TaskAlertTestEvent.TaskFailed => TaskEventAlertEventSettings.Default with { TaskFailed = false },
+            _ => TaskEventAlertEventSettings.Default
+        };
+    }
+
+    private static Task NotifyEventAsync(TaskEventAlertService service, TaskAlertTestEvent eventKind)
+    {
+        return eventKind switch
+        {
+            TaskAlertTestEvent.SessionInvalid => service.NotifySessionInvalidAsync("抢座轮询", "Cookie 无效"),
+            TaskAlertTestEvent.GrabSucceeded => service.NotifyGrabSucceededAsync("自科阅览区一", "2号座"),
+            TaskAlertTestEvent.OccupyReReserveSucceeded => service.NotifyOccupyReReserveSucceededAsync("2号座"),
+            TaskAlertTestEvent.TomorrowReservationSucceeded => service.NotifyTomorrowReservationSucceededAsync("自科阅览区一", "2号座", "明日"),
+            TaskAlertTestEvent.GlobalLeakSucceeded => service.NotifyGlobalLeakSucceededAsync("自科阅览区一", "2号座"),
+            TaskAlertTestEvent.TaskFailed => service.NotifyTaskFailedAsync("抢座", "预约请求超时"),
+            _ => Task.CompletedTask
+        };
+    }
+
+    public enum TaskAlertTestEvent
+    {
+        SessionInvalid,
+        GrabSucceeded,
+        OccupyReReserveSucceeded,
+        TomorrowReservationSucceeded,
+        GlobalLeakSucceeded,
+        TaskFailed
+    }
 
     private static async Task WaitForAsync(Func<bool> predicate)
     {

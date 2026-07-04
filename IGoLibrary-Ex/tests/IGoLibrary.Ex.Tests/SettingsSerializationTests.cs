@@ -93,6 +93,7 @@ public sealed class SettingsSerializationTests
         Assert.True(alerts.Local.PopupEnabled);
         Assert.False(alerts.Local.SoundEnabled);
         Assert.Equal(TelegramAlertChannelSettings.Default, alerts.Telegram);
+        Assert.Equal(TaskEventAlertEventSettings.Default, alerts.Events);
     }
 
     [Fact]
@@ -132,9 +133,11 @@ public sealed class SettingsSerializationTests
         var alerts = Assert.IsType<TaskEventAlertSettings>(settings.Notifications.TaskEventAlerts);
         Assert.True(alerts.Local.PopupEnabled);
         Assert.False(alerts.Local.SoundEnabled);
+        Assert.Equal(TaskEventAlertEventSettings.Default, alerts.Events);
         Assert.DoesNotContain("toastEnabled", migratedJson);
         Assert.DoesNotContain("appBannerNotificationsEnabled", migratedJson);
         Assert.Contains("\"popupEnabled\": true", migratedJson);
+        Assert.Contains("\"events\":", migratedJson);
     }
 
     [Fact]
@@ -232,8 +235,124 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"dashboard\":", json);
         Assert.Contains("\"updates\":", json);
         Assert.Contains("\"taskEventAlerts\":", json);
+        Assert.Contains("\"events\":", json);
+        Assert.Contains("\"grabSucceeded\": true", json);
+        Assert.Contains("\"occupyReReserveSucceeded\": true", json);
+        Assert.Contains("\"tomorrowReservationSucceeded\": true", json);
+        Assert.Contains("\"globalLeakSucceeded\": true", json);
+        Assert.Contains("\"sessionInvalid\": true", json);
+        Assert.Contains("\"taskFailed\": true", json);
         Assert.DoesNotContain("appBannerNotificationsEnabled", json);
         Assert.Contains("\"graphQlOverridesEnabled\": true", json);
+    }
+
+    [Fact]
+    public void CanonicalJsonWithoutEventSettings_RewritesWithDefaultEventSettings()
+    {
+        var migratedJson = MigrateLegacyAppSettingsJson(
+            """
+            {
+              "notifications": {
+                "taskEventAlerts": {
+                  "email": {
+                    "enabled": false,
+                    "smtpHost": "",
+                    "port": 587,
+                    "securityMode": 1,
+                    "username": "",
+                    "password": "",
+                    "fromAddress": "",
+                    "toAddress": ""
+                  },
+                  "local": {
+                    "popupEnabled": true,
+                    "soundEnabled": false
+                  },
+                  "telegram": {
+                    "enabled": false,
+                    "apiBaseUrl": "https://api.telegram.org",
+                    "botToken": "",
+                    "chatId": ""
+                  }
+                }
+              },
+              "ui": {
+                "minimizeToTray": true,
+                "theme": {
+                  "mode": 0,
+                  "useSystemAccent": true
+                }
+              },
+              "traceIntProtocol": {
+                "graphQlOverridesEnabled": false
+              },
+              "network": {
+                "timeoutSeconds": 5,
+                "maxRetries": 3
+              },
+              "tasks": {
+                "grab": {
+                  "reservationStrategy": 0,
+                  "defaultScheduledStartTime": "00:00:00"
+                },
+                "occupy": {
+                  "reReservationMaxAttempts": 4
+                },
+                "autoRelease": {
+                  "enabled": false,
+                  "leadSeconds": 60
+                },
+                "tomorrowReservation": {
+                  "defaultScheduledStartTime": "20:00:00"
+                },
+                "globalLeak": {
+                  "selectedLibraries": []
+                }
+              },
+              "venue": {},
+              "dashboard": {},
+              "updates": {
+                "checkOnStartup": true
+              }
+            }
+            """);
+
+        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default));
+        var alerts = Assert.IsType<TaskEventAlertSettings>(settings.Notifications.TaskEventAlerts);
+        Assert.Equal(TaskEventAlertEventSettings.Default, alerts.Events);
+        Assert.Contains("\"events\":", migratedJson);
+        Assert.Contains("\"taskFailed\": true", migratedJson);
+    }
+
+    [Fact]
+    public void AppSettingsSerialization_PreservesExplicitEventSettings()
+    {
+        var json = JsonSerializer.Serialize(AppSettings.Default with
+        {
+            Notifications = AppSettings.Default.Notifications with
+            {
+                TaskEventAlerts = new TaskEventAlertSettings(
+                    EmailAlertChannelSettings.Default,
+                    LocalDesktopAlertSettings.Default,
+                    TelegramAlertChannelSettings.Default,
+                    TaskEventAlertEventSettings.Default with
+                    {
+                        GrabSucceeded = false,
+                        SessionInvalid = false
+                    })
+            }
+        }, AppJson.Default);
+
+        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
+        var events = Assert.IsType<TaskEventAlertEventSettings>(settings.Notifications.TaskEventAlerts?.Events);
+        Assert.False(events.GrabSucceeded);
+        Assert.True(events.OccupyReReserveSucceeded);
+        Assert.True(events.TomorrowReservationSucceeded);
+        Assert.True(events.GlobalLeakSucceeded);
+        Assert.False(events.SessionInvalid);
+        Assert.True(events.TaskFailed);
+        Assert.Contains("\"grabSucceeded\": false", json);
+        Assert.Contains("\"sessionInvalid\": false", json);
     }
 
     [Fact]

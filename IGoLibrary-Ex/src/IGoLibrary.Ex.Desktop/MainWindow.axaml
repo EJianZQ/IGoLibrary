@@ -65,6 +65,8 @@
     <PathGeometry x:Key="IconGrab">M7 2v11h3v9l7-12h-4l4-8z</PathGeometry>
     <PathGeometry x:Key="IconOccupy">M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z</PathGeometry>
     <PathGeometry x:Key="IconSettings">M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z</PathGeometry>
+    <PathGeometry x:Key="IconEventKey">M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2.18 12C8.16 14 6.82 12.66 6.82 11s1.34-3 3-3c1.3 0 2.41.84 2.83 2H19v2h-2v2h-2v-2h-2.35c-.42 1.16-1.53 2-2.83 2zm0-2c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1z</PathGeometry>
+    <PathGeometry x:Key="IconEventBell">M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm6-6v-5a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2z</PathGeometry>
 
   </Window.Resources>
 
@@ -1788,6 +1790,161 @@
                     <Carousel.PageTransition>
                       <CrossFade Duration="0:0:0.22" />
                     </Carousel.PageTransition>
+
+                    <Grid HorizontalAlignment="Stretch">
+                      <StackPanel Spacing="14"
+                                  HorizontalAlignment="Stretch">
+                        <Border Padding="12,8">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                            <PathIcon Data="{StaticResource IconEventKey}"
+                                      Width="20"
+                                      Height="20"
+                                      Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="Cookie 失效提醒" />
+                              <TextBlock FontSize="12"
+                                         Foreground="{DynamicResource SemiTextTertiaryBrush}"
+                                         TextWrapping="Wrap"
+                                         Text="微信授权凭证到期、被下线或接口返回未登录时通知" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="2"
+                                          IsChecked="{Binding SessionInvalidAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Border Padding="12,8">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                            <PathIcon Data="{StaticResource IconGrab}"
+                                      Width="20"
+                                      Height="20"
+                                      Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="抢座成功提醒" />
+                              <TextBlock FontSize="12"
+                                         Foreground="{DynamicResource SemiTextTertiaryBrush}"
+                                         TextWrapping="Wrap"
+                                         Text="抢座任务成功预约到目标座位时通知" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="2"
+                                          IsChecked="{Binding GrabSucceededAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Border Padding="12,8">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                            <PathIcon Data="{StaticResource IconOccupy}"
+                                      Width="20"
+                                      Height="20"
+                                      Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="占座成功提醒" />
+                              <TextBlock FontSize="12"
+                                         Foreground="{DynamicResource SemiTextTertiaryBrush}"
+                                         TextWrapping="Wrap"
+                                         Text="占座任务完成取消并重新预约后通知" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="2"
+                                          IsChecked="{Binding OccupyReReserveSucceededAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Border Padding="12,8">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                            <PathIcon Data="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"
+                                      Width="20"
+                                      Height="20"
+                                      Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="明日预约成功提醒" />
+                              <TextBlock FontSize="12"
+                                         Foreground="{DynamicResource SemiTextTertiaryBrush}"
+                                         TextWrapping="Wrap"
+                                         Text="明日预约提交成功并完成结果记录时通知" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="2"
+                                          IsChecked="{Binding TomorrowReservationSucceededAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Border Padding="12,8">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                            <PathIcon Data="M9.5 3a6.5 6.5 0 0 1 5.17 10.43l4.45 4.45-1.41 1.41-4.45-4.45A6.5 6.5 0 1 1 9.5 3zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zm9.5-1h2v5h-2V4zm0 7h2v2h-2v-2z"
+                                      Width="20"
+                                      Height="20"
+                                      Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="全域捡漏成功提醒" />
+                              <TextBlock FontSize="12"
+                                         Foreground="{DynamicResource SemiTextTertiaryBrush}"
+                                         TextWrapping="Wrap"
+                                         Text="全域捡漏扫描到空座并预约成功时通知" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="2"
+                                          IsChecked="{Binding GlobalLeakSucceededAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Border Padding="12,8">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                            <PathIcon Data="{StaticResource IconEventBell}"
+                                      Width="20"
+                                      Height="20"
+                                      Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="任务失败提醒" />
+                              <TextBlock FontSize="12"
+                                         Foreground="{DynamicResource SemiTextTertiaryBrush}"
+                                         TextWrapping="Wrap"
+                                         Text="抢座、占座、明日预约或全域捡漏发生非凭证类异常时通知" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="2"
+                                          IsChecked="{Binding TaskFailedAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+                      </StackPanel>
+                    </Grid>
 
                     <Grid HorizontalAlignment="Stretch">
                       <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"

@@ -99,7 +99,7 @@ public sealed class MainWindowViewModelTests
     {
         var viewModel = CreateViewModel();
 
-        Assert.Equal(["邮件提醒配置", "Telegram Bot", "本地弹窗提醒"], viewModel.NotificationSettingsCategories);
+        Assert.Equal(["设置通知事件", "邮件提醒配置", "Telegram Bot", "本地弹窗提醒"], viewModel.NotificationSettingsCategories);
     }
 
     [Fact]
@@ -465,6 +465,55 @@ public sealed class MainWindowViewModelTests
         Assert.True(alerts.Email.Enabled);
         Assert.Equal("smtp.example.com", alerts.Email.SmtpHost);
         Assert.Equal(465, alerts.Email.Port);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_LoadsNotificationEventSettings()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default,
+                LocalDesktopAlertSettings.Default,
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default with
+                {
+                    GrabSucceeded = false,
+                    TaskFailed = false
+                })));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.False(viewModel.GrabSucceededAlertsEnabled);
+        Assert.True(viewModel.OccupyReReserveSucceededAlertsEnabled);
+        Assert.True(viewModel.TomorrowReservationSucceededAlertsEnabled);
+        Assert.True(viewModel.GlobalLeakSucceededAlertsEnabled);
+        Assert.True(viewModel.SessionInvalidAlertsEnabled);
+        Assert.False(viewModel.TaskFailedAlertsEnabled);
+    }
+
+    [Fact]
+    public async Task NotificationSettings_AutoSaveEventAlerts_WhenFieldsChange()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.GrabSucceededAlertsEnabled = false;
+        viewModel.GlobalLeakSucceededAlertsEnabled = false;
+
+        await WaitForAsync(() =>
+            settingsService.SaveCalls > 0 &&
+            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events.GrabSucceeded == false &&
+            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events.GlobalLeakSucceeded == false);
+
+        var events = Assert.IsType<TaskEventAlertEventSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events);
+        Assert.False(events.GrabSucceeded);
+        Assert.True(events.OccupyReReserveSucceeded);
+        Assert.True(events.TomorrowReservationSucceeded);
+        Assert.False(events.GlobalLeakSucceeded);
+        Assert.True(events.SessionInvalid);
+        Assert.True(events.TaskFailed);
     }
 
     [Fact]
@@ -1086,6 +1135,27 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("https://telegram.example.com", telegram.ApiBaseUrl);
         Assert.Equal("token-1", telegram.BotToken);
         Assert.Equal("chat-1", telegram.ChatId);
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_PersistsNotificationEventSettings()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.SessionInvalidAlertsEnabled = false;
+        viewModel.TaskFailedAlertsEnabled = false;
+
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        var events = Assert.IsType<TaskEventAlertEventSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events);
+        Assert.True(events.GrabSucceeded);
+        Assert.True(events.OccupyReReserveSucceeded);
+        Assert.True(events.TomorrowReservationSucceeded);
+        Assert.True(events.GlobalLeakSucceeded);
+        Assert.False(events.SessionInvalid);
+        Assert.False(events.TaskFailed);
     }
 
     [Fact]

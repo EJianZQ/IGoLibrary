@@ -231,7 +231,7 @@ public partial class MainWindowWorkflowViewModel(
 
     public string[] SystemSettingsCategories { get; } = ["常规", "外观", "网络与接口", "存储与更新"];
 
-    public string[] NotificationSettingsCategories { get; } = ["邮件提醒配置", "Telegram Bot", "本地弹窗提醒"];
+    public string[] NotificationSettingsCategories { get; } = ["设置通知事件", "邮件提醒配置", "Telegram Bot", "本地弹窗提醒"];
 
     public string CurrentAppVersionText { get; } = $"v{appVersionProvider.CurrentVersionText}";
 
@@ -758,6 +758,24 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private bool localSoundAlertsEnabled;
+
+    [ObservableProperty]
+    private bool grabSucceededAlertsEnabled = true;
+
+    [ObservableProperty]
+    private bool occupyReReserveSucceededAlertsEnabled = true;
+
+    [ObservableProperty]
+    private bool tomorrowReservationSucceededAlertsEnabled = true;
+
+    [ObservableProperty]
+    private bool globalLeakSucceededAlertsEnabled = true;
+
+    [ObservableProperty]
+    private bool sessionInvalidAlertsEnabled = true;
+
+    [ObservableProperty]
+    private bool taskFailedAlertsEnabled = true;
 
     [ObservableProperty]
     private string allLogsText = string.Empty;

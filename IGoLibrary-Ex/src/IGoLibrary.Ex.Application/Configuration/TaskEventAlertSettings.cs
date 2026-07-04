@@ -5,11 +5,13 @@ public sealed record TaskEventAlertSettings
     public TaskEventAlertSettings(
         EmailAlertChannelSettings email,
         LocalDesktopAlertSettings local,
-        TelegramAlertChannelSettings? telegram = null)
+        TelegramAlertChannelSettings? telegram = null,
+        TaskEventAlertEventSettings? events = null)
     {
         Email = email;
         Local = local;
         Telegram = telegram ?? TelegramAlertChannelSettings.Default;
+        Events = events ?? TaskEventAlertEventSettings.Default;
     }
 
     public EmailAlertChannelSettings Email { get; init; }
@@ -18,8 +20,11 @@ public sealed record TaskEventAlertSettings
 
     public TelegramAlertChannelSettings Telegram { get; init; }
 
+    public TaskEventAlertEventSettings Events { get; init; }
+
     public static TaskEventAlertSettings Default { get; } = new(
         EmailAlertChannelSettings.Default,
         LocalDesktopAlertSettings.Default,
-        TelegramAlertChannelSettings.Default);
+        TelegramAlertChannelSettings.Default,
+        TaskEventAlertEventSettings.Default);
 }

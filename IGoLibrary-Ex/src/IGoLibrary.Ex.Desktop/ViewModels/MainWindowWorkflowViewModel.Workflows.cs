@@ -563,6 +563,18 @@ public partial class MainWindowWorkflowViewModel
 
     partial void OnLocalSoundAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
 
+    partial void OnGrabSucceededAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnOccupyReReserveSucceededAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnTomorrowReservationSucceededAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnGlobalLeakSucceededAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnSessionInvalidAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+
+    partial void OnTaskFailedAlertsEnabledChanged(bool value) => ScheduleNotificationSettingsAutoSave();
+
     partial void OnSelectedLibraryChanged(LibrarySummary? value)
     {
         if (!IsVenuePickerOpen || value is null || !IsAuthorized)
@@ -2091,6 +2103,7 @@ public partial class MainWindowWorkflowViewModel
             var ui = settings.Ui;
             var theme = ui.Theme ?? ThemePreferences.Default;
             var alertSettings = notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
+            var eventSettings = alertSettings.Events ?? TaskEventAlertEventSettings.Default;
 
             MinimizeToTrayEnabled = ui.MinimizeToTray;
             TraceIntGraphQlOverridesEnabled = settings.TraceIntProtocol.GraphQlOverridesEnabled;
@@ -2127,6 +2140,12 @@ public partial class MainWindowWorkflowViewModel
             TelegramAlertChatId = alertSettings.Telegram.ChatId ?? string.Empty;
             LocalToastAlertsEnabled = alertSettings.Local.PopupEnabled;
             LocalSoundAlertsEnabled = alertSettings.Local.SoundEnabled;
+            GrabSucceededAlertsEnabled = eventSettings.GrabSucceeded;
+            OccupyReReserveSucceededAlertsEnabled = eventSettings.OccupyReReserveSucceeded;
+            TomorrowReservationSucceededAlertsEnabled = eventSettings.TomorrowReservationSucceeded;
+            GlobalLeakSucceededAlertsEnabled = eventSettings.GlobalLeakSucceeded;
+            SessionInvalidAlertsEnabled = eventSettings.SessionInvalid;
+            TaskFailedAlertsEnabled = eventSettings.TaskFailed;
 
             _historicalSuccessCount = Math.Max(0, settings.Dashboard.SuccessfulReservationCount);
             _totalGuardSeconds = Math.Max(0, settings.Dashboard.TotalGuardSeconds);
@@ -4212,7 +4231,16 @@ public partial class MainWindowWorkflowViewModel
                 TelegramAlertsEnabled,
                 NormalizeTelegramApiBaseUrlForSnapshot(TelegramAlertApiBaseUrl),
                 (TelegramAlertBotToken ?? string.Empty).Trim(),
-                (TelegramAlertChatId ?? string.Empty).Trim()));
+                (TelegramAlertChatId ?? string.Empty).Trim()),
+            new TaskEventAlertEventSettings
+            {
+                GrabSucceeded = GrabSucceededAlertsEnabled,
+                OccupyReReserveSucceeded = OccupyReReserveSucceededAlertsEnabled,
+                TomorrowReservationSucceeded = TomorrowReservationSucceededAlertsEnabled,
+                GlobalLeakSucceeded = GlobalLeakSucceededAlertsEnabled,
+                SessionInvalid = SessionInvalidAlertsEnabled,
+                TaskFailed = TaskFailedAlertsEnabled
+            });
     }
 
     private static string NormalizeTelegramApiBaseUrlForSnapshot(string? value)

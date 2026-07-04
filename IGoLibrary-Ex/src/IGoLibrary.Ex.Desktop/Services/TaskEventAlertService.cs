@@ -21,16 +21,13 @@ public sealed class TaskEventAlertService(
 
     public async Task NotifySessionInvalidAsync(string source, string reason, CancellationToken cancellationToken = default)
     {
-        if (ShouldSuppress($"session-invalid|{source}|{reason}"))
-        {
-            return;
-        }
-
         var title = "Cookie 已失效";
         var message = $"{source} 检测到当前 Cookie 已失效，请重新授权";
         var detailMessage = AppendDetail(message, reason);
 
         await DispatchAlertAsync(
+            eventKind: TaskEventAlertKind.SessionInvalid,
+            suppressionKey: $"session-invalid|{source}|{reason}",
             emailLabel: "Cookie 过期提醒",
             telegramLabel: "Cookie 过期提醒",
             localLabel: "Cookie 过期提醒",
@@ -48,12 +45,10 @@ public sealed class TaskEventAlertService(
     {
         var normalizedLibraryName = NormalizeLibraryName(libraryName);
         var normalizedSeatName = NormalizeSeatName(seatName);
-        if (ShouldSuppress($"grab-success|{normalizedLibraryName}|{normalizedSeatName}"))
-        {
-            return;
-        }
 
         await DispatchAlertAsync(
+            eventKind: TaskEventAlertKind.GrabSucceeded,
+            suppressionKey: $"grab-success|{normalizedLibraryName}|{normalizedSeatName}",
             emailLabel: "抢座成功提醒",
             telegramLabel: "抢座成功提醒",
             localLabel: "抢座成功提醒",
@@ -70,12 +65,10 @@ public sealed class TaskEventAlertService(
     public async Task NotifyOccupyReReserveSucceededAsync(string seatName, CancellationToken cancellationToken = default)
     {
         var normalizedSeatName = NormalizeSeatName(seatName);
-        if (ShouldSuppress($"occupy-success|{normalizedSeatName}"))
-        {
-            return;
-        }
 
         await DispatchAlertAsync(
+            eventKind: TaskEventAlertKind.OccupyReReserveSucceeded,
+            suppressionKey: $"occupy-success|{normalizedSeatName}",
             emailLabel: "占座成功提醒",
             telegramLabel: "占座成功提醒",
             localLabel: "占座成功提醒",
@@ -98,12 +91,10 @@ public sealed class TaskEventAlertService(
         var normalizedLibraryName = NormalizeLibraryName(libraryName);
         var normalizedSeatName = NormalizeSeatName(seatName);
         var normalizedDay = string.IsNullOrWhiteSpace(day) ? "明日" : day.Trim();
-        if (ShouldSuppress($"tomorrow-success|{normalizedLibraryName}|{normalizedSeatName}|{normalizedDay}"))
-        {
-            return;
-        }
 
         await DispatchAlertAsync(
+            eventKind: TaskEventAlertKind.TomorrowReservationSucceeded,
+            suppressionKey: $"tomorrow-success|{normalizedLibraryName}|{normalizedSeatName}|{normalizedDay}",
             emailLabel: "明日预约成功提醒",
             telegramLabel: "明日预约成功提醒",
             localLabel: "明日预约成功提醒",
@@ -121,12 +112,10 @@ public sealed class TaskEventAlertService(
     {
         var normalizedLibraryName = NormalizeLibraryName(libraryName);
         var normalizedSeatName = NormalizeSeatName(seatName);
-        if (ShouldSuppress($"global-leak-success|{normalizedLibraryName}|{normalizedSeatName}"))
-        {
-            return;
-        }
 
         await DispatchAlertAsync(
+            eventKind: TaskEventAlertKind.GlobalLeakSucceeded,
+            suppressionKey: $"global-leak-success|{normalizedLibraryName}|{normalizedSeatName}",
             emailLabel: "全域捡漏成功提醒",
             telegramLabel: "全域捡漏成功提醒",
             localLabel: "全域捡漏成功提醒",
@@ -143,13 +132,11 @@ public sealed class TaskEventAlertService(
     public async Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default)
     {
         var normalizedTaskName = NormalizeTaskName(taskName);
-        if (ShouldSuppress($"task-failed|{normalizedTaskName}|{reason}"))
-        {
-            return;
-        }
 
         var message = $"{normalizedTaskName}任务执行失败";
         await DispatchAlertAsync(
+            eventKind: TaskEventAlertKind.TaskFailed,
+            suppressionKey: $"task-failed|{normalizedTaskName}|{reason}",
             emailLabel: $"{normalizedTaskName}任务失败提醒",
             telegramLabel: $"{normalizedTaskName}任务失败提醒",
             localLabel: $"{normalizedTaskName}任务失败提醒",
@@ -164,6 +151,8 @@ public sealed class TaskEventAlertService(
     }
 
     private async Task DispatchAlertAsync(
+        TaskEventAlertKind eventKind,
+        string suppressionKey,
         string emailLabel,
         string telegramLabel,
         string localLabel,
@@ -178,6 +167,16 @@ public sealed class TaskEventAlertService(
     {
         var settings = await settingsService.LoadAsync(cancellationToken);
         var alertSettings = settings.Notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
+        if (!IsEventEnabled(alertSettings.Events ?? TaskEventAlertEventSettings.Default, eventKind))
+        {
+            return;
+        }
+
+        if (ShouldSuppress(suppressionKey))
+        {
+            return;
+        }
+
         var localAlertShown = false;
 
         if (alertSettings.Local.PopupEnabled)
@@ -289,6 +288,20 @@ public sealed class TaskEventAlertService(
             _lastAlertAt = now;
             return false;
         }
+    }
+
+    private static bool IsEventEnabled(TaskEventAlertEventSettings settings, TaskEventAlertKind eventKind)
+    {
+        return eventKind switch
+        {
+            TaskEventAlertKind.GrabSucceeded => settings.GrabSucceeded,
+            TaskEventAlertKind.OccupyReReserveSucceeded => settings.OccupyReReserveSucceeded,
+            TaskEventAlertKind.TomorrowReservationSucceeded => settings.TomorrowReservationSucceeded,
+            TaskEventAlertKind.GlobalLeakSucceeded => settings.GlobalLeakSucceeded,
+            TaskEventAlertKind.SessionInvalid => settings.SessionInvalid,
+            TaskEventAlertKind.TaskFailed => settings.TaskFailed,
+            _ => true
+        };
     }
 
     private static void ValidateEmailSettings(EmailAlertChannelSettings settings)
@@ -523,5 +536,15 @@ public sealed class TaskEventAlertService(
         {
             activityLogService.Write(LogEntryKind.Warning, "Alert", $"展示应用内提醒失败：{ex.Message}");
         }
+    }
+
+    private enum TaskEventAlertKind
+    {
+        GrabSucceeded,
+        OccupyReReserveSucceeded,
+        TomorrowReservationSucceeded,
+        GlobalLeakSucceeded,
+        SessionInvalid,
+        TaskFailed
     }
 }

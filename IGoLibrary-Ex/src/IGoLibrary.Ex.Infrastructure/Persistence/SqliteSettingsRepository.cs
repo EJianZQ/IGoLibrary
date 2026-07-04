@@ -262,7 +262,8 @@ public sealed class SqliteSettingsRepository(
                 TaskEventAlerts = new TaskEventAlertSettings(
                     alertSettings.Email ?? EmailAlertChannelSettings.Default,
                     alertSettings.Local ?? LocalDesktopAlertSettings.Default,
-                    alertSettings.Telegram ?? TelegramAlertChannelSettings.Default)
+                    alertSettings.Telegram ?? TelegramAlertChannelSettings.Default,
+                    alertSettings.Events ?? TaskEventAlertEventSettings.Default)
             },
             Ui = ui with
             {
@@ -321,6 +322,7 @@ public sealed class SqliteSettingsRepository(
 
     private static bool ContainsLegacySettingsFields(JsonElement root)
     {
+        var taskEventAlerts = ReadObject(ReadObject(root, "notifications"), "taskEventAlerts");
         return HasAnyProperty(
                    root,
                    "cookieExpiryAlerts",
@@ -346,7 +348,9 @@ public sealed class SqliteSettingsRepository(
                            ReadObject(root, "notifications"),
                            "taskEventAlerts"),
                        "local"),
-                   "toastEnabled");
+                   "toastEnabled") ||
+               taskEventAlerts.ValueKind == JsonValueKind.Object &&
+               !HasAnyProperty(taskEventAlerts, "events");
     }
 
     private static bool HasAnyProperty(JsonElement parent, params string[] propertyNames)
@@ -392,6 +396,35 @@ public sealed class SqliteSettingsRepository(
         WriteLocalDesktopAlert(writer, ReadObject(alerts, "local"), defaults.Local);
         writer.WritePropertyName("telegram");
         WriteObjectOrDefault(writer, ReadObject(alerts, "telegram"), defaults.Telegram);
+        writer.WritePropertyName("events");
+        WriteTaskEventAlertEvents(writer, ReadObject(alerts, "events"), defaults.Events);
+        writer.WriteEndObject();
+    }
+
+    private static void WriteTaskEventAlertEvents(
+        Utf8JsonWriter writer,
+        JsonElement events,
+        TaskEventAlertEventSettings defaults)
+    {
+        writer.WriteStartObject();
+        writer.WriteBoolean(
+            "grabSucceeded",
+            ReadBool(events, "grabSucceeded") ?? defaults.GrabSucceeded);
+        writer.WriteBoolean(
+            "occupyReReserveSucceeded",
+            ReadBool(events, "occupyReReserveSucceeded") ?? defaults.OccupyReReserveSucceeded);
+        writer.WriteBoolean(
+            "tomorrowReservationSucceeded",
+            ReadBool(events, "tomorrowReservationSucceeded") ?? defaults.TomorrowReservationSucceeded);
+        writer.WriteBoolean(
+            "globalLeakSucceeded",
+            ReadBool(events, "globalLeakSucceeded") ?? defaults.GlobalLeakSucceeded);
+        writer.WriteBoolean(
+            "sessionInvalid",
+            ReadBool(events, "sessionInvalid") ?? defaults.SessionInvalid);
+        writer.WriteBoolean(
+            "taskFailed",
+            ReadBool(events, "taskFailed") ?? defaults.TaskFailed);
         writer.WriteEndObject();
     }
 
