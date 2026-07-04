@@ -105,6 +105,10 @@ public sealed class SqliteSettingsRepository(
             ReadBool(ui, "minimizeToTray")
             ?? ReadBool(root, "minimizeToTray")
             ?? defaults.Ui.MinimizeToTray);
+        writer.WriteBoolean(
+            "launchOnStartup",
+            ReadBool(ui, "launchOnStartup")
+            ?? defaults.Ui.LaunchOnStartup);
         writer.WritePropertyName("theme");
         writer.WriteStartObject();
         writer.WriteNumber(

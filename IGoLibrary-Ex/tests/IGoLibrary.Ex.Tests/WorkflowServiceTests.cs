@@ -188,6 +188,7 @@ public sealed class WorkflowServiceTests
 
         await service.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
             MinimizeToTray: false,
+            LaunchOnStartup: false,
             TraceIntGraphQlOverridesEnabled: true,
             CheckUpdatesOnStartup: false,
             RequestTimeoutSeconds: 1,
@@ -220,6 +221,7 @@ public sealed class WorkflowServiceTests
 
         await service.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
             MinimizeToTray: true,
+            LaunchOnStartup: false,
             TraceIntGraphQlOverridesEnabled: false,
             CheckUpdatesOnStartup: true,
             RequestTimeoutSeconds: 5,
@@ -240,7 +242,7 @@ public sealed class WorkflowServiceTests
         var initial = AppSettings.Default with
         {
             Notifications = new NotificationSettings(TaskEventAlertSettings.Default),
-            Ui = new UiPreferences(false, new ThemePreferences(AppThemeMode.Dark, false))
+            Ui = new UiPreferences(false, false, new ThemePreferences(AppThemeMode.Dark, false))
         };
         var settingsService = new FakeSettingsService(initial);
         var service = new SettingsWorkflowService(settingsService);

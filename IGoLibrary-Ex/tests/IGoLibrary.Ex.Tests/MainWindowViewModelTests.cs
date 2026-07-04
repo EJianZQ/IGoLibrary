@@ -2152,6 +2152,68 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("info-override", protocolTemplateStore.LastOverrides.TomorrowReservationInfoTemplate);
     }
 
+    [Fact]
+    public void LaunchOnStartupEnabled_OnToggleToTrue_CallsEnableAsync()
+    {
+        var fakeStartup = new FakeStartupEntryService();
+        var viewModel = CreateViewModel(startupEntryService: fakeStartup);
+        viewModel.IsInitializationComplete = true;
+
+        viewModel.LaunchOnStartupEnabled = true;
+
+        Assert.True(fakeStartup.EnableCalled);
+        Assert.False(fakeStartup.DisableCalled);
+    }
+
+    [Fact]
+    public void LaunchOnStartupEnabled_OnToggleToFalse_CallsDisableAsync()
+    {
+        var fakeStartup = new FakeStartupEntryService();
+        var viewModel = CreateViewModel(startupEntryService: fakeStartup);
+        viewModel.IsInitializationComplete = true;
+
+        viewModel.LaunchOnStartupEnabled = true;
+        fakeStartup.Reset();
+        viewModel.LaunchOnStartupEnabled = false;
+
+        Assert.True(fakeStartup.DisableCalled);
+        Assert.False(fakeStartup.EnableCalled);
+    }
+
+    [Fact]
+    public void LaunchOnStartupEnabled_WhenNotInitialized_DoesNotCallStartupService()
+    {
+        var fakeStartup = new FakeStartupEntryService();
+        var viewModel = CreateViewModel(startupEntryService: fakeStartup);
+
+        // IsInitializationComplete is false by default
+        viewModel.LaunchOnStartupEnabled = true;
+
+        Assert.False(fakeStartup.EnableCalled);
+    }
+
+    [Fact]
+    public async Task LaunchOnStartupEnabled_OnEnableFailure_RollsBackAndNotifies()
+    {
+        var fakeStartup = new FakeStartupEntryService();
+        fakeStartup.EnableException = new InvalidOperationException("reg.exe not found");
+        var fakeNotification = new FakeNotificationService();
+        var viewModel = CreateViewModel(
+            startupEntryService: fakeStartup,
+            notificationService: fakeNotification);
+        viewModel.IsInitializationComplete = true;
+
+        // Fire-and-forget handler runs synchronously with fake services
+        viewModel.LaunchOnStartupEnabled = true;
+
+        // Allow any pending continuation to flush
+        await Task.Yield();
+
+        Assert.True(fakeStartup.EnableCalled);
+        Assert.False(viewModel.LaunchOnStartupEnabled);
+        Assert.NotEmpty(fakeNotification.Warnings);
+    }
+
     private static MainWindowViewModel CreateViewModel(
         FakeSessionService? sessionService = null,
         FakeLibraryService? libraryService = null,
@@ -2169,7 +2231,8 @@ public sealed class MainWindowViewModelTests
         FakeExternalLinkService? externalLinkService = null,
         FakeAppThemeService? appThemeService = null,
         ActivityLogService? activityLogService = null,
-        FakeProtocolTemplateStore? protocolTemplateStore = null)
+        FakeProtocolTemplateStore? protocolTemplateStore = null,
+        FakeStartupEntryService? startupEntryService = null)
     {
         sessionService ??= new FakeSessionService();
         libraryService ??= new FakeLibraryService();
@@ -2201,7 +2264,8 @@ public sealed class MainWindowViewModelTests
             externalLinkService ?? new FakeExternalLinkService(),
             new FakeAppVersionProvider(),
             appThemeService ?? new FakeAppThemeService(),
-            new AppWindowService());
+            new AppWindowService(),
+            startupEntryService ?? new FakeStartupEntryService());
     }
 
     private static ReleaseUpdateInfo CreateReleaseUpdateInfo(string tagName)

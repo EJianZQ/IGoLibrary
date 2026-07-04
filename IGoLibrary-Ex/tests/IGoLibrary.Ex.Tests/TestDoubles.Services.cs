@@ -601,3 +601,51 @@ internal sealed class FakeTomorrowReservationCoordinator : ITomorrowReservationC
 
     public CoordinatorStatus GetStatus() => _status;
 }
+
+internal sealed class FakeStartupEntryService : IStartupEntryService
+{
+    public bool IsSupported { get; set; } = true;
+
+    public bool EnableCalled { get; private set; }
+
+    public bool DisableCalled { get; private set; }
+
+    public Exception? EnableException { get; set; }
+
+    public Exception? DisableException { get; set; }
+
+    public bool IsEnabledResult { get; set; }
+
+    public Task<bool> IsEnabledAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(IsEnabledResult);
+
+    public Task EnableAsync(CancellationToken cancellationToken = default)
+    {
+        EnableCalled = true;
+        if (EnableException is not null)
+        {
+            throw EnableException;
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task DisableAsync(CancellationToken cancellationToken = default)
+    {
+        DisableCalled = true;
+        if (DisableException is not null)
+        {
+            throw DisableException;
+        }
+        return Task.CompletedTask;
+    }
+
+    public void Reset()
+    {
+        EnableCalled = false;
+        DisableCalled = false;
+        EnableException = null;
+        DisableException = null;
+        IsEnabledResult = false;
+        IsSupported = true;
+    }
+}

@@ -36,7 +36,8 @@ public partial class MainWindowWorkflowViewModel(
     IExternalLinkService externalLinkService,
     IAppVersionProvider appVersionProvider,
     IAppThemeService appThemeService,
-    AppWindowService appWindowService) : ViewModelBase
+    AppWindowService appWindowService,
+    IStartupEntryService startupEntryService) : ViewModelBase
 {
     private readonly IAppThemeService _appThemeService = appThemeService;
     private readonly IActivityLogService _activityLogService = activityLogService;
@@ -46,6 +47,7 @@ public partial class MainWindowWorkflowViewModel(
     private readonly IUpdateDialogService _updateDialogService = updateDialogService;
     private readonly IExternalLinkService _externalLinkService = externalLinkService;
     private readonly AppWindowService _appWindowService = appWindowService;
+    private readonly IStartupEntryService _startupEntryService = startupEntryService;
     private readonly IGrabSeatCoordinator _grabSeatCoordinator = grabSeatCoordinator;
     private readonly IGlobalLeakCoordinator _globalLeakCoordinator = globalLeakCoordinator;
     private readonly IOccupySeatCoordinator _occupySeatCoordinator = occupySeatCoordinator;
@@ -164,6 +166,7 @@ public partial class MainWindowWorkflowViewModel(
     private DateTimeOffset? _lastRecordedTomorrowSuccessAt;
     private bool _isSynchronizingSidebarSelection;
     private bool _isLoadingSettings;
+    private bool _isRollingBackStartupEntry;
     private TimeSpan _grabScheduledStartDefault = DefaultGrabScheduledStartTime;
     private TimeSpan _tomorrowScheduledStartDefault = DefaultTomorrowScheduledStartTime;
     private TimeSpan? _pendingGrabScheduledStartDefault;
@@ -607,6 +610,24 @@ public partial class MainWindowWorkflowViewModel(
     private bool minimizeToTrayEnabled = true;
 
     partial void OnMinimizeToTrayEnabledChanged(bool value) => ScheduleSystemSettingsAutoSave();
+
+    [ObservableProperty]
+    private bool launchOnStartupEnabled;
+
+    partial void OnLaunchOnStartupEnabledChanged(bool value)
+    {
+        ScheduleSystemSettingsAutoSave();
+
+        // During rollback (OS operation failed), don't re-attempt the OS operation
+        // to prevent infinite toggle loops. The settings save above ensures the
+        // rolled-back value is persisted.
+        if (_isRollingBackStartupEntry)
+        {
+            return;
+        }
+
+        _ = ApplyLaunchOnStartupEntryAsync(value);
+    }
 
     [ObservableProperty]
     private bool autoReleaseReservationEnabled;

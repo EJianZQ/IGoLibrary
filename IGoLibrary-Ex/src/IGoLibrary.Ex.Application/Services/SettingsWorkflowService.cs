@@ -24,6 +24,7 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
             Ui = current.Ui with
             {
                 MinimizeToTray = snapshot.MinimizeToTray,
+                LaunchOnStartup = snapshot.LaunchOnStartup,
                 Theme = snapshot.Theme
             },
             TraceIntProtocol = current.TraceIntProtocol with

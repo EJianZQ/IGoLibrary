@@ -2240,6 +2240,24 @@
                   </Border>
 
                   <Border Classes="card">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="16">
+                      <StackPanel Spacing="6">
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Text="开机跟随系统自动启动" />
+                        <TextBlock Classes="helper-text"
+                                   Text="启用后系统开机时自动启动本程序；停用后移除已注册的开机启动项。" />
+                      </StackPanel>
+                      <ToggleSwitch Grid.Column="1"
+                                    IsChecked="{Binding LaunchOnStartupEnabled}"
+                                    OnContent="开"
+                                    OffContent="关"
+                                    VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+
+                  <Border Classes="card">
                     <Grid RowDefinitions="Auto,Auto"
                           RowSpacing="14">
                       <Grid ColumnDefinitions="*,Auto"

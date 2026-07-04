@@ -1838,6 +1838,7 @@ public partial class MainWindowWorkflowViewModel
             UseSystemAccent);
         await SystemSettings.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
             MinimizeToTrayEnabled,
+            LaunchOnStartupEnabled,
             TraceIntGraphQlOverridesEnabled,
             CheckUpdatesOnStartup,
             Math.Clamp(RequestTimeoutSeconds, 3, 60),
@@ -1852,6 +1853,79 @@ public partial class MainWindowWorkflowViewModel
         if (showNotification)
         {
             await _notificationService.ShowSuccessAsync("设置已保存", "应用设置已写入本地数据库");
+        }
+    }
+
+    private async Task ApplyLaunchOnStartupEntryAsync(bool enabled)
+    {
+        if (_isLoadingSettings || !IsInitializationComplete)
+        {
+            return;
+        }
+
+        if (!_startupEntryService.IsSupported)
+        {
+            return;
+        }
+
+        try
+        {
+            if (enabled)
+            {
+                await _startupEntryService.EnableAsync();
+                _activityLogService.Write(LogEntryKind.Success, "Settings", "已写入开机启动项");
+                await _notificationService.ShowSuccessAsync("开机启动项", "已注册开机自启动");
+            }
+            else
+            {
+                await _startupEntryService.DisableAsync();
+                _activityLogService.Write(LogEntryKind.Info, "Settings", "已移除开机启动项");
+                await _notificationService.ShowInfoAsync("开机启动项", "已移除开机自启动");
+            }
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"更新开机启动项失败：{ex.Message}");
+
+            // Roll back the toggle so the UI reflects the actual OS state.
+            // The guard flag prevents the changed handler from re-attempting
+            // the OS operation and creating an infinite loop.
+            _isRollingBackStartupEntry = true;
+            try
+            {
+                LaunchOnStartupEnabled = !enabled;
+                await _notificationService.ShowWarningAsync(
+                    "开机启动项更新失败",
+                    $"已恢复开关到关闭状态。原因：{ex.Message}");
+            }
+            finally
+            {
+                _isRollingBackStartupEntry = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// After settings are loaded, ensure the OS startup entry is in sync with
+    /// the saved preference. If the user previously enabled startup but the
+    /// executable path has changed (e.g., moved), this rewrites the entry
+    /// idempotently.
+    /// </summary>
+    private async Task SyncStartupEntryAfterLoadAsync()
+    {
+        if (!_startupEntryService.IsSupported || !LaunchOnStartupEnabled)
+        {
+            return;
+        }
+
+        try
+        {
+            await _startupEntryService.EnableAsync();
+            _activityLogService.Write(LogEntryKind.Info, "Settings", "已同步开机启动项");
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"同步开机启动项失败：{ex.Message}");
         }
     }
 
@@ -2106,6 +2180,7 @@ public partial class MainWindowWorkflowViewModel
             var eventSettings = alertSettings.Events ?? TaskEventAlertEventSettings.Default;
 
             MinimizeToTrayEnabled = ui.MinimizeToTray;
+            LaunchOnStartupEnabled = ui.LaunchOnStartup;
             TraceIntGraphQlOverridesEnabled = settings.TraceIntProtocol.GraphQlOverridesEnabled;
             CheckUpdatesOnStartup = settings.Updates.CheckOnStartup;
             RequestTimeoutSeconds = settings.Network.TimeoutSeconds;
@@ -2157,6 +2232,8 @@ public partial class MainWindowWorkflowViewModel
             _isLoadingSettings = false;
             _notificationSettingsLoaded = true;
         }
+
+        await SyncStartupEntryAfterLoadAsync();
     }
 
     private void PreviewThemePreferences()
