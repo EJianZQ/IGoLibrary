@@ -75,6 +75,8 @@ public sealed class SqliteSettingsRepository(
         var notifications = ReadObject(root, "notifications");
         var ui = ReadObject(root, "ui");
         var theme = ReadObject(ui, "theme");
+        var homeReservationProgress = ReadObject(ui, "homeReservationProgress");
+        var homeCookieProgress = ReadObject(ui, "homeCookieProgress");
         var legacyProtocol = ReadObject(root, "protocol");
         var protocol = ReadObject(root, "traceIntProtocol");
         var legacyRequestPolicy = ReadObject(root, "requestPolicy");
@@ -121,6 +123,36 @@ public sealed class SqliteSettingsRepository(
             ReadBool(theme, "useSystemAccent")
             ?? ReadBool(root, "useSystemAccent")
             ?? defaults.Ui.Theme!.UseSystemAccent);
+        writer.WriteEndObject();
+        writer.WritePropertyName("homeReservationProgress");
+        writer.WriteStartObject();
+        writer.WriteNumber(
+            "mode",
+            NormalizeHomeReservationProgressMode(
+                ReadInt(homeReservationProgress, "mode"),
+                defaults.Ui.HomeReservationProgress?.Mode
+                ?? HomeReservationProgressSettings.Default.Mode));
+        writer.WriteNumber(
+            "fixedDurationMinutes",
+            NormalizeHomeReservationFixedDurationMinutes(
+                ReadInt(homeReservationProgress, "fixedDurationMinutes"),
+                defaults.Ui.HomeReservationProgress?.FixedDurationMinutes
+                ?? HomeReservationProgressSettings.Default.FixedDurationMinutes));
+        writer.WriteEndObject();
+        writer.WritePropertyName("homeCookieProgress");
+        writer.WriteStartObject();
+        writer.WriteNumber(
+            "mode",
+            NormalizeHomeCookieProgressMode(
+                ReadInt(homeCookieProgress, "mode"),
+                defaults.Ui.HomeCookieProgress?.Mode
+                ?? HomeCookieProgressSettings.Default.Mode));
+        writer.WriteNumber(
+            "fixedDurationMinutes",
+            NormalizeHomeCookieFixedDurationMinutes(
+                ReadInt(homeCookieProgress, "fixedDurationMinutes"),
+                defaults.Ui.HomeCookieProgress?.FixedDurationMinutes
+                ?? HomeCookieProgressSettings.Default.FixedDurationMinutes));
         writer.WriteEndObject();
         writer.WriteEndObject();
 
@@ -271,7 +303,9 @@ public sealed class SqliteSettingsRepository(
             },
             Ui = ui with
             {
-                Theme = ui.Theme ?? ThemePreferences.Default
+                Theme = ui.Theme ?? ThemePreferences.Default,
+                HomeReservationProgress = HomeReservationProgressSettings.Normalize(ui.HomeReservationProgress),
+                HomeCookieProgress = HomeCookieProgressSettings.Normalize(ui.HomeCookieProgress)
             },
             TraceIntProtocol = settings.TraceIntProtocol ?? TraceIntProtocolSettings.Default,
             Network = settings.Network ?? NetworkRequestSettings.Default,
@@ -581,6 +615,36 @@ public sealed class SqliteSettingsRepository(
     private static int NormalizeAutoReleaseLeadSeconds(int? value, int fallback)
     {
         return AutoReleaseTaskSettings.NormalizeLeadSeconds(value ?? fallback);
+    }
+
+    private static int NormalizeHomeReservationProgressMode(
+        int? value,
+        HomeReservationProgressTimingMode fallback)
+    {
+        var mode = value.HasValue
+            ? (HomeReservationProgressTimingMode)value.Value
+            : fallback;
+        return (int)HomeReservationProgressSettings.NormalizeMode(mode);
+    }
+
+    private static int NormalizeHomeReservationFixedDurationMinutes(int? value, int fallback)
+    {
+        return HomeReservationProgressSettings.NormalizeFixedDurationMinutes(value ?? fallback);
+    }
+
+    private static int NormalizeHomeCookieProgressMode(
+        int? value,
+        HomeCookieProgressTimingMode fallback)
+    {
+        var mode = value.HasValue
+            ? (HomeCookieProgressTimingMode)value.Value
+            : fallback;
+        return (int)HomeCookieProgressSettings.NormalizeMode(mode);
+    }
+
+    private static int NormalizeHomeCookieFixedDurationMinutes(int? value, int fallback)
+    {
+        return HomeCookieProgressSettings.NormalizeFixedDurationMinutes(value ?? fallback);
     }
 
     private static bool IsTimeOfDay(TimeSpan value)

@@ -36,6 +36,7 @@ public partial class MainWindowWorkflowViewModel(
     IExternalLinkService externalLinkService,
     IAppVersionProvider appVersionProvider,
     IAppThemeService appThemeService,
+    TimeProvider timeProvider,
     AppWindowService appWindowService,
     IStartupEntryService startupEntryService) : ViewModelBase
 {
@@ -48,6 +49,7 @@ public partial class MainWindowWorkflowViewModel(
     private readonly IExternalLinkService _externalLinkService = externalLinkService;
     private readonly AppWindowService _appWindowService = appWindowService;
     private readonly IStartupEntryService _startupEntryService = startupEntryService;
+    private readonly TimeProvider _timeProvider = timeProvider;
     private readonly IGrabSeatCoordinator _grabSeatCoordinator = grabSeatCoordinator;
     private readonly IGlobalLeakCoordinator _globalLeakCoordinator = globalLeakCoordinator;
     private readonly IOccupySeatCoordinator _occupySeatCoordinator = occupySeatCoordinator;
@@ -164,6 +166,14 @@ public partial class MainWindowWorkflowViewModel(
     private DateTimeOffset? _lastRecordedGlobalLeakSuccessAt;
     private DateTimeOffset? _lastRecordedOccupySuccessAt;
     private DateTimeOffset? _lastRecordedTomorrowSuccessAt;
+    private string? _homeReservationProgressReservationIdentity;
+    private DateTimeOffset? _homeReservationProgressExpirationTime;
+    private DateTimeOffset? _homeReservationProgressStartedAt;
+    private string? _homeCookieIdentity;
+    private DateTimeOffset? _homeCookieExpirationTime;
+    private string? _homeCookieProgressCookieIdentity;
+    private DateTimeOffset? _homeCookieProgressExpirationTime;
+    private DateTimeOffset? _homeCookieProgressStartedAt;
     private bool _isSynchronizingSidebarSelection;
     private bool _isLoadingSettings;
     private bool _isRollingBackStartupEntry;
@@ -232,9 +242,18 @@ public partial class MainWindowWorkflowViewModel(
 
     public string[] ThemeModes { get; } = ["跟随系统", "浅色", "深色"];
 
+    public string[] HomeReservationProgressTimingModes { get; } = ["固定预约到期时长", "软件运行时计算时长"];
+
+    public string[] HomeCookieProgressTimingModes { get; } = ["固定 Cookie 有效时长", "软件运行时计算时长"];
+
     public string[] SystemSettingsCategories { get; } = ["常规", "外观", "网络与接口", "存储与更新"];
 
     public string[] NotificationSettingsCategories { get; } = ["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "弹窗提醒配置"];
+
+    private DateTimeOffset GetCurrentTime()
+    {
+        return _timeProvider.GetUtcNow().ToLocalTime();
+    }
 
     public string CurrentAppVersionText { get; } = $"v{appVersionProvider.CurrentVersionText}";
 
@@ -385,6 +404,38 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private string homeReservationRemainingText = "--";
+
+    [ObservableProperty]
+    private double homeReservationProgressValue;
+
+    [ObservableProperty]
+    private IBrush homeReservationProgressBrush = appThemeService.CurrentPalette.IdleBrush;
+
+    [ObservableProperty]
+    private bool hasCurrentCookie;
+
+    public bool HasNoCurrentCookie => !HasCurrentCookie;
+
+    [ObservableProperty]
+    private string homeCookieExpirationTimeText = "--:--:--";
+
+    [ObservableProperty]
+    private string homeCookieRemainingText = "--";
+
+    [ObservableProperty]
+    private string homeCookieBadgeText = "未登录";
+
+    [ObservableProperty]
+    private IBrush homeCookieBadgeBrush = appThemeService.CurrentPalette.IdleBrush;
+
+    [ObservableProperty]
+    private IBrush homeCookieBadgeBackgroundBrush = appThemeService.CurrentPalette.NeutralSoftBrush;
+
+    [ObservableProperty]
+    private double homeCookieProgressValue;
+
+    [ObservableProperty]
+    private IBrush homeCookieProgressBrush = appThemeService.CurrentPalette.IdleBrush;
 
     [ObservableProperty]
     private bool isCancellingCurrentReservation;
@@ -721,6 +772,80 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private int selectedAppThemeModeIndex;
+
+    [ObservableProperty]
+    private int selectedHomeReservationProgressTimingModeIndex;
+
+    public bool IsHomeReservationFixedProgressMode =>
+        CurrentHomeReservationProgressTimingMode == HomeReservationProgressTimingMode.FixedReservationDuration;
+
+    partial void OnSelectedHomeReservationProgressTimingModeIndexChanged(int value)
+    {
+        var normalized = Math.Clamp(value, 0, HomeReservationProgressTimingModes.Length - 1);
+        if (normalized != value)
+        {
+            SelectedHomeReservationProgressTimingModeIndex = normalized;
+            return;
+        }
+
+        OnPropertyChanged(nameof(IsHomeReservationFixedProgressMode));
+        ScheduleSystemSettingsAutoSave();
+        UpdateHomeReservationCardPresentation(GetCurrentTime());
+    }
+
+    [ObservableProperty]
+    private int homeReservationFixedDurationMinutes =
+        HomeReservationProgressSettings.DefaultFixedDurationMinutes;
+
+    partial void OnHomeReservationFixedDurationMinutesChanged(int value)
+    {
+        var normalized = HomeReservationProgressSettings.NormalizeFixedDurationMinutes(value);
+        if (normalized != value)
+        {
+            HomeReservationFixedDurationMinutes = normalized;
+            return;
+        }
+
+        ScheduleSystemSettingsAutoSave();
+        UpdateHomeReservationCardPresentation(GetCurrentTime());
+    }
+
+    [ObservableProperty]
+    private int selectedHomeCookieProgressTimingModeIndex;
+
+    public bool IsHomeCookieFixedProgressMode =>
+        CurrentHomeCookieProgressTimingMode == HomeCookieProgressTimingMode.FixedCookieDuration;
+
+    partial void OnSelectedHomeCookieProgressTimingModeIndexChanged(int value)
+    {
+        var normalized = Math.Clamp(value, 0, HomeCookieProgressTimingModes.Length - 1);
+        if (normalized != value)
+        {
+            SelectedHomeCookieProgressTimingModeIndex = normalized;
+            return;
+        }
+
+        OnPropertyChanged(nameof(IsHomeCookieFixedProgressMode));
+        ScheduleSystemSettingsAutoSave();
+        UpdateHomeCookieCardPresentation(GetCurrentTime());
+    }
+
+    [ObservableProperty]
+    private int homeCookieFixedDurationMinutes =
+        HomeCookieProgressSettings.DefaultFixedDurationMinutes;
+
+    partial void OnHomeCookieFixedDurationMinutesChanged(int value)
+    {
+        var normalized = HomeCookieProgressSettings.NormalizeFixedDurationMinutes(value);
+        if (normalized != value)
+        {
+            HomeCookieFixedDurationMinutes = normalized;
+            return;
+        }
+
+        ScheduleSystemSettingsAutoSave();
+        UpdateHomeCookieCardPresentation(GetCurrentTime());
+    }
 
     [ObservableProperty]
     private bool isCheckingForUpdates;

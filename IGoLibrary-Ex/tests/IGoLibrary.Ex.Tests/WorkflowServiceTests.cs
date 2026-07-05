@@ -194,6 +194,12 @@ public sealed class WorkflowServiceTests
             RequestTimeoutSeconds: 1,
             NetworkMaxRetries: 0,
             Theme: new ThemePreferences(AppThemeMode.Dark, useSystemAccent: false),
+            HomeReservationProgress: new HomeReservationProgressSettings(
+                HomeReservationProgressTimingMode.SoftwareRuntimeDuration,
+                45),
+            HomeCookieProgress: new HomeCookieProgressSettings(
+                HomeCookieProgressTimingMode.SoftwareRuntimeDuration,
+                240),
             GrabReservationStrategy: GrabReservationStrategy.ReserveDirectly,
             AutoReleaseEnabled: true,
             AutoReleaseLeadSeconds: 90,
@@ -204,6 +210,14 @@ public sealed class WorkflowServiceTests
         Assert.Equal(3, settingsService.CurrentSettings.Network.TimeoutSeconds);
         Assert.Equal(0, settingsService.CurrentSettings.Network.MaxRetries);
         Assert.False(settingsService.CurrentSettings.Updates.CheckOnStartup);
+        Assert.Equal(
+            HomeReservationProgressTimingMode.SoftwareRuntimeDuration,
+            settingsService.CurrentSettings.Ui.HomeReservationProgress?.Mode);
+        Assert.Equal(45, settingsService.CurrentSettings.Ui.HomeReservationProgress?.FixedDurationMinutes);
+        Assert.Equal(
+            HomeCookieProgressTimingMode.SoftwareRuntimeDuration,
+            settingsService.CurrentSettings.Ui.HomeCookieProgress?.Mode);
+        Assert.Equal(240, settingsService.CurrentSettings.Ui.HomeCookieProgress?.FixedDurationMinutes);
         Assert.Equal(GrabReservationStrategy.ReserveDirectly, settingsService.CurrentSettings.Tasks.Grab.ReservationStrategy);
         Assert.True(settingsService.CurrentSettings.Tasks.AutoRelease.Enabled);
         Assert.Equal(90, settingsService.CurrentSettings.Tasks.AutoRelease.LeadSeconds);
@@ -227,6 +241,8 @@ public sealed class WorkflowServiceTests
             RequestTimeoutSeconds: 5,
             NetworkMaxRetries: 3,
             Theme: ThemePreferences.Default,
+            HomeReservationProgress: HomeReservationProgressSettings.Default,
+            HomeCookieProgress: HomeCookieProgressSettings.Default,
             GrabReservationStrategy: GrabReservationStrategy.QueryThenReserve,
             AutoReleaseEnabled: true,
             AutoReleaseLeadSeconds: requestedLeadSeconds,

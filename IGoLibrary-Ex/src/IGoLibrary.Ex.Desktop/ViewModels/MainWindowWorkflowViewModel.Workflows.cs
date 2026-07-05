@@ -219,6 +219,11 @@ public partial class MainWindowWorkflowViewModel
         OnPropertyChanged(nameof(AutoReleaseStatusText));
     }
 
+    partial void OnHasCurrentCookieChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HasNoCurrentCookie));
+    }
+
     partial void OnIsGrabTaskActiveChanged(bool value)
     {
         OnPropertyChanged(nameof(CanEditGrabConfiguration));
@@ -330,15 +335,16 @@ public partial class MainWindowWorkflowViewModel
             _lockedVenueFloor = GetUnboundVenueFloorText();
         }
 
-        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeHeroPresentation(GetCurrentTime());
         UpdateHomeLockedVenuePresentation();
         UpdateHomeSystemInfoPresentation();
-        UpdateHomeReservationCardPresentation(DateTimeOffset.Now);
+        UpdateHomeReservationCardPresentation(GetCurrentTime());
+        UpdateHomeCookieCardPresentation(GetCurrentTime());
     }
 
     partial void OnSessionSummaryChanged(string value)
     {
-        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeHeroPresentation(GetCurrentTime());
     }
 
     partial void OnIsVenueOpenChanged(bool value)
@@ -879,7 +885,7 @@ public partial class MainWindowWorkflowViewModel
         OnPropertyChanged(nameof(ShowVenueCancelPreviewButton));
         OnPropertyChanged(nameof(CanCancelVenuePreview));
         UpdateHomeLockedVenuePresentation();
-        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeHeroPresentation(GetCurrentTime());
         UpdateHomeSystemInfoPresentation();
         UpdateReservationPresentation(null);
         ApplyGrabStatus(CoordinatorStatus.Idle("抢座"));
@@ -1752,7 +1758,7 @@ public partial class MainWindowWorkflowViewModel
 
     private async Task TryAutoReleaseCurrentReservationAsync()
     {
-        var now = DateTimeOffset.Now;
+        var now = GetCurrentTime();
         if (!AutoReleaseReservationPolicy.ShouldCancel(
                 _currentReservation,
                 AutoReleaseReservationEnabled,
@@ -1775,7 +1781,7 @@ public partial class MainWindowWorkflowViewModel
     private void RecordAutoReleaseFailure(ReservationInfo reservation)
     {
         _lastAutoReleaseFailedReservationToken = reservation.ReservationToken;
-        _lastAutoReleaseFailedAt = DateTimeOffset.Now;
+        _lastAutoReleaseFailedAt = GetCurrentTime();
     }
 
     private void ClearAutoReleaseFailure()
@@ -1836,6 +1842,12 @@ public partial class MainWindowWorkflowViewModel
         var theme = new ThemePreferences(
             (AppThemeMode)Math.Clamp(SelectedAppThemeModeIndex, 0, ThemeModes.Length - 1),
             UseSystemAccent);
+        var homeReservationProgress = new HomeReservationProgressSettings(
+            CurrentHomeReservationProgressTimingMode,
+            HomeReservationProgressSettings.NormalizeFixedDurationMinutes(HomeReservationFixedDurationMinutes));
+        var homeCookieProgress = new HomeCookieProgressSettings(
+            CurrentHomeCookieProgressTimingMode,
+            HomeCookieProgressSettings.NormalizeFixedDurationMinutes(HomeCookieFixedDurationMinutes));
         await SystemSettings.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
             MinimizeToTrayEnabled,
             LaunchOnStartupEnabled,
@@ -1844,6 +1856,8 @@ public partial class MainWindowWorkflowViewModel
             Math.Clamp(RequestTimeoutSeconds, 3, 60),
             Math.Clamp(NetworkMaxRetries, 0, 10),
             theme,
+            homeReservationProgress,
+            homeCookieProgress,
             grabReservationStrategy,
             AutoReleaseReservationEnabled,
             AutoReleaseTaskSettings.NormalizeLeadSeconds(AutoReleaseLeadSeconds),
@@ -2191,6 +2205,8 @@ public partial class MainWindowWorkflowViewModel
             var notifications = settings.Notifications;
             var ui = settings.Ui;
             var theme = ui.Theme ?? ThemePreferences.Default;
+            var homeReservationProgress = HomeReservationProgressSettings.Normalize(ui.HomeReservationProgress);
+            var homeCookieProgress = HomeCookieProgressSettings.Normalize(ui.HomeCookieProgress);
             var alertSettings = notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
             var eventSettings = alertSettings.Events ?? TaskEventAlertEventSettings.Default;
 
@@ -2202,6 +2218,10 @@ public partial class MainWindowWorkflowViewModel
             NetworkMaxRetries = settings.Network.MaxRetries;
             SelectedAppThemeModeIndex = (int)theme.Mode;
             UseSystemAccent = theme.UseSystemAccent;
+            SelectedHomeReservationProgressTimingModeIndex = (int)homeReservationProgress.Mode;
+            HomeReservationFixedDurationMinutes = homeReservationProgress.FixedDurationMinutes;
+            SelectedHomeCookieProgressTimingModeIndex = (int)homeCookieProgress.Mode;
+            HomeCookieFixedDurationMinutes = homeCookieProgress.FixedDurationMinutes;
             SelectedGrabReservationStrategyIndex = (int)settings.Tasks.Grab.ReservationStrategy;
             AutoReleaseReservationEnabled = settings.Tasks.AutoRelease.Enabled;
             AutoReleaseLeadSeconds = AutoReleaseTaskSettings.NormalizeLeadSeconds(settings.Tasks.AutoRelease.LeadSeconds);
@@ -2384,7 +2404,7 @@ public partial class MainWindowWorkflowViewModel
             OnPropertyChanged(nameof(ShowVenueCancelPreviewButton));
             OnPropertyChanged(nameof(CanCancelVenuePreview));
             UpdateHomeLockedVenuePresentation();
-            UpdateHomeHeroPresentation(DateTimeOffset.Now);
+            UpdateHomeHeroPresentation(GetCurrentTime());
             UpdateHomeSystemInfoPresentation();
             return;
         }
@@ -2460,7 +2480,7 @@ public partial class MainWindowWorkflowViewModel
         _lockedVenueOpenTimeText = VenueOpenTimeText;
         _lockedVenueCloseTimeText = VenueCloseTimeText;
         UpdateHomeLockedVenuePresentation();
-        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateHomeHeroPresentation(GetCurrentTime());
         UpdateHomeSystemInfoPresentation();
     }
 
@@ -3417,7 +3437,7 @@ public partial class MainWindowWorkflowViewModel
         UpdateTomorrowLastRequestText();
         UpdateGrabRuntimeClock();
         UpdateGlobalLeakRuntimeClock();
-        RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);
+        RefreshSidebarSessionExpirationPresentation(GetCurrentTime());
         UpdateHomeDashboardClock();
     }
 
@@ -3432,8 +3452,8 @@ public partial class MainWindowWorkflowViewModel
         _grabStatusReason = status.Reason;
         UpdateGrabLastRequestText();
         ApplyGrabRuntime(status);
-        UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
-        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateGuardTracking(status.LastUpdatedAt ?? GetCurrentTime());
+        UpdateHomeHeroPresentation(GetCurrentTime());
         UpdateHomeSystemInfoPresentation();
         OnPropertyChanged(nameof(GrabDashboardStatusText));
         OnPropertyChanged(nameof(GrabDashboardStatusBrush));
@@ -3450,8 +3470,8 @@ public partial class MainWindowWorkflowViewModel
         _globalLeakStatusReason = status.Reason;
         UpdateGlobalLeakLastRequestText();
         ApplyGlobalLeakRuntime(status);
-        UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
-        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateGuardTracking(status.LastUpdatedAt ?? GetCurrentTime());
+        UpdateHomeHeroPresentation(GetCurrentTime());
         UpdateHomeSystemInfoPresentation();
         OnPropertyChanged(nameof(GlobalLeakDashboardStatusText));
         OnPropertyChanged(nameof(GlobalLeakDashboardStatusBrush));
@@ -3461,8 +3481,8 @@ public partial class MainWindowWorkflowViewModel
     {
         OccupyStatusText = status.Message;
         IsOccupyRunning = IsTaskActive(status);
-        UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
-        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateGuardTracking(status.LastUpdatedAt ?? GetCurrentTime());
+        UpdateHomeHeroPresentation(GetCurrentTime());
         UpdateHomeSystemInfoPresentation();
     }
 
@@ -3487,8 +3507,8 @@ public partial class MainWindowWorkflowViewModel
         };
 
         UpdateTomorrowLastRequestText();
-        UpdateGuardTracking(status.LastUpdatedAt ?? DateTimeOffset.Now);
-        UpdateHomeHeroPresentation(DateTimeOffset.Now);
+        UpdateGuardTracking(status.LastUpdatedAt ?? GetCurrentTime());
+        UpdateHomeHeroPresentation(GetCurrentTime());
         UpdateHomeSystemInfoPresentation();
         OnPropertyChanged(nameof(TomorrowDashboardStatusText));
         OnPropertyChanged(nameof(TomorrowDashboardStatusBrush));
@@ -3502,7 +3522,7 @@ public partial class MainWindowWorkflowViewModel
             return;
         }
 
-        var elapsed = DateTimeOffset.Now - _grabLastRequestAt.Value;
+        var elapsed = GetCurrentTime() - _grabLastRequestAt.Value;
         if (elapsed < TimeSpan.Zero)
         {
             elapsed = TimeSpan.Zero;
@@ -3521,7 +3541,7 @@ public partial class MainWindowWorkflowViewModel
             return;
         }
 
-        var elapsed = DateTimeOffset.Now - _globalLeakLastRequestAt.Value;
+        var elapsed = GetCurrentTime() - _globalLeakLastRequestAt.Value;
         if (elapsed < TimeSpan.Zero)
         {
             elapsed = TimeSpan.Zero;
@@ -3540,7 +3560,7 @@ public partial class MainWindowWorkflowViewModel
             return;
         }
 
-        var elapsed = DateTimeOffset.Now - _tomorrowLastRequestAt.Value;
+        var elapsed = GetCurrentTime() - _tomorrowLastRequestAt.Value;
         if (elapsed < TimeSpan.Zero)
         {
             elapsed = TimeSpan.Zero;
@@ -3560,8 +3580,8 @@ public partial class MainWindowWorkflowViewModel
                 ResetGrabRuntime();
                 return;
             case CoordinatorTaskState.Running:
-                _grabRuntimeStartedAt ??= status.LastUpdatedAt ?? DateTimeOffset.Now;
-                UpdateGrabRuntimeText(DateTimeOffset.Now);
+                _grabRuntimeStartedAt ??= status.LastUpdatedAt ?? GetCurrentTime();
+                UpdateGrabRuntimeText(GetCurrentTime());
                 return;
             case CoordinatorTaskState.Stopping:
             case CoordinatorTaskState.Completed:
@@ -3578,7 +3598,7 @@ public partial class MainWindowWorkflowViewModel
             return;
         }
 
-        UpdateGrabRuntimeText(DateTimeOffset.Now);
+        UpdateGrabRuntimeText(GetCurrentTime());
     }
 
     private void FreezeGrabRuntime(DateTimeOffset? stoppedAt)
@@ -3588,7 +3608,7 @@ public partial class MainWindowWorkflowViewModel
             return;
         }
 
-        UpdateGrabRuntimeText(stoppedAt ?? DateTimeOffset.Now);
+        UpdateGrabRuntimeText(stoppedAt ?? GetCurrentTime());
         _grabRuntimeStartedAt = null;
     }
 
@@ -3618,8 +3638,8 @@ public partial class MainWindowWorkflowViewModel
                 ResetGlobalLeakRuntime();
                 return;
             case CoordinatorTaskState.Running:
-                _globalLeakRuntimeStartedAt ??= status.LastUpdatedAt ?? DateTimeOffset.Now;
-                UpdateGlobalLeakRuntimeText(DateTimeOffset.Now);
+                _globalLeakRuntimeStartedAt ??= status.LastUpdatedAt ?? GetCurrentTime();
+                UpdateGlobalLeakRuntimeText(GetCurrentTime());
                 return;
             case CoordinatorTaskState.Stopping:
             case CoordinatorTaskState.Completed:
@@ -3636,7 +3656,7 @@ public partial class MainWindowWorkflowViewModel
             return;
         }
 
-        UpdateGlobalLeakRuntimeText(DateTimeOffset.Now);
+        UpdateGlobalLeakRuntimeText(GetCurrentTime());
     }
 
     private void FreezeGlobalLeakRuntime(DateTimeOffset? stoppedAt)
@@ -3646,7 +3666,7 @@ public partial class MainWindowWorkflowViewModel
             return;
         }
 
-        UpdateGlobalLeakRuntimeText(stoppedAt ?? DateTimeOffset.Now);
+        UpdateGlobalLeakRuntimeText(stoppedAt ?? GetCurrentTime());
         _globalLeakRuntimeStartedAt = null;
     }
 
@@ -3669,20 +3689,21 @@ public partial class MainWindowWorkflowViewModel
 
     private void UpdateHomeDashboardPresentation()
     {
-        var now = DateTimeOffset.Now;
+        var now = GetCurrentTime();
         UpdateHomeHeroPresentation(now);
         UpdateHomeLockedVenuePresentation();
         UpdateHomeReservationCardPresentation(now);
+        UpdateHomeCookieCardPresentation(now);
         UpdateHomeSystemInfoPresentation();
         UpdateHomeGuardDurationPresentation(now);
     }
 
     private void UpdateHomeDashboardClock()
     {
-        var now = DateTimeOffset.Now;
+        var now = GetCurrentTime();
         UpdateHomeHeroPresentation(now);
         UpdateHomeReservationCardPresentation(now);
-        UpdateHomeSystemInfoPresentation();
+        UpdateHomeCookieCardPresentation(now);
         UpdateHomeGuardDurationPresentation(now);
     }
 
@@ -3772,6 +3793,7 @@ public partial class MainWindowWorkflowViewModel
     {
         if (_currentReservation is null)
         {
+            ClearHomeReservationProgressTracking();
             HomeReservationSeatNumberText = "--";
             HomeReservationVenueText = "当前暂无预约记录";
             HomeReservationExpirationTimeText = "--:--:--";
@@ -3779,9 +3801,12 @@ public partial class MainWindowWorkflowViewModel
             HomeReservationBadgeBrush = GrabStateIdleBrush;
             HomeReservationBadgeBackgroundBrush = DashboardNeutralSoftBrush;
             HomeReservationRemainingText = "--";
+            HomeReservationProgressValue = 0;
+            HomeReservationProgressBrush = GrabStateIdleBrush;
             return;
         }
 
+        EnsureHomeReservationProgressTracking(_currentReservation, now);
         var remaining = _currentReservation.ExpirationTime - now;
         HomeReservationSeatNumberText = ExtractSeatNumberText(_currentReservation.SeatName);
         HomeReservationVenueText = _currentReservation.LibraryName;
@@ -3793,6 +3818,8 @@ public partial class MainWindowWorkflowViewModel
             HomeReservationBadgeBrush = GrabStateWarningBrush;
             HomeReservationBadgeBackgroundBrush = DashboardWarningSoftBrush;
             HomeReservationRemainingText = "已到期";
+            HomeReservationProgressValue = 0;
+            HomeReservationProgressBrush = GrabStateFailureBrush;
             return;
         }
 
@@ -3800,6 +3827,38 @@ public partial class MainWindowWorkflowViewModel
         HomeReservationBadgeBrush = GrabStateSuccessBrush;
         HomeReservationBadgeBackgroundBrush = DashboardSuccessSoftBrush;
         HomeReservationRemainingText = FormatReservationRemaining(remaining);
+        HomeReservationProgressValue = CalculateHomeReservationProgressValue(remaining, now);
+        HomeReservationProgressBrush = ResolveHomeProgressBrush(HomeReservationProgressValue);
+    }
+
+    private void UpdateHomeCookieCardPresentation(DateTimeOffset now)
+    {
+        if (!IsAuthorized ||
+            _homeCookieExpirationTime is not { } expirationTime ||
+            expirationTime <= now)
+        {
+            ClearHomeCookieProgressTracking();
+            HasCurrentCookie = false;
+            HomeCookieExpirationTimeText = "--:--:--";
+            HomeCookieRemainingText = "--";
+            HomeCookieBadgeText = "未登录";
+            HomeCookieBadgeBrush = GrabStateIdleBrush;
+            HomeCookieBadgeBackgroundBrush = DashboardNeutralSoftBrush;
+            HomeCookieProgressValue = 0;
+            HomeCookieProgressBrush = GrabStateIdleBrush;
+            return;
+        }
+
+        HasCurrentCookie = true;
+        EnsureHomeCookieProgressTracking(expirationTime, _homeCookieIdentity, now);
+        var remaining = expirationTime - now;
+        HomeCookieExpirationTimeText = expirationTime.ToString("M月d日 HH:mm:ss", DashboardCulture);
+        HomeCookieRemainingText = FormatCookieRemaining(remaining);
+        HomeCookieBadgeText = "有效中";
+        HomeCookieBadgeBrush = GrabStateSuccessBrush;
+        HomeCookieBadgeBackgroundBrush = DashboardSuccessSoftBrush;
+        HomeCookieProgressValue = CalculateHomeCookieProgressValue(remaining, now);
+        HomeCookieProgressBrush = ResolveHomeProgressBrush(HomeCookieProgressValue);
     }
 
     private void UpdateHomeSystemInfoPresentation()
@@ -3895,7 +3954,7 @@ public partial class MainWindowWorkflowViewModel
             return;
         }
 
-        var recordedAt = status.LastUpdatedAt ?? DateTimeOffset.Now;
+        var recordedAt = status.LastUpdatedAt ?? GetCurrentTime();
         if (_lastRecordedGrabSuccessAt == recordedAt)
         {
             return;
@@ -3913,7 +3972,7 @@ public partial class MainWindowWorkflowViewModel
             return;
         }
 
-        var recordedAt = status.LastUpdatedAt ?? DateTimeOffset.Now;
+        var recordedAt = status.LastUpdatedAt ?? GetCurrentTime();
         if (_lastRecordedGlobalLeakSuccessAt == recordedAt)
         {
             return;
@@ -3942,7 +4001,7 @@ public partial class MainWindowWorkflowViewModel
             return;
         }
 
-        var recordedAt = status.LastUpdatedAt ?? DateTimeOffset.Now;
+        var recordedAt = status.LastUpdatedAt ?? GetCurrentTime();
         if (_lastRecordedTomorrowSuccessAt == recordedAt)
         {
             return;
@@ -3963,7 +4022,7 @@ public partial class MainWindowWorkflowViewModel
     {
         try
         {
-            var totalGuardSeconds = GetCurrentTotalGuardSeconds(DateTimeOffset.Now);
+            var totalGuardSeconds = GetCurrentTotalGuardSeconds(GetCurrentTime());
             await SystemSettings.SaveDashboardMetricsAsync(new DashboardMetrics(
                 _historicalSuccessCount,
                 totalGuardSeconds));
@@ -4046,6 +4105,171 @@ public partial class MainWindowWorkflowViewModel
         return remaining.ToString(@"mm\:ss", DashboardCulture);
     }
 
+    private double CalculateHomeReservationProgressValue(TimeSpan remaining, DateTimeOffset now)
+    {
+        var progressWindow = CurrentHomeReservationProgressTimingMode switch
+        {
+            HomeReservationProgressTimingMode.SoftwareRuntimeDuration =>
+                ResolveSoftwareRuntimeProgressWindow(now),
+            _ => TimeSpan.FromMinutes(HomeReservationFixedDurationMinutes)
+        };
+
+        if (progressWindow <= TimeSpan.Zero)
+        {
+            return 0;
+        }
+
+        return Math.Clamp(remaining.TotalSeconds / progressWindow.TotalSeconds * 100, 0, 100);
+    }
+
+    private IBrush ResolveHomeProgressBrush(double progressValue)
+    {
+        if (progressValue < 10)
+        {
+            return GrabStateFailureBrush;
+        }
+
+        if (progressValue < 30)
+        {
+            return GrabStateWarningBrush;
+        }
+
+        return GrabStateSuccessBrush;
+    }
+
+    private TimeSpan ResolveSoftwareRuntimeProgressWindow(DateTimeOffset now)
+    {
+        if (_currentReservation is null)
+        {
+            return TimeSpan.Zero;
+        }
+
+        EnsureHomeReservationProgressTracking(_currentReservation, now);
+        return _currentReservation.ExpirationTime - (_homeReservationProgressStartedAt ?? now);
+    }
+
+    private double CalculateHomeCookieProgressValue(TimeSpan remaining, DateTimeOffset now)
+    {
+        var progressWindow = CurrentHomeCookieProgressTimingMode switch
+        {
+            HomeCookieProgressTimingMode.SoftwareRuntimeDuration =>
+                ResolveHomeCookieSoftwareRuntimeProgressWindow(now),
+            _ => TimeSpan.FromMinutes(HomeCookieFixedDurationMinutes)
+        };
+
+        if (progressWindow <= TimeSpan.Zero)
+        {
+            return 0;
+        }
+
+        return Math.Clamp(remaining.TotalSeconds / progressWindow.TotalSeconds * 100, 0, 100);
+    }
+
+    private TimeSpan ResolveHomeCookieSoftwareRuntimeProgressWindow(DateTimeOffset now)
+    {
+        if (_homeCookieExpirationTime is not { } expirationTime)
+        {
+            return TimeSpan.Zero;
+        }
+
+        EnsureHomeCookieProgressTracking(expirationTime, _homeCookieIdentity, now);
+        return expirationTime - (_homeCookieProgressStartedAt ?? now);
+    }
+
+    private HomeReservationProgressTimingMode CurrentHomeReservationProgressTimingMode =>
+        HomeReservationProgressSettings.NormalizeMode(
+            (HomeReservationProgressTimingMode)Math.Clamp(
+                SelectedHomeReservationProgressTimingModeIndex,
+                0,
+                HomeReservationProgressTimingModes.Length - 1));
+
+    private HomeCookieProgressTimingMode CurrentHomeCookieProgressTimingMode =>
+        HomeCookieProgressSettings.NormalizeMode(
+            (HomeCookieProgressTimingMode)Math.Clamp(
+                SelectedHomeCookieProgressTimingModeIndex,
+                0,
+                HomeCookieProgressTimingModes.Length - 1));
+
+    private void EnsureHomeReservationProgressTracking(ReservationInfo reservation, DateTimeOffset observedAt)
+    {
+        var reservationIdentity = BuildHomeReservationProgressIdentity(reservation);
+        if (string.Equals(_homeReservationProgressReservationIdentity, reservationIdentity, StringComparison.Ordinal) &&
+            _homeReservationProgressExpirationTime == reservation.ExpirationTime &&
+            _homeReservationProgressStartedAt is not null)
+        {
+            return;
+        }
+
+        _homeReservationProgressReservationIdentity = reservationIdentity;
+        _homeReservationProgressExpirationTime = reservation.ExpirationTime;
+        _homeReservationProgressStartedAt = observedAt;
+    }
+
+    private void ClearHomeReservationProgressTracking()
+    {
+        _homeReservationProgressReservationIdentity = null;
+        _homeReservationProgressExpirationTime = null;
+        _homeReservationProgressStartedAt = null;
+    }
+
+    private void EnsureHomeCookieProgressTracking(
+        DateTimeOffset expirationTime,
+        string? cookieIdentity,
+        DateTimeOffset observedAt)
+    {
+        cookieIdentity = BuildHomeCookieProgressIdentity(expirationTime, cookieIdentity);
+        if (string.Equals(_homeCookieProgressCookieIdentity, cookieIdentity, StringComparison.Ordinal) &&
+            _homeCookieProgressExpirationTime == expirationTime &&
+            _homeCookieProgressStartedAt is not null)
+        {
+            return;
+        }
+
+        _homeCookieProgressCookieIdentity = cookieIdentity;
+        _homeCookieProgressExpirationTime = expirationTime;
+        _homeCookieProgressStartedAt = observedAt;
+    }
+
+    private void ClearHomeCookieProgressTracking()
+    {
+        _homeCookieProgressCookieIdentity = null;
+        _homeCookieProgressExpirationTime = null;
+        _homeCookieProgressStartedAt = null;
+    }
+
+    private static string BuildHomeReservationProgressIdentity(ReservationInfo reservation)
+    {
+        return string.Join(
+            "\u001F",
+            reservation.LibraryId.ToString(CultureInfo.InvariantCulture),
+            reservation.LibraryName,
+            reservation.SeatKey,
+            reservation.SeatName);
+    }
+
+    private static string BuildHomeCookieProgressIdentity(DateTimeOffset expirationTime, string? cookieIdentity)
+    {
+        var normalizedCookieIdentity = cookieIdentity?.Trim();
+        return string.IsNullOrWhiteSpace(normalizedCookieIdentity)
+            ? expirationTime.ToUniversalTime().Ticks.ToString(CultureInfo.InvariantCulture)
+            : normalizedCookieIdentity;
+    }
+
+    private static string FormatCookieRemaining(TimeSpan remaining)
+    {
+        if (remaining.TotalDays >= 1)
+        {
+            return $"{Math.Max(1, (int)Math.Floor(remaining.TotalDays))}天 {remaining.Hours:D2}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
+        }
+
+        if (remaining.TotalHours >= 1)
+        {
+            return remaining.ToString(@"hh\:mm\:ss", DashboardCulture);
+        }
+
+        return remaining.ToString(@"mm\:ss", DashboardCulture);
+    }
+
     private static string ExtractSeatNumberText(string seatName)
     {
         if (string.IsNullOrWhiteSpace(seatName))
@@ -4076,7 +4300,7 @@ public partial class MainWindowWorkflowViewModel
         }
 
         var message = $"Cookie 到期时间：{expirationTime:M月d日 HH:mm}";
-        if (expirationTime - DateTimeOffset.Now < TimeSpan.FromMinutes(30))
+        if (expirationTime - GetCurrentTime() < TimeSpan.FromMinutes(30))
         {
             await _notificationService.ShowWarningAsync("已成功恢复上次的 Cookie，注意到期时间", message);
             return;
@@ -4095,7 +4319,8 @@ public partial class MainWindowWorkflowViewModel
 
         _sidebarSessionExpirationTime = expirationTime;
         HasSidebarSessionExpiration = true;
-        RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);
+        UpdateHomeCookieState(expirationTime, cookie);
+        RefreshSidebarSessionExpirationPresentation(GetCurrentTime());
     }
 
     private void UpdateSidebarSessionExpiration(DateTimeOffset? expirationTime, string? fallbackCookie)
@@ -4114,7 +4339,15 @@ public partial class MainWindowWorkflowViewModel
 
         _sidebarSessionExpirationTime = expirationTime;
         HasSidebarSessionExpiration = true;
-        RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);
+        UpdateHomeCookieState(expirationTime.Value, fallbackCookie);
+        RefreshSidebarSessionExpirationPresentation(GetCurrentTime());
+    }
+
+    private void UpdateHomeCookieState(DateTimeOffset expirationTime, string? cookie)
+    {
+        _homeCookieIdentity = BuildHomeCookieProgressIdentity(expirationTime, cookie);
+        _homeCookieExpirationTime = expirationTime;
+        UpdateHomeCookieCardPresentation(GetCurrentTime());
     }
 
     private void RefreshSidebarSessionExpirationPresentation(DateTimeOffset timestamp)
@@ -4141,6 +4374,15 @@ public partial class MainWindowWorkflowViewModel
         SidebarSessionExpirationText = string.Empty;
         SidebarSessionExpirationBrush = _appThemeService.CurrentPalette.LogDefaultBrush;
         HasSidebarSessionExpiration = false;
+        ClearHomeCookieState();
+    }
+
+    private void ClearHomeCookieState()
+    {
+        _homeCookieIdentity = null;
+        _homeCookieExpirationTime = null;
+        ClearHomeCookieProgressTracking();
+        UpdateHomeCookieCardPresentation(GetCurrentTime());
     }
 
     private static string MeasureMemoryUsageText()
@@ -4160,6 +4402,15 @@ public partial class MainWindowWorkflowViewModel
             ClearAutoReleaseFailure();
         }
 
+        if (info is null)
+        {
+            ClearHomeReservationProgressTracking();
+        }
+        else
+        {
+            EnsureHomeReservationProgressTracking(info, GetCurrentTime());
+        }
+
         OnPropertyChanged(nameof(HasCurrentReservation));
         OnPropertyChanged(nameof(HasNoCurrentReservation));
         OnPropertyChanged(nameof(CanCancelCurrentReservation));
@@ -4171,7 +4422,7 @@ public partial class MainWindowWorkflowViewModel
             ReservationHeroTitle = "暂无预约";
             ReservationExpiryText = "到期：--:--:--";
             ReservationCountdownText = "等待建立预约状态";
-            UpdateHomeReservationCardPresentation(DateTimeOffset.Now);
+            UpdateHomeReservationCardPresentation(GetCurrentTime());
             UpdateHomeSystemInfoPresentation();
             QueueAutoReleaseCheck();
             return;
@@ -4180,7 +4431,7 @@ public partial class MainWindowWorkflowViewModel
         ReservationSummary = $"{info.LibraryName} / {info.SeatName} / 到期 {info.ExpirationTime:HH:mm:ss}";
         ReservationHeroTitle = $"{info.LibraryName} · {info.SeatName}";
         UpdateReservationCountdown();
-        UpdateHomeReservationCardPresentation(DateTimeOffset.Now);
+        UpdateHomeReservationCardPresentation(GetCurrentTime());
         UpdateHomeSystemInfoPresentation();
         QueueAutoReleaseCheck();
     }
@@ -4196,7 +4447,7 @@ public partial class MainWindowWorkflowViewModel
 
         ReservationExpiryText = $"到期：{_currentReservation.ExpirationTime:HH:mm:ss}";
 
-        var remaining = _currentReservation.ExpirationTime - DateTimeOffset.Now;
+        var remaining = _currentReservation.ExpirationTime - GetCurrentTime();
         if (remaining <= TimeSpan.Zero)
         {
             ReservationCountdownText = "倒计时：已到期，等待刷新";
@@ -4698,7 +4949,7 @@ public partial class MainWindowWorkflowViewModel
 
         OnPropertyChanged(nameof(GrabDashboardStatusBrush));
         OnPropertyChanged(nameof(TomorrowDashboardStatusBrush));
-        RefreshSidebarSessionExpirationPresentation(DateTimeOffset.Now);
+        RefreshSidebarSessionExpirationPresentation(GetCurrentTime());
         UpdateHomeDashboardPresentation();
     }
 

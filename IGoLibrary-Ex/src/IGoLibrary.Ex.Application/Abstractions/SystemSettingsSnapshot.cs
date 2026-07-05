@@ -10,6 +10,8 @@ public sealed record SystemSettingsSnapshot(
     int RequestTimeoutSeconds,
     int NetworkMaxRetries,
     ThemePreferences Theme,
+    HomeReservationProgressSettings HomeReservationProgress,
+    HomeCookieProgressSettings HomeCookieProgress,
     GrabReservationStrategy GrabReservationStrategy,
     bool AutoReleaseEnabled,
     int AutoReleaseLeadSeconds,

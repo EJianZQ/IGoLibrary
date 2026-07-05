@@ -1183,6 +1183,36 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task HomeReservationProgressSettings_AutoSavePreferences()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings() with
+        {
+            Ui = AppSettings.Default.Ui with
+            {
+                HomeReservationProgress = new HomeReservationProgressSettings(
+                    HomeReservationProgressTimingMode.SoftwareRuntimeDuration,
+                    40)
+            }
+        });
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        Assert.Equal(1, viewModel.SelectedHomeReservationProgressTimingModeIndex);
+        Assert.Equal(40, viewModel.HomeReservationFixedDurationMinutes);
+        Assert.False(viewModel.IsHomeReservationFixedProgressMode);
+
+        viewModel.SelectedHomeReservationProgressTimingModeIndex = 0;
+        viewModel.HomeReservationFixedDurationMinutes = 45;
+
+        await WaitForAsync(() =>
+            settingsService.CurrentSettings.Ui.HomeReservationProgress?.Mode ==
+            HomeReservationProgressTimingMode.FixedReservationDuration &&
+            settingsService.CurrentSettings.Ui.HomeReservationProgress.FixedDurationMinutes == 45);
+
+        Assert.True(viewModel.IsHomeReservationFixedProgressMode);
+    }
+
+    [Fact]
     public async Task SaveSettingsAsync_PersistsStartupUpdateCheckPreference()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);
@@ -1371,11 +1401,213 @@ public sealed class MainWindowViewModelTests
             notificationService: notifications);
 
         await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+        Assert.True(viewModel.HomeReservationProgressValue > 0);
+
         await viewModel.CancelCurrentReservationCommand.ExecuteAsync(null);
 
         Assert.True(viewModel.HasNoCurrentReservation);
         Assert.Equal("--", viewModel.HomeReservationSeatNumberText);
+        Assert.Equal(0, viewModel.HomeReservationProgressValue);
         Assert.Contains(notifications.Successes, x => x.Title == "已取消预约");
+    }
+
+    [Fact]
+    public async Task RefreshReservationAsync_UsesFixedHomeProgressDuration_WhenConfigured()
+    {
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) => Task.FromResult<ReservationInfo?>(new ReservationInfo(
+                "token-1",
+                1,
+                "自科阅览区一",
+                "seat-4",
+                "4",
+                DateTimeOffset.Now.AddMinutes(5)))
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            apiClient: apiClient);
+        viewModel.SelectedHomeReservationProgressTimingModeIndex = 0;
+        viewModel.HomeReservationFixedDurationMinutes = 10;
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+
+        Assert.InRange(viewModel.HomeReservationProgressValue, 45, 55);
+    }
+
+    [Fact]
+    public async Task RefreshReservationAsync_UsesSoftwareRuntimeHomeProgressDuration_WhenConfigured()
+    {
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) => Task.FromResult<ReservationInfo?>(new ReservationInfo(
+                "token-1",
+                1,
+                "自科阅览区一",
+                "seat-4",
+                "4",
+                DateTimeOffset.Now.AddMinutes(10)))
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            apiClient: apiClient);
+        viewModel.SelectedHomeReservationProgressTimingModeIndex = 1;
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.HomeReservationProgressValue > 95);
+    }
+
+    [Fact]
+    public async Task RefreshReservationAsync_KeepsSoftwareRuntimeHomeProgressStart_WhenReservationTokenChanges()
+    {
+        var observedAt = CreateLocalTimestamp(2026, 5, 5, 10, 0, 0);
+        var expiresAt = observedAt.AddMinutes(10);
+        var timeProvider = new FakeTimeProvider(observedAt);
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, observedAt, true)
+        };
+        var reservationInfoCalls = 0;
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) =>
+            {
+                reservationInfoCalls++;
+                return Task.FromResult<ReservationInfo?>(new ReservationInfo(
+                    $"volatile-token-{reservationInfoCalls}",
+                    1,
+                    "自科阅览区一",
+                    "seat-4",
+                    "4",
+                    expiresAt));
+            }
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            apiClient: apiClient,
+            timeProvider: timeProvider);
+        viewModel.SelectedHomeReservationProgressTimingModeIndex = 1;
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+        timeProvider.Advance(TimeSpan.FromMinutes(5));
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, reservationInfoCalls);
+        Assert.InRange(viewModel.HomeReservationProgressValue, 49.9, 50.1);
+    }
+
+    [Theory]
+    [InlineData(50, "#14804A")]
+    [InlineData(20, "#C27803")]
+    [InlineData(5, "#C93C37")]
+    public async Task RefreshReservationAsync_TintsHomeProgressByRemainingPercent(
+        int remainingMinutes,
+        string expectedColor)
+    {
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) => Task.FromResult<ReservationInfo?>(new ReservationInfo(
+                $"token-{remainingMinutes}",
+                1,
+                "自科阅览区一",
+                "seat-4",
+                "4",
+                DateTimeOffset.Now.AddMinutes(remainingMinutes)))
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            apiClient: apiClient);
+        viewModel.SelectedHomeReservationProgressTimingModeIndex = 0;
+        viewModel.HomeReservationFixedDurationMinutes = 100;
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+
+        Assert.Equal(Color.Parse(expectedColor), GetBrushColor(viewModel.HomeReservationProgressBrush));
+    }
+
+    [Fact]
+    public async Task ValidateManualCookieAsync_UsesFixedHomeCookieProgressDuration_WhenConfigured()
+    {
+        var observedAt = CreateLocalTimestamp(2026, 5, 5, 10, 0, 0);
+        var expiresAt = observedAt.AddMinutes(60);
+        var timeProvider = new FakeTimeProvider(observedAt);
+        var viewModel = CreateViewModel(timeProvider: timeProvider);
+        viewModel.SelectedHomeCookieProgressTimingModeIndex = 0;
+        viewModel.HomeCookieFixedDurationMinutes = 120;
+        viewModel.ManualCookieText = BuildAuthorizationCookie(expiresAt);
+
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.HasCurrentCookie);
+        Assert.False(viewModel.HasNoCurrentCookie);
+        Assert.Equal("有效中", viewModel.HomeCookieBadgeText);
+        Assert.Contains("11:00:00", viewModel.HomeCookieExpirationTimeText);
+        Assert.Equal("01:00:00", viewModel.HomeCookieRemainingText);
+        Assert.InRange(viewModel.HomeCookieProgressValue, 49.9, 50.1);
+        Assert.Equal(Color.Parse("#14804A"), GetBrushColor(viewModel.HomeCookieProgressBrush));
+    }
+
+    [Fact]
+    public async Task ValidateManualCookieAsync_ShowsLoggedOutHomeCookieCard_WhenCookieExpired()
+    {
+        var observedAt = CreateLocalTimestamp(2026, 5, 5, 10, 0, 0);
+        var timeProvider = new FakeTimeProvider(observedAt);
+        var viewModel = CreateViewModel(timeProvider: timeProvider);
+        viewModel.ManualCookieText = BuildAuthorizationCookie(observedAt.AddMinutes(-1));
+
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.HasNoCurrentCookie);
+        Assert.Equal("未登录", viewModel.HomeCookieBadgeText);
+        Assert.Equal("--:--:--", viewModel.HomeCookieExpirationTimeText);
+        Assert.Equal("--", viewModel.HomeCookieRemainingText);
+        Assert.Equal(0, viewModel.HomeCookieProgressValue);
+    }
+
+    [Fact]
+    public async Task ValidateManualCookieAsync_KeepsSoftwareRuntimeHomeCookieProgressStart()
+    {
+        var observedAt = CreateLocalTimestamp(2026, 5, 5, 10, 0, 0);
+        var expiresAt = observedAt.AddHours(1);
+        var timeProvider = new FakeTimeProvider(observedAt);
+        var viewModel = CreateViewModel(timeProvider: timeProvider);
+        viewModel.SelectedHomeCookieProgressTimingModeIndex = 1;
+        viewModel.ManualCookieText = BuildAuthorizationCookie(expiresAt);
+
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+        timeProvider.Advance(TimeSpan.FromMinutes(30));
+        viewModel.HomeCookieFixedDurationMinutes = 121;
+
+        Assert.InRange(viewModel.HomeCookieProgressValue, 49.9, 50.1);
+    }
+
+    [Fact]
+    public async Task HomeCookieProgressSettings_AutoSavePreferences()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.SelectedHomeCookieProgressTimingModeIndex = 1;
+        viewModel.HomeCookieFixedDurationMinutes = 150;
+
+        await WaitForAsync(() =>
+            settingsService.CurrentSettings.Ui.HomeCookieProgress?.Mode ==
+            HomeCookieProgressTimingMode.SoftwareRuntimeDuration &&
+            settingsService.CurrentSettings.Ui.HomeCookieProgress?.FixedDurationMinutes == 150);
     }
 
     [Fact]
@@ -2283,7 +2515,8 @@ public sealed class MainWindowViewModelTests
         FakeAppThemeService? appThemeService = null,
         ActivityLogService? activityLogService = null,
         FakeProtocolTemplateStore? protocolTemplateStore = null,
-        FakeStartupEntryService? startupEntryService = null)
+        FakeStartupEntryService? startupEntryService = null,
+        FakeTimeProvider? timeProvider = null)
     {
         sessionService ??= new FakeSessionService();
         libraryService ??= new FakeLibraryService();
@@ -2315,6 +2548,7 @@ public sealed class MainWindowViewModelTests
             externalLinkService ?? new FakeExternalLinkService(),
             new FakeAppVersionProvider(),
             appThemeService ?? new FakeAppThemeService(),
+            timeProvider ?? new FakeTimeProvider(),
             new AppWindowService(),
             startupEntryService ?? new FakeStartupEntryService());
     }
@@ -2490,6 +2724,18 @@ public sealed class MainWindowViewModelTests
             "seat-1",
             "1",
             expirationTime);
+    }
+
+    private static DateTimeOffset CreateLocalTimestamp(
+        int year,
+        int month,
+        int day,
+        int hour,
+        int minute,
+        int second)
+    {
+        var localTime = new DateTime(year, month, day, hour, minute, second, DateTimeKind.Unspecified);
+        return new DateTimeOffset(localTime, TimeZoneInfo.Local.GetUtcOffset(localTime));
     }
 
     private static string BuildAuthorizationCookie(DateTimeOffset expiresAt)

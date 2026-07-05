@@ -67,6 +67,9 @@
     <PathGeometry x:Key="IconSettings">M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z</PathGeometry>
     <PathGeometry x:Key="IconEventKey">M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2.18 12C8.16 14 6.82 12.66 6.82 11s1.34-3 3-3c1.3 0 2.41.84 2.83 2H19v2h-2v2h-2v-2h-2.35c-.42 1.16-1.53 2-2.83 2zm0-2c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1z</PathGeometry>
     <PathGeometry x:Key="IconEventFailure">M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z</PathGeometry>
+    <PathGeometry x:Key="IconBuilding">M3 21V3h10v18H3zm12 0v-8h6v8h-6zM5 5v2h2V5H5zm4 0v2h2V5H9zM5 9v2h2V9H5zm4 0v2h2V9H9zm-4 4v2h2v-2H5zm4 0v2h2v-2H9zm8 2v4h2v-4h-2z</PathGeometry>
+    <PathGeometry x:Key="IconClock">M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 5h-2v6l5 3 .9-1.5-3.9-2.3V7z</PathGeometry>
+    <PathGeometry x:Key="IconHourglass">M6 2h12v6c0 1.5-.8 2.8-2.1 4 1.3 1.2 2.1 2.5 2.1 4v6H6v-6c0-1.5.8-2.8 2.1-4C6.8 10.8 6 9.5 6 8V2zm2 2v4c0 1.1.9 2.1 2.6 3l1.4.8 1.4-.8C15.1 10.1 16 9.1 16 8V4H8zm4 8.9-1.4.8C8.9 14.6 8 15.6 8 16.7V20h8v-3.3c0-1.1-.9-2.1-2.6-3l-1.4-.8z</PathGeometry>
 
   </Window.Resources>
 
@@ -211,9 +214,10 @@
       <Setter Property="LineHeight" Value="20" />
     </Style>
     <Style Selector="TextBlock.dashboard-ticket-seat">
-      <Setter Property="FontSize" Value="60" />
+      <Setter Property="FontSize" Value="76" />
       <Setter Property="FontWeight" Value="Bold" />
       <Setter Property="Foreground" Value="{DynamicResource SemiTextPrimaryBrush}" />
+      <Setter Property="LineHeight" Value="82" />
     </Style>
     <Style Selector="TextBlock.dashboard-ticket-caption">
       <Setter Property="FontSize" Value="12" />
@@ -230,6 +234,19 @@
       <Setter Property="Background" Value="{DynamicResource DashboardMutedSurfaceBrush}" />
       <Setter Property="CornerRadius" Value="20" />
       <Setter Property="Padding" Value="16" />
+    </Style>
+    <Style Selector="Border.dashboard-reservation-detail">
+      <Setter Property="Background" Value="{DynamicResource DashboardMutedSurfaceBrush}" />
+      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="Border.dashboard-reservation-icon">
+      <Setter Property="Width" Value="34" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="CornerRadius" Value="17" />
+      <Setter Property="Background" Value="{DynamicResource AppAccentPanelBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AppAccentPanelBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Border.notify-toggle-card">
       <Setter Property="Background" Value="{DynamicResource DashboardMutedSurfaceBrush}" />
@@ -366,7 +383,7 @@
         
         <!-- Tab 0: Home -->
         <ScrollViewer>
-          <StackPanel Spacing="18" Margin="0,0,16,0">
+          <StackPanel Spacing="14" Margin="0,0,16,0">
             <Border Classes="dashboard-card Shadow"
                     Background="{DynamicResource DashboardHeroBrush}"
                     Padding="22,20">
@@ -403,74 +420,48 @@
                                Text="{Binding HomeDateText}" />
                     <TextBlock Classes="dashboard-clock-time"
                                Text="{Binding HomeTimeText}" />
-
-                    <Border Background="{Binding HomeHeroStatusBackgroundBrush}"
-                            CornerRadius="999"
-                            Padding="12,8"
-                            HorizontalAlignment="Left">
-                      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                        <Ellipse Width="10"
-                                 Height="10"
-                                 Fill="{Binding HomeHeroStatusBrush}" />
-                        <StackPanel Spacing="2">
-                          <TextBlock Text="{Binding HomeHeroStatusText}"
-                                     FontSize="13"
-                                     FontWeight="SemiBold"
-                                     Foreground="{Binding HomeHeroStatusBrush}" />
-                          <TextBlock Text="{Binding HomeHeroStatusDetailText}"
-                                     FontSize="12"
-                                     Foreground="{DynamicResource SemiTextSecondaryBrush}"
-                                     MaxWidth="240"
-                                     TextWrapping="Wrap" />
-                        </StackPanel>
-                      </StackPanel>
-                    </Border>
                   </StackPanel>
                 </Border>
               </Grid>
             </Border>
 
-            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="20">
-              <Border Classes="dashboard-card Shadow" Padding="20">
-                <StackPanel Spacing="12">
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+              <Border Classes="dashboard-card Shadow" Padding="18,16">
+                <Grid RowDefinitions="Auto,*"
+                      RowSpacing="6"
+                      MinHeight="72">
                   <TextBlock Classes="dashboard-eyebrow" Text="当前锁定场馆" />
                   <TextBlock Classes="dashboard-card-title"
+                             Grid.Row="1"
+                             FontSize="20"
+                             LineHeight="26"
+                             VerticalAlignment="Center"
+                             TextWrapping="NoWrap"
+                             TextTrimming="CharacterEllipsis"
                              Text="{Binding HomeLockedVenueTitle}" />
-                  <Border Background="{Binding HomeLockedVenueStateBackgroundBrush}"
-                          CornerRadius="999"
-                          Padding="12,7"
-                          HorizontalAlignment="Left">
-                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                      <Ellipse Width="8"
-                               Height="8"
-                               Fill="{Binding HomeLockedVenueStateBrush}" />
-                      <TextBlock Text="{Binding HomeLockedVenueStateText}"
-                                 FontSize="12"
-                                 FontWeight="SemiBold"
-                                 Foreground="{Binding HomeLockedVenueStateBrush}" />
-                    </StackPanel>
-                  </Border>
-                </StackPanel>
+                </Grid>
               </Border>
 
-              <Border Grid.Column="1" Classes="dashboard-card Shadow" Padding="20">
+              <Border Grid.Column="1" Classes="dashboard-card Shadow" Padding="18,16">
                 <Grid RowDefinitions="Auto,*"
-                      RowSpacing="10"
-                      MinHeight="98">
+                      RowSpacing="6"
+                      MinHeight="72">
                   <TextBlock Classes="dashboard-eyebrow" Text="历史成功次数" />
                   <TextBlock Classes="dashboard-stat-value"
+                             FontSize="28"
                              Grid.Row="1"
                              VerticalAlignment="Center"
                              Text="{Binding HomeHistoricalSuccessCount}" />
                 </Grid>
               </Border>
 
-              <Border Grid.Column="2" Classes="dashboard-card Shadow" Padding="20">
+              <Border Grid.Column="2" Classes="dashboard-card Shadow" Padding="18,16">
                 <Grid RowDefinitions="Auto,*"
-                      RowSpacing="10"
-                      MinHeight="98">
+                      RowSpacing="6"
+                      MinHeight="72">
                   <TextBlock Classes="dashboard-eyebrow" Text="累计守护时长" />
                   <TextBlock Classes="dashboard-stat-value"
+                             FontSize="28"
                              Grid.Row="1"
                              VerticalAlignment="Center"
                              Text="{Binding HomeTotalGuardDurationText}" />
@@ -478,15 +469,15 @@
               </Border>
             </Grid>
 
-            <Grid ColumnDefinitions="1.65*,1*" ColumnSpacing="24">
+            <Grid>
               <Border Classes="dashboard-card Shadow"
                       Background="{DynamicResource DashboardTicketBrush}"
-                      MinHeight="242"
-                      Padding="22,20">
+                      MinHeight="228"
+                      Padding="22,18">
                 <Grid>
                   <Grid IsVisible="{Binding HasCurrentReservation}"
                         RowDefinitions="Auto,*,Auto"
-                        RowSpacing="18">
+                        RowSpacing="12">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
                       <TextBlock Classes="dashboard-eyebrow"
                                  Text="当前预约"
@@ -510,52 +501,133 @@
                     </Grid>
 
                     <Grid Grid.Row="1"
-                          ColumnDefinitions="128,*"
-                          ColumnSpacing="20"
+                          ColumnDefinitions="144,*"
+                          ColumnSpacing="18"
                           VerticalAlignment="Stretch">
-                      <StackPanel Spacing="2"
+                      <StackPanel Spacing="4"
                                   VerticalAlignment="Stretch"
                                   HorizontalAlignment="Left">
                         <TextBlock Classes="dashboard-ticket-seat"
-                                   Text="{Binding HomeReservationSeatNumberText}" />
+                                   MaxWidth="144"
+                                   Margin="0,-10,0,0"
+                                   FontSize="70"
+                                   LineHeight="74"
+                                   Text="{Binding HomeReservationSeatNumberText}"
+                                   TextTrimming="CharacterEllipsis" />
                         <TextBlock Classes="dashboard-ticket-caption"
                                    Text="座位号" />
                       </StackPanel>
 
-                      <StackPanel Grid.Column="1"
-                                  Spacing="10"
-                                  VerticalAlignment="Center">
-                        <TextBlock FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource SemiTextPrimaryBrush}">
-                          <Run Text="场馆名称：" />
-                          <Run Text="{Binding HomeReservationVenueText}" />
-                        </TextBlock>
+                      <Grid Grid.Column="1"
+                            ColumnDefinitions="Auto,190,190"
+                            ColumnSpacing="10"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                        <Border Classes="dashboard-reservation-detail"
+                                MinWidth="190"
+                                MaxWidth="286"
+                                Padding="12">
+                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Border Classes="dashboard-reservation-icon">
+                              <PathIcon Data="{StaticResource IconBuilding}"
+                                        Width="18"
+                                        Height="18"
+                                        Foreground="{DynamicResource SemiAccentBrush}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="3">
+                              <TextBlock Classes="dashboard-ticket-caption" Text="场馆名称" />
+                              <TextBlock FontSize="16"
+                                         FontWeight="SemiBold"
+                                         Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                         Text="{Binding HomeReservationVenueText}"
+                                         TextWrapping="NoWrap"
+                                         TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                          </Grid>
+                        </Border>
 
-                        <TextBlock FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource SemiTextPrimaryBrush}">
-                          <Run Text="当前有效至：" />
-                          <Run Text="{Binding HomeReservationExpirationTimeText}" />
-                        </TextBlock>
+                        <Border Grid.Column="1"
+                                Classes="dashboard-reservation-detail"
+                                Padding="12">
+                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Border Classes="dashboard-reservation-icon">
+                              <PathIcon Data="{StaticResource IconClock}"
+                                        Width="18"
+                                        Height="18"
+                                        Foreground="{DynamicResource SemiAccentBrush}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="3">
+                              <TextBlock Classes="dashboard-ticket-caption" Text="签到截止时间" />
+                              <TextBlock FontSize="16"
+                                         FontWeight="SemiBold"
+                                         Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                         Text="{Binding HomeReservationExpirationTimeText}"
+                                         TextWrapping="NoWrap"
+                                         TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                          </Grid>
+                        </Border>
 
-                        <TextBlock FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource SemiTextPrimaryBrush}">
-                          <Run Text="剩余时间：" />
-                          <Run Text="{Binding HomeReservationRemainingText}" />
-                        </TextBlock>
-                      </StackPanel>
+                        <Border Grid.Column="2"
+                                Classes="dashboard-reservation-detail"
+                                Padding="12">
+                          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Border Classes="dashboard-reservation-icon">
+                              <PathIcon Data="{StaticResource IconHourglass}"
+                                        Width="18"
+                                        Height="18"
+                                        Foreground="{DynamicResource SemiAccentBrush}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="3">
+                              <TextBlock Classes="dashboard-ticket-caption" Text="剩余时间" />
+                              <TextBlock FontSize="16"
+                                         FontWeight="SemiBold"
+                                         Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                         Text="{Binding HomeReservationRemainingText}"
+                                         TextWrapping="NoWrap"
+                                         TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                          </Grid>
+                        </Border>
+                      </Grid>
                     </Grid>
 
-                    <Button Grid.Row="2"
-                            Content="取消当前预约"
-                            Classes="Danger"
-                            Command="{Binding CancelCurrentReservationCommand}"
-                            IsEnabled="{Binding CanCancelCurrentReservation}"
-                            HorizontalAlignment="Right"
-                            HorizontalContentAlignment="Center"
-                            MinWidth="152" />
+                    <Grid Grid.Row="2"
+                          ColumnDefinitions="*,Auto"
+                          ColumnSpacing="16"
+                          VerticalAlignment="Bottom">
+                      <StackPanel Spacing="5"
+                                  VerticalAlignment="Center">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Classes="dashboard-ticket-caption"
+                                     Text="距离签到截止" />
+                          <TextBlock Grid.Column="1"
+                                     Classes="dashboard-ticket-caption"
+                                     Text="{Binding HomeReservationRemainingText}" />
+                        </Grid>
+                        <ProgressBar Minimum="0"
+                                     Maximum="100"
+                                     Value="{Binding HomeReservationProgressValue}"
+                                     Height="7"
+                                     Foreground="{Binding HomeReservationProgressBrush}"
+                                     Background="{DynamicResource DashboardMutedSurfaceBrush}" />
+                      </StackPanel>
+
+                      <Button Grid.Column="1"
+                              Content="取消当前预约"
+                              Classes="Danger"
+                              Command="{Binding CancelCurrentReservationCommand}"
+                              IsEnabled="{Binding CanCancelCurrentReservation}"
+                              HorizontalAlignment="Right"
+                              HorizontalContentAlignment="Center"
+                              MinWidth="140" />
+                    </Grid>
                   </Grid>
 
                   <StackPanel IsVisible="{Binding HasNoCurrentReservation}"
@@ -588,35 +660,136 @@
                   </StackPanel>
                 </Grid>
               </Border>
+            </Grid>
 
-              <Border Grid.Column="1"
-                      Classes="dashboard-card Shadow"
-                      MinHeight="242"
-                      Padding="20">
-                <StackPanel Spacing="12">
-                  <TextBlock Classes="dashboard-eyebrow" Text="系统信息" />
+            <Grid>
+              <Border Classes="dashboard-card Shadow"
+                      Background="{DynamicResource DashboardTicketBrush}"
+                      MinHeight="214"
+                      Padding="24,22">
+                <Grid>
+                  <Grid IsVisible="{Binding HasCurrentCookie}"
+                        RowDefinitions="Auto,Auto,Auto"
+                        RowSpacing="18">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                      <TextBlock Classes="dashboard-eyebrow"
+                                 Text="当前Cookie"
+                                 VerticalAlignment="Center" />
 
-                  <Border Classes="dashboard-info-row">
-                    <StackPanel Spacing="4">
-                      <TextBlock Classes="dashboard-ticket-caption" Text="核心引擎" />
-                      <TextBlock FontSize="18"
-                                 FontWeight="SemiBold"
-                                 Foreground="{DynamicResource SemiTextPrimaryBrush}"
-                                 Text="{Binding HomeEngineSummaryText}"
-                                 TextWrapping="Wrap" />
+                      <Border Background="{Binding HomeCookieBadgeBackgroundBrush}"
+                              CornerRadius="999"
+                              Padding="12,6"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Top">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                          <Ellipse Width="8"
+                                   Height="8"
+                                   Fill="{Binding HomeCookieBadgeBrush}" />
+                          <TextBlock Text="{Binding HomeCookieBadgeText}"
+                                     FontSize="12"
+                                     FontWeight="SemiBold"
+                                     Foreground="{Binding HomeCookieBadgeBrush}" />
+                        </StackPanel>
+                      </Border>
+                    </Grid>
+
+                    <Grid Grid.Row="1"
+                          ColumnDefinitions="*,*"
+                          ColumnSpacing="12">
+                      <Border Classes="dashboard-reservation-detail">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                          <Border Classes="dashboard-reservation-icon">
+                            <PathIcon Data="{StaticResource IconClock}"
+                                      Width="18"
+                                      Height="18"
+                                      Foreground="{DynamicResource SemiAccentBrush}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                          </Border>
+                          <StackPanel Grid.Column="1" Spacing="3">
+                            <TextBlock Classes="dashboard-ticket-caption" Text="Cookie到期时间" />
+                            <TextBlock FontSize="17"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                       Text="{Binding HomeCookieExpirationTimeText}"
+                                       TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+
+                      <Border Grid.Column="1"
+                              Classes="dashboard-reservation-detail">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                          <Border Classes="dashboard-reservation-icon">
+                            <PathIcon Data="{StaticResource IconHourglass}"
+                                      Width="18"
+                                      Height="18"
+                                      Foreground="{DynamicResource SemiAccentBrush}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                          </Border>
+                          <StackPanel Grid.Column="1" Spacing="3">
+                            <TextBlock Classes="dashboard-ticket-caption" Text="剩余有效时间" />
+                            <TextBlock FontSize="17"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                       Text="{Binding HomeCookieRemainingText}"
+                                       TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+                    </Grid>
+
+                    <StackPanel Grid.Row="2"
+                                Spacing="7"
+                                VerticalAlignment="Bottom">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Classes="dashboard-ticket-caption"
+                                   Text="距离 Cookie 过期" />
+                        <TextBlock Grid.Column="1"
+                                   Classes="dashboard-ticket-caption"
+                                   Text="{Binding HomeCookieRemainingText}" />
+                      </Grid>
+                      <ProgressBar Minimum="0"
+                                   Maximum="100"
+                                   Value="{Binding HomeCookieProgressValue}"
+                                   Height="8"
+                                   Foreground="{Binding HomeCookieProgressBrush}"
+                                   Background="{DynamicResource DashboardMutedSurfaceBrush}" />
                     </StackPanel>
-                  </Border>
+                  </Grid>
 
-                  <Border Classes="dashboard-info-row">
-                    <StackPanel Spacing="4">
-                      <TextBlock Classes="dashboard-ticket-caption" Text="内存占用" />
-                      <TextBlock FontSize="18"
-                                 FontWeight="SemiBold"
-                                 Foreground="{DynamicResource SemiTextPrimaryBrush}"
-                                 Text="{Binding HomeMemoryUsageText}" />
-                    </StackPanel>
-                  </Border>
-                </StackPanel>
+                  <StackPanel IsVisible="{Binding HasNoCurrentCookie}"
+                              Spacing="12"
+                              VerticalAlignment="Center"
+                              HorizontalAlignment="Center">
+                    <Border Width="54"
+                            Height="54"
+                            CornerRadius="27"
+                            Background="{DynamicResource AppNeutralIconSurfaceBrush}"
+                            BorderBrush="{DynamicResource AppNeutralIconBorderBrush}"
+                            BorderThickness="1">
+                      <PathIcon Data="{StaticResource IconEventKey}"
+                                Width="28"
+                                Height="28"
+                                Foreground="{DynamicResource SemiAccentBrush}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="当前未登录"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="登录后这里会显示 Cookie 到期时间、剩余有效时间与过期进度。"
+                               Classes="dashboard-detail"
+                               MaxWidth="420"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center" />
+                  </StackPanel>
+                </Grid>
               </Border>
             </Grid>
           </StackPanel>
@@ -2321,6 +2494,80 @@
                       </StackPanel>
                     </Grid>
                   </Border>
+
+                  <Border Classes="card">
+                    <Grid RowDefinitions="Auto,Auto"
+                          RowSpacing="14">
+                      <Grid ColumnDefinitions="*,260"
+                            ColumnSpacing="20">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="15"
+                                     FontWeight="SemiBold"
+                                     Text="首页预约进度条计时逻辑" />
+                          <TextBlock Classes="helper-text"
+                                     Text="控制当前预约卡片底部进度条的倒退方式。" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding HomeReservationProgressTimingModes}"
+                                  SelectedIndex="{Binding SelectedHomeReservationProgressTimingModeIndex}"
+                                  HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Center" />
+                      </Grid>
+
+                      <Grid Grid.Row="1"
+                            ColumnDefinitions="*,160"
+                            ColumnSpacing="20"
+                            IsVisible="{Binding IsHomeReservationFixedProgressMode}">
+                        <TextBlock Classes="field-label"
+                                   Text="预约到期时间（分钟）"
+                                   VerticalAlignment="Center" />
+                        <NumericUpDown Grid.Column="1"
+                                       Minimum="1"
+                                       Maximum="180"
+                                       Increment="1"
+                                       FormatString="0"
+                                       Value="{Binding HomeReservationFixedDurationMinutes}"
+                                       HorizontalAlignment="Stretch" />
+                      </Grid>
+                    </Grid>
+                  </Border>
+
+                  <Border Classes="card">
+                    <Grid RowDefinitions="Auto,Auto"
+                          RowSpacing="14">
+                      <Grid ColumnDefinitions="*,260"
+                            ColumnSpacing="20">
+                        <StackPanel Spacing="6">
+                          <TextBlock FontSize="15"
+                                     FontWeight="SemiBold"
+                                     Text="首页Cookie进度条计时逻辑" />
+                          <TextBlock Classes="helper-text"
+                                     Text="控制当前Cookie卡片底部进度条的倒退方式。" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding HomeCookieProgressTimingModes}"
+                                  SelectedIndex="{Binding SelectedHomeCookieProgressTimingModeIndex}"
+                                  HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Center" />
+                      </Grid>
+
+                      <Grid Grid.Row="1"
+                            ColumnDefinitions="*,160"
+                            ColumnSpacing="20"
+                            IsVisible="{Binding IsHomeCookieFixedProgressMode}">
+                        <TextBlock Classes="field-label"
+                                   Text="Cookie有效时间（分钟）"
+                                   VerticalAlignment="Center" />
+                        <NumericUpDown Grid.Column="1"
+                                       Minimum="1"
+                                       Maximum="1440"
+                                       Increment="1"
+                                       FormatString="0"
+                                       Value="{Binding HomeCookieFixedDurationMinutes}"
+                                       HorizontalAlignment="Stretch" />
+                      </Grid>
+                    </Grid>
+                  </Border>
                 </StackPanel>
               </ScrollViewer>
 
@@ -3017,5 +3264,3 @@
     </Grid>
   </Grid>
 </Window>
-
-

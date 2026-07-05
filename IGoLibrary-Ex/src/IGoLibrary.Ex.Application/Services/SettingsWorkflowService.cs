@@ -25,7 +25,9 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
             {
                 MinimizeToTray = snapshot.MinimizeToTray,
                 LaunchOnStartup = snapshot.LaunchOnStartup,
-                Theme = snapshot.Theme
+                Theme = snapshot.Theme,
+                HomeReservationProgress = HomeReservationProgressSettings.Normalize(snapshot.HomeReservationProgress),
+                HomeCookieProgress = HomeCookieProgressSettings.Normalize(snapshot.HomeCookieProgress)
             },
             TraceIntProtocol = current.TraceIntProtocol with
             {

@@ -32,6 +32,10 @@ public sealed class SettingsSerializationTests
         Assert.False(settings.Ui.MinimizeToTray);
         Assert.Equal(AppThemeMode.Dark, settings.Ui.Theme?.Mode);
         Assert.False(settings.Ui.Theme?.UseSystemAccent);
+        Assert.Equal(HomeReservationProgressTimingMode.FixedReservationDuration, settings.Ui.HomeReservationProgress?.Mode);
+        Assert.Equal(30, settings.Ui.HomeReservationProgress?.FixedDurationMinutes);
+        Assert.Equal(HomeCookieProgressTimingMode.FixedCookieDuration, settings.Ui.HomeCookieProgress?.Mode);
+        Assert.Equal(120, settings.Ui.HomeCookieProgress?.FixedDurationMinutes);
         Assert.True(settings.TraceIntProtocol.GraphQlOverridesEnabled);
         Assert.Equal(9, settings.Network.TimeoutSeconds);
         Assert.Equal(4, settings.Network.MaxRetries);
@@ -194,6 +198,10 @@ public sealed class SettingsSerializationTests
         Assert.True(settings.Ui.MinimizeToTray);
         Assert.Equal(AppThemeMode.FollowSystem, settings.Ui.Theme?.Mode);
         Assert.Equal(ThemePreferences.Default.UseSystemAccent, settings.Ui.Theme?.UseSystemAccent);
+        Assert.Equal(HomeReservationProgressTimingMode.FixedReservationDuration, settings.Ui.HomeReservationProgress?.Mode);
+        Assert.Equal(30, settings.Ui.HomeReservationProgress?.FixedDurationMinutes);
+        Assert.Equal(HomeCookieProgressTimingMode.FixedCookieDuration, settings.Ui.HomeCookieProgress?.Mode);
+        Assert.Equal(120, settings.Ui.HomeCookieProgress?.FixedDurationMinutes);
         Assert.Equal(5, settings.Network.TimeoutSeconds);
         Assert.Equal(3, settings.Network.MaxRetries);
         Assert.Equal(GrabReservationStrategy.QueryThenReserve, settings.Tasks.Grab.ReservationStrategy);
@@ -220,6 +228,10 @@ public sealed class SettingsSerializationTests
 
         Assert.Contains("\"notifications\":", json);
         Assert.Contains("\"ui\":", json);
+        Assert.Contains("\"homeReservationProgress\":", json);
+        Assert.Contains("\"fixedDurationMinutes\": 30", json);
+        Assert.Contains("\"homeCookieProgress\":", json);
+        Assert.Contains("\"fixedDurationMinutes\": 120", json);
         Assert.Contains("\"traceIntProtocol\":", json);
         Assert.Contains("\"network\":", json);
         Assert.Contains("\"tasks\":", json);

@@ -23,6 +23,7 @@ public sealed class MainWindowViewModel(
     IExternalLinkService externalLinkService,
     IAppVersionProvider appVersionProvider,
     IAppThemeService appThemeService,
+    TimeProvider timeProvider,
     AppWindowService appWindowService,
     IStartupEntryService startupEntryService)
     : MainWindowWorkflowViewModel(
@@ -44,5 +45,6 @@ public sealed class MainWindowViewModel(
         externalLinkService,
         appVersionProvider,
         appThemeService,
+        timeProvider,
         appWindowService,
         startupEntryService);
