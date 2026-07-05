@@ -165,6 +165,12 @@
       <Setter Property="CornerRadius" Value="28" />
       <Setter Property="Padding" Value="22" />
     </Style>
+    <Style Selector="Border.home-minimal-card">
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#EAEAEA" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BoxShadow" Value="0 4 16 0 #0C000000" />
+    </Style>
     <Style Selector="TextBlock.dashboard-eyebrow">
       <Setter Property="FontSize" Value="12" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -236,16 +242,18 @@
       <Setter Property="Padding" Value="16" />
     </Style>
     <Style Selector="Border.dashboard-reservation-detail">
-      <Setter Property="Background" Value="{DynamicResource DashboardMutedSurfaceBrush}" />
-      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
       <Setter Property="Padding" Value="14" />
     </Style>
     <Style Selector="Border.dashboard-reservation-icon">
       <Setter Property="Width" Value="34" />
       <Setter Property="Height" Value="34" />
       <Setter Property="CornerRadius" Value="17" />
-      <Setter Property="Background" Value="{DynamicResource AppAccentPanelBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource AppAccentPanelBorderBrush}" />
+      <Setter Property="Background" Value="#F5F6F8" />
+      <Setter Property="BorderBrush" Value="#EAEAEA" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Border.notify-toggle-card">
@@ -369,10 +377,10 @@
           RowDefinitions="40, *">
       <!-- Top drag area for content pane -->
       <Border Grid.Row="0"
-              Background="{DynamicResource SemiPageBrush}"
+              Background="#F5F6F8"
               IsHitTestVisible="False" />
       <Border Grid.Row="1"
-              Background="{DynamicResource SemiPageBrush}"
+              Background="#F5F6F8"
               IsHitTestVisible="False" />
       
       <!-- Views -->
@@ -382,12 +390,12 @@
         </Carousel.PageTransition>
         
         <!-- Tab 0: Home -->
-        <ScrollViewer>
+        <ScrollViewer Background="#F5F6F8">
           <StackPanel Spacing="14" Margin="0,0,16,0">
-            <Border Classes="dashboard-card Shadow"
-                    Background="{DynamicResource DashboardHeroBrush}"
+            <Border Classes="dashboard-card home-minimal-card"
+                    Background="#FFFFFF"
                     Padding="22,20">
-              <Grid ColumnDefinitions="1.55*,0.95*" ColumnSpacing="22">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="22">
                 <StackPanel Spacing="14">
                   <Border Background="{DynamicResource AppAccentPanelBrush}"
                           BorderBrush="{DynamicResource AppAccentPanelBorderBrush}"
@@ -410,23 +418,27 @@
                 </StackPanel>
 
                 <Border Grid.Column="1"
-                        Background="{DynamicResource DashboardTimeCardBrush}"
-                        CornerRadius="24"
-                        Padding="18"
-                        HorizontalAlignment="Stretch"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        CornerRadius="0"
+                        Padding="0"
+                        HorizontalAlignment="Right"
                         VerticalAlignment="Stretch">
-                  <StackPanel Spacing="10">
+                  <StackPanel Spacing="10"
+                              HorizontalAlignment="Right">
                     <TextBlock Classes="dashboard-clock-date"
+                               HorizontalAlignment="Right"
                                Text="{Binding HomeDateText}" />
                     <TextBlock Classes="dashboard-clock-time"
+                               HorizontalAlignment="Right"
                                Text="{Binding HomeTimeText}" />
                   </StackPanel>
                 </Border>
               </Grid>
             </Border>
 
-            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
-              <Border Classes="dashboard-card Shadow" Padding="18,16">
+            <Grid ColumnDefinitions="2*,*,*" ColumnSpacing="16">
+              <Border Classes="dashboard-card home-minimal-card" Padding="18,16">
                 <Grid RowDefinitions="Auto,*"
                       RowSpacing="6"
                       MinHeight="72">
@@ -442,7 +454,7 @@
                 </Grid>
               </Border>
 
-              <Border Grid.Column="1" Classes="dashboard-card Shadow" Padding="18,16">
+              <Border Grid.Column="1" Classes="dashboard-card home-minimal-card" Padding="18,16">
                 <Grid RowDefinitions="Auto,*"
                       RowSpacing="6"
                       MinHeight="72">
@@ -455,7 +467,7 @@
                 </Grid>
               </Border>
 
-              <Border Grid.Column="2" Classes="dashboard-card Shadow" Padding="18,16">
+              <Border Grid.Column="2" Classes="dashboard-card home-minimal-card" Padding="18,16">
                 <Grid RowDefinitions="Auto,*"
                       RowSpacing="6"
                       MinHeight="72">
@@ -470,8 +482,8 @@
             </Grid>
 
             <Grid>
-              <Border Classes="dashboard-card Shadow"
-                      Background="{DynamicResource DashboardTicketBrush}"
+              <Border Classes="dashboard-card home-minimal-card"
+                      Background="#FFFFFF"
                       MinHeight="228"
                       Padding="22,18">
                 <Grid>
@@ -663,8 +675,8 @@
             </Grid>
 
             <Grid>
-              <Border Classes="dashboard-card Shadow"
-                      Background="{DynamicResource DashboardTicketBrush}"
+              <Border Classes="dashboard-card home-minimal-card"
+                      Background="#FFFFFF"
                       MinHeight="214"
                       Padding="24,22">
                 <Grid>
