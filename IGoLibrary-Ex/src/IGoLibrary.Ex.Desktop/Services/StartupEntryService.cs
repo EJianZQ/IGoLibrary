@@ -76,15 +76,7 @@ public sealed class StartupEntryService : IStartupEntryService
 
     private static bool IsWindowsStartupEntryEnabled()
     {
-        try
-        {
-            var (exitCode, _) = RunRegProcess($"query \"{WindowsRunKey}\" /v {AppName}", redirectError: false);
-            return exitCode == 0;
-        }
-        catch
-        {
-            return false;
-        }
+        return TryQueryWindowsStartupEntry(out var exists, out _) && exists;
     }
 
     private static void EnableWindowsStartupEntry()
@@ -93,35 +85,64 @@ public sealed class StartupEntryService : IStartupEntryService
             ?? throw new InvalidOperationException("无法确定当前可执行文件路径");
 
         var quotedPath = "\"" + exePath + "\"";
-        var (exitCode, stderr) = RunRegProcess(
+        var (exitCode, _, stderr) = RunRegProcess(
             $"add \"{WindowsRunKey}\" /v {AppName} /t REG_SZ /d {quotedPath} /f",
             redirectError: true);
 
         if (exitCode != 0)
         {
             throw new InvalidOperationException(
-                $"写入开机启动注册表失败（退出码 {exitCode}）：{stderr.Trim()}");
+                $"写入开机启动注册表失败（退出码 {exitCode}）：{FormatProcessError(stderr)}");
         }
     }
 
     private static void DisableWindowsStartupEntry()
     {
+        var (exitCode, _, stderr) = RunRegProcess(
+            $"delete \"{WindowsRunKey}\" /v {AppName} /f",
+            redirectError: true);
+
+        if (exitCode == 0)
+        {
+            return;
+        }
+
+        if (TryQueryWindowsStartupEntry(out var exists, out var queryError) && !exists)
+        {
+            return;
+        }
+
+        var detail = string.IsNullOrWhiteSpace(stderr)
+            ? queryError
+            : stderr;
+        throw new InvalidOperationException(
+            $"移除开机启动注册表失败（退出码 {exitCode}）：{FormatProcessError(detail)}");
+    }
+
+    private static bool TryQueryWindowsStartupEntry(out bool exists, out string error)
+    {
         try
         {
-            RunRegProcess($"delete \"{WindowsRunKey}\" /v {AppName} /f", redirectError: false);
-            // ExitCode 1 means the value doesn't exist — that's fine when disabling.
+            var (exitCode, _, stderr) = RunRegProcess(
+                $"query \"{WindowsRunKey}\" /v {AppName}",
+                redirectError: true);
+            exists = exitCode == 0;
+            error = stderr;
+            return true;
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore errors when removing a non-existent entry.
+            exists = false;
+            error = ex.Message;
+            return false;
         }
     }
 
     /// <summary>
-    /// Runs reg.exe with the given arguments, reading stderr asynchronously to avoid deadlocks.
-    /// Returns (exitCode, stderr). Throws if the process cannot be started or times out.
+    /// Runs reg.exe with the given arguments, reading stdout/stderr asynchronously to avoid deadlocks.
+    /// Returns (exitCode, stdout, stderr). Throws if the process cannot be started or times out.
     /// </summary>
-    private static (int ExitCode, string StdError) RunRegProcess(string arguments, bool redirectError)
+    private static (int ExitCode, string StdOut, string StdError) RunRegProcess(string arguments, bool redirectError)
     {
         var info = new ProcessStartInfo("reg", arguments)
         {
@@ -131,11 +152,10 @@ public sealed class StartupEntryService : IStartupEntryService
             RedirectStandardError = redirectError
         };
 
-        var process = Process.Start(info)
+        using var process = Process.Start(info)
             ?? throw new InvalidOperationException("无法启动 reg.exe 进程");
 
-        // Read stderr asynchronously BEFORE WaitForExit to prevent deadlocks
-        // when the child process fills its stderr pipe buffer.
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
         var stderrTask = redirectError
             ? process.StandardError.ReadToEndAsync()
             : Task.FromResult(string.Empty);
@@ -146,11 +166,17 @@ public sealed class StartupEntryService : IStartupEntryService
             throw new TimeoutException($"reg.exe 在 {ProcessTimeout.TotalSeconds:0}s 内未退出");
         }
 
-        var stderr = stderrTask.IsCompleted
-            ? stderrTask.Result
-            : string.Empty;
+        var stdout = stdoutTask.GetAwaiter().GetResult();
+        var stderr = stderrTask.GetAwaiter().GetResult();
 
-        return (process.ExitCode, stderr);
+        return (process.ExitCode, stdout, stderr);
+    }
+
+    private static string FormatProcessError(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? "未返回错误详情"
+            : value.Trim();
     }
 
     // ── macOS (LaunchAgent plist) ───────────────────────────────────────

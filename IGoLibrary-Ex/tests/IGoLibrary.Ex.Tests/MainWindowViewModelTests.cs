@@ -2214,6 +2214,57 @@ public sealed class MainWindowViewModelTests
         Assert.NotEmpty(fakeNotification.Warnings);
     }
 
+    [Fact]
+    public async Task LaunchOnStartupEnabled_OnDisableFailure_RollsBackAndNotifies()
+    {
+        var fakeStartup = new FakeStartupEntryService();
+        var fakeNotification = new FakeNotificationService();
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            startupEntryService: fakeStartup,
+            notificationService: fakeNotification);
+        viewModel.IsInitializationComplete = true;
+        viewModel.LaunchOnStartupEnabled = true;
+        fakeStartup.Reset();
+        fakeStartup.DisableException = new InvalidOperationException("delete failed");
+
+        viewModel.LaunchOnStartupEnabled = false;
+        await Task.Yield();
+
+        Assert.True(fakeStartup.DisableCalled);
+        Assert.True(viewModel.LaunchOnStartupEnabled);
+        Assert.Contains(fakeNotification.Warnings, warning => warning.Message.Contains("开启状态", StringComparison.Ordinal));
+        await WaitForAsync(() => settingsService.CurrentSettings.Ui.LaunchOnStartup);
+    }
+
+    [Fact]
+    public async Task LaunchOnStartupEnabled_WhenUnsupported_RollsBackAndPersistsFalse()
+    {
+        var fakeStartup = new FakeStartupEntryService { IsSupported = false };
+        var fakeNotification = new FakeNotificationService();
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            Ui = AppSettings.Default.Ui with
+            {
+                LaunchOnStartup = true
+            }
+        });
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            startupEntryService: fakeStartup,
+            notificationService: fakeNotification);
+        viewModel.IsInitializationComplete = true;
+
+        viewModel.LaunchOnStartupEnabled = true;
+
+        Assert.False(viewModel.LaunchOnStartupEnabled);
+        Assert.False(fakeStartup.EnableCalled);
+        Assert.False(fakeStartup.DisableCalled);
+        Assert.Contains(fakeNotification.Warnings, warning => warning.Title == "开机启动项不可用");
+        await WaitForAsync(() => settingsService.CurrentSettings.Ui.LaunchOnStartup == false);
+    }
+
     private static MainWindowViewModel CreateViewModel(
         FakeSessionService? sessionService = null,
         FakeLibraryService? libraryService = null,

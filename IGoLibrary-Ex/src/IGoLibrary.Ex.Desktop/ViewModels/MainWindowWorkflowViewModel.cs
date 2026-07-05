@@ -598,6 +598,8 @@ public partial class MainWindowWorkflowViewModel(
 
     public bool IsSystemSettingsStorageUpdateActive => SelectedSystemSettingsCategoryIndex == 3;
 
+    public bool LaunchOnStartupSupported => _startupEntryService.IsSupported;
+
     partial void OnSelectedSystemSettingsCategoryIndexChanged(int value)
     {
         OnPropertyChanged(nameof(IsSystemSettingsGeneralActive));
@@ -616,16 +618,35 @@ public partial class MainWindowWorkflowViewModel(
 
     partial void OnLaunchOnStartupEnabledChanged(bool value)
     {
-        ScheduleSystemSettingsAutoSave();
-
         // During rollback (OS operation failed), don't re-attempt the OS operation
-        // to prevent infinite toggle loops. The settings save above ensures the
-        // rolled-back value is persisted.
+        // to prevent infinite toggle loops.
         if (_isRollingBackStartupEntry)
         {
+            ScheduleSystemSettingsAutoSave();
             return;
         }
 
+        if (!_startupEntryService.IsSupported && value)
+        {
+            _isRollingBackStartupEntry = true;
+            try
+            {
+                LaunchOnStartupEnabled = false;
+            }
+            finally
+            {
+                _isRollingBackStartupEntry = false;
+            }
+
+            if (!_isLoadingSettings && IsInitializationComplete)
+            {
+                _ = NotifyLaunchOnStartupUnsupportedAsync();
+            }
+
+            return;
+        }
+
+        ScheduleSystemSettingsAutoSave();
         _ = ApplyLaunchOnStartupEntryAsync(value);
     }
 

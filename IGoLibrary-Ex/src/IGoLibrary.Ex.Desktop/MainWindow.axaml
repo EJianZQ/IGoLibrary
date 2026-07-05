@@ -2251,6 +2251,7 @@
                       </StackPanel>
                       <ToggleSwitch Grid.Column="1"
                                     IsChecked="{Binding LaunchOnStartupEnabled}"
+                                    IsEnabled="{Binding LaunchOnStartupSupported}"
                                     OnContent="开"
                                     OffContent="关"
                                     VerticalAlignment="Center" />
@@ -3016,6 +3017,5 @@
     </Grid>
   </Grid>
 </Window>
-
 
 

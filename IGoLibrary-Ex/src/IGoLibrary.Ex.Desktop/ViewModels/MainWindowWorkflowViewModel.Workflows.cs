@@ -1894,9 +1894,10 @@ public partial class MainWindowWorkflowViewModel
             try
             {
                 LaunchOnStartupEnabled = !enabled;
+                var restoredState = enabled ? "关闭" : "开启";
                 await _notificationService.ShowWarningAsync(
                     "开机启动项更新失败",
-                    $"已恢复开关到关闭状态。原因：{ex.Message}");
+                    $"已恢复开关到{restoredState}状态。原因：{ex.Message}");
             }
             finally
             {
@@ -1926,6 +1927,20 @@ public partial class MainWindowWorkflowViewModel
         catch (Exception ex)
         {
             _activityLogService.Write(LogEntryKind.Warning, "Settings", $"同步开机启动项失败：{ex.Message}");
+        }
+    }
+
+    private async Task NotifyLaunchOnStartupUnsupportedAsync()
+    {
+        try
+        {
+            await _notificationService.ShowWarningAsync(
+                "开机启动项不可用",
+                "当前系统暂不支持开机自启动，已恢复开关到关闭状态。");
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"提示开机启动不可用失败：{ex.Message}");
         }
     }
 
