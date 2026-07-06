@@ -12,6 +12,81 @@ using MailKit.Security;
 using MimeKit;
 
 namespace IGoLibrary.Ex.Tests;
+
+internal sealed class FakeLanCookieRelayService : ILanCookieRelayService
+{
+    public event EventHandler<LanCookieRelayStoppedEventArgs>? Stopped;
+
+    public int StartCalls { get; private set; }
+
+    public int StopCalls { get; private set; }
+
+    public Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>>? SubmitHandler { get; private set; }
+
+    public LanCookieRelaySession NextSession { get; set; } = new(
+        Guid.NewGuid(),
+        new Uri("http://127.0.0.1:49152/?token=test-token"),
+        "127.0.0.1",
+        49152,
+        DateTimeOffset.Now,
+        TimeSpan.FromMinutes(10));
+
+    public Exception? StartException { get; set; }
+
+    public Task<LanCookieRelaySession> StartAsync(
+        Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler,
+        CancellationToken cancellationToken = default)
+    {
+        StartCalls++;
+        SubmitHandler = submitHandler;
+        if (StartException is not null)
+        {
+            throw StartException;
+        }
+
+        return Task.FromResult(NextSession);
+    }
+
+    public Task StopAsync(
+        LanCookieRelayStopReason reason = LanCookieRelayStopReason.Manual,
+        CancellationToken cancellationToken = default)
+    {
+        StopCalls++;
+        RaiseStopped(reason);
+        return Task.CompletedTask;
+    }
+
+    public async Task<LanCookieRelaySubmitResult> SubmitAsync(
+        string linkText,
+        CancellationToken cancellationToken = default)
+    {
+        if (SubmitHandler is null)
+        {
+            throw new InvalidOperationException("LAN cookie relay session has not been started.");
+        }
+
+        var result = await SubmitHandler(linkText, cancellationToken);
+        RaiseStopped(LanCookieRelayStopReason.Submitted);
+        return result;
+    }
+
+    public void RaiseStopped(LanCookieRelayStopReason reason, string? message = null)
+    {
+        Stopped?.Invoke(this, new LanCookieRelayStoppedEventArgs(NextSession.SessionId, reason, message));
+    }
+}
+
+internal sealed class FakeQrCodeImageFactory : IQrCodeImageFactory
+{
+    public List<string> CreatedTexts { get; } = [];
+
+    public IImage Create(string text)
+    {
+        CreatedTexts.Add(text);
+        return new DrawingImage();
+    }
+}
+
 internal sealed class FakeErrorDialogService : IErrorDialogService
 {
     public List<(string Title, string ErrorType, string ErrorMessage)> Errors { get; } = [];

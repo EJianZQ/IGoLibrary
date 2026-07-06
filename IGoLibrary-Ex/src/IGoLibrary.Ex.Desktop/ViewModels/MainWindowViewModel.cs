@@ -25,7 +25,9 @@ public sealed class MainWindowViewModel(
     IAppThemeService appThemeService,
     TimeProvider timeProvider,
     AppWindowService appWindowService,
-    IStartupEntryService startupEntryService)
+    IStartupEntryService startupEntryService,
+    ILanCookieRelayService lanCookieRelayService,
+    IQrCodeImageFactory qrCodeImageFactory)
     : MainWindowWorkflowViewModel(
         sessionWorkflowService,
         venueWorkflowService,
@@ -47,4 +49,6 @@ public sealed class MainWindowViewModel(
         appThemeService,
         timeProvider,
         appWindowService,
-        startupEntryService);
+        startupEntryService,
+        lanCookieRelayService,
+        qrCodeImageFactory);

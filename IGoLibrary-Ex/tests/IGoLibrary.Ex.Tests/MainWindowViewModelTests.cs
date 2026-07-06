@@ -758,6 +758,127 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task StartLanCookieRelayAsync_OpensDialogAndGeneratesQrCode()
+    {
+        var relayService = new FakeLanCookieRelayService();
+        var qrCodeFactory = new FakeQrCodeImageFactory();
+        var viewModel = CreateViewModel(
+            lanCookieRelayService: relayService,
+            qrCodeImageFactory: qrCodeFactory);
+
+        await viewModel.StartLanCookieRelayCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsLanCookieRelayDialogOpen);
+        Assert.True(viewModel.IsLanCookieRelayRunning);
+        Assert.True(viewModel.ShowLanCookieRelayStartedStatusIcon);
+        Assert.Equal("服务已启动，监听端口 49152", viewModel.LanCookieRelayStatusText);
+        Assert.Equal(0, viewModel.SelectedLanCookieRelayStepIndex);
+        Assert.True(viewModel.IsLanCookieRelayAuthorizationQrMode);
+        Assert.False(viewModel.IsLanCookieRelaySubmitQrMode);
+        Assert.False(viewModel.CanGoToPreviousLanCookieRelayStep);
+        Assert.True(viewModel.CanGoToNextLanCookieRelayStep);
+        Assert.Equal("第一步：获取授权链接", viewModel.LanCookieRelayStepTitle);
+        Assert.Contains("微信扫描", viewModel.LanCookieRelayStepHint);
+        Assert.False(viewModel.ShowLanCookieRelaySubmitQrImage);
+        Assert.False(viewModel.ShowLanCookieRelaySubmitQrLoading);
+        Assert.Equal(relayService.NextSession.Url.ToString(), viewModel.LanCookieRelayUrlText);
+        Assert.Equal([relayService.NextSession.Url.ToString()], qrCodeFactory.CreatedTexts);
+        Assert.Equal(1, relayService.StartCalls);
+
+        viewModel.LanCookieRelayStatusText = "启动文案被调整";
+        Assert.True(viewModel.ShowLanCookieRelayStartedStatusIcon);
+
+        viewModel.GoToNextLanCookieRelayStepCommand.Execute(null);
+
+        Assert.Equal(1, viewModel.SelectedLanCookieRelayStepIndex);
+        Assert.True(viewModel.IsLanCookieRelaySubmitQrMode);
+        Assert.False(viewModel.IsLanCookieRelayAuthorizationQrMode);
+        Assert.True(viewModel.CanGoToPreviousLanCookieRelayStep);
+        Assert.False(viewModel.CanGoToNextLanCookieRelayStep);
+        Assert.Equal("第二步：发送到电脑", viewModel.LanCookieRelayStepTitle);
+        Assert.True(viewModel.ShowLanCookieRelaySubmitQrImage);
+        Assert.False(viewModel.ShowLanCookieRelaySubmitQrLoading);
+        Assert.Contains("手机提交页", viewModel.LanCookieRelayStepHint);
+
+        viewModel.GoToPreviousLanCookieRelayStepCommand.Execute(null);
+
+        Assert.Equal(0, viewModel.SelectedLanCookieRelayStepIndex);
+        Assert.True(viewModel.IsLanCookieRelayAuthorizationQrMode);
+    }
+
+    [Fact]
+    public async Task LanCookieRelaySubmission_WithValidLink_AuthenticatesAndLoadsLibraries()
+    {
+        var relayService = new FakeLanCookieRelayService();
+        var expiresAt = DateTimeOffset.Now.AddHours(2);
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetCookieFromCodeAsync = (_, _) => Task.FromResult(BuildAuthorizationCookie(expiresAt))
+        };
+        var libraryService = new FakeLibraryService
+        {
+            LibrariesToLoad =
+            [
+                new LibrarySummary(1, "场馆A", "3层", true, 120, 20, 10)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            apiClient: apiClient,
+            libraryService: libraryService,
+            lanCookieRelayService: relayService);
+
+        await viewModel.InitializeAsync();
+        await viewModel.StartLanCookieRelayCommand.ExecuteAsync(null);
+        var submitTask = relayService.SubmitAsync("https://example.com/callback?code=1234567890abcdef1234567890abcdef&state=1");
+        Dispatcher.UIThread.RunJobs();
+        var result = await submitTask;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(result.Success);
+        Assert.True(viewModel.IsAuthorized);
+        Assert.True(viewModel.CanShowVenueConfiguration);
+        Assert.False(viewModel.IsLanCookieRelayRunning);
+        Assert.False(viewModel.IsLanCookieRelayDialogOpen);
+        Assert.Contains("Authorization=", viewModel.ManualCookieText);
+        Assert.Equal(["场馆A"], viewModel.AvailableLibraries.Select(library => library.Name).ToArray());
+    }
+
+    [Fact]
+    public async Task LanCookieRelaySubmission_WithInvalidLink_ReturnsFailureAndDoesNotAuthorize()
+    {
+        var relayService = new FakeLanCookieRelayService();
+        var viewModel = CreateViewModel(lanCookieRelayService: relayService);
+
+        await viewModel.InitializeAsync();
+        await viewModel.StartLanCookieRelayCommand.ExecuteAsync(null);
+        var submitTask = relayService.SubmitAsync("not an authorization link");
+        Dispatcher.UIThread.RunJobs();
+        var result = await submitTask;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(result.Success);
+        Assert.False(viewModel.IsAuthorized);
+        Assert.False(viewModel.CanShowVenueConfiguration);
+        Assert.False(viewModel.IsLanCookieRelayRunning);
+        Assert.False(viewModel.ShowLanCookieRelayStartedStatusIcon);
+        Assert.Contains("未能从链接中提取", viewModel.LanCookieRelayStatusText);
+    }
+
+    [Fact]
+    public async Task SignOutAsync_StopsLanCookieRelaySession()
+    {
+        var relayService = new FakeLanCookieRelayService();
+        var viewModel = CreateViewModel(lanCookieRelayService: relayService);
+
+        await viewModel.StartLanCookieRelayCommand.ExecuteAsync(null);
+        await viewModel.SignOutCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, relayService.StopCalls);
+        Assert.False(viewModel.IsLanCookieRelayRunning);
+        Assert.False(viewModel.IsLanCookieRelayDialogOpen);
+    }
+
+    [Fact]
     public async Task InitializeAsync_ShowsSuccessToast_WhenStoredJwtCookieIsRestored()
     {
         var notificationService = new FakeNotificationService();
@@ -1575,6 +1696,31 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("--:--:--", viewModel.HomeCookieExpirationTimeText);
         Assert.Equal("--", viewModel.HomeCookieRemainingText);
         Assert.Equal(0, viewModel.HomeCookieProgressValue);
+    }
+
+    [Fact]
+    public async Task CanShowVenueConfiguration_TracksCookieValidity()
+    {
+        var observedAt = CreateLocalTimestamp(2026, 5, 5, 10, 0, 0);
+        var timeProvider = new FakeTimeProvider(observedAt);
+        var viewModel = CreateViewModel(timeProvider: timeProvider);
+
+        Assert.False(viewModel.CanShowVenueConfiguration);
+        Assert.True(viewModel.ShouldShowAuthorizationInput);
+
+        viewModel.ManualCookieText = BuildAuthorizationCookie(observedAt.AddHours(1));
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsAuthorized);
+        Assert.True(viewModel.CanShowVenueConfiguration);
+        Assert.False(viewModel.ShouldShowAuthorizationInput);
+
+        timeProvider.Advance(TimeSpan.FromHours(2));
+        viewModel.SelectedHomeCookieProgressTimingModeIndex = 1;
+
+        Assert.True(viewModel.IsAuthorized);
+        Assert.False(viewModel.CanShowVenueConfiguration);
+        Assert.True(viewModel.ShouldShowAuthorizationInput);
     }
 
     [Fact]
@@ -2516,6 +2662,8 @@ public sealed class MainWindowViewModelTests
         ActivityLogService? activityLogService = null,
         FakeProtocolTemplateStore? protocolTemplateStore = null,
         FakeStartupEntryService? startupEntryService = null,
+        FakeLanCookieRelayService? lanCookieRelayService = null,
+        FakeQrCodeImageFactory? qrCodeImageFactory = null,
         FakeTimeProvider? timeProvider = null)
     {
         sessionService ??= new FakeSessionService();
@@ -2550,7 +2698,9 @@ public sealed class MainWindowViewModelTests
             appThemeService ?? new FakeAppThemeService(),
             timeProvider ?? new FakeTimeProvider(),
             new AppWindowService(),
-            startupEntryService ?? new FakeStartupEntryService());
+            startupEntryService ?? new FakeStartupEntryService(),
+            lanCookieRelayService ?? new FakeLanCookieRelayService(),
+            qrCodeImageFactory ?? new FakeQrCodeImageFactory());
     }
 
     private static ReleaseUpdateInfo CreateReleaseUpdateInfo(string tagName)

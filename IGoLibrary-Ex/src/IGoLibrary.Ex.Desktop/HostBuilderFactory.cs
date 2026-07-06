@@ -44,6 +44,9 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IUpdateDialogService, UpdateDialogService>();
                 services.AddSingleton<IExternalLinkService, ExternalLinkService>();
                 services.AddSingleton<IStartupEntryService, StartupEntryService>();
+                services.AddSingleton<ILanAddressProvider, LanAddressProvider>();
+                services.AddSingleton<IQrCodeImageFactory, QrCodeImageFactory>();
+                services.AddSingleton<ILanCookieRelayService, LanCookieRelayService>();
                 services.AddSingleton<ToastNotificationService>();
                 services.AddSingleton<INotificationService>(serviceProvider => serviceProvider.GetRequiredService<ToastNotificationService>());
                 services.AddSingleton<AlertSoundService>();

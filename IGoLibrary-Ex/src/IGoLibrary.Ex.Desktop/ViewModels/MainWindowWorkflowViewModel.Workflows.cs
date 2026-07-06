@@ -222,6 +222,44 @@ public partial class MainWindowWorkflowViewModel
     partial void OnHasCurrentCookieChanged(bool value)
     {
         OnPropertyChanged(nameof(HasNoCurrentCookie));
+        RefreshAuthorizationPresentationProperties();
+    }
+
+    partial void OnIsLanCookieRelayRunningChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanStartLanCookieRelay));
+        OnPropertyChanged(nameof(LanCookieRelayCloseButtonText));
+    }
+
+    partial void OnLanCookieRelayQrImageChanged(IImage? value)
+    {
+        OnPropertyChanged(nameof(HasLanCookieRelayQrImage));
+        OnPropertyChanged(nameof(ShowLanCookieRelaySubmitQrImage));
+        OnPropertyChanged(nameof(ShowLanCookieRelaySubmitQrLoading));
+    }
+
+    partial void OnSelectedLanCookieRelayStepIndexChanged(int value)
+    {
+        if (value < 0)
+        {
+            SelectedLanCookieRelayStepIndex = 0;
+            return;
+        }
+
+        if (value > 1)
+        {
+            SelectedLanCookieRelayStepIndex = 1;
+            return;
+        }
+
+        OnPropertyChanged(nameof(IsLanCookieRelayAuthorizationQrMode));
+        OnPropertyChanged(nameof(IsLanCookieRelaySubmitQrMode));
+        OnPropertyChanged(nameof(CanGoToPreviousLanCookieRelayStep));
+        OnPropertyChanged(nameof(CanGoToNextLanCookieRelayStep));
+        OnPropertyChanged(nameof(LanCookieRelayStepTitle));
+        OnPropertyChanged(nameof(ShowLanCookieRelaySubmitQrImage));
+        OnPropertyChanged(nameof(ShowLanCookieRelaySubmitQrLoading));
+        OnPropertyChanged(nameof(LanCookieRelayStepHint));
     }
 
     partial void OnIsGrabTaskActiveChanged(bool value)
@@ -325,6 +363,7 @@ public partial class MainWindowWorkflowViewModel
 
         OnPropertyChanged(nameof(AuthorizationStatusText));
         OnPropertyChanged(nameof(IsUnauthorized));
+        RefreshAuthorizationPresentationProperties();
         OnPropertyChanged(nameof(ShowVenuePreviewStateTag));
         OnPropertyChanged(nameof(ShowVenueOpenStatusTag));
         OnPropertyChanged(nameof(ShowVenueClosedStatusTag));
@@ -345,6 +384,15 @@ public partial class MainWindowWorkflowViewModel
     partial void OnSessionSummaryChanged(string value)
     {
         UpdateHomeHeroPresentation(GetCurrentTime());
+    }
+
+    private void RefreshAuthorizationPresentationProperties()
+    {
+        OnPropertyChanged(nameof(AuthorizationStatusText));
+        OnPropertyChanged(nameof(IsUnauthorized));
+        OnPropertyChanged(nameof(CanShowVenueConfiguration));
+        OnPropertyChanged(nameof(ShouldShowAuthorizationInput));
+        OnPropertyChanged(nameof(ShouldShowAuthorizedSummary));
     }
 
     partial void OnIsVenueOpenChanged(bool value)
@@ -381,6 +429,12 @@ public partial class MainWindowWorkflowViewModel
             _themePaletteSubscribed = true;
             _appThemeService.PaletteChanged += OnThemePaletteChanged;
             ApplyThemePalette(_appThemeService.CurrentPalette);
+        }
+
+        if (!_lanCookieRelayServiceSubscribed)
+        {
+            _lanCookieRelayServiceSubscribed = true;
+            _lanCookieRelayService.Stopped += OnLanCookieRelayStopped;
         }
 
         _ = LoadProjectAuthorAvatarAsync();
@@ -446,6 +500,8 @@ public partial class MainWindowWorkflowViewModel
 
     public async Task FlushPendingScheduledStartDefaultsAsync(CancellationToken cancellationToken = default)
     {
+        await StopLanCookieRelaySessionAsync(closeDialog: false);
+
         var pendingGrab = _pendingGrabScheduledStartDefault;
         var pendingTomorrow = _pendingTomorrowScheduledStartDefault;
         var hasPendingSystemSettings = _systemSettingsAutoSaveCts is not null;
@@ -679,10 +735,11 @@ public partial class MainWindowWorkflowViewModel
     public async Task<bool> TryAutoParseClipboardLinkAsync(string clipboardText)
     {
         QrLinkText = clipboardText.Trim();
-        return await ParseCookieFromLinkAsync(QrLinkText, notifyOnInvalidLink: false);
+        var result = await ParseCookieFromLinkAsync(QrLinkText, notifyOnInvalidLink: false);
+        return result.Processed;
     }
 
-    private async Task<bool> ParseCookieFromLinkAsync(string? linkText, bool notifyOnInvalidLink)
+    private async Task<CookieLinkParseResult> ParseCookieFromLinkAsync(string? linkText, bool notifyOnInvalidLink)
     {
         string? reservedCode = null;
         var shouldMarkCodeAsProcessed = false;
@@ -690,23 +747,25 @@ public partial class MainWindowWorkflowViewModel
         {
             if (!CodeLinkParser.TryExtractCode(linkText, out var code))
             {
+                const string message = "未能从链接中提取 32 位 code";
                 if (notifyOnInvalidLink)
                 {
-                    await _notificationService.ShowWarningAsync("链接无效", "未能从链接中提取 32 位 code");
+                    await _notificationService.ShowWarningAsync("链接无效", message);
                 }
 
-                return false;
+                return CookieLinkParseResult.Failed(message);
             }
 
             if (!TryReserveAuthCode(code))
             {
+                const string message = "该授权链接已处理过一次，如需重试，请重新从微信获取新的授权链接";
                 _activityLogService.Write(LogEntryKind.Info, "Auth", $"授权 code 已处理，跳过重复解析：{code}");
                 if (notifyOnInvalidLink)
                 {
-                    await _notificationService.ShowInfoAsync("链接已处理", "该授权链接已处理过一次，如需重试，请重新从微信获取新的授权链接");
+                    await _notificationService.ShowInfoAsync("链接已处理", message);
                 }
 
-                return false;
+                return CookieLinkParseResult.Failed(message);
             }
 
             reservedCode = code;
@@ -730,6 +789,7 @@ public partial class MainWindowWorkflowViewModel
 
                 QueueAutoReleaseReservationRefresh();
                 QueueAutoReleaseCheck();
+                return CookieLinkParseResult.AuthenticatedSession("授权链接解析成功，Cookie 已验证并同步到电脑");
             }
             else if (!string.IsNullOrWhiteSpace(result.AuthenticationFailureMessage))
             {
@@ -737,15 +797,17 @@ public partial class MainWindowWorkflowViewModel
                 await _notificationService.ShowInfoAsync(
                     "已获取 Cookie",
                     $"Cookie 已填入文本框，但自动验证失败：{result.AuthenticationFailureMessage}");
+                return CookieLinkParseResult.CookieFetched(
+                    $"Cookie 已获取，但自动验证失败：{result.AuthenticationFailureMessage}");
             }
 
-            return true;
+            return CookieLinkParseResult.CookieFetched("Cookie 已获取，但尚未完成自动验证");
         }
         catch (Exception ex)
         {
             _activityLogService.Write(LogEntryKind.Error, "Auth", $"通过链接获取 Cookie 失败：{ex.Message}");
             await _notificationService.ShowWarningAsync("获取 Cookie 失败", ex.Message);
-            return false;
+            return CookieLinkParseResult.Failed(ex.Message);
         }
         finally
         {
@@ -754,6 +816,175 @@ public partial class MainWindowWorkflowViewModel
                 CompleteAuthCodeReservation(reservedCode, shouldMarkCodeAsProcessed);
             }
         }
+    }
+
+    [RelayCommand]
+    private async Task StartLanCookieRelayAsync()
+    {
+        if (IsLanCookieRelayRunning)
+        {
+            return;
+        }
+
+        try
+        {
+            IsLanCookieRelayDialogOpen = true;
+            SelectedLanCookieRelayStepIndex = 0;
+            LanCookieRelayStatusText = "正在启动局域网快传...";
+            ShowLanCookieRelayStartedStatusIcon = false;
+            LanCookieRelayUrlText = string.Empty;
+            LanCookieRelayQrImage = null;
+
+            var session = await _lanCookieRelayService.StartAsync(SubmitLanCookieRelayLinkAsync);
+            _activeLanCookieRelaySessionId = session.SessionId;
+            LanCookieRelayUrlText = session.Url.ToString();
+            LanCookieRelayQrImage = _qrCodeImageFactory.Create(LanCookieRelayUrlText);
+            IsLanCookieRelayRunning = true;
+            LanCookieRelayStatusText = $"服务已启动，监听端口 {session.Port}";
+            ShowLanCookieRelayStartedStatusIcon = true;
+            _activityLogService.Write(LogEntryKind.Info, "Auth", $"局域网 Cookie 快传已启动：{LanCookieRelayUrlText}");
+        }
+        catch (Exception ex)
+        {
+            IsLanCookieRelayRunning = false;
+            ShowLanCookieRelayStartedStatusIcon = false;
+            _activeLanCookieRelaySessionId = null;
+            LanCookieRelayStatusText = $"局域网快传启动失败：{ex.Message}";
+            _activityLogService.Write(LogEntryKind.Error, "Auth", $"局域网快传启动失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("局域网快传启动失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task CloseLanCookieRelayAsync()
+    {
+        await StopLanCookieRelaySessionAsync(closeDialog: true);
+    }
+
+    [RelayCommand]
+    private void GoToNextLanCookieRelayStep()
+    {
+        if (CanGoToNextLanCookieRelayStep)
+        {
+            SelectedLanCookieRelayStepIndex++;
+        }
+    }
+
+    [RelayCommand]
+    private void GoToPreviousLanCookieRelayStep()
+    {
+        if (CanGoToPreviousLanCookieRelayStep)
+        {
+            SelectedLanCookieRelayStepIndex--;
+        }
+    }
+
+    private async Task StopLanCookieRelaySessionAsync(bool closeDialog)
+    {
+        try
+        {
+            await _lanCookieRelayService.StopAsync();
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Auth", $"停止局域网快传失败：{ex.Message}");
+        }
+        finally
+        {
+            IsLanCookieRelayRunning = false;
+            ShowLanCookieRelayStartedStatusIcon = false;
+            _activeLanCookieRelaySessionId = null;
+            if (closeDialog)
+            {
+                IsLanCookieRelayDialogOpen = false;
+                LanCookieRelayUrlText = string.Empty;
+                LanCookieRelayQrImage = null;
+            }
+        }
+    }
+
+    private void OnLanCookieRelayStopped(object? sender, LanCookieRelayStoppedEventArgs e)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            ApplyLanCookieRelayStopped(e);
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() => ApplyLanCookieRelayStopped(e));
+    }
+
+    private void ApplyLanCookieRelayStopped(LanCookieRelayStoppedEventArgs e)
+    {
+        if (_activeLanCookieRelaySessionId is not null &&
+            _activeLanCookieRelaySessionId != e.SessionId)
+        {
+            return;
+        }
+
+        _activeLanCookieRelaySessionId = null;
+        IsLanCookieRelayRunning = false;
+        ShowLanCookieRelayStartedStatusIcon = false;
+
+        if (e.Reason == LanCookieRelayStopReason.Timeout)
+        {
+            LanCookieRelayStatusText = e.Message ?? "局域网快传已超时关闭";
+            return;
+        }
+
+        if (e.Reason == LanCookieRelayStopReason.Failed)
+        {
+            LanCookieRelayStatusText = e.Message ?? "局域网快传已异常关闭";
+            return;
+        }
+
+        if (e.Reason == LanCookieRelayStopReason.Manual && IsLanCookieRelayDialogOpen)
+        {
+            LanCookieRelayStatusText = "局域网快传已停止";
+        }
+    }
+
+    private async Task<LanCookieRelaySubmitResult> SubmitLanCookieRelayLinkAsync(
+        string linkText,
+        CancellationToken cancellationToken)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            return await SubmitLanCookieRelayLinkOnUiThreadAsync(linkText);
+        }
+
+        var completion = new TaskCompletionSource<LanCookieRelaySubmitResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                completion.SetResult(await SubmitLanCookieRelayLinkOnUiThreadAsync(linkText));
+            }
+            catch (Exception ex)
+            {
+                completion.SetException(ex);
+            }
+        });
+
+        return await completion.Task.WaitAsync(cancellationToken);
+    }
+
+    private async Task<LanCookieRelaySubmitResult> SubmitLanCookieRelayLinkOnUiThreadAsync(string linkText)
+    {
+        LanCookieRelayStatusText = "已收到手机提交，正在解析授权链接...";
+        ShowLanCookieRelayStartedStatusIcon = false;
+        QrLinkText = linkText.Trim();
+        var parseResult = await ParseCookieFromLinkAsync(QrLinkText, notifyOnInvalidLink: false);
+        if (parseResult.Authenticated)
+        {
+            LanCookieRelayStatusText = "授权成功，局域网快传已完成";
+            IsLanCookieRelayDialogOpen = false;
+            return LanCookieRelaySubmitResult.Succeeded(parseResult.Message);
+        }
+
+        LanCookieRelayStatusText = parseResult.Message;
+        return LanCookieRelaySubmitResult.Failed(parseResult.Message);
     }
 
     [RelayCommand]
@@ -825,6 +1056,7 @@ public partial class MainWindowWorkflowViewModel
     [RelayCommand]
     private async Task SignOutAsync()
     {
+        await StopLanCookieRelaySessionAsync(closeDialog: true);
         await AccountVenue.SignOutAsync();
         await ClearStoredLibrarySelectionAsync();
         CancelFiltering();
@@ -4348,6 +4580,7 @@ public partial class MainWindowWorkflowViewModel
         _homeCookieIdentity = BuildHomeCookieProgressIdentity(expirationTime, cookie);
         _homeCookieExpirationTime = expirationTime;
         UpdateHomeCookieCardPresentation(GetCurrentTime());
+        RefreshAuthorizationPresentationProperties();
     }
 
     private void RefreshSidebarSessionExpirationPresentation(DateTimeOffset timestamp)
@@ -4383,6 +4616,7 @@ public partial class MainWindowWorkflowViewModel
         _homeCookieExpirationTime = null;
         ClearHomeCookieProgressTracking();
         UpdateHomeCookieCardPresentation(GetCurrentTime());
+        RefreshAuthorizationPresentationProperties();
     }
 
     private static string MeasureMemoryUsageText()
@@ -4961,4 +5195,25 @@ public partial class MainWindowWorkflowViewModel
     private sealed record SeatFilterResult(
         SeatItemViewModel ViewModel,
         bool IsVisible);
+
+    private sealed record CookieLinkParseResult(
+        bool Processed,
+        bool Authenticated,
+        string Message)
+    {
+        public static CookieLinkParseResult AuthenticatedSession(string message)
+        {
+            return new CookieLinkParseResult(true, true, message);
+        }
+
+        public static CookieLinkParseResult CookieFetched(string message)
+        {
+            return new CookieLinkParseResult(true, false, message);
+        }
+
+        public static CookieLinkParseResult Failed(string message)
+        {
+            return new CookieLinkParseResult(false, false, message);
+        }
+    }
 }

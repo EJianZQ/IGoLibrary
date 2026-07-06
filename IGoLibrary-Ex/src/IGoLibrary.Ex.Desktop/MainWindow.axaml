@@ -838,7 +838,7 @@
 
                   <TextBlock Text="{Binding SessionSummary}" Classes="helper-text" />
 
-                  <StackPanel Spacing="16" IsVisible="{Binding IsUnauthorized}">
+                  <StackPanel Spacing="16" IsVisible="{Binding ShouldShowAuthorizationInput}">
                     <Border Background="{DynamicResource SemiColorFill0}"
                             BorderBrush="{DynamicResource SemiCardBorderBrush}"
                             BorderThickness="1"
@@ -865,17 +865,28 @@
                                 HorizontalAlignment="Right" />
                     </StackPanel>
 
-                    <Button Content="从链接解析"
-                            Command="{Binding GetCookieFromLinkCommand}"
-                            HorizontalAlignment="Stretch"
-                            HorizontalContentAlignment="Center"
-                            Background="{DynamicResource AppAccentBrush}"
-                            Foreground="{DynamicResource AppAccentForegroundBrush}"
-                            FontWeight="Bold" />
+                    <Grid ColumnDefinitions="*,*"
+                          ColumnSpacing="12">
+                      <Button Content="从链接解析"
+                              Command="{Binding GetCookieFromLinkCommand}"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Center"
+                              Background="{DynamicResource AppAccentBrush}"
+                              Foreground="{DynamicResource AppAccentForegroundBrush}"
+                              FontWeight="Bold" />
+                      <Button Grid.Column="1"
+                              Content="局域网快传"
+                              Command="{Binding StartLanCookieRelayCommand}"
+                              IsEnabled="{Binding CanStartLanCookieRelay}"
+                              Classes="Secondary"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Center"
+                              FontWeight="SemiBold" />
+                    </Grid>
                   </StackPanel>
 
                   <StackPanel Spacing="12"
-                              IsVisible="{Binding IsAuthorized}"
+                              IsVisible="{Binding ShouldShowAuthorizedSummary}"
                               HorizontalAlignment="Center">
                     <TextBlock Text="✓"
                               FontSize="56"
@@ -921,7 +932,6 @@
 
               <Border Grid.Column="1"
                       Classes="semi-card Shadow"
-                      IsEnabled="{Binding IsAuthorized}"
                       VerticalAlignment="Stretch">
                 <Grid>
                   <StackPanel Spacing="16">
@@ -929,13 +939,46 @@
                               FontSize="22"
                               FontWeight="Bold" />
                     <TextBlock Text="通过看板切换候选场馆，再用下方操作正式锁定"
-                              Classes="helper-text" />
+                              Classes="helper-text"
+                              IsVisible="{Binding CanShowVenueConfiguration}" />
+
+                    <Grid MinHeight="540"
+                          IsVisible="{Binding IsUnauthorized}">
+                      <StackPanel Spacing="12"
+                                  VerticalAlignment="Center"
+                                  HorizontalAlignment="Center">
+                        <Border Width="54"
+                                Height="54"
+                                CornerRadius="27"
+                                Background="{DynamicResource AppNeutralIconSurfaceBrush}"
+                                BorderBrush="{DynamicResource AppNeutralIconBorderBrush}"
+                                BorderThickness="1">
+                          <PathIcon Data="{StaticResource IconBuilding}"
+                                    Width="28"
+                                    Height="28"
+                                    Foreground="{DynamicResource SemiAccentBrush}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock Text="当前未授权"
+                                   FontSize="20"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource SemiTextPrimaryBrush}"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="授权后这里会显示场馆配置、候选场馆与锁定操作"
+                                   Classes="dashboard-detail"
+                                   MaxWidth="380"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center" />
+                      </StackPanel>
+                    </Grid>
 
                     <Border Padding="24,16,24,24"
                             CornerRadius="16"
                             Background="{DynamicResource SemiAccentGlowBrush}"
                             BorderBrush="{DynamicResource SemiCardBorderBrush}"
-                            BorderThickness="1">
+                            BorderThickness="1"
+                            IsVisible="{Binding CanShowVenueConfiguration}">
                     <Grid ColumnDefinitions="*,Auto"
                             RowDefinitions="Auto,Auto"
                             ColumnSpacing="32"
@@ -1070,26 +1113,28 @@
                       </Grid>
                     </Border>
 
-                    <Button Content="{Binding LockVenueButtonText}"
-                            Command="{Binding BindSelectedLibraryCommand}"
-                            MinWidth="140"
-                            IsVisible="{Binding IsCurrentPreview}"
-                            HorizontalAlignment="Right"
-                            HorizontalContentAlignment="Center"
-                            Background="{DynamicResource AppAccentBrush}"
-                            Foreground="{DynamicResource AppAccentForegroundBrush}"
-                            FontWeight="Bold" />
-                    <Button Content="{Binding LockVenueButtonText}"
-                            MinWidth="140"
-                            IsVisible="{Binding IsCurrentLocked}"
-                            IsEnabled="False"
-                            HorizontalAlignment="Right"
-                            HorizontalContentAlignment="Center"
-                            Background="{DynamicResource SemiColorFill0}"
-                            BorderBrush="{DynamicResource SemiCardBorderBrush}"
-                            BorderThickness="1"
-                            Foreground="{DynamicResource SemiColorText2}"
-                            FontWeight="Bold" />
+                    <StackPanel IsVisible="{Binding CanShowVenueConfiguration}">
+                      <Button Content="{Binding LockVenueButtonText}"
+                              Command="{Binding BindSelectedLibraryCommand}"
+                              MinWidth="140"
+                              IsVisible="{Binding IsCurrentPreview}"
+                              HorizontalAlignment="Right"
+                              HorizontalContentAlignment="Center"
+                              Background="{DynamicResource AppAccentBrush}"
+                              Foreground="{DynamicResource AppAccentForegroundBrush}"
+                              FontWeight="Bold" />
+                      <Button Content="{Binding LockVenueButtonText}"
+                              MinWidth="140"
+                              IsVisible="{Binding IsCurrentLocked}"
+                              IsEnabled="False"
+                              HorizontalAlignment="Right"
+                              HorizontalContentAlignment="Center"
+                              Background="{DynamicResource SemiColorFill0}"
+                              BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                              BorderThickness="1"
+                              Foreground="{DynamicResource SemiColorText2}"
+                              FontWeight="Bold" />
+                    </StackPanel>
                   </StackPanel>
 
                 </Grid>
@@ -2796,6 +2841,112 @@
           </Grid>
         </Grid>
       </Carousel>
+
+      <Border Grid.Row="1"
+              ZIndex="31"
+              IsVisible="{Binding IsLanCookieRelayDialogOpen}"
+              Background="{DynamicResource AppModalOverlayBrush}">
+        <Grid Margin="28,16,28,28">
+          <Border Classes="semi-card Shadow"
+                  Width="520"
+                  MaxWidth="520"
+                  Padding="24"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                  RowSpacing="18">
+              <Grid ColumnDefinitions="*,Auto"
+                    ColumnSpacing="12">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="局域网快传"
+                             FontSize="22"
+                             FontWeight="Bold" />
+                  <StackPanel Orientation="Horizontal"
+                              Spacing="6">
+                    <PathIcon Width="16"
+                              Height="16"
+                              VerticalAlignment="Center"
+                              Foreground="{DynamicResource SemiSuccessTextBrush}"
+                              IsVisible="{Binding ShowLanCookieRelayStartedStatusIcon}"
+                              Data="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 14.2-4-4 1.4-1.4 2.6 2.6 5.8-5.8L18 9l-7.2 7.2z" />
+                    <TextBlock Text="{Binding LanCookieRelayStatusText}"
+                               Classes="helper-text"
+                               VerticalAlignment="Center" />
+                  </StackPanel>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Content="{Binding LanCookieRelayCloseButtonText}"
+                        Command="{Binding CloseLanCookieRelayCommand}"
+                        Classes="Secondary"
+                        HorizontalContentAlignment="Center" />
+              </Grid>
+
+              <StackPanel Grid.Row="1"
+                          Spacing="8">
+                <TextBlock Text="{Binding LanCookieRelayStepTitle}"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource SemiTextPrimaryBrush}" />
+                <TextBlock Text="{Binding LanCookieRelayStepHint}"
+                           Classes="helper-text" />
+              </StackPanel>
+
+              <Border Grid.Row="2"
+                      Background="{DynamicResource SemiColorFill0}"
+                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="18"
+                      Padding="18"
+                      HorizontalAlignment="Center">
+                <Grid Width="256"
+                      Height="256">
+                  <Image Source="/Assets/qrcode.png"
+                         Stretch="Uniform"
+                         IsVisible="{Binding IsLanCookieRelayAuthorizationQrMode}" />
+                  <Image Source="{Binding LanCookieRelayQrImage}"
+                         Stretch="Uniform"
+                         IsVisible="{Binding ShowLanCookieRelaySubmitQrImage}" />
+                  <TextBlock Text="正在生成二维码..."
+                             Classes="helper-text"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             IsVisible="{Binding ShowLanCookieRelaySubmitQrLoading}" />
+                </Grid>
+              </Border>
+
+              <Grid Grid.Row="3"
+                    ColumnDefinitions="*,Auto,Auto"
+                    ColumnSpacing="12">
+                <Button Grid.Column="1"
+                        Content="上一步"
+                        Command="{Binding GoToPreviousLanCookieRelayStepCommand}"
+                        IsVisible="{Binding CanGoToPreviousLanCookieRelayStep}"
+                        Classes="Secondary"
+                        HorizontalContentAlignment="Center" />
+                <Button Grid.Column="2"
+                        Content="下一步"
+                        Command="{Binding GoToNextLanCookieRelayStepCommand}"
+                        IsVisible="{Binding CanGoToNextLanCookieRelayStep}"
+                        Background="{DynamicResource AppAccentBrush}"
+                        Foreground="{DynamicResource AppAccentForegroundBrush}"
+                        FontWeight="Bold"
+                        HorizontalContentAlignment="Center" />
+              </Grid>
+
+              <StackPanel Grid.Row="4"
+                          Spacing="8"
+                          IsVisible="{Binding IsLanCookieRelaySubmitQrMode}">
+                <TextBlock Classes="field-label" Text="手机访问地址" />
+                <TextBox Text="{Binding LanCookieRelayUrlText}"
+                         IsReadOnly="True"
+                         TextWrapping="Wrap"
+                         MinHeight="42" />
+              </StackPanel>
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
 
       <Border Grid.Row="1"
               ZIndex="30"

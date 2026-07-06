@@ -38,7 +38,9 @@ public partial class MainWindowWorkflowViewModel(
     IAppThemeService appThemeService,
     TimeProvider timeProvider,
     AppWindowService appWindowService,
-    IStartupEntryService startupEntryService) : ViewModelBase
+    IStartupEntryService startupEntryService,
+    ILanCookieRelayService lanCookieRelayService,
+    IQrCodeImageFactory qrCodeImageFactory) : ViewModelBase
 {
     private readonly IAppThemeService _appThemeService = appThemeService;
     private readonly IActivityLogService _activityLogService = activityLogService;
@@ -49,6 +51,8 @@ public partial class MainWindowWorkflowViewModel(
     private readonly IExternalLinkService _externalLinkService = externalLinkService;
     private readonly AppWindowService _appWindowService = appWindowService;
     private readonly IStartupEntryService _startupEntryService = startupEntryService;
+    private readonly ILanCookieRelayService _lanCookieRelayService = lanCookieRelayService;
+    private readonly IQrCodeImageFactory _qrCodeImageFactory = qrCodeImageFactory;
     private readonly TimeProvider _timeProvider = timeProvider;
     private readonly IGrabSeatCoordinator _grabSeatCoordinator = grabSeatCoordinator;
     private readonly IGlobalLeakCoordinator _globalLeakCoordinator = globalLeakCoordinator;
@@ -194,6 +198,8 @@ public partial class MainWindowWorkflowViewModel(
     private readonly object _processedAuthCodesGate = new();
     private readonly HashSet<string> _processedAuthCodes = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _inFlightAuthCodes = new(StringComparer.OrdinalIgnoreCase);
+    private bool _lanCookieRelayServiceSubscribed;
+    private Guid? _activeLanCookieRelaySessionId;
 
     public HomeDashboardViewModel HomeDashboard { get; } = new();
 
@@ -323,9 +329,15 @@ public partial class MainWindowWorkflowViewModel(
     [ObservableProperty]
     private IBrush sidebarSessionExpirationBrush = appThemeService.CurrentPalette.LogDefaultBrush;
 
-    public string AuthorizationStatusText => IsAuthorized ? "已授权" : "未授权";
+    public string AuthorizationStatusText => CanShowVenueConfiguration ? "已授权" : "未授权";
 
-    public bool IsUnauthorized => !IsAuthorized;
+    public bool IsUnauthorized => !CanShowVenueConfiguration;
+
+    public bool CanShowVenueConfiguration => IsAuthorized && (_homeCookieExpirationTime is null || HasCurrentCookie);
+
+    public bool ShouldShowAuthorizationInput => !CanShowVenueConfiguration;
+
+    public bool ShouldShowAuthorizedSummary => CanShowVenueConfiguration;
 
     public bool HasCurrentReservation => _currentReservation is not null;
 
@@ -518,6 +530,53 @@ public partial class MainWindowWorkflowViewModel(
 
     [ObservableProperty]
     private string qrLinkText = string.Empty;
+
+    [ObservableProperty]
+    private bool isLanCookieRelayDialogOpen;
+
+    [ObservableProperty]
+    private bool isLanCookieRelayRunning;
+
+    public bool CanStartLanCookieRelay => !IsLanCookieRelayRunning;
+
+    public string LanCookieRelayCloseButtonText => IsLanCookieRelayRunning ? "停止并关闭" : "关闭";
+
+    [ObservableProperty]
+    private int selectedLanCookieRelayStepIndex;
+
+    public bool IsLanCookieRelayAuthorizationQrMode => SelectedLanCookieRelayStepIndex == 0;
+
+    public bool IsLanCookieRelaySubmitQrMode => !IsLanCookieRelayAuthorizationQrMode;
+
+    public bool CanGoToPreviousLanCookieRelayStep => SelectedLanCookieRelayStepIndex > 0;
+
+    public bool CanGoToNextLanCookieRelayStep => SelectedLanCookieRelayStepIndex < 1;
+
+    public string LanCookieRelayStepTitle => IsLanCookieRelayAuthorizationQrMode
+        ? "第一步：获取授权链接"
+        : "第二步：发送到电脑";
+
+    [ObservableProperty]
+    private string lanCookieRelayUrlText = string.Empty;
+
+    [ObservableProperty]
+    private string lanCookieRelayStatusText = "局域网快传尚未启动";
+
+    [ObservableProperty]
+    private bool showLanCookieRelayStartedStatusIcon;
+
+    [ObservableProperty]
+    private IImage? lanCookieRelayQrImage;
+
+    public bool HasLanCookieRelayQrImage => LanCookieRelayQrImage is not null;
+
+    public bool ShowLanCookieRelaySubmitQrImage => IsLanCookieRelaySubmitQrMode && HasLanCookieRelayQrImage;
+
+    public bool ShowLanCookieRelaySubmitQrLoading => IsLanCookieRelaySubmitQrMode && !HasLanCookieRelayQrImage;
+
+    public string LanCookieRelayStepHint => IsLanCookieRelayAuthorizationQrMode
+        ? "用微信扫描此二维码完成“我去图书馆”授权，并复制授权链接"
+        : "复制授权链接后，用微信扫描此二维码打开手机提交页";
 
     [ObservableProperty]
     private string manualCookieText = string.Empty;

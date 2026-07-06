@@ -160,7 +160,9 @@ public sealed class MainWindowClipboardTests
             new FakeAppThemeService(),
             new FakeTimeProvider(),
             new AppWindowService(),
-            new FakeStartupEntryService());
+            new FakeStartupEntryService(),
+            new FakeLanCookieRelayService(),
+            new FakeQrCodeImageFactory());
     }
 
     private sealed class ThrowingNotificationService : INotificationService
