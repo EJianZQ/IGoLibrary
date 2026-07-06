@@ -1,0 +1,200 @@
+using CommunityToolkit.Mvvm.Input;
+using IGoLibrary.Ex.Domain.Models;
+
+namespace IGoLibrary.Ex.Desktop.ViewModels;
+
+public partial class MainWindowWorkflowViewModel
+{
+    private bool _notificationSettingsConfigured;
+
+    public string[] EmailSecurityModes => NotificationSettings.EmailSecurityModes;
+
+    public string[] NotificationSettingsCategories => NotificationSettings.NotificationSettingsCategories;
+
+    public bool EmailAlertsEnabled
+    {
+        get => NotificationSettings.EmailAlertsEnabled;
+        set => NotificationSettings.EmailAlertsEnabled = value;
+    }
+
+    public string EmailAlertSmtpHost
+    {
+        get => NotificationSettings.EmailAlertSmtpHost;
+        set => NotificationSettings.EmailAlertSmtpHost = value;
+    }
+
+    public int EmailAlertSmtpPort
+    {
+        get => NotificationSettings.EmailAlertSmtpPort;
+        set => NotificationSettings.EmailAlertSmtpPort = value;
+    }
+
+    public int SelectedEmailAlertSecurityModeIndex
+    {
+        get => NotificationSettings.SelectedEmailAlertSecurityModeIndex;
+        set => NotificationSettings.SelectedEmailAlertSecurityModeIndex = value;
+    }
+
+    public string EmailAlertUsername
+    {
+        get => NotificationSettings.EmailAlertUsername;
+        set => NotificationSettings.EmailAlertUsername = value;
+    }
+
+    public string EmailAlertPassword
+    {
+        get => NotificationSettings.EmailAlertPassword;
+        set => NotificationSettings.EmailAlertPassword = value;
+    }
+
+    public string EmailAlertFromAddress
+    {
+        get => NotificationSettings.EmailAlertFromAddress;
+        set => NotificationSettings.EmailAlertFromAddress = value;
+    }
+
+    public string EmailAlertToAddress
+    {
+        get => NotificationSettings.EmailAlertToAddress;
+        set => NotificationSettings.EmailAlertToAddress = value;
+    }
+
+    public bool TelegramAlertsEnabled
+    {
+        get => NotificationSettings.TelegramAlertsEnabled;
+        set => NotificationSettings.TelegramAlertsEnabled = value;
+    }
+
+    public string TelegramAlertApiBaseUrl
+    {
+        get => NotificationSettings.TelegramAlertApiBaseUrl;
+        set => NotificationSettings.TelegramAlertApiBaseUrl = value;
+    }
+
+    public string TelegramAlertBotToken
+    {
+        get => NotificationSettings.TelegramAlertBotToken;
+        set => NotificationSettings.TelegramAlertBotToken = value;
+    }
+
+    public string TelegramAlertChatId
+    {
+        get => NotificationSettings.TelegramAlertChatId;
+        set => NotificationSettings.TelegramAlertChatId = value;
+    }
+
+    public bool LocalToastAlertsEnabled
+    {
+        get => NotificationSettings.LocalToastAlertsEnabled;
+        set => NotificationSettings.LocalToastAlertsEnabled = value;
+    }
+
+    public bool LocalSoundAlertsEnabled
+    {
+        get => NotificationSettings.LocalSoundAlertsEnabled;
+        set => NotificationSettings.LocalSoundAlertsEnabled = value;
+    }
+
+    public bool GrabSucceededAlertsEnabled
+    {
+        get => NotificationSettings.GrabSucceededAlertsEnabled;
+        set => NotificationSettings.GrabSucceededAlertsEnabled = value;
+    }
+
+    public bool OccupyReReserveSucceededAlertsEnabled
+    {
+        get => NotificationSettings.OccupyReReserveSucceededAlertsEnabled;
+        set => NotificationSettings.OccupyReReserveSucceededAlertsEnabled = value;
+    }
+
+    public bool TomorrowReservationSucceededAlertsEnabled
+    {
+        get => NotificationSettings.TomorrowReservationSucceededAlertsEnabled;
+        set => NotificationSettings.TomorrowReservationSucceededAlertsEnabled = value;
+    }
+
+    public bool GlobalLeakSucceededAlertsEnabled
+    {
+        get => NotificationSettings.GlobalLeakSucceededAlertsEnabled;
+        set => NotificationSettings.GlobalLeakSucceededAlertsEnabled = value;
+    }
+
+    public bool SessionInvalidAlertsEnabled
+    {
+        get => NotificationSettings.SessionInvalidAlertsEnabled;
+        set => NotificationSettings.SessionInvalidAlertsEnabled = value;
+    }
+
+    public bool TaskFailedAlertsEnabled
+    {
+        get => NotificationSettings.TaskFailedAlertsEnabled;
+        set => NotificationSettings.TaskFailedAlertsEnabled = value;
+    }
+
+    public IAsyncRelayCommand TestToastCommand => NotificationSettings.TestToastCommand;
+
+    public IAsyncRelayCommand SendTestEmailAlertCommand => NotificationSettings.SendTestEmailAlertCommand;
+
+    public IAsyncRelayCommand SendTestTelegramAlertCommand => NotificationSettings.SendTestTelegramAlertCommand;
+
+    public IAsyncRelayCommand SendTestLocalAlertCommand => NotificationSettings.SendTestLocalAlertCommand;
+
+    private void ConfigureNotificationSettingsPropertyBridge(ViewModelPropertyBridge propertyBridge)
+    {
+        propertyBridge.ForwardSame(
+            NotificationSettings,
+            nameof(EmailAlertsEnabled),
+            nameof(EmailAlertSmtpHost),
+            nameof(EmailAlertSmtpPort),
+            nameof(SelectedEmailAlertSecurityModeIndex),
+            nameof(EmailAlertUsername),
+            nameof(EmailAlertPassword),
+            nameof(EmailAlertFromAddress),
+            nameof(EmailAlertToAddress),
+            nameof(TelegramAlertsEnabled),
+            nameof(TelegramAlertApiBaseUrl),
+            nameof(TelegramAlertBotToken),
+            nameof(TelegramAlertChatId),
+            nameof(LocalToastAlertsEnabled),
+            nameof(LocalSoundAlertsEnabled),
+            nameof(GrabSucceededAlertsEnabled),
+            nameof(OccupyReReserveSucceededAlertsEnabled),
+            nameof(TomorrowReservationSucceededAlertsEnabled),
+            nameof(GlobalLeakSucceededAlertsEnabled),
+            nameof(SessionInvalidAlertsEnabled),
+            nameof(TaskFailedAlertsEnabled));
+    }
+
+    private void EnsureNotificationSettingsConfigured()
+    {
+        if (_notificationSettingsConfigured)
+        {
+            return;
+        }
+
+        NotificationSettings.ConfigureAutoSave(() => !IsLoadingSettings && IsInitializationComplete);
+        _notificationSettingsConfigured = true;
+    }
+
+    private TaskEventAlertSettings BuildTaskEventAlertSettingsSnapshot()
+    {
+        EnsureNotificationSettingsConfigured();
+        return NotificationSettings.BuildTaskEventAlertSettingsSnapshot();
+    }
+
+    private void ScheduleNotificationSettingsAutoSave()
+    {
+        EnsureNotificationSettingsConfigured();
+    }
+
+    private async Task PersistNotificationSettingsSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        EnsureNotificationSettingsConfigured();
+        await NotificationSettings.PersistSnapshotAsync(cancellationToken);
+    }
+
+    private void CancelPendingNotificationSettingsAutoSave()
+    {
+        NotificationSettings.CancelPendingAutoSave();
+    }
+}

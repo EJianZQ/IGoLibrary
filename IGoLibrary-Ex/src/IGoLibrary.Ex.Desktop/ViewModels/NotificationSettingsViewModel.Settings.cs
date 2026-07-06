@@ -1,0 +1,314 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using IGoLibrary.Ex.Desktop.Services;
+using IGoLibrary.Ex.Domain.Enums;
+using IGoLibrary.Ex.Domain.Models;
+
+namespace IGoLibrary.Ex.Desktop.ViewModels;
+
+public sealed partial class NotificationSettingsViewModel
+{
+    private DeferredAutoSaveController? _autoSave;
+    private Func<bool> _canAutoSave = static () => false;
+    private bool _settingsLoaded;
+
+    private DeferredAutoSaveController AutoSave => _autoSave ??= new DeferredAutoSaveController(
+        TimeSpan.FromMilliseconds(450),
+        cancellationToken => SaveNotificationSettingsAsync(BuildTaskEventAlertSettingsSnapshot(), cancellationToken));
+
+    public string[] EmailSecurityModes { get; } = ["无", "TLS"];
+
+    public string[] NotificationSettingsCategories { get; } = ["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "弹窗提醒配置"];
+
+    [ObservableProperty]
+    private bool emailAlertsEnabled;
+
+    [ObservableProperty]
+    private string emailAlertSmtpHost = string.Empty;
+
+    [ObservableProperty]
+    private int emailAlertSmtpPort = 587;
+
+    [ObservableProperty]
+    private int selectedEmailAlertSecurityModeIndex = 1;
+
+    [ObservableProperty]
+    private string emailAlertUsername = string.Empty;
+
+    [ObservableProperty]
+    private string emailAlertPassword = string.Empty;
+
+    [ObservableProperty]
+    private string emailAlertFromAddress = string.Empty;
+
+    [ObservableProperty]
+    private string emailAlertToAddress = string.Empty;
+
+    [ObservableProperty]
+    private bool telegramAlertsEnabled;
+
+    [ObservableProperty]
+    private string telegramAlertApiBaseUrl = TelegramAlertChannelSettings.DefaultApiBaseUrl;
+
+    [ObservableProperty]
+    private string telegramAlertBotToken = string.Empty;
+
+    [ObservableProperty]
+    private string telegramAlertChatId = string.Empty;
+
+    [ObservableProperty]
+    private bool localToastAlertsEnabled = true;
+
+    [ObservableProperty]
+    private bool localSoundAlertsEnabled;
+
+    [ObservableProperty]
+    private bool grabSucceededAlertsEnabled = true;
+
+    [ObservableProperty]
+    private bool occupyReReserveSucceededAlertsEnabled = true;
+
+    [ObservableProperty]
+    private bool tomorrowReservationSucceededAlertsEnabled = true;
+
+    [ObservableProperty]
+    private bool globalLeakSucceededAlertsEnabled = true;
+
+    [ObservableProperty]
+    private bool sessionInvalidAlertsEnabled = true;
+
+    [ObservableProperty]
+    private bool taskFailedAlertsEnabled = true;
+
+    partial void OnEmailAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnEmailAlertSmtpHostChanged(string value) => ScheduleAutoSave();
+
+    partial void OnEmailAlertSmtpPortChanged(int value) => ScheduleAutoSave();
+
+    partial void OnSelectedEmailAlertSecurityModeIndexChanged(int value) => ScheduleAutoSave();
+
+    partial void OnEmailAlertUsernameChanged(string value) => ScheduleAutoSave();
+
+    partial void OnEmailAlertPasswordChanged(string value) => ScheduleAutoSave();
+
+    partial void OnEmailAlertFromAddressChanged(string value) => ScheduleAutoSave();
+
+    partial void OnEmailAlertToAddressChanged(string value) => ScheduleAutoSave();
+
+    partial void OnTelegramAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnTelegramAlertApiBaseUrlChanged(string value) => ScheduleAutoSave();
+
+    partial void OnTelegramAlertBotTokenChanged(string value) => ScheduleAutoSave();
+
+    partial void OnTelegramAlertChatIdChanged(string value) => ScheduleAutoSave();
+
+    partial void OnLocalToastAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnLocalSoundAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnGrabSucceededAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnOccupyReReserveSucceededAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnTomorrowReservationSucceededAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnGlobalLeakSucceededAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnSessionInvalidAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnTaskFailedAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    public void ConfigureAutoSave(Func<bool> canAutoSave)
+    {
+        _canAutoSave = canAutoSave;
+    }
+
+    public void MarkSettingsLoaded()
+    {
+        _settingsLoaded = true;
+    }
+
+    public void ApplySettings(AppSettings settings)
+    {
+        var alertSettings = settings.Notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
+        var eventSettings = alertSettings.Events ?? TaskEventAlertEventSettings.Default;
+
+        EmailAlertsEnabled = alertSettings.Email.Enabled;
+        EmailAlertSmtpHost = alertSettings.Email.SmtpHost;
+        EmailAlertSmtpPort = alertSettings.Email.Port;
+        SelectedEmailAlertSecurityModeIndex = alertSettings.Email.SecurityMode == EmailSecurityMode.Tls ? 1 : 0;
+        EmailAlertUsername = alertSettings.Email.Username;
+        EmailAlertPassword = alertSettings.Email.Password;
+        EmailAlertFromAddress = alertSettings.Email.FromAddress;
+        EmailAlertToAddress = alertSettings.Email.ToAddress;
+        TelegramAlertsEnabled = alertSettings.Telegram.Enabled;
+        TelegramAlertApiBaseUrl = string.IsNullOrWhiteSpace(alertSettings.Telegram.ApiBaseUrl)
+            ? TelegramAlertChannelSettings.DefaultApiBaseUrl
+            : alertSettings.Telegram.ApiBaseUrl;
+        TelegramAlertBotToken = alertSettings.Telegram.BotToken ?? string.Empty;
+        TelegramAlertChatId = alertSettings.Telegram.ChatId ?? string.Empty;
+        LocalToastAlertsEnabled = alertSettings.Local.PopupEnabled;
+        LocalSoundAlertsEnabled = alertSettings.Local.SoundEnabled;
+        GrabSucceededAlertsEnabled = eventSettings.GrabSucceeded;
+        OccupyReReserveSucceededAlertsEnabled = eventSettings.OccupyReReserveSucceeded;
+        TomorrowReservationSucceededAlertsEnabled = eventSettings.TomorrowReservationSucceeded;
+        GlobalLeakSucceededAlertsEnabled = eventSettings.GlobalLeakSucceeded;
+        SessionInvalidAlertsEnabled = eventSettings.SessionInvalid;
+        TaskFailedAlertsEnabled = eventSettings.TaskFailed;
+    }
+
+    public void CancelPendingAutoSave()
+    {
+        AutoSave.Cancel();
+    }
+
+    public Task FlushAsync(CancellationToken cancellationToken = default)
+    {
+        return AutoSave.FlushAsync(cancellationToken);
+    }
+
+    [RelayCommand]
+    private async Task TestToastAsync()
+    {
+        if (notificationService is ToastNotificationService toastNotificationService)
+        {
+            await toastNotificationService.ShowPreviewAsync("测试通知", "这是一条用于测试界面动效与停留时间的 Toast 通知");
+            return;
+        }
+
+        await notificationService.ShowInfoAsync("测试通知", "这是一条用于测试界面动效与停留时间的 Toast 通知");
+    }
+
+    [RelayCommand]
+    private async Task SendTestEmailAlertAsync()
+    {
+        try
+        {
+            AutoSave.Cancel();
+            await PersistSnapshotAsync();
+            await SendTestEmailAsync(BuildTaskEventAlertSettingsSnapshot().Email);
+            await notificationService.ShowSuccessAsync("测试邮件已发送", "请检查收件箱，确认当前 SMTP 配置可用");
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试邮件失败：{ex.Message}");
+            await errorDialogService.ShowErrorAsync("测试邮件发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
+        }
+    }
+
+    [RelayCommand]
+    private async Task SendTestTelegramAlertAsync()
+    {
+        try
+        {
+            AutoSave.Cancel();
+            await PersistSnapshotAsync();
+            await SendTestTelegramAsync(BuildTaskEventAlertSettingsSnapshot().Telegram);
+            await notificationService.ShowSuccessAsync("测试 Telegram 已发送", "请检查 Telegram，确认当前 Bot 配置可用");
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Telegram 失败：{ex.Message}");
+            await errorDialogService.ShowErrorAsync("测试 Telegram 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
+        }
+    }
+
+    [RelayCommand]
+    private async Task SendTestLocalAlertAsync()
+    {
+        try
+        {
+            AutoSave.Cancel();
+            await PersistSnapshotAsync();
+            await SendTestLocalAlertAsync(BuildTaskEventAlertSettingsSnapshot().Local);
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试通知失败：{ex.Message}");
+            await notificationService.ShowWarningAsync("测试通知发送失败", ex.Message);
+        }
+    }
+
+    public TaskEventAlertSettings BuildTaskEventAlertSettingsSnapshot()
+    {
+        return new TaskEventAlertSettings(
+            new EmailAlertChannelSettings(
+                EmailAlertsEnabled,
+                EmailAlertSmtpHost.Trim(),
+                Math.Clamp(EmailAlertSmtpPort, 1, 65535),
+                SelectedEmailAlertSecurityModeIndex == 1 ? EmailSecurityMode.Tls : EmailSecurityMode.None,
+                EmailAlertUsername.Trim(),
+                EmailAlertPassword,
+                EmailAlertFromAddress.Trim(),
+                EmailAlertToAddress.Trim()),
+            new LocalDesktopAlertSettings(
+                LocalToastAlertsEnabled,
+                LocalSoundAlertsEnabled),
+            new TelegramAlertChannelSettings(
+                TelegramAlertsEnabled,
+                NormalizeTelegramApiBaseUrlForSnapshot(TelegramAlertApiBaseUrl),
+                (TelegramAlertBotToken ?? string.Empty).Trim(),
+                (TelegramAlertChatId ?? string.Empty).Trim()),
+            new TaskEventAlertEventSettings
+            {
+                GrabSucceeded = GrabSucceededAlertsEnabled,
+                OccupyReReserveSucceeded = OccupyReReserveSucceededAlertsEnabled,
+                TomorrowReservationSucceeded = TomorrowReservationSucceededAlertsEnabled,
+                GlobalLeakSucceeded = GlobalLeakSucceededAlertsEnabled,
+                SessionInvalid = SessionInvalidAlertsEnabled,
+                TaskFailed = TaskFailedAlertsEnabled
+            });
+    }
+
+    public Task PersistSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        return SaveNotificationSettingsAsync(BuildTaskEventAlertSettingsSnapshot(), cancellationToken);
+    }
+
+    private void ScheduleAutoSave()
+    {
+        if (!_settingsLoaded || !_canAutoSave())
+        {
+            return;
+        }
+
+        AutoSave.Schedule(ex =>
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"自动保存通知设置失败：{ex.Message}"));
+    }
+
+    private static string NormalizeTelegramApiBaseUrlForSnapshot(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim().TrimEnd('/');
+        return string.IsNullOrWhiteSpace(trimmed)
+            ? TelegramAlertChannelSettings.DefaultApiBaseUrl
+            : trimmed;
+    }
+
+    private static string BuildExceptionDetails(Exception exception)
+    {
+        var builder = new System.Text.StringBuilder();
+        var current = exception;
+        var depth = 0;
+
+        while (current is not null)
+        {
+            if (depth == 0)
+            {
+                builder.Append(current.Message);
+            }
+            else
+            {
+                builder.AppendLine();
+                builder.AppendLine();
+                builder.Append($"内部异常 {depth}：{current.GetType().Name}: {current.Message}");
+            }
+
+            current = current.InnerException;
+            depth++;
+        }
+
+        return builder.ToString();
+    }
+}

@@ -2677,7 +2677,7 @@ public sealed class MainWindowViewModelTests
         taskAlertService ??= new FakeTaskEventAlertDispatcher();
         activityLogService ??= new ActivityLogService();
 
-        return new MainWindowViewModel(
+        return MainWindowViewModelTestHarness.Create(
             new SessionWorkflowService(apiClient, sessionService),
             new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
             new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),

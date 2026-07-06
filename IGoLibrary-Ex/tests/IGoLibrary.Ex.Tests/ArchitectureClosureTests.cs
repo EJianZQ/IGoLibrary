@@ -176,6 +176,68 @@ public sealed class ArchitectureClosureTests
         }
     }
 
+    [Fact]
+    public void MigratedMainWindowWorkflowFacadeFiles_DoNotOwnObservableStateOrCommands()
+    {
+        var viewModelRoot = Path.Combine(GetRepositoryRoot().FullName, "src", "IGoLibrary.Ex.Desktop", "ViewModels");
+        var facadeFiles = new[]
+        {
+            "MainWindowWorkflowViewModel.CoordinatorStatusLogs.cs",
+            "MainWindowWorkflowViewModel.Navigation.cs",
+            "MainWindowWorkflowViewModel.Notifications.cs",
+            "MainWindowWorkflowViewModel.ProtocolTemplates.cs",
+            "MainWindowWorkflowViewModel.UpdatesLinks.cs",
+            "MainWindowWorkflowViewModel.GlobalLeak.cs",
+            "MainWindowWorkflowViewModel.Grab.cs",
+            "MainWindowWorkflowViewModel.TomorrowReservation.cs",
+            "MainWindowWorkflowViewModel.SeatSelection.cs",
+            "MainWindowWorkflowViewModel.Venue.cs",
+            "MainWindowWorkflowViewModel.LanCookieRelay.cs",
+            "MainWindowWorkflowViewModel.ReservationOccupyAutoRelease.cs",
+            "MainWindowWorkflowViewModel.Session.cs",
+            "MainWindowWorkflowViewModel.HomeDashboard.cs",
+            "MainWindowWorkflowViewModel.Settings.cs",
+            "MainWindowWorkflowViewModel.Theme.cs"
+        };
+
+        foreach (var fileName in facadeFiles)
+        {
+            var text = File.ReadAllText(Path.Combine(viewModelRoot, fileName));
+            Assert.DoesNotContain("[ObservableProperty]", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("[RelayCommand]", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void ExtractedPageViewModels_DoNotReferenceMainWindowWorkflowViewModel()
+    {
+        var viewModelRoot = Path.Combine(GetRepositoryRoot().FullName, "src", "IGoLibrary.Ex.Desktop", "ViewModels");
+        var extractedFiles = new[]
+        {
+            "ActivityLogPanelViewModel.cs",
+            "ShellNavigationViewModel.cs",
+            "NotificationSettingsViewModel.Settings.cs",
+            "ProtocolTemplatesViewModel.cs",
+            "UpdateLinksViewModel.cs",
+            "GlobalLeakPageViewModel.cs",
+            "GrabPageViewModel.cs",
+            "TomorrowReservationPageViewModel.cs",
+            "MultiSeatSelectionViewModel.cs",
+            "AccountVenueViewModel.cs",
+            "LanCookieRelayViewModel.cs",
+            "OccupyPageViewModel.cs",
+            "SessionViewModel.cs",
+            "HomeDashboardViewModel.cs",
+            "SystemSettingsViewModel.cs"
+        };
+
+        foreach (var fileName in extractedFiles)
+        {
+            var text = File.ReadAllText(Path.Combine(viewModelRoot, fileName));
+            Assert.DoesNotContain("MainWindowWorkflowViewModel", text, StringComparison.Ordinal);
+        }
+    }
+
     private static IEnumerable<string> EnumerateProductionFiles(string repositoryRoot)
     {
         var srcRoot = Path.Combine(repositoryRoot, "src");

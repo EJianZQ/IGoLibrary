@@ -139,7 +139,7 @@ public sealed class MainWindowClipboardTests
         var activityLogService = new ActivityLogService();
         var taskAlertService = new FakeTaskEventAlertDispatcher();
 
-        return new MainWindowViewModel(
+        return MainWindowViewModelTestHarness.Create(
             new SessionWorkflowService(apiClient, sessionService),
             new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
             new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),
