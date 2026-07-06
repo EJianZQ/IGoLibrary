@@ -144,8 +144,8 @@ public sealed class ArchitectureClosureTests
     [Fact]
     public void MainWindowViewModelShellFiles_StaySmallAndDoNotContainPageBusinessCommands()
     {
-        var viewModelRoot = Path.Combine(GetRepositoryRoot().FullName, "src", "IGoLibrary.Ex.Desktop", "ViewModels");
-        var files = Directory.EnumerateFiles(viewModelRoot, "MainWindowViewModel*.cs", SearchOption.TopDirectoryOnly)
+        var shellViewModelRoot = Path.Combine(GetRepositoryRoot().FullName, "src", "IGoLibrary.Ex.Desktop", "ViewModels", "Shell");
+        var files = Directory.EnumerateFiles(shellViewModelRoot, "MainWindowViewModel*.cs", SearchOption.TopDirectoryOnly)
             .ToArray();
         var lineCount = files.Sum(file => File.ReadLines(file).Count());
 
@@ -182,22 +182,22 @@ public sealed class ArchitectureClosureTests
         var viewModelRoot = Path.Combine(GetRepositoryRoot().FullName, "src", "IGoLibrary.Ex.Desktop", "ViewModels");
         var facadeFiles = new[]
         {
-            "MainWindowWorkflowViewModel.CoordinatorStatusLogs.cs",
-            "MainWindowWorkflowViewModel.Navigation.cs",
-            "MainWindowWorkflowViewModel.Notifications.cs",
-            "MainWindowWorkflowViewModel.ProtocolTemplates.cs",
-            "MainWindowWorkflowViewModel.UpdatesLinks.cs",
-            "MainWindowWorkflowViewModel.GlobalLeak.cs",
-            "MainWindowWorkflowViewModel.Grab.cs",
-            "MainWindowWorkflowViewModel.TomorrowReservation.cs",
-            "MainWindowWorkflowViewModel.SeatSelection.cs",
-            "MainWindowWorkflowViewModel.Venue.cs",
-            "MainWindowWorkflowViewModel.LanCookieRelay.cs",
-            "MainWindowWorkflowViewModel.ReservationOccupyAutoRelease.cs",
-            "MainWindowWorkflowViewModel.Session.cs",
-            "MainWindowWorkflowViewModel.HomeDashboard.cs",
-            "MainWindowWorkflowViewModel.Settings.cs",
-            "MainWindowWorkflowViewModel.Theme.cs"
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.CoordinatorStatusLogs.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.Navigation.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.Notifications.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.ProtocolTemplates.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.UpdatesLinks.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.GlobalLeak.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.Grab.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.TomorrowReservation.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.SeatSelection.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.Venue.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.LanCookieRelay.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.ReservationOccupyAutoRelease.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.Session.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.HomeDashboard.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.Settings.cs"),
+            Path.Combine("Shell", "MainWindowWorkflowViewModel.Theme.cs")
         };
 
         foreach (var fileName in facadeFiles)
@@ -214,21 +214,21 @@ public sealed class ArchitectureClosureTests
         var viewModelRoot = Path.Combine(GetRepositoryRoot().FullName, "src", "IGoLibrary.Ex.Desktop", "ViewModels");
         var extractedFiles = new[]
         {
-            "ActivityLogPanelViewModel.cs",
-            "ShellNavigationViewModel.cs",
-            "NotificationSettingsViewModel.Settings.cs",
-            "ProtocolTemplatesViewModel.cs",
-            "UpdateLinksViewModel.cs",
-            "GlobalLeakPageViewModel.cs",
-            "GrabPageViewModel.cs",
-            "TomorrowReservationPageViewModel.cs",
-            "MultiSeatSelectionViewModel.cs",
-            "AccountVenueViewModel.cs",
-            "LanCookieRelayViewModel.cs",
-            "OccupyPageViewModel.cs",
-            "SessionViewModel.cs",
-            "HomeDashboardViewModel.cs",
-            "SystemSettingsViewModel.cs"
+            Path.Combine("Components", "ActivityLogPanelViewModel.cs"),
+            Path.Combine("Shell", "ShellNavigationViewModel.cs"),
+            Path.Combine("Pages", "NotificationSettingsViewModel.Settings.cs"),
+            Path.Combine("Pages", "ProtocolTemplatesViewModel.cs"),
+            Path.Combine("Pages", "UpdateLinksViewModel.cs"),
+            Path.Combine("Pages", "GlobalLeakPageViewModel.cs"),
+            Path.Combine("Pages", "GrabPageViewModel.cs"),
+            Path.Combine("Pages", "TomorrowReservationPageViewModel.cs"),
+            Path.Combine("Components", "MultiSeatSelectionViewModel.cs"),
+            Path.Combine("Pages", "AccountVenueViewModel.cs"),
+            Path.Combine("Pages", "LanCookieRelayViewModel.cs"),
+            Path.Combine("Pages", "OccupyPageViewModel.cs"),
+            Path.Combine("Pages", "SessionViewModel.cs"),
+            Path.Combine("Pages", "HomeDashboardViewModel.cs"),
+            Path.Combine("Pages", "SystemSettingsViewModel.cs")
         };
 
         foreach (var fileName in extractedFiles)
