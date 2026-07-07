@@ -874,38 +874,14 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsLanCookieRelayRunning);
         Assert.True(viewModel.ShowLanCookieRelayStartedStatusIcon);
         Assert.Equal("服务已启动，监听端口 49152", viewModel.LanCookieRelayStatusText);
-        Assert.Equal(0, viewModel.SelectedLanCookieRelayStepIndex);
-        Assert.True(viewModel.IsLanCookieRelayAuthorizationQrMode);
-        Assert.False(viewModel.IsLanCookieRelaySubmitQrMode);
-        Assert.False(viewModel.CanGoToPreviousLanCookieRelayStep);
-        Assert.True(viewModel.CanGoToNextLanCookieRelayStep);
-        Assert.Equal("第一步：获取授权链接", viewModel.LanCookieRelayStepTitle);
-        Assert.Contains("微信扫描", viewModel.LanCookieRelayStepHint);
-        Assert.False(viewModel.ShowLanCookieRelaySubmitQrImage);
-        Assert.False(viewModel.ShowLanCookieRelaySubmitQrLoading);
+        Assert.True(viewModel.HasLanCookieRelayQrImage);
+        Assert.False(viewModel.HasNoLanCookieRelayQrImage);
         Assert.Equal(relayService.NextSession.Url.ToString(), viewModel.LanCookieRelayUrlText);
         Assert.Equal([relayService.NextSession.Url.ToString()], qrCodeFactory.CreatedTexts);
         Assert.Equal(1, relayService.StartCalls);
 
         viewModel.LanCookieRelayStatusText = "启动文案被调整";
         Assert.True(viewModel.ShowLanCookieRelayStartedStatusIcon);
-
-        viewModel.GoToNextLanCookieRelayStepCommand.Execute(null);
-
-        Assert.Equal(1, viewModel.SelectedLanCookieRelayStepIndex);
-        Assert.True(viewModel.IsLanCookieRelaySubmitQrMode);
-        Assert.False(viewModel.IsLanCookieRelayAuthorizationQrMode);
-        Assert.True(viewModel.CanGoToPreviousLanCookieRelayStep);
-        Assert.False(viewModel.CanGoToNextLanCookieRelayStep);
-        Assert.Equal("第二步：发送到电脑", viewModel.LanCookieRelayStepTitle);
-        Assert.True(viewModel.ShowLanCookieRelaySubmitQrImage);
-        Assert.False(viewModel.ShowLanCookieRelaySubmitQrLoading);
-        Assert.Contains("手机提交页", viewModel.LanCookieRelayStepHint);
-
-        viewModel.GoToPreviousLanCookieRelayStepCommand.Execute(null);
-
-        Assert.Equal(0, viewModel.SelectedLanCookieRelayStepIndex);
-        Assert.True(viewModel.IsLanCookieRelayAuthorizationQrMode);
     }
 
     [Fact]

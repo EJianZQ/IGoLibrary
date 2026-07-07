@@ -1,5 +1,4 @@
 using Avalonia.Media;
-using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using IGoLibrary.Ex.Desktop.Services;
@@ -27,22 +26,6 @@ public partial class MainWindowWorkflowViewModel
 
     public string LanCookieRelayCloseButtonText => LanCookieRelay.LanCookieRelayCloseButtonText;
 
-    public int SelectedLanCookieRelayStepIndex
-    {
-        get => LanCookieRelay.SelectedLanCookieRelayStepIndex;
-        set => LanCookieRelay.SelectedLanCookieRelayStepIndex = value;
-    }
-
-    public bool IsLanCookieRelayAuthorizationQrMode => LanCookieRelay.IsLanCookieRelayAuthorizationQrMode;
-
-    public bool IsLanCookieRelaySubmitQrMode => LanCookieRelay.IsLanCookieRelaySubmitQrMode;
-
-    public bool CanGoToPreviousLanCookieRelayStep => LanCookieRelay.CanGoToPreviousLanCookieRelayStep;
-
-    public bool CanGoToNextLanCookieRelayStep => LanCookieRelay.CanGoToNextLanCookieRelayStep;
-
-    public string LanCookieRelayStepTitle => LanCookieRelay.LanCookieRelayStepTitle;
-
     public string LanCookieRelayUrlText
     {
         get => LanCookieRelay.LanCookieRelayUrlText;
@@ -69,11 +52,7 @@ public partial class MainWindowWorkflowViewModel
 
     public bool HasLanCookieRelayQrImage => LanCookieRelay.HasLanCookieRelayQrImage;
 
-    public bool ShowLanCookieRelaySubmitQrImage => LanCookieRelay.ShowLanCookieRelaySubmitQrImage;
-
-    public bool ShowLanCookieRelaySubmitQrLoading => LanCookieRelay.ShowLanCookieRelaySubmitQrLoading;
-
-    public string LanCookieRelayStepHint => LanCookieRelay.LanCookieRelayStepHint;
+    public bool HasNoLanCookieRelayQrImage => LanCookieRelay.HasNoLanCookieRelayQrImage;
 
     public IAsyncRelayCommand StartLanCookieRelayCommand
     {
@@ -92,10 +71,6 @@ public partial class MainWindowWorkflowViewModel
             return LanCookieRelay.CloseLanCookieRelayCommand;
         }
     }
-
-    public IRelayCommand GoToNextLanCookieRelayStepCommand => LanCookieRelay.GoToNextLanCookieRelayStepCommand;
-
-    public IRelayCommand GoToPreviousLanCookieRelayStepCommand => LanCookieRelay.GoToPreviousLanCookieRelayStepCommand;
 
     private void EnsureLanCookieRelayConfigured()
     {
@@ -137,19 +112,11 @@ public partial class MainWindowWorkflowViewModel
             nameof(LanCookieRelay.IsLanCookieRelayRunning),
             nameof(LanCookieRelay.CanStartLanCookieRelay),
             nameof(LanCookieRelay.LanCookieRelayCloseButtonText),
-            nameof(LanCookieRelay.SelectedLanCookieRelayStepIndex),
-            nameof(LanCookieRelay.IsLanCookieRelayAuthorizationQrMode),
-            nameof(LanCookieRelay.IsLanCookieRelaySubmitQrMode),
-            nameof(LanCookieRelay.CanGoToPreviousLanCookieRelayStep),
-            nameof(LanCookieRelay.CanGoToNextLanCookieRelayStep),
-            nameof(LanCookieRelay.LanCookieRelayStepTitle),
             nameof(LanCookieRelay.LanCookieRelayUrlText),
             nameof(LanCookieRelay.LanCookieRelayStatusText),
             nameof(LanCookieRelay.ShowLanCookieRelayStartedStatusIcon),
             nameof(LanCookieRelay.LanCookieRelayQrImage),
             nameof(LanCookieRelay.HasLanCookieRelayQrImage),
-            nameof(LanCookieRelay.ShowLanCookieRelaySubmitQrImage),
-            nameof(LanCookieRelay.ShowLanCookieRelaySubmitQrLoading),
-            nameof(LanCookieRelay.LanCookieRelayStepHint));
+            nameof(LanCookieRelay.HasNoLanCookieRelayQrImage));
     }
 }

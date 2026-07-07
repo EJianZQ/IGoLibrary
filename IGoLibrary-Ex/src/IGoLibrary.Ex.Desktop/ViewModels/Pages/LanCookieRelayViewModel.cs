@@ -1,5 +1,4 @@
 using Avalonia.Media;
-using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -30,21 +29,6 @@ public sealed partial class LanCookieRelayViewModel(
     public string LanCookieRelayCloseButtonText => IsLanCookieRelayRunning ? "停止并关闭" : "关闭";
 
     [ObservableProperty]
-    private int selectedLanCookieRelayStepIndex;
-
-    public bool IsLanCookieRelayAuthorizationQrMode => SelectedLanCookieRelayStepIndex == 0;
-
-    public bool IsLanCookieRelaySubmitQrMode => !IsLanCookieRelayAuthorizationQrMode;
-
-    public bool CanGoToPreviousLanCookieRelayStep => SelectedLanCookieRelayStepIndex > 0;
-
-    public bool CanGoToNextLanCookieRelayStep => SelectedLanCookieRelayStepIndex < 1;
-
-    public string LanCookieRelayStepTitle => IsLanCookieRelayAuthorizationQrMode
-        ? "第一步：获取授权链接"
-        : "第二步：发送到电脑";
-
-    [ObservableProperty]
     private string lanCookieRelayUrlText = string.Empty;
 
     [ObservableProperty]
@@ -58,13 +42,7 @@ public sealed partial class LanCookieRelayViewModel(
 
     public bool HasLanCookieRelayQrImage => LanCookieRelayQrImage is not null;
 
-    public bool ShowLanCookieRelaySubmitQrImage => IsLanCookieRelaySubmitQrMode && HasLanCookieRelayQrImage;
-
-    public bool ShowLanCookieRelaySubmitQrLoading => IsLanCookieRelaySubmitQrMode && !HasLanCookieRelayQrImage;
-
-    public string LanCookieRelayStepHint => IsLanCookieRelayAuthorizationQrMode
-        ? "用微信扫描此二维码完成“我去图书馆”授权，并复制授权链接"
-        : "复制授权链接后，用微信扫描此二维码打开手机提交页";
+    public bool HasNoLanCookieRelayQrImage => !HasLanCookieRelayQrImage;
 
     public void Configure(Func<string, Task<LanCookieRelayLinkSubmitResult>> submitLinkAsync)
     {
@@ -134,32 +112,7 @@ public sealed partial class LanCookieRelayViewModel(
     partial void OnLanCookieRelayQrImageChanged(IImage? value)
     {
         OnPropertyChanged(nameof(HasLanCookieRelayQrImage));
-        OnPropertyChanged(nameof(ShowLanCookieRelaySubmitQrImage));
-        OnPropertyChanged(nameof(ShowLanCookieRelaySubmitQrLoading));
-    }
-
-    partial void OnSelectedLanCookieRelayStepIndexChanged(int value)
-    {
-        if (value < 0)
-        {
-            SelectedLanCookieRelayStepIndex = 0;
-            return;
-        }
-
-        if (value > 1)
-        {
-            SelectedLanCookieRelayStepIndex = 1;
-            return;
-        }
-
-        OnPropertyChanged(nameof(IsLanCookieRelayAuthorizationQrMode));
-        OnPropertyChanged(nameof(IsLanCookieRelaySubmitQrMode));
-        OnPropertyChanged(nameof(CanGoToPreviousLanCookieRelayStep));
-        OnPropertyChanged(nameof(CanGoToNextLanCookieRelayStep));
-        OnPropertyChanged(nameof(LanCookieRelayStepTitle));
-        OnPropertyChanged(nameof(ShowLanCookieRelaySubmitQrImage));
-        OnPropertyChanged(nameof(ShowLanCookieRelaySubmitQrLoading));
-        OnPropertyChanged(nameof(LanCookieRelayStepHint));
+        OnPropertyChanged(nameof(HasNoLanCookieRelayQrImage));
     }
 
     [RelayCommand]
@@ -173,7 +126,6 @@ public sealed partial class LanCookieRelayViewModel(
         try
         {
             IsLanCookieRelayDialogOpen = true;
-            SelectedLanCookieRelayStepIndex = 0;
             LanCookieRelayStatusText = "正在启动局域网快传...";
             ShowLanCookieRelayStartedStatusIcon = false;
             LanCookieRelayUrlText = string.Empty;
@@ -203,24 +155,6 @@ public sealed partial class LanCookieRelayViewModel(
     private async Task CloseLanCookieRelayAsync()
     {
         await StopSessionAsync(closeDialog: true);
-    }
-
-    [RelayCommand]
-    private void GoToNextLanCookieRelayStep()
-    {
-        if (CanGoToNextLanCookieRelayStep)
-        {
-            SelectedLanCookieRelayStepIndex++;
-        }
-    }
-
-    [RelayCommand]
-    private void GoToPreviousLanCookieRelayStep()
-    {
-        if (CanGoToPreviousLanCookieRelayStep)
-        {
-            SelectedLanCookieRelayStepIndex--;
-        }
     }
 
     private async Task<LanCookieRelaySubmitResult> SubmitLanCookieRelayLinkAsync(

@@ -50,6 +50,7 @@ public sealed class LanCookieRelayService(
 
             var app = builder.Build();
             app.MapGet("/", context => WriteLandingPageAsync(context, token));
+            app.MapGet("/auth-qrcode", context => WriteAuthQrCodeAsync(context, token));
             app.MapPost("/submit", context => HandleSubmitAsync(context, token, submitHandler));
             app.MapFallback(context => WriteJsonAsync(
                 context,
@@ -183,6 +184,25 @@ public sealed class LanCookieRelayService(
         SetNoStore(context);
         context.Response.ContentType = "text/html; charset=utf-8";
         await context.Response.WriteAsync(LanCookieRelayMobilePage.Build(token), context.RequestAborted);
+    }
+
+    private static async Task WriteAuthQrCodeAsync(HttpContext context, string token)
+    {
+        if (!IsValidToken(context, token))
+        {
+            await WriteJsonAsync(
+                context,
+                StatusCodes.Status403Forbidden,
+                LanCookieRelaySubmitResult.Failed("快传会话无效，请重新在电脑端启动局域网快传"));
+            return;
+        }
+
+        SetNoStore(context);
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.ContentType = "image/png";
+        var pngBytes = AuthQrCodeImageResource.GetPngBytes();
+        context.Response.ContentLength = pngBytes.Length;
+        await context.Response.Body.WriteAsync(pngBytes, context.RequestAborted);
     }
 
     private async Task StopAfterTimeoutAsync(Guid sessionId, CancellationToken cancellationToken)

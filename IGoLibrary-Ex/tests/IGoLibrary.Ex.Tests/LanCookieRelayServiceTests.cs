@@ -36,8 +36,44 @@ public sealed class LanCookieRelayServiceTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(response.Headers.CacheControl?.NoStore);
-        Assert.Contains("发送授权链接到电脑", html);
+        Assert.Contains("局域网快传", html);
+        Assert.Contains("微信授权二维码", html);
+        Assert.Contains("/auth-qrcode?token=' + encodeURIComponent(token)", html);
         Assert.Contains("navigator.clipboard.readText", html);
+    }
+
+    [Fact]
+    public async Task GetAuthQrCode_WithValidToken_ReturnsPngWithNoStore()
+    {
+        await using var service = CreateService();
+        var session = await service.StartAsync((_, _) =>
+            Task.FromResult(LanCookieRelaySubmitResult.Succeeded("ok")));
+        using var client = new HttpClient();
+
+        using var response = await client.GetAsync(BuildAuthQrCodeUri(session));
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
+        Assert.True(bytes.Length > 8);
+        Assert.Equal(0x89, bytes[0]);
+        Assert.Equal((byte)'P', bytes[1]);
+        Assert.Equal((byte)'N', bytes[2]);
+        Assert.Equal((byte)'G', bytes[3]);
+    }
+
+    [Fact]
+    public async Task GetAuthQrCode_WithInvalidToken_IsRejected()
+    {
+        await using var service = CreateService();
+        var session = await service.StartAsync((_, _) =>
+            Task.FromResult(LanCookieRelaySubmitResult.Succeeded("ok")));
+        using var client = new HttpClient();
+
+        using var response = await client.GetAsync(BuildAuthQrCodeUri(session, "bad-token"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -226,6 +262,15 @@ public sealed class LanCookieRelayServiceTests
     private static Uri BuildSubmitUri(LanCookieRelaySession session, string? token = null)
     {
         var builder = new UriBuilder(new Uri(session.Url, "/submit"))
+        {
+            Query = token is null ? session.Url.Query.TrimStart('?') : $"token={Uri.EscapeDataString(token)}"
+        };
+        return builder.Uri;
+    }
+
+    private static Uri BuildAuthQrCodeUri(LanCookieRelaySession session, string? token = null)
+    {
+        var builder = new UriBuilder(new Uri(session.Url, "/auth-qrcode"))
         {
             Query = token is null ? session.Url.Query.TrimStart('?') : $"token={Uri.EscapeDataString(token)}"
         };

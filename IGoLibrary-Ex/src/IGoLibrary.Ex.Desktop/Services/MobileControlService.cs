@@ -179,7 +179,7 @@ public sealed class MobileControlService(
         SetNoStore(context);
         context.Response.Headers["X-Content-Type-Options"] = "nosniff";
         context.Response.ContentType = "image/png";
-        var pngBytes = MobileControlAuthQrCodeImage.GetPngBytes();
+        var pngBytes = AuthQrCodeImageResource.GetPngBytes();
         context.Response.ContentLength = pngBytes.Length;
         await context.Response.Body.WriteAsync(pngBytes, context.RequestAborted);
     }

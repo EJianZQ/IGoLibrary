@@ -3048,7 +3048,7 @@
                   Padding="24"
                   HorizontalAlignment="Center"
                   VerticalAlignment="Center">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto"
                   RowSpacing="18">
               <Grid ColumnDefinitions="*,Auto"
                     ColumnSpacing="12">
@@ -3079,11 +3079,11 @@
 
               <StackPanel Grid.Row="1"
                           Spacing="8">
-                <TextBlock Text="{Binding LanCookieRelayStepTitle}"
+                <TextBlock Text="扫描局域网快传页"
                            FontSize="16"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource SemiTextPrimaryBrush}" />
-                <TextBlock Text="{Binding LanCookieRelayStepHint}"
+                <TextBlock Text="用微信扫描下方二维码打开提交页；页面内可长按识别授权二维码，复制链接后直接提交。"
                            Classes="helper-text" />
               </StackPanel>
 
@@ -3096,42 +3096,19 @@
                       HorizontalAlignment="Center">
                 <Grid Width="256"
                       Height="256">
-                  <Image Source="/Assets/qrcode.png"
-                         Stretch="Uniform"
-                         IsVisible="{Binding IsLanCookieRelayAuthorizationQrMode}" />
                   <Image Source="{Binding LanCookieRelayQrImage}"
-                         Stretch="Uniform"
-                         IsVisible="{Binding ShowLanCookieRelaySubmitQrImage}" />
+                          Stretch="Uniform"
+                         IsVisible="{Binding HasLanCookieRelayQrImage}" />
                   <TextBlock Text="正在生成二维码..."
                              Classes="helper-text"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
-                             IsVisible="{Binding ShowLanCookieRelaySubmitQrLoading}" />
+                             IsVisible="{Binding HasNoLanCookieRelayQrImage}" />
                 </Grid>
               </Border>
 
-              <Grid Grid.Row="3"
-                    ColumnDefinitions="*,Auto,Auto"
-                    ColumnSpacing="12">
-                <Button Grid.Column="1"
-                        Content="上一步"
-                        Command="{Binding GoToPreviousLanCookieRelayStepCommand}"
-                        IsVisible="{Binding CanGoToPreviousLanCookieRelayStep}"
-                        Classes="Secondary"
-                        HorizontalContentAlignment="Center" />
-                <Button Grid.Column="2"
-                        Content="下一步"
-                        Command="{Binding GoToNextLanCookieRelayStepCommand}"
-                        IsVisible="{Binding CanGoToNextLanCookieRelayStep}"
-                        Background="{DynamicResource AppAccentBrush}"
-                        Foreground="{DynamicResource AppAccentForegroundBrush}"
-                        FontWeight="Bold"
-                        HorizontalContentAlignment="Center" />
-              </Grid>
-
-              <StackPanel Grid.Row="4"
-                          Spacing="8"
-                          IsVisible="{Binding IsLanCookieRelaySubmitQrMode}">
+              <StackPanel Grid.Row="3"
+                          Spacing="8">
                 <TextBlock Classes="field-label" Text="手机访问地址" />
                 <TextBox Text="{Binding LanCookieRelayUrlText}"
                          IsReadOnly="True"
