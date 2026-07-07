@@ -2555,6 +2555,95 @@
                   </Grid>
 
                   <Grid HorizontalAlignment="Stretch">
+                    <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+                          RowSpacing="18"
+                          HorizontalAlignment="Stretch">
+                      <StackPanel Grid.Row="0"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
+                                   Text="Bark 服务端地址" />
+                        <TextBox Text="{Binding BarkAlertApiBaseUrl}"
+                                 Watermark="https://api.day.app"
+                                 HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <Grid Grid.Row="1"
+                            ColumnDefinitions="*,*"
+                            ColumnSpacing="24">
+                        <StackPanel Grid.Column="0"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="Device Key" />
+                          <TextBox Text="{Binding BarkAlertDeviceKey}"
+                                   PasswordChar="●"
+                                   Watermark="从 Bark App 测试 URL 中复制"
+                                   HorizontalAlignment="Stretch" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="通知级别" />
+                          <ComboBox ItemsSource="{Binding BarkAlertLevels}"
+                                    SelectedIndex="{Binding SelectedBarkAlertLevelIndex}"
+                                    HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                      </Grid>
+
+                      <Grid Grid.Row="2"
+                            ColumnDefinitions="*,*"
+                            ColumnSpacing="24">
+                        <StackPanel Grid.Column="0"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="分组" />
+                          <TextBox Text="{Binding BarkAlertGroup}"
+                                   Watermark="IGoLibrary-Ex"
+                                   HorizontalAlignment="Stretch" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="铃声" />
+                          <TextBox Text="{Binding BarkAlertSound}"
+                                   Watermark="alarm"
+                                   HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                      </Grid>
+
+                      <Grid Grid.Row="3"
+                            ColumnDefinitions="*,Auto"
+                            ColumnSpacing="16"
+                            Margin="0,8,0,0">
+                        <Border Classes="notify-toggle-card">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                            <StackPanel Spacing="4">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="开启 Bark 推送" />
+                              <TextBlock Classes="helper-text"
+                                         Text="Cookie 失效、抢座成功或任务失败时，会通过 Bark 向绑定 iPhone 发送推送提醒" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          IsChecked="{Binding BarkAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Button Grid.Column="1"
+                                Content="发送测试 Bark"
+                                Command="{Binding SendTestBarkAlertCommand}"
+                                Background="{DynamicResource SemiAccentBrush}"
+                                Foreground="{DynamicResource AppAccentForegroundBrush}"
+                                MinWidth="160" />
+                      </Grid>
+                    </Grid>
+                  </Grid>
+
+                  <Grid HorizontalAlignment="Stretch">
                     <StackPanel Spacing="18"
                                 HorizontalAlignment="Stretch">
                       <Border Classes="notify-toggle-card">

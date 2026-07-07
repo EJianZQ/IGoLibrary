@@ -16,9 +16,13 @@ public sealed partial class NotificationSettingsViewModel
         TimeSpan.FromMilliseconds(450),
         cancellationToken => SaveNotificationSettingsAsync(BuildTaskEventAlertSettingsSnapshot(), cancellationToken));
 
+    private static readonly string[] BarkAlertLevelValues = ["", "active", "timeSensitive", "passive", "critical"];
+
     public string[] EmailSecurityModes { get; } = ["无", "TLS"];
 
-    public string[] NotificationSettingsCategories { get; } = ["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "弹窗提醒配置"];
+    public string[] BarkAlertLevels { get; } = ["默认", "主动 active", "时效 timeSensitive", "静默 passive", "重要 critical"];
+
+    public string[] NotificationSettingsCategories { get; } = ["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "Bark 推送配置", "弹窗提醒配置"];
 
     [ObservableProperty]
     private bool emailAlertsEnabled;
@@ -55,6 +59,24 @@ public sealed partial class NotificationSettingsViewModel
 
     [ObservableProperty]
     private string telegramAlertChatId = string.Empty;
+
+    [ObservableProperty]
+    private bool barkAlertsEnabled;
+
+    [ObservableProperty]
+    private string barkAlertApiBaseUrl = BarkAlertChannelSettings.DefaultApiBaseUrl;
+
+    [ObservableProperty]
+    private string barkAlertDeviceKey = string.Empty;
+
+    [ObservableProperty]
+    private string barkAlertGroup = string.Empty;
+
+    [ObservableProperty]
+    private string barkAlertSound = string.Empty;
+
+    [ObservableProperty]
+    private int selectedBarkAlertLevelIndex;
 
     [ObservableProperty]
     private bool localToastAlertsEnabled = true;
@@ -104,6 +126,18 @@ public sealed partial class NotificationSettingsViewModel
 
     partial void OnTelegramAlertChatIdChanged(string value) => ScheduleAutoSave();
 
+    partial void OnBarkAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnBarkAlertApiBaseUrlChanged(string value) => ScheduleAutoSave();
+
+    partial void OnBarkAlertDeviceKeyChanged(string value) => ScheduleAutoSave();
+
+    partial void OnBarkAlertGroupChanged(string value) => ScheduleAutoSave();
+
+    partial void OnBarkAlertSoundChanged(string value) => ScheduleAutoSave();
+
+    partial void OnSelectedBarkAlertLevelIndexChanged(int value) => ScheduleAutoSave();
+
     partial void OnLocalToastAlertsEnabledChanged(bool value) => ScheduleAutoSave();
 
     partial void OnLocalSoundAlertsEnabledChanged(bool value) => ScheduleAutoSave();
@@ -134,6 +168,7 @@ public sealed partial class NotificationSettingsViewModel
     {
         var alertSettings = settings.Notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
         var eventSettings = alertSettings.Events ?? TaskEventAlertEventSettings.Default;
+        var barkSettings = alertSettings.Bark ?? BarkAlertChannelSettings.Default;
 
         EmailAlertsEnabled = alertSettings.Email.Enabled;
         EmailAlertSmtpHost = alertSettings.Email.SmtpHost;
@@ -149,6 +184,14 @@ public sealed partial class NotificationSettingsViewModel
             : alertSettings.Telegram.ApiBaseUrl;
         TelegramAlertBotToken = alertSettings.Telegram.BotToken ?? string.Empty;
         TelegramAlertChatId = alertSettings.Telegram.ChatId ?? string.Empty;
+        BarkAlertsEnabled = barkSettings.Enabled;
+        BarkAlertApiBaseUrl = string.IsNullOrWhiteSpace(barkSettings.ApiBaseUrl)
+            ? BarkAlertChannelSettings.DefaultApiBaseUrl
+            : barkSettings.ApiBaseUrl;
+        BarkAlertDeviceKey = barkSettings.DeviceKey ?? string.Empty;
+        BarkAlertGroup = barkSettings.Group ?? string.Empty;
+        BarkAlertSound = barkSettings.Sound ?? string.Empty;
+        SelectedBarkAlertLevelIndex = FindBarkAlertLevelIndex(barkSettings.Level);
         LocalToastAlertsEnabled = alertSettings.Local.PopupEnabled;
         LocalSoundAlertsEnabled = alertSettings.Local.SoundEnabled;
         GrabSucceededAlertsEnabled = eventSettings.GrabSucceeded;
@@ -216,6 +259,23 @@ public sealed partial class NotificationSettingsViewModel
     }
 
     [RelayCommand]
+    private async Task SendTestBarkAlertAsync()
+    {
+        try
+        {
+            AutoSave.Cancel();
+            await PersistSnapshotAsync();
+            await SendTestBarkAsync(BuildTaskEventAlertSettingsSnapshot().Bark);
+            await notificationService.ShowSuccessAsync("测试 Bark 已发送", "请检查 Bark App，确认当前推送配置可用");
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Bark 失败：{ex.Message}");
+            await errorDialogService.ShowErrorAsync("测试 Bark 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
+        }
+    }
+
+    [RelayCommand]
     private async Task SendTestLocalAlertAsync()
     {
         try
@@ -259,7 +319,14 @@ public sealed partial class NotificationSettingsViewModel
                 GlobalLeakSucceeded = GlobalLeakSucceededAlertsEnabled,
                 SessionInvalid = SessionInvalidAlertsEnabled,
                 TaskFailed = TaskFailedAlertsEnabled
-            });
+            },
+            new BarkAlertChannelSettings(
+                BarkAlertsEnabled,
+                NormalizeBarkApiBaseUrlForSnapshot(BarkAlertApiBaseUrl),
+                (BarkAlertDeviceKey ?? string.Empty).Trim(),
+                (BarkAlertGroup ?? string.Empty).Trim(),
+                (BarkAlertSound ?? string.Empty).Trim(),
+                GetSelectedBarkAlertLevel()));
     }
 
     public Task PersistSnapshotAsync(CancellationToken cancellationToken = default)
@@ -284,6 +351,35 @@ public sealed partial class NotificationSettingsViewModel
         return string.IsNullOrWhiteSpace(trimmed)
             ? TelegramAlertChannelSettings.DefaultApiBaseUrl
             : trimmed;
+    }
+
+    private static string NormalizeBarkApiBaseUrlForSnapshot(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim().TrimEnd('/');
+        return string.IsNullOrWhiteSpace(trimmed)
+            ? BarkAlertChannelSettings.DefaultApiBaseUrl
+            : trimmed;
+    }
+
+    private string GetSelectedBarkAlertLevel()
+    {
+        return SelectedBarkAlertLevelIndex >= 0 && SelectedBarkAlertLevelIndex < BarkAlertLevelValues.Length
+            ? BarkAlertLevelValues[SelectedBarkAlertLevelIndex]
+            : string.Empty;
+    }
+
+    private static int FindBarkAlertLevelIndex(string? level)
+    {
+        var normalized = (level ?? string.Empty).Trim();
+        for (var index = 0; index < BarkAlertLevelValues.Length; index++)
+        {
+            if (string.Equals(BarkAlertLevelValues[index], normalized, StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+
+        return 0;
     }
 
     private static string BuildExceptionDetails(Exception exception)

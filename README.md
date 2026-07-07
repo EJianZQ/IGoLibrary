@@ -107,7 +107,7 @@ IGoLibrary-Ex/
 3. 点击 `开始占座` 按钮，确认任务开始后把软件挂在后台即可
 
 ### 7️⃣ 系统提醒
-系统提醒目前包含 Cookie 过期提醒、抢座成功提醒、全域捡漏成功提醒、占座成功提醒、明日预约成功提醒和任务失败提醒，可按需开启本地弹窗、提示音、SMTP 邮件和 Telegram Bot 通知
+系统提醒目前包含 Cookie 过期提醒、抢座成功提醒、全域捡漏成功提醒、占座成功提醒、明日预约成功提醒和任务失败提醒，可按需开启本地弹窗、提示音、SMTP 邮件、Telegram Bot 和 Bark 推送通知
 ####  邮件提醒配置
 参见 [SMTP 邮件提醒配置指南](docs/smtp-email-alert-configuration.md)
 #### Telegram Bot 提醒配置
@@ -147,7 +147,17 @@ https://api.telegram.org/bot<BotToken>/getUpdates
 
 </details>
 
-开启后，Cookie 失效、抢座成功、全域捡漏成功、占座成功、明日预约成功和任务失败都会通过 Telegram Bot 发送提醒。Telegram 发送失败时只会写入应用日志，不会阻塞本地弹窗、邮件或任务执行流程
+开启后，Cookie 失效、抢座成功、全域捡漏成功、占座成功、明日预约成功和任务失败都会通过 Telegram Bot 发送提醒。Telegram 发送失败时只会写入应用日志，不会阻塞本地弹窗、邮件、Bark 或任务执行流程
+#### Bark 推送提醒配置
+1. 在 `通知设置` 页面切换到 `Bark 推送配置` 页
+2. 开启 `Bark 推送`
+3. 填写 `Bark 服务端地址` 和 `Device Key`
+   - `Bark 服务端地址` 默认使用 `https://api.day.app`
+   - 如果使用自建 Bark Server，可以改成自己的服务端地址
+   - `Device Key` 可从 Bark App 首页显示的测试 URL 中复制。例如测试 URL 是 `https://api.day.app/abc123DEF456/Body`，就填写 `abc123DEF456`
+4. 可按需填写 `分组`、`铃声`，并选择通知级别；不填写时使用 Bark 默认行为
+5. 点击 `发送测试 Bark`，确认 iPhone 能收到测试推送后即可保存使用
+
 #### 本地弹窗提醒
 当监测到 Cookie 过期、抢座成功、全域捡漏成功、占座成功、明日预约成功或任务失败时，会在屏幕右下角弹出 Toast 弹窗提醒。如果打开了提示音，还会有相应的提示音
 

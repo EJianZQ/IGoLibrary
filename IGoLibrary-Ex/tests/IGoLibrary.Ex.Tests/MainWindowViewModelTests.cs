@@ -201,7 +201,7 @@ public sealed class MainWindowViewModelTests
     {
         var viewModel = CreateViewModel();
 
-        Assert.Equal(["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "弹窗提醒配置"], viewModel.NotificationSettingsCategories);
+        Assert.Equal(["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "Bark 推送配置", "弹窗提醒配置"], viewModel.NotificationSettingsCategories);
     }
 
     [Fact]
@@ -776,6 +776,126 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_LoadsBarkNotificationSettings()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default,
+                LocalDesktopAlertSettings.Default,
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                new BarkAlertChannelSettings(true, "https://bark.example.com", "key-1", "IGoLibrary-Ex", "alarm", "timeSensitive"))));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.BarkAlertsEnabled);
+        Assert.Equal("https://bark.example.com", viewModel.BarkAlertApiBaseUrl);
+        Assert.Equal("key-1", viewModel.BarkAlertDeviceKey);
+        Assert.Equal("IGoLibrary-Ex", viewModel.BarkAlertGroup);
+        Assert.Equal("alarm", viewModel.BarkAlertSound);
+        Assert.Equal(2, viewModel.SelectedBarkAlertLevelIndex);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_DefaultsNullBarkNotificationStrings()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default,
+                LocalDesktopAlertSettings.Default,
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                new BarkAlertChannelSettings(true, null!, null!, null!, null!, null!))));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.BarkAlertsEnabled);
+        Assert.Equal(BarkAlertChannelSettings.DefaultApiBaseUrl, viewModel.BarkAlertApiBaseUrl);
+        Assert.Equal(string.Empty, viewModel.BarkAlertDeviceKey);
+        Assert.Equal(string.Empty, viewModel.BarkAlertGroup);
+        Assert.Equal(string.Empty, viewModel.BarkAlertSound);
+        Assert.Equal(0, viewModel.SelectedBarkAlertLevelIndex);
+    }
+
+    [Fact]
+    public async Task NotificationSettings_AutoSaveBarkAlerts_WhenFieldsChange()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.BarkAlertsEnabled = true;
+        viewModel.BarkAlertApiBaseUrl = "https://bark.example.com/";
+        viewModel.BarkAlertDeviceKey = " key-1 ";
+        viewModel.BarkAlertGroup = " IGoLibrary-Ex ";
+        viewModel.BarkAlertSound = " alarm ";
+        viewModel.SelectedBarkAlertLevelIndex = 2;
+
+        await WaitForAsync(() =>
+            settingsService.SaveCalls > 0 &&
+            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Bark.DeviceKey == "key-1");
+
+        var bark = Assert.IsType<BarkAlertChannelSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Bark);
+        Assert.True(bark.Enabled);
+        Assert.Equal("https://bark.example.com", bark.ApiBaseUrl);
+        Assert.Equal("key-1", bark.DeviceKey);
+        Assert.Equal("IGoLibrary-Ex", bark.Group);
+        Assert.Equal("alarm", bark.Sound);
+        Assert.Equal("timeSensitive", bark.Level);
+    }
+
+    [Fact]
+    public async Task SendTestBarkAlertAsync_UsesCurrentNotificationSettingsSnapshot()
+    {
+        var alertService = new FakeTaskEventAlertDispatcher();
+        var viewModel = CreateViewModel(taskAlertService: alertService);
+        await viewModel.InitializeAsync();
+
+        viewModel.BarkAlertsEnabled = true;
+        viewModel.BarkAlertApiBaseUrl = "https://bark.example.com/";
+        viewModel.BarkAlertDeviceKey = " key-1 ";
+        viewModel.BarkAlertGroup = " IGoLibrary-Ex ";
+        viewModel.BarkAlertSound = " alarm ";
+        viewModel.SelectedBarkAlertLevelIndex = 2;
+
+        await viewModel.SendTestBarkAlertCommand.ExecuteAsync(null);
+
+        var request = Assert.Single(alertService.TestBarkRequests);
+        Assert.True(request.Enabled);
+        Assert.Equal("https://bark.example.com", request.ApiBaseUrl);
+        Assert.Equal("key-1", request.DeviceKey);
+        Assert.Equal("IGoLibrary-Ex", request.Group);
+        Assert.Equal("alarm", request.Sound);
+        Assert.Equal("timeSensitive", request.Level);
+    }
+
+    [Fact]
+    public async Task SendTestBarkAlertAsync_ShowsErrorDialog_WhenSendingFails()
+    {
+        var alertService = new FakeTaskEventAlertDispatcher
+        {
+            SendTestBarkException = new InvalidOperationException("bark send failed")
+        };
+        var errorDialogService = new FakeErrorDialogService();
+        var viewModel = CreateViewModel(
+            taskAlertService: alertService,
+            errorDialogService: errorDialogService);
+        await viewModel.InitializeAsync();
+
+        viewModel.BarkAlertApiBaseUrl = "https://bark.example.com";
+        viewModel.BarkAlertDeviceKey = "key-1";
+
+        await viewModel.SendTestBarkAlertCommand.ExecuteAsync(null);
+
+        var error = Assert.Single(errorDialogService.Errors);
+        Assert.Equal("测试 Bark 发送失败", error.Title);
+        Assert.Equal(nameof(InvalidOperationException), error.ErrorType);
+        Assert.Equal("bark send failed", error.ErrorMessage);
+    }
+
+    [Fact]
     public async Task TryAutoParseClipboardLinkAsync_DoesNotConsumeSameCodeTwice()
     {
         var notificationService = new FakeNotificationService();
@@ -1334,6 +1454,31 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("https://telegram.example.com", telegram.ApiBaseUrl);
         Assert.Equal("token-1", telegram.BotToken);
         Assert.Equal("chat-1", telegram.ChatId);
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_PersistsBarkNotificationSettings()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.BarkAlertsEnabled = true;
+        viewModel.BarkAlertApiBaseUrl = "https://bark.example.com/";
+        viewModel.BarkAlertDeviceKey = " key-1 ";
+        viewModel.BarkAlertGroup = " IGoLibrary-Ex ";
+        viewModel.BarkAlertSound = " alarm ";
+        viewModel.SelectedBarkAlertLevelIndex = 4;
+
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        var bark = Assert.IsType<BarkAlertChannelSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Bark);
+        Assert.True(bark.Enabled);
+        Assert.Equal("https://bark.example.com", bark.ApiBaseUrl);
+        Assert.Equal("key-1", bark.DeviceKey);
+        Assert.Equal("IGoLibrary-Ex", bark.Group);
+        Assert.Equal("alarm", bark.Sound);
+        Assert.Equal("critical", bark.Level);
     }
 
     [Fact]

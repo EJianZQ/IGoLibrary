@@ -15,6 +15,7 @@ public sealed class TaskEventAlertServiceTests
         var service = new DesktopNotificationTestService(
             new FakeEmailAlertSender(),
             new FakeTelegramAlertSender(),
+            new FakeBarkAlertSender(),
             new ToastNotificationService(new AppWindowService()),
             new AlertSoundService());
         var settings = new EmailAlertChannelSettings(
@@ -174,6 +175,7 @@ public sealed class TaskEventAlertServiceTests
     {
         var emailSender = new FakeEmailAlertSender();
         var telegramSender = new FakeTelegramAlertSender();
+        var barkSender = new FakeBarkAlertSender();
         var notificationService = new FakeNotificationService();
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             CreateAllChannelsEnabledSettings(DisableEvent(eventKind))));
@@ -181,12 +183,14 @@ public sealed class TaskEventAlertServiceTests
             settingsService,
             emailSender,
             notificationService: notificationService,
-            telegramSender: telegramSender);
+            telegramSender: telegramSender,
+            barkSender: barkSender);
 
         await NotifyEventAsync(service, eventKind);
 
         Assert.Empty(emailSender.Requests);
         Assert.Empty(telegramSender.Requests);
+        Assert.Empty(barkSender.Requests);
         Assert.Empty(notificationService.Successes);
         Assert.Empty(notificationService.Warnings);
         Assert.Empty(notificationService.Infos);
@@ -253,6 +257,30 @@ public sealed class TaskEventAlertServiceTests
     }
 
     [Fact]
+    public async Task NotifySessionInvalidAsync_SendsBarkUsingPersistedSettings()
+    {
+        var barkSender = new FakeBarkAlertSender();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "timeSensitive"))));
+
+        var service = CreateService(settingsService: settingsService, barkSender: barkSender);
+
+        await service.NotifySessionInvalidAsync("抢座轮询", "Cookie 无效");
+
+        var request = Assert.Single(barkSender.Requests);
+        Assert.Equal("bark-key", request.Settings.DeviceKey);
+        Assert.Equal("Cookie 已失效", request.Title);
+        Assert.Contains("IGoLibrary-Ex Cookie 已失效", request.Body);
+        Assert.Contains("触发模块：抢座轮询", request.Body);
+        Assert.Contains("详细信息：Cookie 无效", request.Body);
+    }
+
+    [Fact]
     public async Task NotifyGrabSucceededAsync_SendsTelegramUsingPersistedSettings()
     {
         var telegramSender = new FakeTelegramAlertSender();
@@ -270,6 +298,29 @@ public sealed class TaskEventAlertServiceTests
         Assert.Contains("IGoLibrary-Ex 抢座成功", request.Message);
         Assert.Contains("目标场馆：自科阅览区一", request.Message);
         Assert.Contains("目标座位：2号座", request.Message);
+    }
+
+    [Fact]
+    public async Task NotifyGrabSucceededAsync_SendsBarkUsingPersistedSettings()
+    {
+        var barkSender = new FakeBarkAlertSender();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "active"))));
+
+        var service = CreateService(settingsService: settingsService, barkSender: barkSender);
+
+        await service.NotifyGrabSucceededAsync("自科阅览区一", "2号座");
+
+        var request = Assert.Single(barkSender.Requests);
+        Assert.Equal("抢座成功", request.Title);
+        Assert.Contains("IGoLibrary-Ex 抢座成功", request.Body);
+        Assert.Contains("目标场馆：自科阅览区一", request.Body);
+        Assert.Contains("目标座位：2号座", request.Body);
     }
 
     [Fact]
@@ -335,6 +386,29 @@ public sealed class TaskEventAlertServiceTests
     }
 
     [Fact]
+    public async Task NotifyTaskFailedAsync_SendsBarkUsingPersistedSettings()
+    {
+        var barkSender = new FakeBarkAlertSender();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "critical"))));
+
+        var service = CreateService(settingsService: settingsService, barkSender: barkSender);
+
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+
+        var request = Assert.Single(barkSender.Requests);
+        Assert.Equal("抢座失败", request.Title);
+        Assert.Contains("IGoLibrary-Ex 抢座任务失败", request.Body);
+        Assert.Contains("任务模块：抢座", request.Body);
+        Assert.Contains("详细信息：预约请求超时", request.Body);
+    }
+
+    [Fact]
     public async Task NotifyTaskFailedAsync_LogsWarningWhenTelegramSendFails_AndContinuesEmail()
     {
         var emailSender = new FakeEmailAlertSender();
@@ -370,6 +444,43 @@ public sealed class TaskEventAlertServiceTests
     }
 
     [Fact]
+    public async Task NotifyTaskFailedAsync_LogsWarningWhenBarkSendFails_AndContinuesEmail()
+    {
+        var emailSender = new FakeEmailAlertSender();
+        var barkSender = new FakeBarkAlertSender
+        {
+            SendException = new InvalidOperationException("bark boom")
+        };
+        var activityLog = new ActivityLogService();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                new EmailAlertChannelSettings(
+                    Enabled: true,
+                    SmtpHost: "smtp.example.com",
+                    Port: 587,
+                    SecurityMode: EmailSecurityMode.Tls,
+                    Username: "tester",
+                    Password: "secret",
+                    FromAddress: "sender@example.com",
+                    ToAddress: "receiver@example.com"),
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "critical"))));
+
+        var service = CreateService(settingsService, emailSender, activityLog, barkSender: barkSender);
+
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+
+        Assert.Single(emailSender.Requests);
+        Assert.Contains(
+            activityLog.Entries,
+            entry => entry.Kind == LogEntryKind.Warning
+                     && entry.Category == "Alert"
+                     && entry.Message.Contains("发送抢座任务失败提醒Bark提醒失败：bark boom", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task NotifyTaskFailedAsync_SuppressesDuplicateTelegramWithinWindow()
     {
         var telegramSender = new FakeTelegramAlertSender();
@@ -385,6 +496,26 @@ public sealed class TaskEventAlertServiceTests
         await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
 
         Assert.Single(telegramSender.Requests);
+    }
+
+    [Fact]
+    public async Task NotifyTaskFailedAsync_SuppressesDuplicateBarkWithinWindow()
+    {
+        var barkSender = new FakeBarkAlertSender();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "critical"))));
+
+        var service = CreateService(settingsService: settingsService, barkSender: barkSender);
+
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+
+        Assert.Single(barkSender.Requests);
     }
 
     [Fact]
@@ -419,7 +550,8 @@ public sealed class TaskEventAlertServiceTests
         FakeEmailAlertSender? emailSender = null,
         ActivityLogService? activityLogService = null,
         INotificationService? notificationService = null,
-        FakeTelegramAlertSender? telegramSender = null)
+        FakeTelegramAlertSender? telegramSender = null,
+        FakeBarkAlertSender? barkSender = null)
     {
         settingsService ??= new FakeSettingsService(AppSettings.Default);
         var toastService = new ToastNotificationService(new AppWindowService());
@@ -428,6 +560,7 @@ public sealed class TaskEventAlertServiceTests
             settingsService,
             emailSender ?? new FakeEmailAlertSender(),
             telegramSender ?? new FakeTelegramAlertSender(),
+            barkSender ?? new FakeBarkAlertSender(),
             toastService,
             notificationService ?? new FakeNotificationService(),
             new AlertSoundService(),
@@ -457,7 +590,8 @@ public sealed class TaskEventAlertServiceTests
                 ToAddress: "receiver@example.com"),
             new LocalDesktopAlertSettings(false, false),
             new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"),
-            events);
+            events,
+            new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "timeSensitive"));
     }
 
     private static TaskEventAlertEventSettings DisableEvent(TaskAlertTestEvent eventKind)

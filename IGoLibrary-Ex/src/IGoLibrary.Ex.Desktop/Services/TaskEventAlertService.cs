@@ -10,6 +10,7 @@ public sealed class TaskEventAlertService(
     ISettingsService settingsService,
     IEmailAlertSender emailAlertSender,
     ITelegramAlertSender telegramAlertSender,
+    IBarkAlertSender barkAlertSender,
     ToastNotificationService toastNotificationService,
     INotificationService notificationService,
     AlertSoundService alertSoundService,
@@ -34,6 +35,8 @@ public sealed class TaskEventAlertService(
             emailSubject: "IGoLibrary-Ex Cookie 失效提醒",
             emailBody: BuildSessionInvalidEmailBody(source, reason),
             telegramMessage: BuildSessionInvalidTelegramMessage(source, reason),
+            barkTitle: title,
+            barkBody: BuildSessionInvalidTelegramMessage(source, reason),
             toastKind: ToastVisualKind.Warning,
             toastTitle: title,
             toastMessage: detailMessage,
@@ -55,6 +58,8 @@ public sealed class TaskEventAlertService(
             emailSubject: "IGoLibrary-Ex 抢座成功提醒",
             emailBody: BuildGrabSucceededEmailBody(normalizedLibraryName, normalizedSeatName),
             telegramMessage: BuildGrabSucceededTelegramMessage(normalizedLibraryName, normalizedSeatName),
+            barkTitle: "抢座成功",
+            barkBody: BuildGrabSucceededTelegramMessage(normalizedLibraryName, normalizedSeatName),
             toastKind: ToastVisualKind.Success,
             toastTitle: "抢座成功",
             toastMessage: $"{normalizedLibraryName} · {normalizedSeatName} 已成功预约",
@@ -75,6 +80,8 @@ public sealed class TaskEventAlertService(
             emailSubject: "IGoLibrary-Ex 占座成功提醒",
             emailBody: BuildOccupyReReserveSucceededEmailBody(normalizedSeatName),
             telegramMessage: BuildOccupyReReserveSucceededTelegramMessage(normalizedSeatName),
+            barkTitle: "占座成功",
+            barkBody: BuildOccupyReReserveSucceededTelegramMessage(normalizedSeatName),
             toastKind: ToastVisualKind.Success,
             toastTitle: "占座成功",
             toastMessage: $"{normalizedSeatName} 已重新预约",
@@ -101,6 +108,8 @@ public sealed class TaskEventAlertService(
             emailSubject: "IGoLibrary-Ex 明日预约成功提醒",
             emailBody: BuildTomorrowReservationSucceededEmailBody(normalizedLibraryName, normalizedSeatName, normalizedDay),
             telegramMessage: BuildTomorrowReservationSucceededTelegramMessage(normalizedLibraryName, normalizedSeatName, normalizedDay),
+            barkTitle: "明日预约成功",
+            barkBody: BuildTomorrowReservationSucceededTelegramMessage(normalizedLibraryName, normalizedSeatName, normalizedDay),
             toastKind: ToastVisualKind.Success,
             toastTitle: "明日预约成功",
             toastMessage: $"{normalizedDay} · {normalizedLibraryName} · {normalizedSeatName} 已成功预约",
@@ -122,6 +131,8 @@ public sealed class TaskEventAlertService(
             emailSubject: "IGoLibrary-Ex 全域捡漏成功提醒",
             emailBody: BuildGlobalLeakSucceededEmailBody(normalizedLibraryName, normalizedSeatName),
             telegramMessage: BuildGlobalLeakSucceededTelegramMessage(normalizedLibraryName, normalizedSeatName),
+            barkTitle: "全域捡漏成功",
+            barkBody: BuildGlobalLeakSucceededTelegramMessage(normalizedLibraryName, normalizedSeatName),
             toastKind: ToastVisualKind.Success,
             toastTitle: "全域捡漏成功",
             toastMessage: $"{normalizedLibraryName} · {normalizedSeatName} 已成功预约",
@@ -143,6 +154,8 @@ public sealed class TaskEventAlertService(
             emailSubject: $"IGoLibrary-Ex {normalizedTaskName}任务失败提醒",
             emailBody: BuildTaskFailedEmailBody(normalizedTaskName, reason),
             telegramMessage: BuildTaskFailedTelegramMessage(normalizedTaskName, reason),
+            barkTitle: $"{normalizedTaskName}失败",
+            barkBody: BuildTaskFailedTelegramMessage(normalizedTaskName, reason),
             toastKind: ToastVisualKind.Warning,
             toastTitle: $"{normalizedTaskName}失败",
             toastMessage: AppendDetail(message, reason),
@@ -159,6 +172,8 @@ public sealed class TaskEventAlertService(
         string emailSubject,
         string emailBody,
         string telegramMessage,
+        string barkTitle,
+        string barkBody,
         ToastVisualKind toastKind,
         string toastTitle,
         string toastMessage,
@@ -206,7 +221,7 @@ public sealed class TaskEventAlertService(
             await ShowInAppFallbackAsync(toastKind, toastTitle, toastMessage, cancellationToken);
         }
 
-        var remoteAlertTasks = new List<Task>(capacity: 2);
+        var remoteAlertTasks = new List<Task>(capacity: 3);
         if (alertSettings.Email.Enabled)
         {
             remoteAlertTasks.Add(SendEmailAlertSafelyAsync(
@@ -223,6 +238,16 @@ public sealed class TaskEventAlertService(
                 alertSettings.Telegram,
                 telegramLabel,
                 telegramMessage,
+                cancellationToken));
+        }
+
+        if (alertSettings.Bark.Enabled)
+        {
+            remoteAlertTasks.Add(SendBarkAlertSafelyAsync(
+                alertSettings.Bark,
+                localLabel,
+                barkTitle,
+                barkBody,
                 cancellationToken));
         }
 
@@ -270,6 +295,27 @@ public sealed class TaskEventAlertService(
         catch (Exception ex)
         {
             activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{telegramLabel}Telegram提醒失败：{ex.Message}");
+        }
+    }
+
+    private async Task SendBarkAlertSafelyAsync(
+        BarkAlertChannelSettings settings,
+        string barkLabel,
+        string barkTitle,
+        string barkBody,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await barkAlertSender.SendAsync(
+                settings,
+                barkTitle,
+                barkBody,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{barkLabel}Bark提醒失败：{ex.Message}");
         }
     }
 

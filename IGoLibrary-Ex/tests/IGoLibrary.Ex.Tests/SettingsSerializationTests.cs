@@ -99,6 +99,7 @@ public sealed class SettingsSerializationTests
         Assert.True(alerts.Local.PopupEnabled);
         Assert.False(alerts.Local.SoundEnabled);
         Assert.Equal(TelegramAlertChannelSettings.Default, alerts.Telegram);
+        Assert.Equal(BarkAlertChannelSettings.Default, alerts.Bark);
         Assert.Equal(TaskEventAlertEventSettings.Default, alerts.Events);
     }
 
@@ -252,6 +253,9 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"updates\":", json);
         Assert.Contains("\"mobileControl\":", json);
         Assert.Contains("\"taskEventAlerts\":", json);
+        Assert.Contains("\"bark\":", json);
+        Assert.Contains("\"apiBaseUrl\": \"https://api.day.app\"", json);
+        Assert.Contains("\"deviceKey\": \"\"", json);
         Assert.Contains("\"events\":", json);
         Assert.Contains("\"grabSucceeded\": true", json);
         Assert.Contains("\"occupyReReserveSucceeded\": true", json);
@@ -337,7 +341,10 @@ public sealed class SettingsSerializationTests
         var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default));
         var alerts = Assert.IsType<TaskEventAlertSettings>(settings.Notifications.TaskEventAlerts);
         Assert.Equal(TaskEventAlertEventSettings.Default, alerts.Events);
+        Assert.Equal(BarkAlertChannelSettings.Default, alerts.Bark);
         Assert.Contains("\"events\":", migratedJson);
+        Assert.Contains("\"bark\":", migratedJson);
+        Assert.Contains("\"apiBaseUrl\": \"https://api.day.app\"", migratedJson);
         Assert.Contains("\"taskFailed\": true", migratedJson);
     }
 
@@ -370,6 +377,41 @@ public sealed class SettingsSerializationTests
         Assert.True(events.TaskFailed);
         Assert.Contains("\"grabSucceeded\": false", json);
         Assert.Contains("\"sessionInvalid\": false", json);
+    }
+
+    [Fact]
+    public void AppSettingsSerialization_PreservesExplicitBarkSettings()
+    {
+        var json = JsonSerializer.Serialize(AppSettings.Default with
+        {
+            Notifications = AppSettings.Default.Notifications with
+            {
+                TaskEventAlerts = new TaskEventAlertSettings(
+                    EmailAlertChannelSettings.Default,
+                    LocalDesktopAlertSettings.Default,
+                    TelegramAlertChannelSettings.Default,
+                    TaskEventAlertEventSettings.Default,
+                    new BarkAlertChannelSettings(
+                        true,
+                        "https://bark.example.com",
+                        "key-1",
+                        "IGoLibrary-Ex",
+                        "alarm",
+                        "timeSensitive"))
+            }
+        }, AppJson.Default);
+
+        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
+        var bark = Assert.IsType<BarkAlertChannelSettings>(settings.Notifications.TaskEventAlerts?.Bark);
+        Assert.True(bark.Enabled);
+        Assert.Equal("https://bark.example.com", bark.ApiBaseUrl);
+        Assert.Equal("key-1", bark.DeviceKey);
+        Assert.Equal("IGoLibrary-Ex", bark.Group);
+        Assert.Equal("alarm", bark.Sound);
+        Assert.Equal("timeSensitive", bark.Level);
+        Assert.Contains("\"bark\":", json);
+        Assert.Contains("\"deviceKey\": \"key-1\"", json);
+        Assert.Contains("\"level\": \"timeSensitive\"", json);
     }
 
     [Fact]

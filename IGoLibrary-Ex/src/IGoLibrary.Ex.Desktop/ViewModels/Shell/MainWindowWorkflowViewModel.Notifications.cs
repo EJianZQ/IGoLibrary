@@ -9,6 +9,8 @@ public partial class MainWindowWorkflowViewModel
 
     public string[] EmailSecurityModes => NotificationSettings.EmailSecurityModes;
 
+    public string[] BarkAlertLevels => NotificationSettings.BarkAlertLevels;
+
     public string[] NotificationSettingsCategories => NotificationSettings.NotificationSettingsCategories;
 
     public bool EmailAlertsEnabled
@@ -83,6 +85,42 @@ public partial class MainWindowWorkflowViewModel
         set => NotificationSettings.TelegramAlertChatId = value;
     }
 
+    public bool BarkAlertsEnabled
+    {
+        get => NotificationSettings.BarkAlertsEnabled;
+        set => NotificationSettings.BarkAlertsEnabled = value;
+    }
+
+    public string BarkAlertApiBaseUrl
+    {
+        get => NotificationSettings.BarkAlertApiBaseUrl;
+        set => NotificationSettings.BarkAlertApiBaseUrl = value;
+    }
+
+    public string BarkAlertDeviceKey
+    {
+        get => NotificationSettings.BarkAlertDeviceKey;
+        set => NotificationSettings.BarkAlertDeviceKey = value;
+    }
+
+    public string BarkAlertGroup
+    {
+        get => NotificationSettings.BarkAlertGroup;
+        set => NotificationSettings.BarkAlertGroup = value;
+    }
+
+    public string BarkAlertSound
+    {
+        get => NotificationSettings.BarkAlertSound;
+        set => NotificationSettings.BarkAlertSound = value;
+    }
+
+    public int SelectedBarkAlertLevelIndex
+    {
+        get => NotificationSettings.SelectedBarkAlertLevelIndex;
+        set => NotificationSettings.SelectedBarkAlertLevelIndex = value;
+    }
+
     public bool LocalToastAlertsEnabled
     {
         get => NotificationSettings.LocalToastAlertsEnabled;
@@ -137,6 +175,8 @@ public partial class MainWindowWorkflowViewModel
 
     public IAsyncRelayCommand SendTestTelegramAlertCommand => NotificationSettings.SendTestTelegramAlertCommand;
 
+    public IAsyncRelayCommand SendTestBarkAlertCommand => NotificationSettings.SendTestBarkAlertCommand;
+
     public IAsyncRelayCommand SendTestLocalAlertCommand => NotificationSettings.SendTestLocalAlertCommand;
 
     private void ConfigureNotificationSettingsPropertyBridge(ViewModelPropertyBridge propertyBridge)
@@ -155,6 +195,12 @@ public partial class MainWindowWorkflowViewModel
             nameof(TelegramAlertApiBaseUrl),
             nameof(TelegramAlertBotToken),
             nameof(TelegramAlertChatId),
+            nameof(BarkAlertsEnabled),
+            nameof(BarkAlertApiBaseUrl),
+            nameof(BarkAlertDeviceKey),
+            nameof(BarkAlertGroup),
+            nameof(BarkAlertSound),
+            nameof(SelectedBarkAlertLevelIndex),
             nameof(LocalToastAlertsEnabled),
             nameof(LocalSoundAlertsEnabled),
             nameof(GrabSucceededAlertsEnabled),
