@@ -88,6 +88,7 @@ public sealed class SqliteSettingsRepository(
         var tomorrowReservation = ReadObject(tasks, "tomorrowReservation");
         var globalLeak = ReadObject(tasks, "globalLeak");
         var updates = ReadObject(root, "updates");
+        var mobileControl = ReadObject(root, "mobileControl");
 
         var legacyRetryCount = ReadInt(root, "retryCount")
             ?? ReadInt(legacyRequestPolicy, "retryCount");
@@ -274,6 +275,16 @@ public sealed class SqliteSettingsRepository(
         WriteNullableString(writer, "lastReleaseETag", updates, default, "lastReleaseETag");
         writer.WriteEndObject();
 
+        writer.WritePropertyName("mobileControl");
+        writer.WriteStartObject();
+        writer.WriteNumber(
+            "port",
+            ReadInt(mobileControl, "port") ?? defaults.MobileControl.Port);
+        writer.WriteString(
+            "accessToken",
+            ReadString(mobileControl, "accessToken") ?? defaults.MobileControl.AccessToken);
+        writer.WriteEndObject();
+
         writer.WriteEndObject();
         writer.Flush();
         return Encoding.UTF8.GetString(stream.ToArray());
@@ -291,6 +302,7 @@ public sealed class SqliteSettingsRepository(
         var tomorrowReservation = tasks.TomorrowReservation ?? TomorrowReservationTaskSettings.Default;
         var globalLeak = tasks.GlobalLeak ?? GlobalLeakTaskSettings.Default;
         var updates = settings.Updates ?? UpdateCheckSettings.Default;
+        var mobileControl = settings.MobileControl ?? MobileControlSettings.Default;
         return settings with
         {
             Notifications = notifications with
@@ -335,7 +347,12 @@ public sealed class SqliteSettingsRepository(
             },
             Venue = settings.Venue ?? VenueSelectionSettings.Default,
             Dashboard = settings.Dashboard ?? DashboardMetrics.Default,
-            Updates = updates
+            Updates = updates,
+            MobileControl = mobileControl with
+            {
+                Port = MobileControlSettings.IsValidPort(mobileControl.Port) ? mobileControl.Port : 0,
+                AccessToken = mobileControl.AccessToken?.Trim() ?? string.Empty
+            }
         };
     }
 
@@ -355,7 +372,8 @@ public sealed class SqliteSettingsRepository(
                tasks.TryGetProperty("autoRelease", out _) &&
                tasks.TryGetProperty("tomorrowReservation", out _) &&
                tasks.TryGetProperty("globalLeak", out _) &&
-               root.TryGetProperty("updates", out _);
+               root.TryGetProperty("updates", out _) &&
+               root.TryGetProperty("mobileControl", out _);
     }
 
     private static bool ContainsLegacySettingsFields(JsonElement root)
@@ -380,6 +398,8 @@ public sealed class SqliteSettingsRepository(
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "autoRelease"), "leadSeconds") ||
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "tomorrowReservation"), "defaultScheduledStartTime") ||
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "globalLeak"), "selectedLibraries") ||
+               !HasAnyProperty(ReadObject(root, "mobileControl"), "port") ||
+               !HasAnyProperty(ReadObject(root, "mobileControl"), "accessToken") ||
                HasAnyProperty(
                    ReadObject(
                        ReadObject(

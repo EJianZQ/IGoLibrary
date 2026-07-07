@@ -11,6 +11,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Resources\MobileControl\MobileControlPage.html" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\IGoLibrary.Ex.Application\IGoLibrary.Ex.Application.csproj" />
     <ProjectReference Include="..\IGoLibrary.Ex.Domain\IGoLibrary.Ex.Domain.csproj" />
     <ProjectReference Include="..\IGoLibrary.Ex.Infrastructure\IGoLibrary.Ex.Infrastructure.csproj" />

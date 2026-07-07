@@ -1,5 +1,6 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using System.ComponentModel;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Domain.Models;
 
@@ -12,6 +13,34 @@ public partial class MainWindowWorkflowViewModel
     private bool _reservationCountdownTimerInitialized;
 
     private bool _occupyPageConfigured;
+
+    private void OnWorkflowStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ShellWorkflowState.CurrentReservation))
+        {
+            return;
+        }
+
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(SynchronizeReservationPresentationFromWorkflowState);
+            return;
+        }
+
+        SynchronizeReservationPresentationFromWorkflowState();
+    }
+
+    private void SynchronizeReservationPresentationFromWorkflowState()
+    {
+        EnsureOccupyPageConfigured();
+        var reservation = WorkflowState.CurrentReservation;
+        if (EqualityComparer<ReservationInfo?>.Default.Equals(OccupyPage.CurrentReservation, reservation))
+        {
+            return;
+        }
+
+        OccupyPage.UpdateReservationPresentation(reservation);
+    }
 
     public string[] OccupyCheckIntervalModes => OccupyPage.OccupyCheckIntervalModes;
 

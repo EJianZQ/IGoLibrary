@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
@@ -215,9 +216,114 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
         }, cancellationToken);
     }
 
+    public async Task<MobileControlSettings> EnsureMobileControlSettingsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await settingsService.UpdateAsync(current =>
+        {
+            var mobileControl = NormalizeMobileControlSettings(current.MobileControl);
+            if (mobileControl == current.MobileControl)
+            {
+                return current;
+            }
+
+            return current with
+            {
+                MobileControl = mobileControl
+            };
+        }, cancellationToken);
+
+        return settings.MobileControl;
+    }
+
+    public async Task<MobileControlSettings> SaveMobileControlPortAsync(
+        int port,
+        CancellationToken cancellationToken = default)
+    {
+        if (!MobileControlSettings.IsValidPort(port))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(port),
+                $"手机控制端口必须介于 {MobileControlSettings.MinPort} 和 {MobileControlSettings.MaxPort} 之间");
+        }
+
+        var settings = await settingsService.UpdateAsync(current =>
+        {
+            var mobileControl = NormalizeMobileControlSettings(current.MobileControl) with
+            {
+                Port = port
+            };
+            if (mobileControl == current.MobileControl)
+            {
+                return current;
+            }
+
+            return current with
+            {
+                MobileControl = mobileControl
+            };
+        }, cancellationToken);
+
+        return settings.MobileControl;
+    }
+
+    public async Task<MobileControlSettings> SaveMobileControlAccessTokenAsync(
+        string accessToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            throw new ArgumentException("手机控制访问令牌不能为空", nameof(accessToken));
+        }
+
+        var normalizedToken = accessToken.Trim();
+        var settings = await settingsService.UpdateAsync(current =>
+        {
+            var mobileControl = NormalizeMobileControlSettings(current.MobileControl) with
+            {
+                AccessToken = normalizedToken
+            };
+            if (mobileControl == current.MobileControl)
+            {
+                return current;
+            }
+
+            return current with
+            {
+                MobileControl = mobileControl
+            };
+        }, cancellationToken);
+
+        return settings.MobileControl;
+    }
+
     private static bool IsTimeOfDay(TimeSpan value)
     {
         return value >= TimeSpan.Zero && value < TimeSpan.FromDays(1);
+    }
+
+    private static MobileControlSettings NormalizeMobileControlSettings(MobileControlSettings? settings)
+    {
+        var current = settings ?? MobileControlSettings.Default;
+        return new MobileControlSettings(
+            MobileControlSettings.IsValidPort(current.Port)
+                ? current.Port
+                : CreateRandomMobileControlPort(),
+            string.IsNullOrWhiteSpace(current.AccessToken)
+                ? CreateMobileControlAccessToken()
+                : current.AccessToken.Trim());
+    }
+
+    public static int CreateRandomMobileControlPort()
+    {
+        return RandomNumberGenerator.GetInt32(
+            MobileControlSettings.RandomPortMinInclusive,
+            MobileControlSettings.RandomPortMaxExclusive);
+    }
+
+    public static string CreateMobileControlAccessToken()
+    {
+        return Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
     }
 
     private static bool AreGlobalLeakSelectionsEqual(

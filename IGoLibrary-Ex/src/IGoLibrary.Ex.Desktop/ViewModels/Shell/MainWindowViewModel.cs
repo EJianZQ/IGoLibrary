@@ -10,7 +10,8 @@ public sealed class MainWindowViewModel(
     INotificationService notificationService,
     IAppThemeService appThemeService,
     TimeProvider timeProvider,
-    ILanCookieRelayService lanCookieRelayService)
+    ILanCookieRelayService lanCookieRelayService,
+    IMobileControlService mobileControlService)
     : MainWindowWorkflowViewModel(
         pages,
         workflowState,
@@ -18,4 +19,5 @@ public sealed class MainWindowViewModel(
         notificationService,
         appThemeService,
         timeProvider,
-        lanCookieRelayService);
+        lanCookieRelayService,
+        mobileControlService);

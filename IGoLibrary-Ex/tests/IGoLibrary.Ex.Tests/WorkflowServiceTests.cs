@@ -383,6 +383,57 @@ public sealed class WorkflowServiceTests
     }
 
     [Fact]
+    public async Task SettingsWorkflowService_EnsureMobileControlSettingsAsync_GeneratesAndPersistsMissingValues()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default, normalizeMobileControl: false);
+        var service = new SettingsWorkflowService(settingsService);
+
+        var settings = await service.EnsureMobileControlSettingsAsync();
+
+        Assert.InRange(
+            settings.Port,
+            MobileControlSettings.RandomPortMinInclusive,
+            MobileControlSettings.RandomPortMaxExclusive - 1);
+        Assert.Equal(32, settings.AccessToken.Length);
+        Assert.Equal(settings, settingsService.CurrentSettings.MobileControl);
+        Assert.Equal(1, settingsService.SaveCalls);
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_SaveMobileControlPortAsync_OnlyChangesPort()
+    {
+        var initial = AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(9527, "token")
+        };
+        var settingsService = new FakeSettingsService(initial);
+        var service = new SettingsWorkflowService(settingsService);
+
+        var settings = await service.SaveMobileControlPortAsync(9528);
+
+        Assert.Equal(9528, settings.Port);
+        Assert.Equal("token", settings.AccessToken);
+        Assert.Equal(settings, settingsService.CurrentSettings.MobileControl);
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_SaveMobileControlAccessTokenAsync_OnlyChangesToken()
+    {
+        var initial = AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(9527, "old-token")
+        };
+        var settingsService = new FakeSettingsService(initial);
+        var service = new SettingsWorkflowService(settingsService);
+
+        var settings = await service.SaveMobileControlAccessTokenAsync("new-token");
+
+        Assert.Equal(9527, settings.Port);
+        Assert.Equal("new-token", settings.AccessToken);
+        Assert.Equal(settings, settingsService.CurrentSettings.MobileControl);
+    }
+
+    [Fact]
     public async Task SettingsWorkflowService_ScheduledStartDefaults_IgnoresOutOfRangeValues()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);

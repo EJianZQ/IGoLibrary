@@ -1,0 +1,404 @@
+using System.Net;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using IGoLibrary.Ex.Application.Configuration;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+
+namespace IGoLibrary.Ex.Desktop.Services;
+
+public sealed class MobileControlService(
+    ILanAddressProvider addressProvider,
+    IMobileControlStatusSnapshotProvider statusSnapshotProvider,
+    IMobileControlActionService actionService,
+    ILogger<MobileControlService> logger) : IMobileControlService, IAsyncDisposable
+{
+    private static readonly TimeSpan DeviceActiveWindow = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan DevicePruneInterval = TimeSpan.FromSeconds(10);
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly object _devicesGate = new();
+    private readonly Dictionary<string, DateTimeOffset> _deviceLastSeenByKey = new(StringComparer.Ordinal);
+    private WebApplication? _app;
+    private MobileControlSession? _session;
+    private System.Threading.Timer? _devicePruneTimer;
+    private int _connectedDeviceCount;
+
+    public event EventHandler<MobileControlStoppedEventArgs>? Stopped;
+
+    public event EventHandler<MobileControlDeviceCountChangedEventArgs>? DeviceCountChanged;
+
+    public MobileControlSession? CurrentSession => _session;
+
+    public int ConnectedDeviceCount => Volatile.Read(ref _connectedDeviceCount);
+
+    public async Task<MobileControlSession> StartAsync(
+        MobileControlSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (!MobileControlSettings.IsValidPort(settings.Port))
+        {
+            throw new InvalidOperationException("手机控制端口无效，请重新随机端口后再启动");
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.AccessToken))
+        {
+            throw new InvalidOperationException("手机控制访问令牌无效，请重置访问令牌后再启动");
+        }
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await StopCurrentSessionAsync(MobileControlStopReason.Replaced, null, cancellationToken);
+
+            var address = addressProvider.GetPrimaryLanAddress()
+                ?? throw new InvalidOperationException("没有找到可用的局域网 IPv4 地址，请确认电脑已连接到局域网");
+            var sessionId = Guid.NewGuid();
+            var token = settings.AccessToken.Trim();
+
+            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                ApplicationName = typeof(MobileControlService).Assembly.GetName().Name
+            });
+            builder.Logging.ClearProviders();
+            builder.WebHost.ConfigureKestrel(options =>
+            {
+                options.Listen(address, settings.Port);
+            });
+
+            var app = builder.Build();
+            app.MapGet("/", context => WriteLandingPageAsync(context, token));
+            app.MapGet("/api/status", context => WriteStatusAsync(context, token));
+            app.MapPost("/api/tasks/{kind}/cancel", context => WriteCancelTaskAsync(context, token));
+            app.MapPost("/api/reservation/cancel", context => WriteCancelReservationAsync(context, token));
+            app.MapFallback(context => WriteJsonAsync(
+                context,
+                StatusCodes.Status404NotFound,
+                new { success = false, message = "请求地址不存在" }));
+
+            var appStarted = false;
+            try
+            {
+                await app.StartAsync(cancellationToken);
+                appStarted = true;
+                var session = BuildSession(sessionId, address, settings.Port, token);
+                _app = app;
+                _session = session;
+                _devicePruneTimer = new System.Threading.Timer(
+                    _ => PruneConnectedDevices(),
+                    null,
+                    DevicePruneInterval,
+                    DevicePruneInterval);
+                return session;
+            }
+            catch
+            {
+                await DisposeUnpublishedAppAsync(app, appStarted);
+                throw;
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task StopAsync(
+        MobileControlStopReason reason = MobileControlStopReason.Manual,
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await StopCurrentSessionAsync(reason, null, cancellationToken);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopAsync(MobileControlStopReason.Manual);
+        _gate.Dispose();
+    }
+
+    private async Task WriteLandingPageAsync(HttpContext context, string token)
+    {
+        if (!IsValidToken(context, token))
+        {
+            await WriteForbiddenAsync(context);
+            return;
+        }
+
+        TrackConnectedDevice(context);
+        SetNoStore(context);
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.WriteAsync(MobileControlMobilePage.Build(token), context.RequestAborted);
+    }
+
+    private async Task WriteStatusAsync(HttpContext context, string token)
+    {
+        if (!IsValidToken(context, token))
+        {
+            await WriteForbiddenAsync(context);
+            return;
+        }
+
+        TrackConnectedDevice(context);
+        SetNoStore(context);
+        context.Response.ContentType = "application/json; charset=utf-8";
+        await JsonSerializer.SerializeAsync(
+            context.Response.Body,
+            await statusSnapshotProvider.CreateSnapshotAsync(context.RequestAborted),
+            JsonOptions,
+            context.RequestAborted);
+    }
+
+    private async Task WriteCancelTaskAsync(HttpContext context, string token)
+    {
+        if (!IsValidToken(context, token))
+        {
+            await WriteForbiddenAsync(context);
+            return;
+        }
+
+        TrackConnectedDevice(context);
+        var taskKind = context.Request.RouteValues["kind"]?.ToString();
+        if (string.IsNullOrWhiteSpace(taskKind))
+        {
+            await WriteActionResponseAsync(
+                context,
+                new MobileControlActionResult(false, "未知任务类型", StatusCodes.Status400BadRequest));
+            return;
+        }
+
+        await WriteActionResultAsync(
+            context,
+            () => actionService.CancelTaskAsync(taskKind, context.RequestAborted),
+            "Failed to cancel mobile-control task.");
+    }
+
+    private async Task WriteCancelReservationAsync(HttpContext context, string token)
+    {
+        if (!IsValidToken(context, token))
+        {
+            await WriteForbiddenAsync(context);
+            return;
+        }
+
+        TrackConnectedDevice(context);
+        await WriteActionResultAsync(
+            context,
+            () => actionService.CancelCurrentReservationAsync(context.RequestAborted),
+            "Failed to cancel mobile-control reservation.");
+    }
+
+    private async Task WriteActionResultAsync(
+        HttpContext context,
+        Func<Task<MobileControlActionResult>> action,
+        string logMessage)
+    {
+        try
+        {
+            await WriteActionResponseAsync(context, await action());
+        }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, logMessage);
+            await WriteActionResponseAsync(
+                context,
+                new MobileControlActionResult(
+                    false,
+                    $"操作失败：{ex.Message}",
+                    StatusCodes.Status500InternalServerError));
+        }
+    }
+
+    private static Task WriteActionResponseAsync(
+        HttpContext context,
+        MobileControlActionResult result)
+    {
+        return WriteJsonAsync(
+            context,
+            result.StatusCode,
+            new MobileControlActionResponse(result.Success, result.Message));
+    }
+
+    private async Task StopCurrentSessionAsync(
+        MobileControlStopReason reason,
+        string? message,
+        CancellationToken cancellationToken)
+    {
+        var app = _app;
+        var session = _session;
+        var pruneTimer = _devicePruneTimer;
+        _app = null;
+        _session = null;
+        _devicePruneTimer = null;
+
+        pruneTimer?.Dispose();
+        ResetConnectedDevices();
+
+        if (app is not null)
+        {
+            try
+            {
+                await app.StopAsync(cancellationToken);
+            }
+            finally
+            {
+                await app.DisposeAsync();
+            }
+        }
+
+        if (session is not null)
+        {
+            Stopped?.Invoke(this, new MobileControlStoppedEventArgs(session.SessionId, reason, message));
+        }
+    }
+
+    private void TrackConnectedDevice(HttpContext context)
+    {
+        var key = context.Connection.RemoteIpAddress?.ToString();
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            key = context.Connection.Id;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        int count;
+        lock (_devicesGate)
+        {
+            _deviceLastSeenByKey[key] = now;
+            RemoveStaleDevices(now);
+            count = _deviceLastSeenByKey.Count;
+        }
+
+        PublishDeviceCount(count);
+    }
+
+    private void PruneConnectedDevices()
+    {
+        int count;
+        lock (_devicesGate)
+        {
+            RemoveStaleDevices(DateTimeOffset.UtcNow);
+            count = _deviceLastSeenByKey.Count;
+        }
+
+        PublishDeviceCount(count);
+    }
+
+    private void ResetConnectedDevices()
+    {
+        lock (_devicesGate)
+        {
+            _deviceLastSeenByKey.Clear();
+        }
+
+        PublishDeviceCount(0);
+    }
+
+    private void RemoveStaleDevices(DateTimeOffset now)
+    {
+        foreach (var pair in _deviceLastSeenByKey.ToArray())
+        {
+            if (now - pair.Value > DeviceActiveWindow)
+            {
+                _deviceLastSeenByKey.Remove(pair.Key);
+            }
+        }
+    }
+
+    private void PublishDeviceCount(int count)
+    {
+        if (Interlocked.Exchange(ref _connectedDeviceCount, count) == count)
+        {
+            return;
+        }
+
+        DeviceCountChanged?.Invoke(this, new MobileControlDeviceCountChangedEventArgs(count));
+    }
+
+    private static MobileControlSession BuildSession(
+        Guid sessionId,
+        IPAddress address,
+        int port,
+        string token)
+    {
+        var builder = new UriBuilder("http", address.ToString(), port)
+        {
+            Path = "/",
+            Query = $"token={Uri.EscapeDataString(token)}"
+        };
+
+        return new MobileControlSession(sessionId, builder.Uri, address.ToString(), port, DateTimeOffset.Now);
+    }
+
+    private async Task DisposeUnpublishedAppAsync(WebApplication app, bool appStarted)
+    {
+        try
+        {
+            if (appStarted)
+            {
+                await app.StopAsync(CancellationToken.None);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to stop unpublished mobile-control app.");
+        }
+        finally
+        {
+            await app.DisposeAsync();
+        }
+    }
+
+    private static bool IsValidToken(HttpContext context, string expectedToken)
+    {
+        return string.Equals(
+            context.Request.Query["token"].ToString(),
+            expectedToken,
+            StringComparison.Ordinal);
+    }
+
+    private static Task WriteForbiddenAsync(HttpContext context)
+    {
+        return WriteJsonAsync(
+            context,
+            StatusCodes.Status403Forbidden,
+            new { success = false, message = "手机控制访问令牌无效，请从电脑端重新扫码进入" });
+    }
+
+    private static async Task WriteJsonAsync(
+        HttpContext context,
+        int statusCode,
+        object value)
+    {
+        SetNoStore(context);
+        context.Response.StatusCode = statusCode;
+        context.Response.ContentType = "application/json; charset=utf-8";
+        await JsonSerializer.SerializeAsync(context.Response.Body, value, JsonOptions, context.RequestAborted);
+    }
+
+    private static void SetNoStore(HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.Headers.Pragma = "no-cache";
+        context.Response.Headers.Expires = "0";
+    }
+}

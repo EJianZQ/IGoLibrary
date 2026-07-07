@@ -36,4 +36,14 @@ public interface ISettingsWorkflowService
     Task SaveDashboardMetricsAsync(
         DashboardMetrics metrics,
         CancellationToken cancellationToken = default);
+
+    Task<MobileControlSettings> EnsureMobileControlSettingsAsync(CancellationToken cancellationToken = default);
+
+    Task<MobileControlSettings> SaveMobileControlPortAsync(
+        int port,
+        CancellationToken cancellationToken = default);
+
+    Task<MobileControlSettings> SaveMobileControlAccessTokenAsync(
+        string accessToken,
+        CancellationToken cancellationToken = default);
 }

@@ -1,0 +1,299 @@
+using Avalonia.Media;
+using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Configuration;
+using IGoLibrary.Ex.Application.Services;
+using IGoLibrary.Ex.Desktop.Services;
+using IGoLibrary.Ex.Domain.Enums;
+
+namespace IGoLibrary.Ex.Desktop.ViewModels;
+
+public sealed partial class MobileControlPageViewModel : ViewModelBase
+{
+    private readonly IMobileControlService mobileControlService;
+    private readonly ISettingsWorkflowService settingsWorkflowService;
+    private readonly IQrCodeImageFactory qrCodeImageFactory;
+    private readonly IActivityLogService activityLogService;
+    private readonly INotificationService notificationService;
+    private string _accessToken = string.Empty;
+
+    public MobileControlPageViewModel(
+        IMobileControlService mobileControlService,
+        ISettingsWorkflowService settingsWorkflowService,
+        IQrCodeImageFactory qrCodeImageFactory,
+        IActivityLogService activityLogService,
+        INotificationService notificationService)
+    {
+        this.mobileControlService = mobileControlService;
+        this.settingsWorkflowService = settingsWorkflowService;
+        this.qrCodeImageFactory = qrCodeImageFactory;
+        this.activityLogService = activityLogService;
+        this.notificationService = notificationService;
+
+        MobileControlConnectedDeviceCount = mobileControlService.ConnectedDeviceCount;
+        mobileControlService.DeviceCountChanged += OnMobileControlDeviceCountChanged;
+    }
+
+    [ObservableProperty]
+    private bool isMobileControlRunning;
+
+    [ObservableProperty]
+    private int mobileControlPort;
+
+    [ObservableProperty]
+    private string mobileControlStatusText = "未启动";
+
+    [ObservableProperty]
+    private string mobileControlUrlText = "启动后生成访问地址";
+
+    [ObservableProperty]
+    private string mobileControlHostText = "未监听";
+
+    [ObservableProperty]
+    private string mobileControlAccessTokenText = "未生成";
+
+    [ObservableProperty]
+    private IImage? mobileControlQrCode;
+
+    [ObservableProperty]
+    private bool isMobileControlDetailsOpen;
+
+    [ObservableProperty]
+    private int mobileControlConnectedDeviceCount;
+
+    public bool IsMobileControlStopped => !IsMobileControlRunning;
+
+    public string MobileControlToggleButtonText => IsMobileControlRunning ? "停用手机控制" : "启用手机控制";
+
+    public string MobileControlAccessTokenFullText => string.IsNullOrWhiteSpace(_accessToken) ? "未生成" : _accessToken;
+
+    public string MobileControlConnectedDeviceCountText => $"当前有 {MobileControlConnectedDeviceCount} 台设备连接";
+
+    public bool HasMobileControlQrCode => MobileControlQrCode is not null;
+
+    public bool HasNoMobileControlQrCode => !HasMobileControlQrCode;
+
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await settingsWorkflowService.EnsureMobileControlSettingsAsync(cancellationToken);
+        ApplySettings(settings);
+    }
+
+    public void ApplySettings(MobileControlSettings settings)
+    {
+        MobileControlPort = settings.Port;
+        _accessToken = settings.AccessToken;
+        MobileControlAccessTokenText = MaskAccessToken(_accessToken);
+        OnPropertyChanged(nameof(MobileControlAccessTokenFullText));
+    }
+
+    [RelayCommand]
+    private async Task ToggleMobileControlAsync()
+    {
+        if (IsMobileControlRunning)
+        {
+            await StopMobileControlCoreAsync(showNotification: true);
+            return;
+        }
+
+        await StartMobileControlCoreAsync(showNotification: true);
+    }
+
+    [RelayCommand]
+    private async Task StartMobileControlAsync()
+    {
+        if (IsMobileControlRunning)
+        {
+            return;
+        }
+
+        await StartMobileControlCoreAsync(showNotification: true);
+    }
+
+    [RelayCommand]
+    private async Task StopMobileControlAsync()
+    {
+        if (!IsMobileControlRunning)
+        {
+            return;
+        }
+
+        await StopMobileControlCoreAsync(showNotification: true);
+    }
+
+    [RelayCommand]
+    private async Task RandomizeMobileControlPortAsync()
+    {
+        var wasRunning = IsMobileControlRunning;
+        if (wasRunning)
+        {
+            await StopMobileControlCoreAsync(showNotification: false);
+        }
+
+        var newPort = CreateDifferentPort(MobileControlPort);
+        var settings = await settingsWorkflowService.SaveMobileControlPortAsync(newPort);
+        ApplySettings(settings);
+        activityLogService.Write(LogEntryKind.Info, "MobileControl", $"手机控制端口已更新为 {newPort}");
+
+        if (wasRunning)
+        {
+            await StartMobileControlCoreAsync(showNotification: false);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ResetMobileControlAccessTokenAsync()
+    {
+        var wasRunning = IsMobileControlRunning;
+        if (wasRunning)
+        {
+            await StopMobileControlCoreAsync(showNotification: false);
+        }
+
+        var settings = await settingsWorkflowService.SaveMobileControlAccessTokenAsync(
+            SettingsWorkflowService.CreateMobileControlAccessToken());
+        ApplySettings(settings);
+        activityLogService.Write(LogEntryKind.Info, "MobileControl", "手机控制访问令牌已重置");
+
+        if (wasRunning)
+        {
+            await StartMobileControlCoreAsync(showNotification: false);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenMobileControlDetails()
+    {
+        IsMobileControlDetailsOpen = true;
+    }
+
+    [RelayCommand]
+    private void CloseMobileControlDetails()
+    {
+        IsMobileControlDetailsOpen = false;
+    }
+
+    private async Task StartMobileControlCoreAsync(bool showNotification)
+    {
+        try
+        {
+            var settings = await settingsWorkflowService.EnsureMobileControlSettingsAsync();
+            ApplySettings(settings);
+            var session = await mobileControlService.StartAsync(settings);
+            ApplyStartedSession(session);
+            activityLogService.Write(LogEntryKind.Success, "MobileControl", $"手机控制已启动：{session.Host}:{session.Port}");
+            if (showNotification)
+            {
+                await notificationService.ShowSuccessAsync("手机控制已启动", "请用手机扫码访问局域网页面");
+            }
+        }
+        catch (Exception ex)
+        {
+            ApplyStopped("启动失败");
+            activityLogService.Write(LogEntryKind.Error, "MobileControl", $"启动手机控制失败：{ex.Message}");
+            if (showNotification)
+            {
+                await notificationService.ShowWarningAsync("启动手机控制失败", ex.Message);
+            }
+            else
+            {
+                await notificationService.ShowWarningAsync("手机控制重启失败", ex.Message);
+            }
+        }
+    }
+
+    private async Task StopMobileControlCoreAsync(bool showNotification)
+    {
+        try
+        {
+            await mobileControlService.StopAsync();
+            ApplyStopped("已停止");
+            activityLogService.Write(LogEntryKind.Info, "MobileControl", "手机控制已停止");
+            if (showNotification)
+            {
+                await notificationService.ShowInfoAsync("手机控制已停止", "局域网页面已关闭");
+            }
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Error, "MobileControl", $"停止手机控制失败：{ex.Message}");
+            if (showNotification)
+            {
+                await notificationService.ShowWarningAsync("停止手机控制失败", ex.Message);
+            }
+        }
+    }
+
+    private void ApplyStartedSession(MobileControlSession session)
+    {
+        IsMobileControlRunning = true;
+        MobileControlStatusText = "运行中";
+        MobileControlConnectedDeviceCount = mobileControlService.ConnectedDeviceCount;
+        MobileControlHostText = $"{session.Host}:{session.Port}";
+        MobileControlUrlText = session.Url.ToString();
+        MobileControlQrCode = qrCodeImageFactory.Create(MobileControlUrlText);
+        OnPropertyChanged(nameof(HasMobileControlQrCode));
+        OnPropertyChanged(nameof(HasNoMobileControlQrCode));
+    }
+
+    private void ApplyStopped(string statusText)
+    {
+        IsMobileControlRunning = false;
+        MobileControlStatusText = statusText;
+        MobileControlConnectedDeviceCount = 0;
+        MobileControlHostText = "未监听";
+        MobileControlUrlText = "启动后生成访问地址";
+        MobileControlQrCode = null;
+        OnPropertyChanged(nameof(HasMobileControlQrCode));
+        OnPropertyChanged(nameof(HasNoMobileControlQrCode));
+    }
+
+    partial void OnIsMobileControlRunningChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsMobileControlStopped));
+        OnPropertyChanged(nameof(MobileControlToggleButtonText));
+    }
+
+    partial void OnMobileControlConnectedDeviceCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(MobileControlConnectedDeviceCountText));
+    }
+
+    private void OnMobileControlDeviceCountChanged(object? sender, MobileControlDeviceCountChangedEventArgs e)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            MobileControlConnectedDeviceCount = e.ConnectedDeviceCount;
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() => MobileControlConnectedDeviceCount = e.ConnectedDeviceCount);
+    }
+
+    private static int CreateDifferentPort(int currentPort)
+    {
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            var port = SettingsWorkflowService.CreateRandomMobileControlPort();
+            if (port != currentPort)
+            {
+                return port;
+            }
+        }
+
+        return SettingsWorkflowService.CreateRandomMobileControlPort();
+    }
+
+    private static string MaskAccessToken(string accessToken)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken))
+        {
+            return "未生成";
+        }
+
+        var token = accessToken.Trim();
+        return token.Length <= 8 ? token : $"{token[..8]}...";
+    }
+}

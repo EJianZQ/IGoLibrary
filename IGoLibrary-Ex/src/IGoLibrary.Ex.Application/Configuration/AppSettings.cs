@@ -18,5 +18,7 @@ public sealed record AppSettings
 
     public UpdateCheckSettings Updates { get; init; } = UpdateCheckSettings.Default;
 
+    public MobileControlSettings MobileControl { get; init; } = MobileControlSettings.Default;
+
     public static AppSettings Default { get; } = new();
 }

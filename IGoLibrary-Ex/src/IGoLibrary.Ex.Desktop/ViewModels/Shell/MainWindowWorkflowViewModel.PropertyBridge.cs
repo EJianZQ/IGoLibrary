@@ -18,6 +18,7 @@ public partial class MainWindowWorkflowViewModel
         ConfigureGlobalLeakPropertyBridge(propertyBridge);
         ConfigureTomorrowReservationPropertyBridge(propertyBridge);
         ConfigureLanCookieRelayPropertyBridge(propertyBridge);
+        ConfigureMobileControlPropertyBridge(propertyBridge);
         ConfigureOccupyPropertyBridge(propertyBridge);
     }
 }

@@ -30,8 +30,10 @@ internal static class MainWindowViewModelTestHarness
         AppWindowService appWindowService,
         IStartupEntryService startupEntryService,
         ILanCookieRelayService lanCookieRelayService,
-        IQrCodeImageFactory qrCodeImageFactory)
+        IQrCodeImageFactory qrCodeImageFactory,
+        IMobileControlService? mobileControlService = null)
     {
+        mobileControlService ??= new FakeMobileControlService();
         var pages = new MainWindowWorkflowPages(
             new HomeDashboardViewModel(
                 activityLogService,
@@ -85,6 +87,12 @@ internal static class MainWindowViewModelTestHarness
                 qrCodeImageFactory,
                 activityLogService,
                 notificationService),
+            new MobileControlPageViewModel(
+                mobileControlService,
+                settingsWorkflowService,
+                qrCodeImageFactory,
+                activityLogService,
+                notificationService),
             new NotificationSettingsViewModel(
                 settingsWorkflowService,
                 notificationTestService,
@@ -126,6 +134,7 @@ internal static class MainWindowViewModelTestHarness
             notificationService,
             appThemeService,
             timeProvider,
-            lanCookieRelayService);
+            lanCookieRelayService,
+            mobileControlService);
     }
 }

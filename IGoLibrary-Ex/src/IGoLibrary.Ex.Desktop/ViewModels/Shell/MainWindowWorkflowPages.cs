@@ -10,6 +10,7 @@ public sealed class MainWindowWorkflowPages(
     OccupyPageViewModel occupyPage,
     TomorrowReservationPageViewModel tomorrowReservationPage,
     LanCookieRelayViewModel lanCookieRelay,
+    MobileControlPageViewModel mobileControl,
     NotificationSettingsViewModel notificationSettings,
     SystemSettingsViewModel systemSettings,
     ProtocolTemplatesViewModel protocolTemplates,
@@ -34,6 +35,8 @@ public sealed class MainWindowWorkflowPages(
     public TomorrowReservationPageViewModel TomorrowReservationPage { get; } = tomorrowReservationPage;
 
     public LanCookieRelayViewModel LanCookieRelay { get; } = lanCookieRelay;
+
+    public MobileControlPageViewModel MobileControl { get; } = mobileControl;
 
     public NotificationSettingsViewModel NotificationSettings { get; } = notificationSettings;
 

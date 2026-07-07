@@ -76,6 +76,69 @@ internal sealed class FakeLanCookieRelayService : ILanCookieRelayService
     }
 }
 
+internal sealed class FakeMobileControlService : IMobileControlService
+{
+    public event EventHandler<MobileControlStoppedEventArgs>? Stopped;
+
+    public event EventHandler<MobileControlDeviceCountChangedEventArgs>? DeviceCountChanged;
+
+    public int StartCalls { get; private set; }
+
+    public int StopCalls { get; private set; }
+
+    public MobileControlSession? CurrentSession { get; private set; }
+
+    public int ConnectedDeviceCount { get; private set; }
+
+    public Exception? StartException { get; set; }
+
+    public MobileControlSession NextSession { get; set; } = new(
+        Guid.NewGuid(),
+        new Uri("http://127.0.0.1:49153/?token=test-token"),
+        "127.0.0.1",
+        49153,
+        DateTimeOffset.Now);
+
+    public Task<MobileControlSession> StartAsync(
+        MobileControlSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        StartCalls++;
+        if (StartException is not null)
+        {
+            throw StartException;
+        }
+
+        CurrentSession = NextSession with
+        {
+            Url = new Uri($"http://127.0.0.1:{settings.Port}/?token={settings.AccessToken}"),
+            Port = settings.Port
+        };
+        return Task.FromResult(CurrentSession);
+    }
+
+    public Task StopAsync(
+        MobileControlStopReason reason = MobileControlStopReason.Manual,
+        CancellationToken cancellationToken = default)
+    {
+        StopCalls++;
+        var session = CurrentSession;
+        CurrentSession = null;
+        if (session is not null)
+        {
+            Stopped?.Invoke(this, new MobileControlStoppedEventArgs(session.SessionId, reason));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public void SetConnectedDeviceCount(int connectedDeviceCount)
+    {
+        ConnectedDeviceCount = connectedDeviceCount;
+        DeviceCountChanged?.Invoke(this, new MobileControlDeviceCountChangedEventArgs(connectedDeviceCount));
+    }
+}
+
 internal sealed class FakeQrCodeImageFactory : IQrCodeImageFactory
 {
     public List<string> CreatedTexts { get; } = [];
@@ -245,11 +308,18 @@ internal sealed class FakeAppThemeService : IAppThemeService
     }
 }
 
-internal sealed class FakeSettingsService(AppSettings settings) : ISettingsService
+internal sealed class FakeSettingsService : ISettingsService
 {
     private readonly SemaphoreSlim _settingsGate = new(1, 1);
 
-    public AppSettings CurrentSettings { get; private set; } = settings;
+    public FakeSettingsService(AppSettings settings, bool normalizeMobileControl = true)
+    {
+        CurrentSettings = normalizeMobileControl
+            ? EnsureMobileControlSettings(settings)
+            : settings;
+    }
+
+    public AppSettings CurrentSettings { get; private set; }
 
     public int SaveCalls { get; private set; }
 
@@ -314,6 +384,20 @@ internal sealed class FakeSettingsService(AppSettings settings) : ISettingsServi
         {
             _settingsGate.Release();
         }
+    }
+
+    private static AppSettings EnsureMobileControlSettings(AppSettings settings)
+    {
+        if (MobileControlSettings.IsValidPort(settings.MobileControl.Port) &&
+            !string.IsNullOrWhiteSpace(settings.MobileControl.AccessToken))
+        {
+            return settings;
+        }
+
+        return settings with
+        {
+            MobileControl = new MobileControlSettings(49153, "test-mobile-token")
+        };
     }
 }
 
@@ -523,6 +607,8 @@ internal sealed class FakeGrabSeatCoordinator : IGrabSeatCoordinator
 
     public GrabSeatPlan? LastPlan { get; private set; }
 
+    public int StopCalls { get; private set; }
+
     public Task StartAsync(GrabSeatPlan plan, CancellationToken cancellationToken = default)
     {
         LastPlan = plan;
@@ -539,6 +625,7 @@ internal sealed class FakeGrabSeatCoordinator : IGrabSeatCoordinator
 
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
+        StopCalls++;
         _status = new CoordinatorStatus(
             CoordinatorTaskState.Completed,
             "抢座",

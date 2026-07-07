@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>IGoLibrary</title>
+  <style>
+    /* ═══════════════════════════════════════════════════════
+       iOS-Inspired Design System — 我去图书馆 Mobile Control
+       ═══════════════════════════════════════════════════════ */
+
+    :root {
+      /* iOS-style color tokens */
+      --bg-primary: #f2f2f7;
+      --bg-card: rgba(255, 255, 255, 0.82);
+      --bg-card-solid: #ffffff;
+      --bg-grouped: rgba(255, 255, 255, 0.6);
+      --bg-tertiary: #f5f5fa;
+      --bg-field: rgba(120, 120, 128, 0.06);
+
+      --text-primary: #1c1c1e;
+      --text-secondary: #8e8e93;
+      --text-tertiary: #aeaeb2;
+
+      --accent-blue: #007aff;
+      --accent-green: #34c759;
+      --accent-orange: #ff9500;
+      --accent-red: #ff3b30;
+      --accent-indigo: #5856d6;
+      --accent-teal: #5ac8fa;
+      --accent-purple: #af52de;
+
+      --separator: rgba(60, 60, 67, 0.08);
+      --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.06), 0 0 1px rgba(0, 0, 0, 0.04);
+      --shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.1), 0 0 1px rgba(0, 0, 0, 0.06);
+
+      --radius-card: 16px;
+      --radius-inner: 12px;
+      --radius-pill: 999px;
+      --radius-button: 14px;
+
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      min-height: 100dvh;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+      overflow-x: hidden;
+    }
+
+    /* ── Animated gradient background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -40%;
+      left: -20%;
+      width: 140%;
+      height: 80%;
+      background: radial-gradient(ellipse at 30% 50%, rgba(0, 122, 255, 0.08) 0%, transparent 60%),
+                  radial-gradient(ellipse at 80% 30%, rgba(88, 86, 214, 0.06) 0%, transparent 50%),
+                  radial-gradient(ellipse at 50% 80%, rgba(52, 199, 89, 0.04) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+      animation: bgDrift 20s ease-in-out infinite alternate;
+    }
+    @keyframes bgDrift {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(3%, 5%) scale(1.05); }
+    }
+
+    /* ── Layout ── */
+    main {
+      position: relative;
+      z-index: 1;
+      width: min(100%, 500px);
+      margin: 0 auto;
+      padding: 16px 16px calc(24px + var(--safe-bottom));
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 8px;
+      padding: 12px 4px 8px;
+    }
+
+    h1 {
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      line-height: 1.15;
+      color: var(--text-primary);
+    }
+
+    .sub {
+      margin-top: 6px;
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.4;
+      transition: color 0.3s ease;
+    }
+
+    /* ── Connection pill ── */
+    .pill {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: var(--radius-pill);
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      color: var(--accent-blue);
+      background: rgba(0, 122, 255, 0.1);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      animation: pillPulse 2.5s ease-in-out infinite;
+      margin-top: 6px;
+    }
+    .pill::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      transition: background 0.4s ease;
+      animation: dotPulse 2.5s ease-in-out infinite;
+    }
+    @keyframes pillPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+    }
+    @keyframes dotPulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+    .pill.connected {
+      color: var(--accent-green);
+      background: rgba(52, 199, 89, 0.1);
+      animation: none;
+    }
+    .pill.connected::before { animation: none; opacity: 1; }
+    .pill.bad {
+      color: var(--accent-red);
+      background: rgba(255, 59, 48, 0.1);
+      animation: none;
+    }
+    .pill.bad::before { animation: none; opacity: 1; }
+
+    /* ── Section Card (iOS Grouped Style) ── */
+    section {
+      margin: 14px 0;
+      border-radius: var(--radius-card);
+      background: var(--bg-card);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+      border: 0.5px solid rgba(255, 255, 255, 0.6);
+      transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.3s ease;
+      animation: cardIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    }
+    section:nth-child(2) { animation-delay: 0.05s; }
+    section:nth-child(3) { animation-delay: 0.1s; }
+    section:nth-child(4) { animation-delay: 0.15s; }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .card { padding: 18px; }
+
+    /* ── Section header with icon ── */
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .head-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .head-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+    .head-icon.cookie { background: linear-gradient(135deg, #ff9500, #ff6723); }
+    .head-icon.reservation { background: linear-gradient(135deg, #007aff, #5856d6); }
+    .head-icon.task { background: linear-gradient(135deg, #34c759, #30d158); }
+
+    h2 {
+      font-size: 17px;
+      font-weight: 650;
+      letter-spacing: -0.2px;
+      color: var(--text-primary);
+    }
+
+    /* ── State badge ── */
+    .state {
+      display: inline-flex;
+      align-items: center;
+      border-radius: var(--radius-pill);
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.1px;
+      color: var(--accent-blue);
+      background: rgba(0, 122, 255, 0.1);
+      white-space: nowrap;
+      transition: all 0.3s ease;
+    }
+
+    /* ── Data Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .item {
+      border-radius: var(--radius-inner);
+      padding: 12px;
+      background: var(--bg-field);
+      min-width: 0;
+      transition: background 0.2s ease;
+    }
+
+    .label {
+      display: block;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.1px;
+      margin-bottom: 6px;
+    }
+
+    .value {
+      display: block;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      overflow-wrap: anywhere;
+      line-height: 1.35;
+    }
+
+    .wide { grid-column: 1 / -1; }
+
+    /* ── Task cards ── */
+    .task-list { display: grid; gap: 12px; }
+
+    .task-panel {
+      border-radius: var(--radius-inner);
+      padding: 14px;
+      background: var(--bg-field);
+      transition: all 0.3s ease;
+    }
+    .task-panel .head { margin-bottom: 12px; }
+    .task-panel .item {
+      background: var(--bg-card-solid);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .empty-task {
+      border-radius: var(--radius-inner);
+      padding: 32px 18px;
+      color: var(--text-tertiary);
+      text-align: center;
+      font-size: 15px;
+      font-weight: 500;
+      background: var(--bg-field);
+      position: relative;
+    }
+    .empty-task::before {
+      content: '📋';
+      display: block;
+      font-size: 32px;
+      margin-bottom: 8px;
+      opacity: 0.6;
+    }
+
+    /* ── Cookie Hero Countdown ── */
+    .cookie-hero {
+      text-align: center;
+      padding: 20px 12px 16px;
+      border-radius: var(--radius-inner);
+      background: linear-gradient(135deg, rgba(255, 149, 0, 0.06) 0%, rgba(255, 103, 35, 0.03) 100%);
+      margin-bottom: 10px;
+    }
+    .cookie-hero .label {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--text-secondary);
+    }
+    .cookie-hero .countdown {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      line-height: 1.1;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cookie-times {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    /* ── Progress Bar ── */
+    .progress {
+      height: 6px;
+      border-radius: var(--radius-pill);
+      background: var(--bg-field);
+      overflow: hidden;
+      margin-top: 14px;
+    }
+    .progress > span {
+      display: block;
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--accent-green);
+      transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    .progress.normal > span {
+      background: linear-gradient(90deg, #16a34a, var(--accent-green));
+    }
+    .progress.warning > span {
+      background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    }
+    .progress.danger > span {
+      background: linear-gradient(90deg, var(--accent-red), #ff6961);
+    }
+    .progress.idle > span {
+      background: var(--text-tertiary);
+      opacity: 0.4;
+    }
+
+    /* ── Buttons (iOS style) ── */
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: var(--radius-button);
+      padding: 12px 20px;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.1px;
+      color: #fff;
+      background: var(--accent-blue);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      -webkit-tap-highlight-color: transparent;
+      position: relative;
+      overflow: hidden;
+    }
+    button::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0);
+      transition: background 0.15s ease;
+    }
+    button:active {
+      transform: scale(0.96);
+    }
+    button:active::after {
+      background: rgba(255, 255, 255, 0.15);
+    }
+    button.danger {
+      background: var(--accent-red);
+    }
+    button:disabled {
+      opacity: 0.45;
+      transform: none;
+      cursor: not-allowed;
+    }
+
+    /* ── Log area ── */
+    pre {
+      margin: 0;
+      max-height: 200px;
+      overflow: auto;
+      white-space: pre-wrap;
+      color: var(--text-secondary);
+      font: 12px/1.6 "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,0.15) transparent;
+    }
+    pre::-webkit-scrollbar { width: 4px; }
+    pre::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+
+    .empty { color: var(--text-tertiary); font-size: 13px; }
+
+    /* ── iOS Confirm Dialog ── */
+    .ios-dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: overlayIn 0.2s ease;
+    }
+    @keyframes overlayIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .ios-dialog {
+      width: min(100%, 300px);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(40px) saturate(200%);
+      -webkit-backdrop-filter: blur(40px) saturate(200%);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      animation: dialogIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes dialogIn {
+      from { opacity: 0; transform: scale(0.85); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .ios-dialog-body {
+      padding: 24px 20px 20px;
+      text-align: center;
+    }
+    .ios-dialog-body h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .ios-dialog-body p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+    .ios-dialog-actions {
+      display: flex;
+      border-top: 0.5px solid var(--separator);
+    }
+    .ios-dialog-actions button {
+      flex: 1;
+      border-radius: 0;
+      padding: 14px;
+      font-size: 17px;
+      font-weight: 400;
+      color: var(--accent-blue);
+      background: transparent;
+    }
+    .ios-dialog-actions button:active {
+      background: rgba(0, 0, 0, 0.04);
+      transform: none;
+    }
+    .ios-dialog-actions button:active::after { background: transparent; }
+    .ios-dialog-actions button + button {
+      border-left: 0.5px solid var(--separator);
+    }
+    .ios-dialog-actions button.danger-text {
+      color: var(--accent-red);
+      font-weight: 600;
+    }
+
+    /* ── iOS Toast (replaces alert) ── */
+    .ios-toast {
+      position: fixed;
+      top: calc(12px + var(--safe-top));
+      left: 50%;
+      transform: translateX(-50%) translateY(-120%);
+      max-width: min(90%, 380px);
+      border-radius: 14px;
+      padding: 14px 18px;
+      background: rgba(50, 50, 50, 0.92);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 500;
+      text-align: center;
+      line-height: 1.4;
+      z-index: 10000;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    }
+    .ios-toast.visible {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 360px) {
+      .grid { grid-template-columns: 1fr; }
+      .wide { grid-column: auto; }
+      h1 { font-size: 28px; }
+      .head-icon { width: 30px; height: 30px; font-size: 15px; }
+    }
+
+    /* ── Loading shimmer for initial state ── */
+    @keyframes shimmer {
+      0% { background-position: -200px 0; }
+      100% { background-position: 200px 0; }
+    }
+
+    .value[data-loading="true"] {
+      background: linear-gradient(90deg, var(--bg-field) 25%, rgba(120,120,128,0.12) 50%, var(--bg-field) 75%);
+      background-size: 200px 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+      color: transparent;
+      user-select: none;
+    }
+
+    /* ── Haptic-style button feedback ── */
+    @media (hover: hover) {
+      button:hover:not(:disabled) {
+        filter: brightness(1.08);
+      }
+      section:hover {
+        box-shadow: var(--shadow-elevated);
+      }
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>IGoLibrary</h1>
+        <p class="sub" id="updated">等待连接电脑端</p>
+      </div>
+      <div class="pill" id="connection">
+        <span>连接中</span>
+      </div>
+    </header>
+
+    <!-- Cookie 状态 -->
+    <section><div class="card">
+      <div class="head">
+        <div class="head-title">
+          <div class="head-icon cookie">🍪</div>
+          <h2>Cookie 状态</h2>
+        </div>
+        <span class="state" id="cookieState">--</span>
+      </div>
+      <div class="cookie-hero">
+        <span class="label">剩余时间</span>
+        <div class="countdown" id="cookieRemaining">--</div>
+      </div>
+      <div class="cookie-times">
+        <div class="item"><span class="label">保存时间</span><span class="value" id="cookieSaved">--</span></div>
+        <div class="item"><span class="label">到期时间</span><span class="value" id="cookieExpires">--</span></div>
+      </div>
+      <div class="progress idle" id="cookieProgress"><span></span></div>
+    </div></section>
+
+    <!-- 当前预约 -->
+    <section><div class="card">
+      <div class="head">
+        <div class="head-title">
+          <div class="head-icon reservation">📖</div>
+          <h2>当前预约</h2>
+        </div>
+        <span class="state" id="reservationState">--</span>
+      </div>
+      <div class="grid">
+        <div class="item wide"><span class="label">预约</span><span class="value" id="reservationSummary">--</span></div>
+        <div class="item"><span class="label">过期时间</span><span class="value" id="reservationExpires">--</span></div>
+        <div class="item"><span class="label">剩余时间</span><span class="value" id="reservationRemaining">--</span></div>
+      </div>
+      <div class="progress idle" id="reservationProgress"><span></span></div>
+      <div class="actions"><button class="danger" id="cancelReservationButton" type="button" hidden>取消当前预约</button></div>
+    </div></section>
+
+    <!-- 当前任务 -->
+    <section><div class="card">
+      <div class="head">
+        <div class="head-title">
+          <div class="head-icon task">⚡</div>
+          <h2>当前任务</h2>
+        </div>
+        <span class="state" id="taskState">--</span>
+      </div>
+      <div class="task-list" id="taskPanels">
+        <div class="empty-task">当前无任务</div>
+      </div>
+    </div></section>
+  </main>
+
+  <!-- iOS Toast element -->
+  <div class="ios-toast" id="iosToast"></div>
+
+  <script>
+    const token = __MOBILE_CONTROL_TOKEN_JSON__;
+    const $ = id => document.getElementById(id);
+    const display = value => value === null || value === undefined || value === '' ? '--' : value;
+    const text = (id, value) => { $(id).textContent = display(value); };
+    const escapeHtml = value => String(value ?? '--').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+    const field = (label, value, wide = false) =>
+      `<div class="item${wide ? ' wide' : ''}"><span class="label">${escapeHtml(label)}</span><span class="value">${escapeHtml(display(value))}</span></div>`;
+
+    const logField = lines =>
+      `<div class="item wide"><span class="label">实时日志</span><pre>${escapeHtml(lines && lines.length ? lines.join('\n') : '暂无日志')}</pre></div>`;
+
+    const panel = task => `
+      <div class="task-panel">
+        <div class="head">
+          <div class="head-title"><h2>${escapeHtml(task.title)}</h2></div>
+          <span class="state">${escapeHtml(task.stateText)}</span>
+        </div>
+        <div class="grid">${task.items.join('')}${logField(task.logs)}</div>
+        <div class="actions"><button class="danger" type="button" data-task-cancel="${escapeHtml(task.kind)}">取消任务</button></div>
+      </div>`;
+
+    function setProgress(id, value, level) {
+      const node = $(id);
+      const normalizedLevel = ['normal', 'warning', 'danger', 'idle'].includes(level) ? level : 'idle';
+      const normalizedValue = Math.max(0, Math.min(100, Number(value) || 0));
+      node.className = 'progress ' + normalizedLevel;
+      node.querySelector('span').style.width = normalizedValue + '%';
+    }
+
+    function renderTasks(data) {
+      const tasks = [];
+      if (data.grab && data.grab.isActive) {
+        tasks.push({
+          kind: 'grab',
+          title: '抢座',
+          stateText: data.grab.stateText,
+          items: [
+            field('轮询总次数', data.grab.pollCount),
+            field('已发请求数', data.grab.requestCount),
+            field('最近一次请求', data.grab.lastRequestText),
+            field('运行时长', data.grab.runtimeText)
+          ],
+          logs: data.grab.logs
+        });
+      }
+      if (data.globalLeak && data.globalLeak.isActive) {
+        tasks.push({
+          kind: 'globalLeak',
+          title: '全域捡漏',
+          stateText: data.globalLeak.stateText,
+          items: [
+            field('扫描轮次', data.globalLeak.scanRoundCount),
+            field('已发请求数', data.globalLeak.requestCount),
+            field('最近一次请求', data.globalLeak.lastRequestText),
+            field('运行时长', data.globalLeak.runtimeText)
+          ],
+          logs: data.globalLeak.logs
+        });
+      }
+      if (data.tomorrow && data.tomorrow.isActive) {
+        tasks.push({
+          kind: 'tomorrow',
+          title: '明日预约',
+          stateText: data.tomorrow.stateText,
+          items: [
+            field('定时时间', data.tomorrow.scheduledTimeText),
+            field('已发请求', data.tomorrow.requestCount),
+            field('最近一次请求', data.tomorrow.lastRequestText),
+            field('运行时长', data.tomorrow.runtimeText),
+            field('验证结果', data.tomorrow.verificationText, true)
+          ],
+          logs: data.tomorrow.logs
+        });
+      }
+      if (data.occupy && data.occupy.isActive) {
+        tasks.push({
+          kind: 'occupy',
+          title: '占座',
+          stateText: data.occupy.stateText,
+          items: [
+            field('座位过期时间', data.occupy.expirationTimeText),
+            field('取消/重约触发倒计时', data.occupy.reReserveCountdownText)
+          ],
+          logs: data.occupy.logs
+        });
+      }
+
+      $('taskState').textContent = tasks.length ? `${tasks.length} 个运行中` : '无任务';
+      $('taskPanels').innerHTML = tasks.length
+        ? tasks.map(panel).join('')
+        : '<div class="empty-task">当前无任务</div>';
+    }
+
+    async function refresh() {
+      try {
+        const response = await fetch('/api/status?token=' + encodeURIComponent(token), { cache: 'no-store' });
+        if (!response.ok) throw new Error('bad status');
+        const data = await response.json();
+
+        const connEl = $('connection');
+        connEl.querySelector('span').textContent = '已连接';
+        connEl.className = 'pill connected';
+
+        text('updated', '更新于 ' + data.generatedAtText);
+        text('cookieState', data.cookie.statusText);
+
+        text('cookieSaved', data.cookie.savedAtText);
+        text('cookieExpires', data.cookie.expirationTimeText);
+        text('cookieRemaining', data.cookie.remainingText);
+        text('reservationState', data.reservation.hasReservation ? '有预约' : '暂无预约');
+        text('reservationSummary', data.reservation.summaryText);
+        text('reservationExpires', data.reservation.expirationTimeText);
+        text('reservationRemaining', data.reservation.remainingText);
+        setProgress('cookieProgress', data.cookie.progressValue, data.cookie.progressLevel);
+        setProgress('reservationProgress', data.reservation.progressValue, data.reservation.progressLevel);
+        $('cancelReservationButton').hidden = !data.reservation.hasReservation;
+        renderTasks(data);
+      } catch {
+        const connEl = $('connection');
+        connEl.querySelector('span').textContent = '连接失败';
+        connEl.className = 'pill bad';
+        text('updated', '请确认手机和电脑在同一局域网');
+      }
+    }
+
+    let timer = 0;
+    function schedule() {
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        await refresh();
+        schedule();
+      }, document.hidden ? 10000 : 3000);
+    }
+    refresh().then(schedule);
+    document.addEventListener('visibilitychange', () => { refresh(); schedule(); });
+
+    /* ── iOS-style confirm dialog ── */
+    function iosConfirm(message) {
+      return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'ios-dialog-overlay';
+        overlay.innerHTML = `
+          <div class="ios-dialog">
+            <div class="ios-dialog-body">
+              <h3>确认操作</h3>
+              <p>${escapeHtml(message)}</p>
+            </div>
+            <div class="ios-dialog-actions">
+              <button type="button" data-action="cancel">取消</button>
+              <button type="button" data-action="confirm" class="danger-text">确定</button>
+            </div>
+          </div>`;
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', e => {
+          const btn = e.target.closest('button[data-action]');
+          if (!btn) return;
+          overlay.style.animation = 'overlayIn 0.15s ease reverse';
+          overlay.querySelector('.ios-dialog').style.animation = 'dialogIn 0.15s ease reverse';
+          setTimeout(() => {
+            overlay.remove();
+            resolve(btn.dataset.action === 'confirm');
+          }, 140);
+        });
+      });
+    }
+
+    /* ── iOS-style toast ── */
+    let toastTimer = 0;
+    function iosAlert(message) {
+      const toast = $('iosToast');
+      toast.textContent = message;
+      toast.classList.add('visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('visible'), 3500);
+    }
+
+    /* ── Action handler ── */
+    async function postAction(path, confirmText, button) {
+      const confirmed = await iosConfirm(confirmText);
+      if (!confirmed) return;
+      button.disabled = true;
+      try {
+        const response = await fetch(path + '?token=' + encodeURIComponent(token), { method: 'POST', cache: 'no-store' });
+        let result = { success: false, message: '操作失败，请稍后重试' };
+        try { result = await response.json(); } catch {}
+        if (!response.ok || !result.success) {
+          iosAlert(result.message || '操作失败，请稍后重试');
+        }
+        await refresh();
+      } catch {
+        iosAlert('操作失败，请确认手机和电脑在同一局域网');
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    document.addEventListener('click', event => {
+      const taskButton = event.target.closest('button[data-task-cancel]');
+      if (taskButton) {
+        postAction('/api/tasks/' + encodeURIComponent(taskButton.dataset.taskCancel) + '/cancel', '确定取消这个任务吗？', taskButton);
+        return;
+      }
+      if (event.target.closest('#cancelReservationButton')) {
+        postAction('/api/reservation/cancel', '确定取消当前预约吗？', $('cancelReservationButton'));
+      }
+    });
+  </script>
+</body>
+</html>

@@ -50,6 +50,8 @@ public sealed class SettingsSerializationTests
         Assert.Equal(6, settings.Dashboard.SuccessfulReservationCount);
         Assert.Equal(3600, settings.Dashboard.TotalGuardSeconds);
         Assert.True(settings.Updates.CheckOnStartup);
+        Assert.Equal(0, settings.MobileControl.Port);
+        Assert.Equal(string.Empty, settings.MobileControl.AccessToken);
     }
 
     [Fact]
@@ -212,6 +214,8 @@ public sealed class SettingsSerializationTests
         Assert.Equal(new TimeSpan(20, 0, 0), settings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
         Assert.Empty(settings.Tasks.GlobalLeak.SelectedLibraries);
         Assert.True(settings.Updates.CheckOnStartup);
+        Assert.Equal(0, settings.MobileControl.Port);
+        Assert.Equal(string.Empty, settings.MobileControl.AccessToken);
     }
 
     [Fact]
@@ -246,6 +250,7 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"venue\":", json);
         Assert.Contains("\"dashboard\":", json);
         Assert.Contains("\"updates\":", json);
+        Assert.Contains("\"mobileControl\":", json);
         Assert.Contains("\"taskEventAlerts\":", json);
         Assert.Contains("\"events\":", json);
         Assert.Contains("\"grabSucceeded\": true", json);
@@ -401,6 +406,7 @@ public sealed class SettingsSerializationTests
 
         Assert.Contains("\"updates\":", migratedJson);
         Assert.Contains("\"checkOnStartup\": true", migratedJson);
+        Assert.Contains("\"mobileControl\":", migratedJson);
         Assert.Contains("\"autoRelease\":", migratedJson);
         Assert.Contains("\"leadSeconds\": 60", migratedJson);
         Assert.Contains("\"globalLeak\":", migratedJson);

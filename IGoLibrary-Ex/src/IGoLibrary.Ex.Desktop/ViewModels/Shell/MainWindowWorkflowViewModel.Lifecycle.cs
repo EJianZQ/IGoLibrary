@@ -42,6 +42,12 @@ public partial class MainWindowWorkflowViewModel
         EnsureActivityLogsConfigured();
         EnsureSessionConfigured();
 
+        if (!_workflowStateSubscribed)
+        {
+            _workflowStateSubscribed = true;
+            WorkflowState.PropertyChanged += OnWorkflowStatePropertyChanged;
+        }
+
         if (!_themePaletteSubscribed)
         {
             _themePaletteSubscribed = true;
@@ -75,6 +81,7 @@ public partial class MainWindowWorkflowViewModel
         try
         {
             await LoadSettingsAsync();
+            await InitializeMobileControlAsync();
             await LoadProtocolTemplatesAsync();
 
             try
@@ -103,6 +110,14 @@ public partial class MainWindowWorkflowViewModel
     public async Task FlushPendingScheduledStartDefaultsAsync(CancellationToken cancellationToken = default)
     {
         await StopLanCookieRelaySessionAsync(closeDialog: false);
+        try
+        {
+            await _mobileControlService.StopAsync(cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "MobileControl", $"退出前停止手机控制失败：{ex.Message}");
+        }
 
         var hasPendingProtocolTemplates = HasPendingProtocolTemplateAutoSave;
 

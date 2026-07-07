@@ -24,7 +24,8 @@ public partial class MainWindowWorkflowViewModel(
     INotificationService notificationService,
     IAppThemeService appThemeService,
     TimeProvider timeProvider,
-    ILanCookieRelayService lanCookieRelayService) : ViewModelBase
+    ILanCookieRelayService lanCookieRelayService,
+    IMobileControlService mobileControlService) : ViewModelBase
 {
     private readonly IAppThemeService _appThemeService = appThemeService;
 
@@ -34,9 +35,13 @@ public partial class MainWindowWorkflowViewModel(
 
     private readonly ILanCookieRelayService _lanCookieRelayService = lanCookieRelayService;
 
+    private readonly IMobileControlService _mobileControlService = mobileControlService;
+
     private readonly TimeProvider _timeProvider = timeProvider;
 
     private ViewModelPropertyBridge? _propertyBridge;
+
+    private bool _workflowStateSubscribed;
 
     public ShellWorkflowState WorkflowState { get; } = workflowState;
 
@@ -59,6 +64,8 @@ public partial class MainWindowWorkflowViewModel(
     public TomorrowReservationPageViewModel TomorrowReservationPage => Pages.TomorrowReservationPage;
 
     public LanCookieRelayViewModel LanCookieRelay => Pages.LanCookieRelay;
+
+    public MobileControlPageViewModel MobileControl => Pages.MobileControl;
 
     public NotificationSettingsViewModel NotificationSettings => Pages.NotificationSettings;
 

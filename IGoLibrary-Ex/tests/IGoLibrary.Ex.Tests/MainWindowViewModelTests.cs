@@ -1,4 +1,5 @@
 using System.Net;
+using System.Globalization;
 using System.Text;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Desktop.Services;
@@ -49,7 +50,24 @@ public sealed class MainWindowViewModelTests
         var pageIndexes = viewModel.SidebarItems.Select(item => item.PageIndex).ToArray();
 
         Assert.Equal(["首页", "账户与场馆", "系统设置"], titles);
-        Assert.Equal([0, 1, 7], pageIndexes);
+        Assert.Equal([0, 1, 8], pageIndexes);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_UpdatesHomeDashboardDateAndTime()
+    {
+        var observedAt = CreateLocalTimestamp(2026, 7, 6, 22, 1, 46);
+        var timeProvider = new FakeTimeProvider(observedAt);
+        var viewModel = CreateViewModel(timeProvider: timeProvider);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal(
+            observedAt.ToLocalTime().ToString("yyyy 年 MM 月 dd 日 dddd", CultureInfo.GetCultureInfo("zh-CN")),
+            viewModel.HomeDateText);
+        Assert.Equal("22:01:46", viewModel.HomeTimeText);
+        Assert.Equal(viewModel.HomeDateText, viewModel.HomeDashboard.HomeDateText);
+        Assert.Equal(viewModel.HomeTimeText, viewModel.HomeDashboard.HomeTimeText);
     }
 
     [Fact]
@@ -57,9 +75,9 @@ public sealed class MainWindowViewModelTests
     {
         var viewModel = CreateViewModel();
 
-        viewModel.SelectedTabIndex = 7;
+        viewModel.SelectedTabIndex = 8;
 
-        Assert.Equal(7, viewModel.SelectedTabIndex);
+        Assert.Equal(8, viewModel.SelectedTabIndex);
 
         viewModel.SelectedTabIndex = 2;
 
@@ -76,8 +94,8 @@ public sealed class MainWindowViewModelTests
         var titles = viewModel.SidebarItems.Select(item => item.Title).ToArray();
         var pageIndexes = viewModel.SidebarItems.Select(item => item.PageIndex).ToArray();
 
-        Assert.Equal(["首页", "账户与场馆", "抢座", "全域捡漏", "明日预约", "占座", "自动通知", "系统设置"], titles);
-        Assert.Equal([0, 1, 2, 3, 4, 5, 6, 7], pageIndexes);
+        Assert.Equal(["首页", "账户与场馆", "抢座", "全域捡漏", "明日预约", "占座", "手机控制", "自动通知", "系统设置"], titles);
+        Assert.Equal([0, 1, 2, 3, 4, 5, 6, 7, 8], pageIndexes);
     }
 
     [Fact]
@@ -1530,6 +1548,30 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("--", viewModel.HomeReservationSeatNumberText);
         Assert.Equal(0, viewModel.HomeReservationProgressValue);
         Assert.Contains(notifications.Successes, x => x.Title == "已取消预约");
+    }
+
+    [Fact]
+    public async Task WorkflowStateCurrentReservationChange_UpdatesOccupyPresentation()
+    {
+        var viewModel = CreateViewModel();
+        await viewModel.InitializeAsync();
+        var reservation = new ReservationInfo(
+            "token-1",
+            1,
+            "自科阅览区一",
+            "seat-4",
+            "4",
+            DateTimeOffset.Now.AddMinutes(30));
+
+        viewModel.WorkflowState.CurrentReservation = reservation;
+
+        await WaitForAsync(() => viewModel.Pages.OccupyPage.CurrentReservation == reservation);
+
+        viewModel.WorkflowState.CurrentReservation = null;
+
+        await WaitForAsync(() => viewModel.Pages.OccupyPage.CurrentReservation is null);
+        Assert.True(viewModel.HasNoCurrentReservation);
+        Assert.Equal("--", viewModel.HomeReservationSeatNumberText);
     }
 
     [Fact]

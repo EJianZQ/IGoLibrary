@@ -47,6 +47,10 @@ internal static class HostBuilderFactory
                 services.AddSingleton<ILanAddressProvider, LanAddressProvider>();
                 services.AddSingleton<IQrCodeImageFactory, QrCodeImageFactory>();
                 services.AddSingleton<ILanCookieRelayService, LanCookieRelayService>();
+                services.AddSingleton<IMobileControlTaskUiStateAccessor, MobileControlTaskUiStateAccessor>();
+                services.AddSingleton<IMobileControlStatusSnapshotProvider, MobileControlStatusSnapshotProvider>();
+                services.AddSingleton<IMobileControlActionService, MobileControlActionService>();
+                services.AddSingleton<IMobileControlService, MobileControlService>();
                 services.AddSingleton<ToastNotificationService>();
                 services.AddSingleton<INotificationService>(serviceProvider => serviceProvider.GetRequiredService<ToastNotificationService>());
                 services.AddSingleton<AlertSoundService>();
@@ -63,6 +67,7 @@ internal static class HostBuilderFactory
                 services.AddSingleton<OccupyPageViewModel>();
                 services.AddSingleton<TomorrowReservationPageViewModel>();
                 services.AddSingleton<LanCookieRelayViewModel>();
+                services.AddSingleton<MobileControlPageViewModel>();
                 services.AddSingleton<NotificationSettingsViewModel>();
                 services.AddSingleton<SystemSettingsViewModel>();
                 services.AddSingleton<ProtocolTemplatesViewModel>();

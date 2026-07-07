@@ -141,6 +141,7 @@ public partial class MainWindowWorkflowViewModel
             GrabPage.ApplySettings(settings);
             OccupyPage.ApplySettings(settings);
             TomorrowReservationPage.ApplySettings(settings);
+            MobileControl.ApplySettings(settings.MobileControl);
             NotificationSettings.ApplySettings(settings);
             UpdateHomeDashboardPresentation();
             EnsureNotificationSettingsConfigured();
