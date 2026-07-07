@@ -22,7 +22,7 @@ public sealed partial class NotificationSettingsViewModel
 
     public string[] BarkAlertLevels { get; } = ["默认", "主动 active", "时效 timeSensitive", "静默 passive", "重要 critical"];
 
-    public string[] NotificationSettingsCategories { get; } = ["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "Bark 推送配置", "弹窗提醒配置"];
+    public string[] NotificationSettingsCategories { get; } = ["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "WxPusher 推送配置", "Bark 推送配置", "弹窗提醒配置"];
 
     [ObservableProperty]
     private bool emailAlertsEnabled;
@@ -77,6 +77,21 @@ public sealed partial class NotificationSettingsViewModel
 
     [ObservableProperty]
     private int selectedBarkAlertLevelIndex;
+
+    [ObservableProperty]
+    private bool wxPusherAlertsEnabled;
+
+    [ObservableProperty]
+    private string wxPusherAlertApiBaseUrl = WxPusherAlertChannelSettings.DefaultApiBaseUrl;
+
+    [ObservableProperty]
+    private string wxPusherAlertAppToken = string.Empty;
+
+    [ObservableProperty]
+    private string wxPusherAlertUids = string.Empty;
+
+    [ObservableProperty]
+    private string wxPusherAlertTopicIds = string.Empty;
 
     [ObservableProperty]
     private bool localToastAlertsEnabled = true;
@@ -138,6 +153,16 @@ public sealed partial class NotificationSettingsViewModel
 
     partial void OnSelectedBarkAlertLevelIndexChanged(int value) => ScheduleAutoSave();
 
+    partial void OnWxPusherAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnWxPusherAlertApiBaseUrlChanged(string value) => ScheduleAutoSave();
+
+    partial void OnWxPusherAlertAppTokenChanged(string value) => ScheduleAutoSave();
+
+    partial void OnWxPusherAlertUidsChanged(string value) => ScheduleAutoSave();
+
+    partial void OnWxPusherAlertTopicIdsChanged(string value) => ScheduleAutoSave();
+
     partial void OnLocalToastAlertsEnabledChanged(bool value) => ScheduleAutoSave();
 
     partial void OnLocalSoundAlertsEnabledChanged(bool value) => ScheduleAutoSave();
@@ -169,6 +194,7 @@ public sealed partial class NotificationSettingsViewModel
         var alertSettings = settings.Notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
         var eventSettings = alertSettings.Events ?? TaskEventAlertEventSettings.Default;
         var barkSettings = alertSettings.Bark ?? BarkAlertChannelSettings.Default;
+        var wxPusherSettings = alertSettings.WxPusher ?? WxPusherAlertChannelSettings.Default;
 
         EmailAlertsEnabled = alertSettings.Email.Enabled;
         EmailAlertSmtpHost = alertSettings.Email.SmtpHost;
@@ -192,6 +218,13 @@ public sealed partial class NotificationSettingsViewModel
         BarkAlertGroup = barkSettings.Group ?? string.Empty;
         BarkAlertSound = barkSettings.Sound ?? string.Empty;
         SelectedBarkAlertLevelIndex = FindBarkAlertLevelIndex(barkSettings.Level);
+        WxPusherAlertsEnabled = wxPusherSettings.Enabled;
+        WxPusherAlertApiBaseUrl = string.IsNullOrWhiteSpace(wxPusherSettings.ApiBaseUrl)
+            ? WxPusherAlertChannelSettings.DefaultApiBaseUrl
+            : wxPusherSettings.ApiBaseUrl;
+        WxPusherAlertAppToken = wxPusherSettings.AppToken ?? string.Empty;
+        WxPusherAlertUids = wxPusherSettings.Uids ?? string.Empty;
+        WxPusherAlertTopicIds = wxPusherSettings.TopicIds ?? string.Empty;
         LocalToastAlertsEnabled = alertSettings.Local.PopupEnabled;
         LocalSoundAlertsEnabled = alertSettings.Local.SoundEnabled;
         GrabSucceededAlertsEnabled = eventSettings.GrabSucceeded;
@@ -276,6 +309,23 @@ public sealed partial class NotificationSettingsViewModel
     }
 
     [RelayCommand]
+    private async Task SendTestWxPusherAlertAsync()
+    {
+        try
+        {
+            AutoSave.Cancel();
+            await PersistSnapshotAsync();
+            await SendTestWxPusherAsync(BuildTaskEventAlertSettingsSnapshot().WxPusher);
+            await notificationService.ShowSuccessAsync("测试 WxPusher 已发送", "请检查 WxPusher 客户端，确认当前推送配置可用");
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 WxPusher 失败：{ex.Message}");
+            await errorDialogService.ShowErrorAsync("测试 WxPusher 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
+        }
+    }
+
+    [RelayCommand]
     private async Task SendTestLocalAlertAsync()
     {
         try
@@ -326,7 +376,13 @@ public sealed partial class NotificationSettingsViewModel
                 (BarkAlertDeviceKey ?? string.Empty).Trim(),
                 (BarkAlertGroup ?? string.Empty).Trim(),
                 (BarkAlertSound ?? string.Empty).Trim(),
-                GetSelectedBarkAlertLevel()));
+                GetSelectedBarkAlertLevel()),
+            new WxPusherAlertChannelSettings(
+                WxPusherAlertsEnabled,
+                NormalizeWxPusherApiBaseUrlForSnapshot(WxPusherAlertApiBaseUrl),
+                (WxPusherAlertAppToken ?? string.Empty).Trim(),
+                (WxPusherAlertUids ?? string.Empty).Trim(),
+                (WxPusherAlertTopicIds ?? string.Empty).Trim()));
     }
 
     public Task PersistSnapshotAsync(CancellationToken cancellationToken = default)
@@ -358,6 +414,14 @@ public sealed partial class NotificationSettingsViewModel
         var trimmed = (value ?? string.Empty).Trim().TrimEnd('/');
         return string.IsNullOrWhiteSpace(trimmed)
             ? BarkAlertChannelSettings.DefaultApiBaseUrl
+            : trimmed;
+    }
+
+    private static string NormalizeWxPusherApiBaseUrlForSnapshot(string? value)
+    {
+        var trimmed = (value ?? string.Empty).Trim().TrimEnd('/');
+        return string.IsNullOrWhiteSpace(trimmed)
+            ? WxPusherAlertChannelSettings.DefaultApiBaseUrl
             : trimmed;
     }
 

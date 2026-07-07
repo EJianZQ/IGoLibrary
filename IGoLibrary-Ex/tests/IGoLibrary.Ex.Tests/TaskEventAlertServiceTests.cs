@@ -16,6 +16,7 @@ public sealed class TaskEventAlertServiceTests
             new FakeEmailAlertSender(),
             new FakeTelegramAlertSender(),
             new FakeBarkAlertSender(),
+            new FakeWxPusherAlertSender(),
             new ToastNotificationService(new AppWindowService()),
             new AlertSoundService());
         var settings = new EmailAlertChannelSettings(
@@ -176,6 +177,7 @@ public sealed class TaskEventAlertServiceTests
         var emailSender = new FakeEmailAlertSender();
         var telegramSender = new FakeTelegramAlertSender();
         var barkSender = new FakeBarkAlertSender();
+        var wxPusherSender = new FakeWxPusherAlertSender();
         var notificationService = new FakeNotificationService();
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             CreateAllChannelsEnabledSettings(DisableEvent(eventKind))));
@@ -184,13 +186,15 @@ public sealed class TaskEventAlertServiceTests
             emailSender,
             notificationService: notificationService,
             telegramSender: telegramSender,
-            barkSender: barkSender);
+            barkSender: barkSender,
+            wxPusherSender: wxPusherSender);
 
         await NotifyEventAsync(service, eventKind);
 
         Assert.Empty(emailSender.Requests);
         Assert.Empty(telegramSender.Requests);
         Assert.Empty(barkSender.Requests);
+        Assert.Empty(wxPusherSender.Requests);
         Assert.Empty(notificationService.Successes);
         Assert.Empty(notificationService.Warnings);
         Assert.Empty(notificationService.Infos);
@@ -274,6 +278,31 @@ public sealed class TaskEventAlertServiceTests
 
         var request = Assert.Single(barkSender.Requests);
         Assert.Equal("bark-key", request.Settings.DeviceKey);
+        Assert.Equal("Cookie 已失效", request.Title);
+        Assert.Contains("IGoLibrary-Ex Cookie 已失效", request.Body);
+        Assert.Contains("触发模块：抢座轮询", request.Body);
+        Assert.Contains("详细信息：Cookie 无效", request.Body);
+    }
+
+    [Fact]
+    public async Task NotifySessionInvalidAsync_SendsWxPusherUsingPersistedSettings()
+    {
+        var wxPusherSender = new FakeWxPusherAlertSender();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                BarkAlertChannelSettings.Default,
+                new WxPusherAlertChannelSettings(true, "https://wxpusher.zjiecode.com", "AT_xxx", "UID_xxx", ""))));
+
+        var service = CreateService(settingsService: settingsService, wxPusherSender: wxPusherSender);
+
+        await service.NotifySessionInvalidAsync("抢座轮询", "Cookie 无效");
+
+        var request = Assert.Single(wxPusherSender.Requests);
+        Assert.Equal("AT_xxx", request.Settings.AppToken);
         Assert.Equal("Cookie 已失效", request.Title);
         Assert.Contains("IGoLibrary-Ex Cookie 已失效", request.Body);
         Assert.Contains("触发模块：抢座轮询", request.Body);
@@ -481,6 +510,48 @@ public sealed class TaskEventAlertServiceTests
     }
 
     [Fact]
+    public async Task NotifyTaskFailedAsync_LogsWarningWhenWxPusherSendFails_AndContinuesEmail()
+    {
+        var emailSender = new FakeEmailAlertSender();
+        var wxPusherSender = new FakeWxPusherAlertSender
+        {
+            SendException = new InvalidOperationException("wxpusher boom")
+        };
+        var activityLog = new ActivityLogService();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                new EmailAlertChannelSettings(
+                    Enabled: true,
+                    SmtpHost: "smtp.example.com",
+                    Port: 587,
+                    SecurityMode: EmailSecurityMode.Tls,
+                    Username: "tester",
+                    Password: "secret",
+                    FromAddress: "sender@example.com",
+                    ToAddress: "receiver@example.com"),
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                BarkAlertChannelSettings.Default,
+                new WxPusherAlertChannelSettings(true, "https://wxpusher.zjiecode.com", "AT_xxx", "UID_xxx", ""))));
+
+        var service = CreateService(
+            settingsService,
+            emailSender,
+            activityLog,
+            wxPusherSender: wxPusherSender);
+
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+
+        Assert.Single(emailSender.Requests);
+        Assert.Contains(
+            activityLog.Entries,
+            entry => entry.Kind == LogEntryKind.Warning
+                     && entry.Category == "Alert"
+                     && entry.Message.Contains("发送抢座任务失败提醒WxPusher提醒失败：wxpusher boom", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task NotifyTaskFailedAsync_SuppressesDuplicateTelegramWithinWindow()
     {
         var telegramSender = new FakeTelegramAlertSender();
@@ -519,6 +590,27 @@ public sealed class TaskEventAlertServiceTests
     }
 
     [Fact]
+    public async Task NotifyTaskFailedAsync_SuppressesDuplicateWxPusherWithinWindow()
+    {
+        var wxPusherSender = new FakeWxPusherAlertSender();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalDesktopAlertSettings(false, false),
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                BarkAlertChannelSettings.Default,
+                new WxPusherAlertChannelSettings(true, "https://wxpusher.zjiecode.com", "AT_xxx", "UID_xxx", ""))));
+
+        var service = CreateService(settingsService: settingsService, wxPusherSender: wxPusherSender);
+
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
+
+        Assert.Single(wxPusherSender.Requests);
+    }
+
+    [Fact]
     public async Task NotifyGrabSucceededAsync_ShowsInAppFallbackBeforeSlowTelegramCompletes()
     {
         var notificationService = new FakeNotificationService();
@@ -551,7 +643,8 @@ public sealed class TaskEventAlertServiceTests
         ActivityLogService? activityLogService = null,
         INotificationService? notificationService = null,
         FakeTelegramAlertSender? telegramSender = null,
-        FakeBarkAlertSender? barkSender = null)
+        FakeBarkAlertSender? barkSender = null,
+        FakeWxPusherAlertSender? wxPusherSender = null)
     {
         settingsService ??= new FakeSettingsService(AppSettings.Default);
         var toastService = new ToastNotificationService(new AppWindowService());
@@ -561,6 +654,7 @@ public sealed class TaskEventAlertServiceTests
             emailSender ?? new FakeEmailAlertSender(),
             telegramSender ?? new FakeTelegramAlertSender(),
             barkSender ?? new FakeBarkAlertSender(),
+            wxPusherSender ?? new FakeWxPusherAlertSender(),
             toastService,
             notificationService ?? new FakeNotificationService(),
             new AlertSoundService(),
@@ -591,7 +685,8 @@ public sealed class TaskEventAlertServiceTests
             new LocalDesktopAlertSettings(false, false),
             new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"),
             events,
-            new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "timeSensitive"));
+            new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "timeSensitive"),
+            new WxPusherAlertChannelSettings(true, "https://wxpusher.zjiecode.com", "AT_xxx", "UID_xxx", ""));
     }
 
     private static TaskEventAlertEventSettings DisableEvent(TaskAlertTestEvent eventKind)

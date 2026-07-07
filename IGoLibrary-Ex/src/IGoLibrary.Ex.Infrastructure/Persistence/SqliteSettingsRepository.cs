@@ -312,7 +312,8 @@ public sealed class SqliteSettingsRepository(
                     alertSettings.Local ?? LocalDesktopAlertSettings.Default,
                     alertSettings.Telegram ?? TelegramAlertChannelSettings.Default,
                     alertSettings.Events ?? TaskEventAlertEventSettings.Default,
-                    alertSettings.Bark ?? BarkAlertChannelSettings.Default)
+                    alertSettings.Bark ?? BarkAlertChannelSettings.Default,
+                    alertSettings.WxPusher ?? WxPusherAlertChannelSettings.Default)
             },
             Ui = ui with
             {
@@ -410,7 +411,8 @@ public sealed class SqliteSettingsRepository(
                    "toastEnabled") ||
                taskEventAlerts.ValueKind == JsonValueKind.Object &&
                (!HasAnyProperty(taskEventAlerts, "events") ||
-                !HasAnyProperty(taskEventAlerts, "bark"));
+                !HasAnyProperty(taskEventAlerts, "bark") ||
+                !HasAnyProperty(taskEventAlerts, "wxPusher"));
     }
 
     private static bool HasAnyProperty(JsonElement parent, params string[] propertyNames)
@@ -458,6 +460,8 @@ public sealed class SqliteSettingsRepository(
         WriteObjectOrDefault(writer, ReadObject(alerts, "telegram"), defaults.Telegram);
         writer.WritePropertyName("bark");
         WriteObjectOrDefault(writer, ReadObject(alerts, "bark"), defaults.Bark);
+        writer.WritePropertyName("wxPusher");
+        WriteObjectOrDefault(writer, ReadObject(alerts, "wxPusher"), defaults.WxPusher);
         writer.WritePropertyName("events");
         WriteTaskEventAlertEvents(writer, ReadObject(alerts, "events"), defaults.Events);
         writer.WriteEndObject();

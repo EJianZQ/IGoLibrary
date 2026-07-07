@@ -121,6 +121,36 @@ public partial class MainWindowWorkflowViewModel
         set => NotificationSettings.SelectedBarkAlertLevelIndex = value;
     }
 
+    public bool WxPusherAlertsEnabled
+    {
+        get => NotificationSettings.WxPusherAlertsEnabled;
+        set => NotificationSettings.WxPusherAlertsEnabled = value;
+    }
+
+    public string WxPusherAlertApiBaseUrl
+    {
+        get => NotificationSettings.WxPusherAlertApiBaseUrl;
+        set => NotificationSettings.WxPusherAlertApiBaseUrl = value;
+    }
+
+    public string WxPusherAlertAppToken
+    {
+        get => NotificationSettings.WxPusherAlertAppToken;
+        set => NotificationSettings.WxPusherAlertAppToken = value;
+    }
+
+    public string WxPusherAlertUids
+    {
+        get => NotificationSettings.WxPusherAlertUids;
+        set => NotificationSettings.WxPusherAlertUids = value;
+    }
+
+    public string WxPusherAlertTopicIds
+    {
+        get => NotificationSettings.WxPusherAlertTopicIds;
+        set => NotificationSettings.WxPusherAlertTopicIds = value;
+    }
+
     public bool LocalToastAlertsEnabled
     {
         get => NotificationSettings.LocalToastAlertsEnabled;
@@ -177,6 +207,8 @@ public partial class MainWindowWorkflowViewModel
 
     public IAsyncRelayCommand SendTestBarkAlertCommand => NotificationSettings.SendTestBarkAlertCommand;
 
+    public IAsyncRelayCommand SendTestWxPusherAlertCommand => NotificationSettings.SendTestWxPusherAlertCommand;
+
     public IAsyncRelayCommand SendTestLocalAlertCommand => NotificationSettings.SendTestLocalAlertCommand;
 
     private void ConfigureNotificationSettingsPropertyBridge(ViewModelPropertyBridge propertyBridge)
@@ -201,6 +233,11 @@ public partial class MainWindowWorkflowViewModel
             nameof(BarkAlertGroup),
             nameof(BarkAlertSound),
             nameof(SelectedBarkAlertLevelIndex),
+            nameof(WxPusherAlertsEnabled),
+            nameof(WxPusherAlertApiBaseUrl),
+            nameof(WxPusherAlertAppToken),
+            nameof(WxPusherAlertUids),
+            nameof(WxPusherAlertTopicIds),
             nameof(LocalToastAlertsEnabled),
             nameof(LocalSoundAlertsEnabled),
             nameof(GrabSucceededAlertsEnabled),

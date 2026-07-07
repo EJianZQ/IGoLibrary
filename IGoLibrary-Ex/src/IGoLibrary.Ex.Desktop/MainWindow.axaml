@@ -2561,6 +2561,88 @@
                       <StackPanel Grid.Row="0"
                                   Spacing="0">
                         <TextBlock Classes="field-label"
+                                   Text="WxPusher API 基础地址" />
+                        <TextBox Text="{Binding WxPusherAlertApiBaseUrl}"
+                                 Watermark="https://wxpusher.zjiecode.com"
+                                 HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <StackPanel Grid.Row="1"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
+                                   Text="AppToken" />
+                        <TextBox Text="{Binding WxPusherAlertAppToken}"
+                                 PasswordChar="●"
+                                 Watermark="AT_xxx"
+                                 HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <Grid Grid.Row="2"
+                            ColumnDefinitions="*,*"
+                            ColumnSpacing="24">
+                        <StackPanel Grid.Column="0"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="UID 列表" />
+                          <TextBox Text="{Binding WxPusherAlertUids}"
+                                   Watermark="UID_xxx，多个可用逗号、分号或换行分隔"
+                                   AcceptsReturn="True"
+                                   TextWrapping="Wrap"
+                                   MinHeight="88"
+                                   HorizontalAlignment="Stretch" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    Spacing="0">
+                          <TextBlock Classes="field-label"
+                                     Text="Topic ID 列表" />
+                          <TextBox Text="{Binding WxPusherAlertTopicIds}"
+                                   Watermark="123，多个可用逗号、分号或换行分隔"
+                                   AcceptsReturn="True"
+                                   TextWrapping="Wrap"
+                                   MinHeight="88"
+                                   HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                      </Grid>
+
+                      <Grid Grid.Row="3"
+                            ColumnDefinitions="*,Auto"
+                            ColumnSpacing="16"
+                            Margin="0,8,0,0">
+                        <Border Classes="notify-toggle-card">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                            <StackPanel Spacing="4">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="开启 WxPusher 推送" />
+                              <TextBlock Classes="helper-text"
+                                         Text="Cookie 失效、抢座成功或任务失败时，会通过 WxPusher 标准推送发送到指定 UID 或 Topic" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          IsChecked="{Binding WxPusherAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Button Grid.Column="1"
+                                Content="发送测试 WxPusher"
+                                Command="{Binding SendTestWxPusherAlertCommand}"
+                                Background="{DynamicResource SemiAccentBrush}"
+                                Foreground="{DynamicResource AppAccentForegroundBrush}"
+                                MinWidth="184" />
+                      </Grid>
+                    </Grid>
+                  </Grid>
+
+                  <Grid HorizontalAlignment="Stretch">
+                    <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+                          RowSpacing="18"
+                          HorizontalAlignment="Stretch">
+                      <StackPanel Grid.Row="0"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
                                    Text="Bark 服务端地址" />
                         <TextBox Text="{Binding BarkAlertApiBaseUrl}"
                                  Watermark="https://api.day.app"

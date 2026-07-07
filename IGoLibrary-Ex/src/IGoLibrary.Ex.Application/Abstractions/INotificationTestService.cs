@@ -10,5 +10,7 @@ public interface INotificationTestService
 
     Task SendTestBarkAsync(BarkAlertChannelSettings settings, CancellationToken cancellationToken = default);
 
+    Task SendTestWxPusherAsync(WxPusherAlertChannelSettings settings, CancellationToken cancellationToken = default);
+
     Task SendTestLocalAlertAsync(LocalDesktopAlertSettings settings, CancellationToken cancellationToken = default);
 }

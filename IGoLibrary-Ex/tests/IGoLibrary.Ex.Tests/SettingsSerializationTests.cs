@@ -100,6 +100,7 @@ public sealed class SettingsSerializationTests
         Assert.False(alerts.Local.SoundEnabled);
         Assert.Equal(TelegramAlertChannelSettings.Default, alerts.Telegram);
         Assert.Equal(BarkAlertChannelSettings.Default, alerts.Bark);
+        Assert.Equal(WxPusherAlertChannelSettings.Default, alerts.WxPusher);
         Assert.Equal(TaskEventAlertEventSettings.Default, alerts.Events);
     }
 
@@ -256,6 +257,9 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"bark\":", json);
         Assert.Contains("\"apiBaseUrl\": \"https://api.day.app\"", json);
         Assert.Contains("\"deviceKey\": \"\"", json);
+        Assert.Contains("\"wxPusher\":", json);
+        Assert.Contains("\"apiBaseUrl\": \"https://wxpusher.zjiecode.com\"", json);
+        Assert.Contains("\"appToken\": \"\"", json);
         Assert.Contains("\"events\":", json);
         Assert.Contains("\"grabSucceeded\": true", json);
         Assert.Contains("\"occupyReReserveSucceeded\": true", json);
@@ -342,9 +346,12 @@ public sealed class SettingsSerializationTests
         var alerts = Assert.IsType<TaskEventAlertSettings>(settings.Notifications.TaskEventAlerts);
         Assert.Equal(TaskEventAlertEventSettings.Default, alerts.Events);
         Assert.Equal(BarkAlertChannelSettings.Default, alerts.Bark);
+        Assert.Equal(WxPusherAlertChannelSettings.Default, alerts.WxPusher);
         Assert.Contains("\"events\":", migratedJson);
         Assert.Contains("\"bark\":", migratedJson);
         Assert.Contains("\"apiBaseUrl\": \"https://api.day.app\"", migratedJson);
+        Assert.Contains("\"wxPusher\":", migratedJson);
+        Assert.Contains("\"apiBaseUrl\": \"https://wxpusher.zjiecode.com\"", migratedJson);
         Assert.Contains("\"taskFailed\": true", migratedJson);
     }
 
@@ -412,6 +419,41 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"bark\":", json);
         Assert.Contains("\"deviceKey\": \"key-1\"", json);
         Assert.Contains("\"level\": \"timeSensitive\"", json);
+    }
+
+    [Fact]
+    public void AppSettingsSerialization_PreservesExplicitWxPusherSettings()
+    {
+        var json = JsonSerializer.Serialize(AppSettings.Default with
+        {
+            Notifications = AppSettings.Default.Notifications with
+            {
+                TaskEventAlerts = new TaskEventAlertSettings(
+                    EmailAlertChannelSettings.Default,
+                    LocalDesktopAlertSettings.Default,
+                    TelegramAlertChannelSettings.Default,
+                    TaskEventAlertEventSettings.Default,
+                    BarkAlertChannelSettings.Default,
+                    new WxPusherAlertChannelSettings(
+                        true,
+                        "https://wxpusher.example.com",
+                        "AT_xxx",
+                        "UID_1,UID_2",
+                        "1;2"))
+            }
+        }, AppJson.Default);
+
+        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
+        var wxPusher = Assert.IsType<WxPusherAlertChannelSettings>(settings.Notifications.TaskEventAlerts?.WxPusher);
+        Assert.True(wxPusher.Enabled);
+        Assert.Equal("https://wxpusher.example.com", wxPusher.ApiBaseUrl);
+        Assert.Equal("AT_xxx", wxPusher.AppToken);
+        Assert.Equal("UID_1,UID_2", wxPusher.Uids);
+        Assert.Equal("1;2", wxPusher.TopicIds);
+        Assert.Contains("\"wxPusher\":", json);
+        Assert.Contains("\"appToken\": \"AT_xxx\"", json);
+        Assert.Contains("\"uids\": \"UID_1,UID_2\"", json);
+        Assert.Contains("\"topicIds\": \"1;2\"", json);
     }
 
     [Fact]

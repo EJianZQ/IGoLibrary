@@ -31,6 +31,10 @@ public static class DependencyInjection
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
         });
+        services.AddHttpClient<IWxPusherAlertSender, WxPusherAlertSender>(client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        });
         services.AddHttpClient<ITelegramAlertSender, TelegramAlertSender>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;

@@ -11,6 +11,7 @@ public sealed class TaskEventAlertService(
     IEmailAlertSender emailAlertSender,
     ITelegramAlertSender telegramAlertSender,
     IBarkAlertSender barkAlertSender,
+    IWxPusherAlertSender wxPusherAlertSender,
     ToastNotificationService toastNotificationService,
     INotificationService notificationService,
     AlertSoundService alertSoundService,
@@ -221,7 +222,7 @@ public sealed class TaskEventAlertService(
             await ShowInAppFallbackAsync(toastKind, toastTitle, toastMessage, cancellationToken);
         }
 
-        var remoteAlertTasks = new List<Task>(capacity: 3);
+        var remoteAlertTasks = new List<Task>(capacity: 4);
         if (alertSettings.Email.Enabled)
         {
             remoteAlertTasks.Add(SendEmailAlertSafelyAsync(
@@ -245,6 +246,16 @@ public sealed class TaskEventAlertService(
         {
             remoteAlertTasks.Add(SendBarkAlertSafelyAsync(
                 alertSettings.Bark,
+                localLabel,
+                barkTitle,
+                barkBody,
+                cancellationToken));
+        }
+
+        if (alertSettings.WxPusher.Enabled)
+        {
+            remoteAlertTasks.Add(SendWxPusherAlertSafelyAsync(
+                alertSettings.WxPusher,
                 localLabel,
                 barkTitle,
                 barkBody,
@@ -316,6 +327,27 @@ public sealed class TaskEventAlertService(
         catch (Exception ex)
         {
             activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{barkLabel}Bark提醒失败：{ex.Message}");
+        }
+    }
+
+    private async Task SendWxPusherAlertSafelyAsync(
+        WxPusherAlertChannelSettings settings,
+        string wxPusherLabel,
+        string wxPusherTitle,
+        string wxPusherBody,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await wxPusherAlertSender.SendAsync(
+                settings,
+                wxPusherTitle,
+                wxPusherBody,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{wxPusherLabel}WxPusher提醒失败：{ex.Message}");
         }
     }
 

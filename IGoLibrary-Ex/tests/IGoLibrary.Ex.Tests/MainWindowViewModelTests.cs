@@ -201,7 +201,7 @@ public sealed class MainWindowViewModelTests
     {
         var viewModel = CreateViewModel();
 
-        Assert.Equal(["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "Bark 推送配置", "弹窗提醒配置"], viewModel.NotificationSettingsCategories);
+        Assert.Equal(["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "WxPusher 推送配置", "Bark 推送配置", "弹窗提醒配置"], viewModel.NotificationSettingsCategories);
     }
 
     [Fact]
@@ -773,6 +773,123 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("测试 Telegram 发送失败", error.Title);
         Assert.Equal(nameof(InvalidOperationException), error.ErrorType);
         Assert.Equal("telegram send failed", error.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_LoadsWxPusherNotificationSettings()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default,
+                LocalDesktopAlertSettings.Default,
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                BarkAlertChannelSettings.Default,
+                new WxPusherAlertChannelSettings(true, "https://wxpusher.example.com", "AT_xxx", "UID_1,UID_2", "1;2"))));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.WxPusherAlertsEnabled);
+        Assert.Equal("https://wxpusher.example.com", viewModel.WxPusherAlertApiBaseUrl);
+        Assert.Equal("AT_xxx", viewModel.WxPusherAlertAppToken);
+        Assert.Equal("UID_1,UID_2", viewModel.WxPusherAlertUids);
+        Assert.Equal("1;2", viewModel.WxPusherAlertTopicIds);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_DefaultsNullWxPusherNotificationStrings()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default,
+                LocalDesktopAlertSettings.Default,
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                BarkAlertChannelSettings.Default,
+                new WxPusherAlertChannelSettings(true, null!, null!, null!, null!))));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.WxPusherAlertsEnabled);
+        Assert.Equal(WxPusherAlertChannelSettings.DefaultApiBaseUrl, viewModel.WxPusherAlertApiBaseUrl);
+        Assert.Equal(string.Empty, viewModel.WxPusherAlertAppToken);
+        Assert.Equal(string.Empty, viewModel.WxPusherAlertUids);
+        Assert.Equal(string.Empty, viewModel.WxPusherAlertTopicIds);
+    }
+
+    [Fact]
+    public async Task NotificationSettings_AutoSaveWxPusherAlerts_WhenFieldsChange()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.WxPusherAlertsEnabled = true;
+        viewModel.WxPusherAlertApiBaseUrl = "https://wxpusher.example.com/";
+        viewModel.WxPusherAlertAppToken = " AT_xxx ";
+        viewModel.WxPusherAlertUids = " UID_1, UID_2 ";
+        viewModel.WxPusherAlertTopicIds = " 1;2 ";
+
+        await WaitForAsync(() =>
+            settingsService.SaveCalls > 0 &&
+            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.WxPusher.AppToken == "AT_xxx");
+
+        var wxPusher = Assert.IsType<WxPusherAlertChannelSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.WxPusher);
+        Assert.True(wxPusher.Enabled);
+        Assert.Equal("https://wxpusher.example.com", wxPusher.ApiBaseUrl);
+        Assert.Equal("AT_xxx", wxPusher.AppToken);
+        Assert.Equal("UID_1, UID_2", wxPusher.Uids);
+        Assert.Equal("1;2", wxPusher.TopicIds);
+    }
+
+    [Fact]
+    public async Task SendTestWxPusherAlertAsync_UsesCurrentNotificationSettingsSnapshot()
+    {
+        var alertService = new FakeTaskEventAlertDispatcher();
+        var viewModel = CreateViewModel(taskAlertService: alertService);
+        await viewModel.InitializeAsync();
+
+        viewModel.WxPusherAlertsEnabled = true;
+        viewModel.WxPusherAlertApiBaseUrl = "https://wxpusher.example.com/";
+        viewModel.WxPusherAlertAppToken = " AT_xxx ";
+        viewModel.WxPusherAlertUids = " UID_1 ";
+        viewModel.WxPusherAlertTopicIds = " 1 ";
+
+        await viewModel.SendTestWxPusherAlertCommand.ExecuteAsync(null);
+
+        var request = Assert.Single(alertService.TestWxPusherRequests);
+        Assert.True(request.Enabled);
+        Assert.Equal("https://wxpusher.example.com", request.ApiBaseUrl);
+        Assert.Equal("AT_xxx", request.AppToken);
+        Assert.Equal("UID_1", request.Uids);
+        Assert.Equal("1", request.TopicIds);
+    }
+
+    [Fact]
+    public async Task SendTestWxPusherAlertAsync_ShowsErrorDialog_WhenSendingFails()
+    {
+        var alertService = new FakeTaskEventAlertDispatcher
+        {
+            SendTestWxPusherException = new InvalidOperationException("wxpusher send failed")
+        };
+        var errorDialogService = new FakeErrorDialogService();
+        var viewModel = CreateViewModel(
+            taskAlertService: alertService,
+            errorDialogService: errorDialogService);
+        await viewModel.InitializeAsync();
+
+        viewModel.WxPusherAlertApiBaseUrl = "https://wxpusher.example.com";
+        viewModel.WxPusherAlertAppToken = "AT_xxx";
+        viewModel.WxPusherAlertUids = "UID_1";
+
+        await viewModel.SendTestWxPusherAlertCommand.ExecuteAsync(null);
+
+        var error = Assert.Single(errorDialogService.Errors);
+        Assert.Equal("测试 WxPusher 发送失败", error.Title);
+        Assert.Equal(nameof(InvalidOperationException), error.ErrorType);
+        Assert.Equal("wxpusher send failed", error.ErrorMessage);
     }
 
     [Fact]
@@ -1479,6 +1596,29 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("IGoLibrary-Ex", bark.Group);
         Assert.Equal("alarm", bark.Sound);
         Assert.Equal("critical", bark.Level);
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_PersistsWxPusherNotificationSettings()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.WxPusherAlertsEnabled = true;
+        viewModel.WxPusherAlertApiBaseUrl = "https://wxpusher.example.com/";
+        viewModel.WxPusherAlertAppToken = " AT_xxx ";
+        viewModel.WxPusherAlertUids = " UID_1 ";
+        viewModel.WxPusherAlertTopicIds = " 1 ";
+
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        var wxPusher = Assert.IsType<WxPusherAlertChannelSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.WxPusher);
+        Assert.True(wxPusher.Enabled);
+        Assert.Equal("https://wxpusher.example.com", wxPusher.ApiBaseUrl);
+        Assert.Equal("AT_xxx", wxPusher.AppToken);
+        Assert.Equal("UID_1", wxPusher.Uids);
+        Assert.Equal("1", wxPusher.TopicIds);
     }
 
     [Fact]
