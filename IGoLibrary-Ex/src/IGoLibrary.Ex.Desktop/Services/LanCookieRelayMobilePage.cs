@@ -40,13 +40,13 @@ internal static class LanCookieRelayMobilePage
   <main>
     <section>
       <h1>局域网快传</h1>
-      <p>在微信内长按识别下方授权二维码，完成授权后复制包含 code 的链接，返回本页提交到电脑端。</p>
+      <p>在微信内长按识别下方授权二维码，完成授权后复制包含 code 的链接，返回本页提交到电脑端</p>
       <div class="qr-card">
         <div class="qr-title">微信授权二维码</div>
         <div class="qr-frame">
           <img id="authQrCode" alt="微信授权二维码">
         </div>
-        <p class="qr-hint">如果长按不可用，可以截图后在微信扫一扫中识别。</p>
+        <p class="qr-hint">如果长按不可用，可以截图后在微信扫一扫中识别</p>
       </div>
       <button class="secondary" id="paste" type="button">点击粘贴链接</button>
       <textarea id="link" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="在这里粘贴包含 code 的授权链接"></textarea>
