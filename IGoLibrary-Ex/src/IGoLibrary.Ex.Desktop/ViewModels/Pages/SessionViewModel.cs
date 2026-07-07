@@ -237,6 +237,21 @@ public sealed partial class SessionViewModel : ViewModelBase
         string? linkText,
         bool notifyOnInvalidLink)
     {
+        return await ParseCookieFromLinkAsync(
+            linkText,
+            new SessionCookieLinkParseOptions(
+                NotifyOnInvalidLink: notifyOnInvalidLink,
+                ShowDesktopNotifications: true,
+                SelectAccountTab: true,
+                LogDuplicateCodeValue: true,
+                ApplyFetchedCookieWhenUnauthenticated: true,
+                MarkCodeProcessedWhenUnauthenticated: true));
+    }
+
+    public async Task<SessionCookieLinkParseResult> ParseCookieFromLinkAsync(
+        string? linkText,
+        SessionCookieLinkParseOptions options)
+    {
         string? reservedCode = null;
         var shouldMarkCodeAsProcessed = false;
         try
@@ -244,33 +259,51 @@ public sealed partial class SessionViewModel : ViewModelBase
             if (!CodeLinkParser.TryExtractCode(linkText, out var code))
             {
                 const string message = "未能从链接中提取 32 位 code";
-                if (notifyOnInvalidLink)
+                if (options.NotifyOnInvalidLink && options.ShowDesktopNotifications)
                 {
                     await _notificationService.ShowWarningAsync("链接无效", message);
                 }
 
-                return SessionCookieLinkParseResult.Failed(message);
+                return SessionCookieLinkParseResult.InvalidLink(message);
             }
 
             if (!TryReserveAuthCode(code))
             {
                 const string message = "该授权链接已处理过一次，如需重试，请重新从微信获取新的授权链接";
-                _activityLogService.Write(LogEntryKind.Info, "Auth", $"授权 code 已处理，跳过重复解析：{code}");
-                if (notifyOnInvalidLink)
+                _activityLogService.Write(
+                    LogEntryKind.Info,
+                    "Auth",
+                    options.LogDuplicateCodeValue
+                        ? $"授权 code 已处理，跳过重复解析：{code}"
+                        : "授权 code 已处理，跳过重复解析。");
+                if (options.NotifyOnInvalidLink && options.ShowDesktopNotifications)
                 {
                     await _notificationService.ShowInfoAsync("链接已处理", message);
                 }
 
-                return SessionCookieLinkParseResult.Failed(message);
+                return SessionCookieLinkParseResult.DuplicateCode(message);
             }
 
             reservedCode = code;
             var result = await AuthenticateFromCodeAsync(code, RememberSession);
-            shouldMarkCodeAsProcessed = true;
-            ManualCookieText = result.Cookie ?? string.Empty;
-            SessionSummary = result.StatusMessage;
-            _selectTabIndex?.Invoke(1);
-            await _notificationService.ShowSuccessAsync("已成功获取 Cookie", BuildCookieFetchedMessage(result.Cookie ?? string.Empty));
+            shouldMarkCodeAsProcessed = result.Session is not null || options.MarkCodeProcessedWhenUnauthenticated;
+            if (result.Session is not null || options.ApplyFetchedCookieWhenUnauthenticated)
+            {
+                ManualCookieText = result.Cookie ?? string.Empty;
+                SessionSummary = result.StatusMessage;
+            }
+
+            if (options.SelectAccountTab)
+            {
+                _selectTabIndex?.Invoke(1);
+            }
+
+            if (options.ShowDesktopNotifications)
+            {
+                await _notificationService.ShowSuccessAsync(
+                    "已成功获取 Cookie",
+                    BuildCookieFetchedMessage(result.Cookie ?? string.Empty));
+            }
 
             if (result.Session is not null)
             {
@@ -289,10 +322,14 @@ public sealed partial class SessionViewModel : ViewModelBase
             else if (!string.IsNullOrWhiteSpace(result.AuthenticationFailureMessage))
             {
                 _activityLogService.Write(LogEntryKind.Warning, "Auth", $"Cookie 已获取，但自动验证失败：{result.AuthenticationFailureMessage}");
-                await _notificationService.ShowInfoAsync(
-                    "已获取 Cookie",
-                    $"Cookie 已填入文本框，但自动验证失败：{result.AuthenticationFailureMessage}");
-                return SessionCookieLinkParseResult.CookieFetched(
+                if (options.ShowDesktopNotifications)
+                {
+                    await _notificationService.ShowInfoAsync(
+                        "已获取 Cookie",
+                        $"Cookie 已填入文本框，但自动验证失败：{result.AuthenticationFailureMessage}");
+                }
+
+                return SessionCookieLinkParseResult.AuthenticationFailed(
                     $"Cookie 已获取，但自动验证失败：{result.AuthenticationFailureMessage}");
             }
 
@@ -301,8 +338,12 @@ public sealed partial class SessionViewModel : ViewModelBase
         catch (Exception ex)
         {
             _activityLogService.Write(LogEntryKind.Error, "Auth", $"通过链接获取 Cookie 失败：{ex.Message}");
-            await _notificationService.ShowWarningAsync("获取 Cookie 失败", ex.Message);
-            return SessionCookieLinkParseResult.Failed(ex.Message);
+            if (options.ShowDesktopNotifications)
+            {
+                await _notificationService.ShowWarningAsync("获取 Cookie 失败", ex.Message);
+            }
+
+            return SessionCookieLinkParseResult.FetchFailed(ex.Message);
         }
         finally
         {
@@ -782,20 +823,87 @@ public sealed partial class SessionViewModel : ViewModelBase
 public sealed record SessionCookieLinkParseResult(
     bool Processed,
     bool Authenticated,
-    string Message)
+    string Message,
+    SessionCookieLinkParseStatus Status)
 {
     public static SessionCookieLinkParseResult AuthenticatedSession(string message)
     {
-        return new SessionCookieLinkParseResult(true, true, message);
+        return new SessionCookieLinkParseResult(
+            true,
+            true,
+            message,
+            SessionCookieLinkParseStatus.Authenticated);
     }
 
     public static SessionCookieLinkParseResult CookieFetched(string message)
     {
-        return new SessionCookieLinkParseResult(true, false, message);
+        return new SessionCookieLinkParseResult(
+            true,
+            false,
+            message,
+            SessionCookieLinkParseStatus.CookieFetched);
     }
 
-    public static SessionCookieLinkParseResult Failed(string message)
+    public static SessionCookieLinkParseResult InvalidLink(string message)
     {
-        return new SessionCookieLinkParseResult(false, false, message);
+        return new SessionCookieLinkParseResult(
+            false,
+            false,
+            message,
+            SessionCookieLinkParseStatus.InvalidLink);
     }
+
+    public static SessionCookieLinkParseResult DuplicateCode(string message)
+    {
+        return new SessionCookieLinkParseResult(
+            false,
+            false,
+            message,
+            SessionCookieLinkParseStatus.DuplicateCode);
+    }
+
+    public static SessionCookieLinkParseResult AuthenticationFailed(string message)
+    {
+        return new SessionCookieLinkParseResult(
+            true,
+            false,
+            message,
+            SessionCookieLinkParseStatus.AuthenticationFailed);
+    }
+
+    public static SessionCookieLinkParseResult FetchFailed(string message)
+    {
+        return new SessionCookieLinkParseResult(
+            false,
+            false,
+            message,
+            SessionCookieLinkParseStatus.FetchFailed);
+    }
+}
+
+public sealed record SessionCookieLinkParseOptions(
+    bool NotifyOnInvalidLink,
+    bool ShowDesktopNotifications,
+    bool SelectAccountTab,
+    bool LogDuplicateCodeValue,
+    bool ApplyFetchedCookieWhenUnauthenticated,
+    bool MarkCodeProcessedWhenUnauthenticated)
+{
+    public static SessionCookieLinkParseOptions MobileControlRefresh { get; } = new(
+        NotifyOnInvalidLink: false,
+        ShowDesktopNotifications: false,
+        SelectAccountTab: false,
+        LogDuplicateCodeValue: false,
+        ApplyFetchedCookieWhenUnauthenticated: false,
+        MarkCodeProcessedWhenUnauthenticated: false);
+}
+
+public enum SessionCookieLinkParseStatus
+{
+    InvalidLink,
+    DuplicateCode,
+    FetchFailed,
+    CookieFetched,
+    AuthenticationFailed,
+    Authenticated
 }

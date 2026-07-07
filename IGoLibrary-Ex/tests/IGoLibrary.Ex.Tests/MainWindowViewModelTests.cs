@@ -42,6 +42,90 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task MobileControlCookieRefresh_UpdatesSessionStateWithoutSwitchingTabOrShowingSuccessToast()
+    {
+        var code = "1234567890abcdef1234567890abcdef";
+        var cookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddHours(2));
+        var notificationService = new FakeNotificationService();
+        var libraryService = new FakeLibraryService
+        {
+            LibrariesToLoad =
+            [
+                new LibrarySummary(1, "场馆A", "3层", true, 120, 20, 10),
+                new LibrarySummary(2, "场馆B", "5层", true, 80, 10, 5)
+            ]
+        };
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetCookieFromCodeAsync = (_, _) => Task.FromResult(cookie)
+        };
+        var viewModel = CreateViewModel(
+            libraryService: libraryService,
+            apiClient: apiClient,
+            notificationService: notificationService);
+        await viewModel.InitializeAsync();
+        viewModel.SelectedTabIndex = 0;
+
+        var result = await viewModel.Session.ParseCookieFromLinkAsync(
+            $"https://example.test/auth?code={code}",
+            SessionCookieLinkParseOptions.MobileControlRefresh);
+
+        Assert.True(result.Authenticated);
+        Assert.True(viewModel.IsAuthorized);
+        Assert.Equal(cookie, viewModel.ManualCookieText);
+        Assert.Equal(cookie, viewModel.WorkflowState.CurrentCookie);
+        Assert.True(viewModel.HasCurrentCookie);
+        Assert.Equal(1, libraryService.LoadLibrariesCalls);
+        Assert.Equal(0, viewModel.SelectedTabIndex);
+        Assert.Empty(notificationService.Successes);
+    }
+
+    [Fact]
+    public async Task MobileControlCookieRefresh_WhenValidationFails_PreservesCurrentSessionPresentation()
+    {
+        var firstCode = "1234567890abcdef1234567890abcdef";
+        var secondCode = "abcdef1234567890abcdef1234567890";
+        var originalCookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddHours(2));
+        var failedCookie = BuildAuthorizationCookie(DateTimeOffset.Now.AddHours(3));
+        var sessionService = new FakeSessionService();
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetCookieFromCodeAsync = (_, _) => Task.FromResult(originalCookie)
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            apiClient: apiClient);
+        await viewModel.InitializeAsync();
+        var firstResult = await viewModel.Session.ParseCookieFromLinkAsync(
+            $"https://example.test/auth?code={firstCode}",
+            SessionCookieLinkParseOptions.MobileControlRefresh);
+        Assert.True(firstResult.Authenticated);
+        var originalSessionSummary = viewModel.SessionSummary;
+
+        apiClient.OnGetCookieFromCodeAsync = (_, _) => Task.FromResult(failedCookie);
+        sessionService.AuthenticateFromCookieException = new InvalidOperationException("invalid cookie");
+        var secondResult = await viewModel.Session.ParseCookieFromLinkAsync(
+            $"https://example.test/auth?code={secondCode}",
+            SessionCookieLinkParseOptions.MobileControlRefresh);
+
+        Assert.False(secondResult.Authenticated);
+        Assert.Equal(SessionCookieLinkParseStatus.AuthenticationFailed, secondResult.Status);
+        Assert.True(viewModel.IsAuthorized);
+        Assert.Equal(originalCookie, viewModel.ManualCookieText);
+        Assert.Equal(originalCookie, viewModel.WorkflowState.CurrentCookie);
+        Assert.Equal(originalSessionSummary, viewModel.SessionSummary);
+
+        sessionService.AuthenticateFromCookieException = null;
+        var retryResult = await viewModel.Session.ParseCookieFromLinkAsync(
+            $"https://example.test/auth?code={secondCode}",
+            SessionCookieLinkParseOptions.MobileControlRefresh);
+
+        Assert.True(retryResult.Authenticated);
+        Assert.Equal(failedCookie, viewModel.ManualCookieText);
+        Assert.Equal(failedCookie, viewModel.WorkflowState.CurrentCookie);
+    }
+
+    [Fact]
     public void SidebarItems_ExposeSystemSettings_WhenUnauthorized()
     {
         var viewModel = CreateViewModel();

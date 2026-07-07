@@ -1,6 +1,5 @@
 using System.Net;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -14,7 +13,6 @@ public sealed class LanCookieRelayService(
     ILogger<LanCookieRelayService> logger) : ILanCookieRelayService, IAsyncDisposable
 {
     private static readonly TimeSpan DefaultSessionTimeout = TimeSpan.FromMinutes(10);
-    private const long MaxRequestBodyBytes = 8 * 1024;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private WebApplication? _app;
     private CancellationTokenSource? _timeoutCts;
@@ -47,7 +45,7 @@ public sealed class LanCookieRelayService(
             builder.WebHost.ConfigureKestrel(options =>
             {
                 options.Listen(address, 0);
-                options.Limits.MaxRequestBodySize = MaxRequestBodyBytes;
+                options.Limits.MaxRequestBodySize = SubmittedLinkReader.MaxRequestBodyBytes;
             });
 
             var app = builder.Build();
@@ -132,7 +130,7 @@ public sealed class LanCookieRelayService(
             LanCookieRelaySubmitResult result;
             try
             {
-                var link = await ReadSubmittedLinkAsync(context);
+                var link = await SubmittedLinkReader.ReadLinkAsync(context);
                 if (string.IsNullOrWhiteSpace(link))
                 {
                     result = LanCookieRelaySubmitResult.Failed("没有收到授权链接，请先粘贴链接");
@@ -142,7 +140,7 @@ public sealed class LanCookieRelayService(
                     result = await submitHandler(link, CancellationToken.None);
                 }
             }
-            catch (RequestBodyTooLargeException)
+            catch (SubmittedLinkBodyTooLargeException)
             {
                 await TryWriteJsonAsync(
                     context,
@@ -277,68 +275,6 @@ public sealed class LanCookieRelayService(
             DefaultSessionTimeout);
     }
 
-    private static async Task<string> ReadSubmittedLinkAsync(HttpContext context)
-    {
-        if (context.Request.ContentLength > MaxRequestBodyBytes)
-        {
-            throw new RequestBodyTooLargeException();
-        }
-
-        using var stream = new MemoryStream();
-        var buffer = new byte[1024];
-        long totalBytes = 0;
-        while (true)
-        {
-            var bytesRead = await context.Request.Body.ReadAsync(buffer, context.RequestAborted);
-            if (bytesRead == 0)
-            {
-                break;
-            }
-
-            totalBytes += bytesRead;
-            if (totalBytes > MaxRequestBodyBytes)
-            {
-                throw new RequestBodyTooLargeException();
-            }
-
-            stream.Write(buffer, 0, bytesRead);
-        }
-
-        var body = Encoding.UTF8.GetString(stream.ToArray()).Trim();
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return string.Empty;
-        }
-
-        if (body.StartsWith('{'))
-        {
-            using var document = JsonDocument.Parse(body);
-            if (document.RootElement.ValueKind == JsonValueKind.Object &&
-                document.RootElement.TryGetProperty("link", out var linkElement) &&
-                linkElement.ValueKind == JsonValueKind.String)
-            {
-                return linkElement.GetString()?.Trim() ?? string.Empty;
-            }
-
-            return string.Empty;
-        }
-
-        if (body.Contains("link=", StringComparison.Ordinal))
-        {
-            foreach (var segment in body.Split('&', StringSplitOptions.RemoveEmptyEntries))
-            {
-                var parts = segment.Split('=', 2);
-                if (parts.Length == 2 &&
-                    string.Equals(Uri.UnescapeDataString(parts[0]), "link", StringComparison.Ordinal))
-                {
-                    return Uri.UnescapeDataString(parts[1].Replace('+', ' ')).Trim();
-                }
-            }
-        }
-
-        return body;
-    }
-
     private static bool IsValidToken(HttpContext context, string expectedToken)
     {
         return string.Equals(
@@ -411,7 +347,4 @@ public sealed class LanCookieRelayService(
         return Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
     }
 
-    private sealed class RequestBodyTooLargeException : Exception
-    {
-    }
 }

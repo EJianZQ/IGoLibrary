@@ -49,6 +49,7 @@ internal static class HostBuilderFactory
                 services.AddSingleton<ILanCookieRelayService, LanCookieRelayService>();
                 services.AddSingleton<IMobileControlTaskUiStateAccessor, MobileControlTaskUiStateAccessor>();
                 services.AddSingleton<IMobileControlStatusSnapshotProvider, MobileControlStatusSnapshotProvider>();
+                services.AddSingleton<IMobileControlCookieRefreshHandler, MobileControlCookieRefreshHandler>();
                 services.AddSingleton<IMobileControlActionService, MobileControlActionService>();
                 services.AddSingleton<IMobileControlService, MobileControlService>();
                 services.AddSingleton<ToastNotificationService>();

@@ -78,8 +78,10 @@ public sealed class MobileControlService(
             var app = builder.Build();
             app.MapGet("/", context => WriteLandingPageAsync(context, token));
             app.MapGet("/api/status", context => WriteStatusAsync(context, token));
+            app.MapGet("/api/session/auth-qrcode", context => WriteAuthQrCodeAsync(context, token));
             app.MapPost("/api/tasks/{kind}/cancel", context => WriteCancelTaskAsync(context, token));
             app.MapPost("/api/reservation/cancel", context => WriteCancelReservationAsync(context, token));
+            app.MapPost("/api/session/cookie/refresh", context => WriteRefreshCookieAsync(context, token));
             app.MapFallback(context => WriteJsonAsync(
                 context,
                 StatusCodes.Status404NotFound,
@@ -165,6 +167,23 @@ public sealed class MobileControlService(
             context.RequestAborted);
     }
 
+    private async Task WriteAuthQrCodeAsync(HttpContext context, string token)
+    {
+        if (!IsValidToken(context, token))
+        {
+            await WriteForbiddenAsync(context);
+            return;
+        }
+
+        TrackConnectedDevice(context);
+        SetNoStore(context);
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.ContentType = "image/png";
+        var pngBytes = MobileControlAuthQrCodeImage.GetPngBytes();
+        context.Response.ContentLength = pngBytes.Length;
+        await context.Response.Body.WriteAsync(pngBytes, context.RequestAborted);
+    }
+
     private async Task WriteCancelTaskAsync(HttpContext context, string token)
     {
         if (!IsValidToken(context, token))
@@ -202,6 +221,47 @@ public sealed class MobileControlService(
             context,
             () => actionService.CancelCurrentReservationAsync(context.RequestAborted),
             "Failed to cancel mobile-control reservation.");
+    }
+
+    private async Task WriteRefreshCookieAsync(HttpContext context, string token)
+    {
+        if (!IsValidToken(context, token))
+        {
+            await WriteForbiddenAsync(context);
+            return;
+        }
+
+        TrackConnectedDevice(context);
+        string linkText;
+        try
+        {
+            linkText = await SubmittedLinkReader.ReadLinkAsync(context);
+        }
+        catch (SubmittedLinkBodyTooLargeException)
+        {
+            await WriteActionResponseAsync(
+                context,
+                new MobileControlActionResult(
+                    false,
+                    "提交内容过大，请只粘贴授权链接",
+                    StatusCodes.Status413PayloadTooLarge));
+            return;
+        }
+        catch (JsonException)
+        {
+            await WriteActionResponseAsync(
+                context,
+                new MobileControlActionResult(
+                    false,
+                    "提交内容格式无效，请只提交授权链接",
+                    StatusCodes.Status400BadRequest));
+            return;
+        }
+
+        await WriteActionResultAsync(
+            context,
+            () => actionService.RefreshCookieFromLinkAsync(linkText, context.RequestAborted),
+            "Failed to refresh mobile-control cookie.");
     }
 
     private async Task WriteActionResultAsync(

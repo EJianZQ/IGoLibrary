@@ -82,6 +82,40 @@ public sealed class MobileControlServiceTests
     }
 
     [Fact]
+    public async Task GetAuthQrCode_WithValidToken_ReturnsPngWithNoStore()
+    {
+        var port = GetFreeTcpPort();
+        await using var service = CreateService();
+        var session = await service.StartAsync(new MobileControlSettings(port, "token"));
+        using var client = new HttpClient();
+
+        using var response = await client.GetAsync(new Uri(session.Url, "/api/session/auth-qrcode?token=token"));
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
+        Assert.True(bytes.Length > 8);
+        Assert.Equal(0x89, bytes[0]);
+        Assert.Equal((byte)'P', bytes[1]);
+        Assert.Equal((byte)'N', bytes[2]);
+        Assert.Equal((byte)'G', bytes[3]);
+    }
+
+    [Fact]
+    public async Task GetAuthQrCode_WithInvalidToken_IsRejected()
+    {
+        var port = GetFreeTcpPort();
+        await using var service = CreateService();
+        var session = await service.StartAsync(new MobileControlSettings(port, "token"));
+        using var client = new HttpClient();
+
+        using var response = await client.GetAsync(new Uri(session.Url, "/api/session/auth-qrcode?token=bad"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Requests_WithInvalidToken_AreRejected()
     {
         var provider = new FakeMobileControlStatusSnapshotProvider();
@@ -185,6 +219,102 @@ public sealed class MobileControlServiceTests
         Assert.Equal(0, actionService.CancelReservationCalls);
     }
 
+    [Theory]
+    [InlineData("application/json", "{\"link\":\"https://example.test/auth?code=1234567890abcdef1234567890abcdef\"}")]
+    [InlineData("application/x-www-form-urlencoded", "link=https%3A%2F%2Fexample.test%2Fauth%3Fcode%3D1234567890abcdef1234567890abcdef")]
+    [InlineData("text/plain", "https://example.test/auth?code=1234567890abcdef1234567890abcdef")]
+    public async Task PostRefreshCookie_WithValidToken_ReadsSubmittedLinkAndReturnsActionJson(
+        string contentType,
+        string body)
+    {
+        var actionService = new FakeMobileControlActionService();
+        var port = GetFreeTcpPort();
+        await using var service = CreateService(actionService: actionService);
+        var session = await service.StartAsync(new MobileControlSettings(port, "token"));
+        using var client = new HttpClient();
+        using var content = new StringContent(body);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+
+        using var response = await client.PostAsync(
+            new Uri(session.Url, "/api/session/cookie/refresh?token=token"),
+            content);
+        var json = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            ["https://example.test/auth?code=1234567890abcdef1234567890abcdef"],
+            actionService.RefreshedCookieLinks);
+        using var document = JsonDocument.Parse(json);
+        Assert.True(document.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal("Cookie 已刷新", document.RootElement.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task PostRefreshCookie_WithInvalidToken_IsRejected()
+    {
+        var actionService = new FakeMobileControlActionService();
+        var port = GetFreeTcpPort();
+        await using var service = CreateService(actionService: actionService);
+        var session = await service.StartAsync(new MobileControlSettings(port, "token"));
+        using var client = new HttpClient();
+        using var content = new StringContent("https://example.test/auth?code=1234567890abcdef1234567890abcdef");
+
+        using var response = await client.PostAsync(
+            new Uri(session.Url, "/api/session/cookie/refresh?token=bad"),
+            content);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Empty(actionService.RefreshedCookieLinks);
+    }
+
+    [Fact]
+    public async Task PostRefreshCookie_WhenActionFails_ReturnsActionStatusCode()
+    {
+        var actionService = new FakeMobileControlActionService
+        {
+            RefreshCookieResult = new MobileControlActionResult(
+                false,
+                "Cookie 已获取，但自动验证失败：invalid cookie",
+                StatusCodes.Status422UnprocessableEntity)
+        };
+        var port = GetFreeTcpPort();
+        await using var service = CreateService(actionService: actionService);
+        var session = await service.StartAsync(new MobileControlSettings(port, "token"));
+        using var client = new HttpClient();
+        using var content = new StringContent("https://example.test/auth?code=1234567890abcdef1234567890abcdef");
+
+        using var response = await client.PostAsync(
+            new Uri(session.Url, "/api/session/cookie/refresh?token=token"),
+            content);
+        var json = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        using var document = JsonDocument.Parse(json);
+        Assert.False(document.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal("Cookie 已获取，但自动验证失败：invalid cookie", document.RootElement.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task PostRefreshCookie_WhenBodyIsTooLarge_ReturnsPayloadTooLargeWithoutCallingAction()
+    {
+        var actionService = new FakeMobileControlActionService();
+        var port = GetFreeTcpPort();
+        await using var service = CreateService(actionService: actionService);
+        var session = await service.StartAsync(new MobileControlSettings(port, "token"));
+        using var client = new HttpClient();
+        using var content = new StringContent(new string('x', (int)SubmittedLinkReader.MaxRequestBodyBytes + 1));
+
+        using var response = await client.PostAsync(
+            new Uri(session.Url, "/api/session/cookie/refresh?token=token"),
+            content);
+        var json = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+        Assert.Empty(actionService.RefreshedCookieLinks);
+        using var document = JsonDocument.Parse(json);
+        Assert.False(document.RootElement.GetProperty("success").GetBoolean());
+    }
+
     private static MobileControlService CreateService(
         IMobileControlStatusSnapshotProvider? statusSnapshotProvider = null,
         IMobileControlActionService? actionService = null)
@@ -236,6 +366,8 @@ public sealed class MobileControlServiceTests
     {
         public List<string> CancelledTaskKinds { get; } = [];
 
+        public List<string> RefreshedCookieLinks { get; } = [];
+
         public int CancelReservationCalls { get; private set; }
 
         public MobileControlActionResult CancelTaskResult { get; set; } =
@@ -243,6 +375,9 @@ public sealed class MobileControlServiceTests
 
         public MobileControlActionResult CancelReservationResult { get; set; } =
             new(true, "已取消预约", StatusCodes.Status200OK);
+
+        public MobileControlActionResult RefreshCookieResult { get; set; } =
+            new(true, "Cookie 已刷新", StatusCodes.Status200OK);
 
         public Task<MobileControlActionResult> CancelTaskAsync(
             string taskKind,
@@ -257,6 +392,14 @@ public sealed class MobileControlServiceTests
         {
             CancelReservationCalls++;
             return Task.FromResult(CancelReservationResult);
+        }
+
+        public Task<MobileControlActionResult> RefreshCookieFromLinkAsync(
+            string linkText,
+            CancellationToken cancellationToken = default)
+        {
+            RefreshedCookieLinks.Add(linkText);
+            return Task.FromResult(RefreshCookieResult);
         }
     }
 }

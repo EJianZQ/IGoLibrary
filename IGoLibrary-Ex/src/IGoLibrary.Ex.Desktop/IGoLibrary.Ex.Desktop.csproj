@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\MobileControl\MobileControlPage.html" />
+    <EmbeddedResource Include="Assets\qrcode.png" LogicalName="IGoLibrary.Ex.Desktop.Assets.qrcode.png" />
   </ItemGroup>
 
   <ItemGroup>

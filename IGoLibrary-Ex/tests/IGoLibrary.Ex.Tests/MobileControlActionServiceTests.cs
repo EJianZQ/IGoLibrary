@@ -149,6 +149,93 @@ public sealed class MobileControlActionServiceTests
         Assert.Equal(1, reservationWorkflow.CancelCalls);
     }
 
+    [Fact]
+    public async Task RefreshCookieFromLinkAsync_WhenLinkIsEmpty_ReturnsBadRequest()
+    {
+        var handler = new FakeMobileControlCookieRefreshHandler();
+        var service = CreateService(cookieRefreshHandler: handler);
+
+        var result = await service.RefreshCookieFromLinkAsync(" ");
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status400BadRequest, result.StatusCode);
+        Assert.Equal(0, handler.RefreshCalls);
+    }
+
+    [Fact]
+    public async Task RefreshCookieFromLinkAsync_WhenAuthenticated_ReturnsSuccessAndDoesNotLogSecrets()
+    {
+        const string submittedLink = "https://example.test/auth?code=1234567890abcdef1234567890abcdef&cookie=secret-cookie";
+        var logs = new ActivityLogService();
+        var handler = new FakeMobileControlCookieRefreshHandler
+        {
+            Result = SessionCookieLinkParseResult.AuthenticatedSession("授权链接解析成功，Cookie 已验证并同步到电脑")
+        };
+        var service = CreateService(cookieRefreshHandler: handler, activityLogService: logs);
+
+        var result = await service.RefreshCookieFromLinkAsync(submittedLink);
+
+        Assert.True(result.Success);
+        Assert.Equal(StatusCodes.Status200OK, result.StatusCode);
+        Assert.Equal([submittedLink], handler.SubmittedLinks);
+        Assert.Contains(logs.Entries, entry => entry.Message == "手机端已刷新 Cookie。");
+        Assert.DoesNotContain(logs.Entries, entry => entry.Message.Contains(submittedLink, StringComparison.Ordinal));
+        Assert.DoesNotContain(logs.Entries, entry => entry.Message.Contains("secret-cookie", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RefreshCookieFromLinkAsync_WhenValidationFails_ReturnsUnprocessableEntity()
+    {
+        var handler = new FakeMobileControlCookieRefreshHandler
+        {
+            Result = SessionCookieLinkParseResult.AuthenticationFailed("Cookie 已获取，但自动验证失败：invalid cookie")
+        };
+        var service = CreateService(cookieRefreshHandler: handler);
+
+        var result = await service.RefreshCookieFromLinkAsync("https://example.test/auth?code=1234567890abcdef1234567890abcdef");
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status422UnprocessableEntity, result.StatusCode);
+        Assert.Equal(1, handler.RefreshCalls);
+    }
+
+    [Fact]
+    public async Task RefreshCookieFromLinkAsync_WhenDuplicateCode_ReturnsConflict()
+    {
+        var handler = new FakeMobileControlCookieRefreshHandler
+        {
+            Result = SessionCookieLinkParseResult.DuplicateCode("该授权链接已处理过一次，如需重试，请重新从微信获取新的授权链接")
+        };
+        var service = CreateService(cookieRefreshHandler: handler);
+
+        var result = await service.RefreshCookieFromLinkAsync("https://example.test/auth?code=1234567890abcdef1234567890abcdef");
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status409Conflict, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task RefreshCookieFromLinkAsync_WhenRefreshAlreadyRunning_ReturnsConflictWithoutSecondHandlerCall()
+    {
+        var handler = new FakeMobileControlCookieRefreshHandler
+        {
+            PendingResult = new TaskCompletionSource<SessionCookieLinkParseResult>(
+                TaskCreationOptions.RunContinuationsAsynchronously)
+        };
+        var service = CreateService(cookieRefreshHandler: handler);
+
+        var first = service.RefreshCookieFromLinkAsync("https://example.test/auth?code=1234567890abcdef1234567890abcdef");
+        await handler.RefreshStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        var second = await service.RefreshCookieFromLinkAsync("https://example.test/auth?code=abcdef1234567890abcdef1234567890");
+        handler.PendingResult.SetResult(SessionCookieLinkParseResult.AuthenticatedSession("Cookie 已刷新"));
+        var firstResult = await first;
+
+        Assert.True(firstResult.Success);
+        Assert.False(second.Success);
+        Assert.Equal(StatusCodes.Status409Conflict, second.StatusCode);
+        Assert.Equal(1, handler.RefreshCalls);
+    }
+
     private static MobileControlActionService CreateService(
         AppRuntimeState? runtimeState = null,
         ShellWorkflowState? workflowState = null,
@@ -156,7 +243,9 @@ public sealed class MobileControlActionServiceTests
         FakeGlobalLeakCoordinator? globalLeakCoordinator = null,
         FakeTomorrowReservationCoordinator? tomorrowCoordinator = null,
         FakeOccupySeatCoordinator? occupyCoordinator = null,
-        IReservationWorkflowService? reservationWorkflowService = null)
+        IReservationWorkflowService? reservationWorkflowService = null,
+        IMobileControlCookieRefreshHandler? cookieRefreshHandler = null,
+        IActivityLogService? activityLogService = null)
     {
         runtimeState ??= new AppRuntimeState();
         workflowState ??= new ShellWorkflowState();
@@ -169,7 +258,8 @@ public sealed class MobileControlActionServiceTests
             reservationWorkflowService ?? new FakeReservationWorkflowService(),
             runtimeState,
             workflowState,
-            new ActivityLogService());
+            cookieRefreshHandler ?? new FakeMobileControlCookieRefreshHandler(),
+            activityLogService ?? new ActivityLogService());
     }
 
     private static CoordinatorStatus CreateRunningStatus(string title)
@@ -227,6 +317,31 @@ public sealed class MobileControlActionServiceTests
             LastStopOccupyFirst = stopOccupyFirst;
             CancelStarted.TrySetResult(null);
             return PendingCancelResult?.Task ?? Task.FromResult(CancelResult);
+        }
+    }
+
+    private sealed class FakeMobileControlCookieRefreshHandler : IMobileControlCookieRefreshHandler
+    {
+        public int RefreshCalls { get; private set; }
+
+        public List<string> SubmittedLinks { get; } = [];
+
+        public SessionCookieLinkParseResult Result { get; set; } =
+            SessionCookieLinkParseResult.AuthenticatedSession("Cookie 已刷新");
+
+        public TaskCompletionSource<object?> RefreshStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<SessionCookieLinkParseResult>? PendingResult { get; set; }
+
+        public Task<SessionCookieLinkParseResult> RefreshCookieFromLinkAsync(
+            string linkText,
+            CancellationToken cancellationToken = default)
+        {
+            RefreshCalls++;
+            SubmittedLinks.Add(linkText);
+            RefreshStarted.TrySetResult(null);
+            return PendingResult?.Task ?? Task.FromResult(Result);
         }
     }
 }

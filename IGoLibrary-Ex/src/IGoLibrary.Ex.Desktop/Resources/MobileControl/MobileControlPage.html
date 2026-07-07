@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-store">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>IGoLibrary</title>
+  <title>IGoLibrary 手机控制</title>
   <style>
     /* ═══════════════════════════════════════════════════════
        iOS-Inspired Design System — 我去图书馆 Mobile Control
@@ -338,6 +338,140 @@
       gap: 8px;
     }
 
+    .cookie-refresh-panel {
+      margin-top: 14px;
+      border-radius: var(--radius-inner);
+      background: var(--bg-field);
+      overflow: hidden;
+    }
+
+    .cookie-refresh-panel summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 52px;
+      padding: 12px;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .cookie-refresh-panel summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .summary-title {
+      display: block;
+      color: var(--text-primary);
+      font-size: 15px;
+      font-weight: 650;
+      line-height: 1.25;
+    }
+
+    .summary-subtitle {
+      display: block;
+      margin-top: 2px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .summary-meta {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent-blue);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .summary-state::after {
+      content: '展开';
+    }
+
+    .cookie-refresh-panel[open] .summary-state::after {
+      content: '收起';
+    }
+
+    .summary-caret {
+      width: 8px;
+      height: 8px;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: translateY(-2px) rotate(45deg);
+      transition: transform 0.2s ease;
+    }
+
+    .cookie-refresh-panel[open] .summary-caret {
+      transform: translateY(2px) rotate(-135deg);
+    }
+
+    .cookie-refresh-content {
+      display: grid;
+      gap: 14px;
+      padding: 0 12px 12px;
+    }
+
+    .auth-qr {
+      border-radius: var(--radius-inner);
+      padding: 12px;
+      background: var(--bg-card-solid);
+      display: grid;
+      gap: 10px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .auth-qr-frame {
+      width: min(100%, 220px);
+      aspect-ratio: 1;
+      margin: 0 auto;
+      border-radius: 10px;
+      padding: 10px;
+      background: var(--bg-card-solid);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .auth-qr-frame img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+
+    .auth-qr-hint {
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .cookie-refresh {
+      display: grid;
+      gap: 10px;
+    }
+
+    .cookie-refresh textarea {
+      width: 100%;
+      min-height: 92px;
+      resize: vertical;
+      border: 0;
+      outline: none;
+      border-radius: var(--radius-inner);
+      padding: 12px;
+      background: var(--bg-field);
+      color: var(--text-primary);
+      font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      -webkit-appearance: none;
+    }
+
+    .cookie-refresh textarea::placeholder {
+      color: var(--text-tertiary);
+    }
+
     /* ── Progress Bar ── */
     .progress {
       height: 6px;
@@ -606,6 +740,32 @@
         <div class="item"><span class="label">到期时间</span><span class="value" id="cookieExpires">--</span></div>
       </div>
       <div class="progress idle" id="cookieProgress"><span></span></div>
+      <details class="cookie-refresh-panel" id="cookieRefreshPanel">
+        <summary>
+          <span>
+            <span class="summary-title">刷新 Cookie</span>
+            <span class="summary-subtitle">二维码和授权链接</span>
+          </span>
+          <span class="summary-meta">
+            <span class="summary-state"></span>
+            <span class="summary-caret" aria-hidden="true"></span>
+          </span>
+        </summary>
+        <div class="cookie-refresh-content">
+          <div class="auth-qr">
+            <span class="label">微信授权二维码</span>
+            <div class="auth-qr-frame">
+              <img id="authQrCode" alt="微信授权二维码">
+            </div>
+            <p class="auth-qr-hint">在微信内长按识别或截图扫码，完成授权后复制包含 code 的链接。</p>
+          </div>
+          <form class="cookie-refresh" id="cookieRefreshForm">
+            <label class="label" for="cookieRefreshLink">刷新 Cookie 授权链接</label>
+            <textarea id="cookieRefreshLink" name="link" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="粘贴微信授权链接..."></textarea>
+            <div class="actions"><button id="refreshCookieButton" type="submit">刷新 Cookie</button></div>
+          </form>
+        </div>
+      </details>
     </div></section>
 
     <!-- 当前预约 -->
@@ -650,6 +810,7 @@
     const display = value => value === null || value === undefined || value === '' ? '--' : value;
     const text = (id, value) => { $(id).textContent = display(value); };
     const escapeHtml = value => String(value ?? '--').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    $('authQrCode').src = '/api/session/auth-qrcode?token=' + encodeURIComponent(token);
 
     const field = (label, value, wide = false) =>
       `<div class="item${wide ? ' wide' : ''}"><span class="label">${escapeHtml(label)}</span><span class="value">${escapeHtml(display(value))}</span></div>`;
@@ -843,6 +1004,38 @@
       }
     }
 
+    async function refreshCookieFromLink(button) {
+      const input = $('cookieRefreshLink');
+      const link = input.value.trim();
+      if (!link) {
+        iosAlert('请先粘贴授权链接');
+        return;
+      }
+
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/session/cookie/refresh?token=' + encodeURIComponent(token), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ link }),
+          cache: 'no-store'
+        });
+        let result = { success: false, message: '刷新失败，请稍后重试' };
+        try { result = await response.json(); } catch {}
+        if (!response.ok || !result.success) {
+          iosAlert(result.message || '刷新失败，请稍后重试');
+        } else {
+          input.value = '';
+          iosAlert(result.message || 'Cookie 已刷新');
+        }
+        await refresh();
+      } catch {
+        iosAlert('刷新失败，请确认手机和电脑在同一局域网');
+      } finally {
+        button.disabled = false;
+      }
+    }
+
     document.addEventListener('click', event => {
       const taskButton = event.target.closest('button[data-task-cancel]');
       if (taskButton) {
@@ -851,6 +1044,13 @@
       }
       if (event.target.closest('#cancelReservationButton')) {
         postAction('/api/reservation/cancel', '确定取消当前预约吗？', $('cancelReservationButton'));
+      }
+    });
+
+    document.addEventListener('submit', event => {
+      if (event.target.closest('#cookieRefreshForm')) {
+        event.preventDefault();
+        refreshCookieFromLink($('refreshCookieButton'));
       }
     });
   </script>

@@ -15,6 +15,10 @@ public interface IMobileControlActionService
 
     Task<MobileControlActionResult> CancelCurrentReservationAsync(
         CancellationToken cancellationToken = default);
+
+    Task<MobileControlActionResult> RefreshCookieFromLinkAsync(
+        string linkText,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record MobileControlActionResult(
@@ -34,9 +38,11 @@ public sealed class MobileControlActionService(
     IReservationWorkflowService reservationWorkflowService,
     IReservationState reservationState,
     ShellWorkflowState workflowState,
+    IMobileControlCookieRefreshHandler cookieRefreshHandler,
     IActivityLogService activityLogService) : IMobileControlActionService
 {
     private readonly SemaphoreSlim _reservationCancelGate = new(1, 1);
+    private readonly SemaphoreSlim _cookieRefreshGate = new(1, 1);
 
     public async Task<MobileControlActionResult> CancelTaskAsync(
         string taskKind,
@@ -117,6 +123,48 @@ public sealed class MobileControlActionService(
         }
     }
 
+    public async Task<MobileControlActionResult> RefreshCookieFromLinkAsync(
+        string linkText,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(linkText))
+        {
+            return ConflictOrFailure(
+                false,
+                "没有收到授权链接，请先粘贴链接",
+                StatusCodes.Status400BadRequest);
+        }
+
+        if (!await _cookieRefreshGate.WaitAsync(0, cancellationToken))
+        {
+            return ConflictOrFailure(
+                false,
+                "当前已有 Cookie 刷新操作正在执行",
+                StatusCodes.Status409Conflict);
+        }
+
+        try
+        {
+            var result = await cookieRefreshHandler.RefreshCookieFromLinkAsync(
+                linkText.Trim(),
+                cancellationToken);
+            if (result.Authenticated)
+            {
+                activityLogService.Write(LogEntryKind.Info, "MobileControl", "手机端已刷新 Cookie。");
+                return new MobileControlActionResult(
+                    true,
+                    result.Message,
+                    StatusCodes.Status200OK);
+            }
+
+            return ConflictOrFailure(false, result.Message, ResolveCookieRefreshFailureStatusCode(result.Status));
+        }
+        finally
+        {
+            _cookieRefreshGate.Release();
+        }
+    }
+
     private MobileControlTaskDescriptor? ResolveTaskDescriptor(string taskKind)
     {
         return taskKind.Trim() switch
@@ -166,6 +214,19 @@ public sealed class MobileControlActionService(
         return result.RemoteSucceeded == false
             ? StatusCodes.Status502BadGateway
             : StatusCodes.Status500InternalServerError;
+    }
+
+    private static int ResolveCookieRefreshFailureStatusCode(SessionCookieLinkParseStatus status)
+    {
+        return status switch
+        {
+            SessionCookieLinkParseStatus.InvalidLink => StatusCodes.Status400BadRequest,
+            SessionCookieLinkParseStatus.DuplicateCode => StatusCodes.Status409Conflict,
+            SessionCookieLinkParseStatus.AuthenticationFailed => StatusCodes.Status422UnprocessableEntity,
+            SessionCookieLinkParseStatus.CookieFetched => StatusCodes.Status422UnprocessableEntity,
+            SessionCookieLinkParseStatus.FetchFailed => StatusCodes.Status502BadGateway,
+            _ => StatusCodes.Status500InternalServerError
+        };
     }
 
     private static bool IsActive(CoordinatorStatus status)
