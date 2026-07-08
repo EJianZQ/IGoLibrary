@@ -2169,7 +2169,7 @@
                 </Grid>
 
                 <Grid Grid.Row="1"
-                      ColumnDefinitions="Auto,Auto,*"
+                      ColumnDefinitions="Auto,Auto,Auto,*"
                       ColumnSpacing="12"
                       Margin="0,8,0,0">
                   <Button Content="{Binding MobileControlToggleButtonText}"
@@ -2187,6 +2187,23 @@
                           Foreground="{DynamicResource SemiAccentBrush}"
                           FontWeight="SemiBold"
                           HorizontalContentAlignment="Center" />
+                  <StackPanel Grid.Column="2"
+                              Orientation="Horizontal"
+                              Spacing="8"
+                              VerticalAlignment="Center">
+                    <TextBlock Text="自动开启"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                               VerticalAlignment="Center" />
+                    <ToggleSwitch IsChecked="{Binding IsMobileControlAutoStartEnabled}"
+                                  OnContent=""
+                                  OffContent=""
+                                  Width="40"
+                                  MinWidth="0"
+                                  ClipToBounds="True"
+                                  HorizontalAlignment="Left"
+                                  VerticalAlignment="Center" />
+                  </StackPanel>
                 </Grid>
               </Grid>
           </Grid>

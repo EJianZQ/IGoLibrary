@@ -81,6 +81,47 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_WithMobileControlAutoStartAndNoSession_StartsMobileControl()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(9527, "token", true)
+        });
+        var mobileControlService = new FakeMobileControlService();
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            mobileControlService: mobileControlService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.False(viewModel.IsAuthorized);
+        Assert.True(viewModel.IsMobileControlRunning);
+        Assert.Equal(1, mobileControlService.StartCalls);
+        Assert.Contains("http://127.0.0.1:9527/?token=token", viewModel.MobileControlUrlText);
+    }
+
+    [Fact]
+    public async Task ValidateManualCookieAsync_WithMobileControlAutoStart_DoesNotStartMobileControlAgain()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(9527, "token", true)
+        });
+        var mobileControlService = new FakeMobileControlService();
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            mobileControlService: mobileControlService);
+        await viewModel.InitializeAsync();
+        Assert.Equal(1, mobileControlService.StartCalls);
+
+        viewModel.ManualCookieText = BuildAuthorizationCookie(DateTimeOffset.Now.AddHours(2));
+        await viewModel.ValidateManualCookieCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, mobileControlService.StartCalls);
+        Assert.True(viewModel.IsMobileControlRunning);
+    }
+
+    [Fact]
     public async Task MobileControlCookieRefresh_WhenValidationFails_PreservesCurrentSessionPresentation()
     {
         var firstCode = "1234567890abcdef1234567890abcdef";
@@ -3197,6 +3238,7 @@ public sealed class MainWindowViewModelTests
         FakeStartupEntryService? startupEntryService = null,
         FakeLanCookieRelayService? lanCookieRelayService = null,
         FakeQrCodeImageFactory? qrCodeImageFactory = null,
+        FakeMobileControlService? mobileControlService = null,
         FakeTimeProvider? timeProvider = null)
     {
         sessionService ??= new FakeSessionService();
@@ -3233,7 +3275,8 @@ public sealed class MainWindowViewModelTests
             new AppWindowService(),
             startupEntryService ?? new FakeStartupEntryService(),
             lanCookieRelayService ?? new FakeLanCookieRelayService(),
-            qrCodeImageFactory ?? new FakeQrCodeImageFactory());
+            qrCodeImageFactory ?? new FakeQrCodeImageFactory(),
+            mobileControlService);
     }
 
     private static ReleaseUpdateInfo CreateReleaseUpdateInfo(string tagName)

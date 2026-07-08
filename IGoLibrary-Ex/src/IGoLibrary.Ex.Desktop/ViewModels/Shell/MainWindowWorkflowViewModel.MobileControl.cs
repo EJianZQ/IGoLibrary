@@ -11,6 +11,15 @@ public partial class MainWindowWorkflowViewModel
         set => MobileControl.IsMobileControlRunning = value;
     }
 
+    public bool IsMobileControlAutoStartEnabled
+    {
+        get => MobileControl.IsMobileControlAutoStartEnabled;
+        set
+        {
+            MobileControl.IsMobileControlAutoStartEnabled = value;
+        }
+    }
+
     public bool IsMobileControlStopped => MobileControl.IsMobileControlStopped;
 
     public string MobileControlToggleButtonText => MobileControl.MobileControlToggleButtonText;
@@ -86,11 +95,17 @@ public partial class MainWindowWorkflowViewModel
         return MobileControl.InitializeAsync(cancellationToken);
     }
 
+    private async Task StartMobileControlAutomaticallyAsync(CancellationToken cancellationToken = default)
+    {
+        await MobileControl.StartAutomaticallyIfEnabledAsync(cancellationToken);
+    }
+
     private void ConfigureMobileControlPropertyBridge(ViewModelPropertyBridge propertyBridge)
     {
         propertyBridge.ForwardSame(
             MobileControl,
             nameof(MobileControl.IsMobileControlRunning),
+            nameof(MobileControl.IsMobileControlAutoStartEnabled),
             nameof(MobileControl.IsMobileControlStopped),
             nameof(MobileControl.MobileControlToggleButtonText),
             nameof(MobileControl.MobileControlPort),

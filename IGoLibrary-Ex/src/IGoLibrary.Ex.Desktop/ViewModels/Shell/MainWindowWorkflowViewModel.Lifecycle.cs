@@ -82,6 +82,7 @@ public partial class MainWindowWorkflowViewModel
         {
             await LoadSettingsAsync();
             await InitializeMobileControlAsync();
+            await StartMobileControlAutomaticallyAsync();
             await LoadProtocolTemplatesAsync();
 
             try

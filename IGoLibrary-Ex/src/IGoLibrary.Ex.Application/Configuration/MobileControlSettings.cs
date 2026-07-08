@@ -1,6 +1,6 @@
 namespace IGoLibrary.Ex.Application.Configuration;
 
-public sealed record MobileControlSettings(int Port = 0, string AccessToken = "")
+public sealed record MobileControlSettings(int Port = 0, string AccessToken = "", bool AutoStart = false)
 {
     public const int MinPort = 1024;
 

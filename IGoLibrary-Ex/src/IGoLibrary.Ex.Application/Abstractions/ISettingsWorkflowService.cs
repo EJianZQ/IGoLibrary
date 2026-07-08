@@ -46,4 +46,8 @@ public interface ISettingsWorkflowService
     Task<MobileControlSettings> SaveMobileControlAccessTokenAsync(
         string accessToken,
         CancellationToken cancellationToken = default);
+
+    Task<MobileControlSettings> SaveMobileControlAutoStartAsync(
+        bool autoStart,
+        CancellationToken cancellationToken = default);
 }

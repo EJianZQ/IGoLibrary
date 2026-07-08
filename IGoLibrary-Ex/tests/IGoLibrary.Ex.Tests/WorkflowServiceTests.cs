@@ -395,6 +395,7 @@ public sealed class WorkflowServiceTests
             MobileControlSettings.RandomPortMinInclusive,
             MobileControlSettings.RandomPortMaxExclusive - 1);
         Assert.Equal(32, settings.AccessToken.Length);
+        Assert.False(settings.AutoStart);
         Assert.Equal(settings, settingsService.CurrentSettings.MobileControl);
         Assert.Equal(1, settingsService.SaveCalls);
     }
@@ -404,7 +405,7 @@ public sealed class WorkflowServiceTests
     {
         var initial = AppSettings.Default with
         {
-            MobileControl = new MobileControlSettings(9527, "token")
+            MobileControl = new MobileControlSettings(9527, "token", true)
         };
         var settingsService = new FakeSettingsService(initial);
         var service = new SettingsWorkflowService(settingsService);
@@ -413,6 +414,7 @@ public sealed class WorkflowServiceTests
 
         Assert.Equal(9528, settings.Port);
         Assert.Equal("token", settings.AccessToken);
+        Assert.True(settings.AutoStart);
         Assert.Equal(settings, settingsService.CurrentSettings.MobileControl);
     }
 
@@ -421,7 +423,7 @@ public sealed class WorkflowServiceTests
     {
         var initial = AppSettings.Default with
         {
-            MobileControl = new MobileControlSettings(9527, "old-token")
+            MobileControl = new MobileControlSettings(9527, "old-token", true)
         };
         var settingsService = new FakeSettingsService(initial);
         var service = new SettingsWorkflowService(settingsService);
@@ -430,6 +432,25 @@ public sealed class WorkflowServiceTests
 
         Assert.Equal(9527, settings.Port);
         Assert.Equal("new-token", settings.AccessToken);
+        Assert.True(settings.AutoStart);
+        Assert.Equal(settings, settingsService.CurrentSettings.MobileControl);
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_SaveMobileControlAutoStartAsync_OnlyChangesAutoStart()
+    {
+        var initial = AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(9527, "token")
+        };
+        var settingsService = new FakeSettingsService(initial);
+        var service = new SettingsWorkflowService(settingsService);
+
+        var settings = await service.SaveMobileControlAutoStartAsync(true);
+
+        Assert.Equal(9527, settings.Port);
+        Assert.Equal("token", settings.AccessToken);
+        Assert.True(settings.AutoStart);
         Assert.Equal(settings, settingsService.CurrentSettings.MobileControl);
     }
 

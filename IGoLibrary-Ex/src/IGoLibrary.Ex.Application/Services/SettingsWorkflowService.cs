@@ -297,6 +297,30 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
         return settings.MobileControl;
     }
 
+    public async Task<MobileControlSettings> SaveMobileControlAutoStartAsync(
+        bool autoStart,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await settingsService.UpdateAsync(current =>
+        {
+            var mobileControl = NormalizeMobileControlSettings(current.MobileControl) with
+            {
+                AutoStart = autoStart
+            };
+            if (mobileControl == current.MobileControl)
+            {
+                return current;
+            }
+
+            return current with
+            {
+                MobileControl = mobileControl
+            };
+        }, cancellationToken);
+
+        return settings.MobileControl;
+    }
+
     private static bool IsTimeOfDay(TimeSpan value)
     {
         return value >= TimeSpan.Zero && value < TimeSpan.FromDays(1);
@@ -311,7 +335,8 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
                 : CreateRandomMobileControlPort(),
             string.IsNullOrWhiteSpace(current.AccessToken)
                 ? CreateMobileControlAccessToken()
-                : current.AccessToken.Trim());
+                : current.AccessToken.Trim(),
+            current.AutoStart);
     }
 
     public static int CreateRandomMobileControlPort()

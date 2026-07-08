@@ -130,4 +130,85 @@ public sealed class MobileControlPageViewModelTests
 
         Assert.False(viewModel.IsMobileControlDetailsOpen);
     }
+
+    [Fact]
+    public async Task AutoStartToggle_PersistsSettingAndStartsImmediately()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(9527, "token")
+        });
+        var mobileControlService = new FakeMobileControlService();
+        var viewModel = new MobileControlPageViewModel(
+            mobileControlService,
+            new SettingsWorkflowService(settingsService),
+            new FakeQrCodeImageFactory(),
+            new ActivityLogService(),
+            new FakeNotificationService());
+        viewModel.ApplySettings(settingsService.CurrentSettings.MobileControl);
+
+        viewModel.IsMobileControlAutoStartEnabled = true;
+
+        await WaitForAsync(() =>
+            settingsService.CurrentSettings.MobileControl.AutoStart &&
+            mobileControlService.StartCalls == 1);
+        Assert.True(viewModel.IsMobileControlRunning);
+    }
+
+    [Fact]
+    public async Task StartAutomaticallyIfEnabledAsync_StartsWhenEnabledWithoutAuthorization()
+    {
+        var mobileControlService = new FakeMobileControlService();
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(9527, "token", true)
+        });
+        var viewModel = new MobileControlPageViewModel(
+            mobileControlService,
+            new SettingsWorkflowService(settingsService),
+            new FakeQrCodeImageFactory(),
+            new ActivityLogService(),
+            new FakeNotificationService());
+        viewModel.ApplySettings(settingsService.CurrentSettings.MobileControl);
+
+        await viewModel.StartAutomaticallyIfEnabledAsync();
+
+        Assert.Equal(1, mobileControlService.StartCalls);
+        Assert.True(viewModel.IsMobileControlRunning);
+    }
+
+    [Fact]
+    public async Task StartAutomaticallyIfEnabledAsync_DoesNotStartWhenDisabled()
+    {
+        var mobileControlService = new FakeMobileControlService();
+        var viewModel = new MobileControlPageViewModel(
+            mobileControlService,
+            new SettingsWorkflowService(new FakeSettingsService(AppSettings.Default)),
+            new FakeQrCodeImageFactory(),
+            new ActivityLogService(),
+            new FakeNotificationService());
+        viewModel.ApplySettings(new MobileControlSettings(9527, "token"));
+
+        await viewModel.StartAutomaticallyIfEnabledAsync();
+
+        Assert.Equal(0, mobileControlService.StartCalls);
+        Assert.False(viewModel.IsMobileControlRunning);
+    }
+
+    private static async Task WaitForAsync(Func<bool> predicate)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            if (predicate())
+            {
+                return;
+            }
+
+            await Task.Delay(25);
+        }
+
+        throw new TimeoutException("Condition was not met within the expected time.");
+    }
 }

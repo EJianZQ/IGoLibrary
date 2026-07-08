@@ -18,6 +18,9 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
     private readonly IActivityLogService activityLogService;
     private readonly INotificationService notificationService;
     private string _accessToken = string.Empty;
+    private bool _isApplyingSettings;
+    private bool _lastPersistedAutoStart;
+    private bool _isStartingAutomatically;
 
     public MobileControlPageViewModel(
         IMobileControlService mobileControlService,
@@ -38,6 +41,9 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool isMobileControlRunning;
+
+    [ObservableProperty]
+    private bool isMobileControlAutoStartEnabled;
 
     [ObservableProperty]
     private int mobileControlPort;
@@ -83,10 +89,44 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
 
     public void ApplySettings(MobileControlSettings settings)
     {
-        MobileControlPort = settings.Port;
-        _accessToken = settings.AccessToken;
-        MobileControlAccessTokenText = MaskAccessToken(_accessToken);
-        OnPropertyChanged(nameof(MobileControlAccessTokenFullText));
+        _isApplyingSettings = true;
+        try
+        {
+            MobileControlPort = settings.Port;
+            _accessToken = settings.AccessToken;
+            IsMobileControlAutoStartEnabled = settings.AutoStart;
+            _lastPersistedAutoStart = settings.AutoStart;
+            MobileControlAccessTokenText = MaskAccessToken(_accessToken);
+            OnPropertyChanged(nameof(MobileControlAccessTokenFullText));
+        }
+        finally
+        {
+            _isApplyingSettings = false;
+        }
+    }
+
+    public async Task StartAutomaticallyIfEnabledAsync(CancellationToken cancellationToken = default)
+    {
+        if (!IsMobileControlAutoStartEnabled ||
+            IsMobileControlRunning ||
+            _isStartingAutomatically)
+        {
+            return;
+        }
+
+        _isStartingAutomatically = true;
+        try
+        {
+            await StartMobileControlCoreAsync(
+                showNotification: false,
+                failureNotificationTitle: "自动开启手机控制失败",
+                cancellationToken: cancellationToken,
+                requireAutoStartEnabled: true);
+        }
+        finally
+        {
+            _isStartingAutomatically = false;
+        }
     }
 
     [RelayCommand]
@@ -175,13 +215,25 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
         IsMobileControlDetailsOpen = false;
     }
 
-    private async Task StartMobileControlCoreAsync(bool showNotification)
+    private async Task StartMobileControlCoreAsync(
+        bool showNotification,
+        string failureNotificationTitle = "手机控制重启失败",
+        CancellationToken cancellationToken = default,
+        bool requireAutoStartEnabled = false)
     {
         try
         {
-            var settings = await settingsWorkflowService.EnsureMobileControlSettingsAsync();
+            var settings = await settingsWorkflowService.EnsureMobileControlSettingsAsync(cancellationToken);
             ApplySettings(settings);
-            var session = await mobileControlService.StartAsync(settings);
+            var session = await mobileControlService.StartAsync(settings, cancellationToken);
+            if (requireAutoStartEnabled && !IsMobileControlAutoStartEnabled)
+            {
+                await mobileControlService.StopAsync(cancellationToken: cancellationToken);
+                ApplyStopped("已停止");
+                activityLogService.Write(LogEntryKind.Info, "MobileControl", "自动开启手机控制已取消：自动开启已关闭");
+                return;
+            }
+
             ApplyStartedSession(session);
             activityLogService.Write(LogEntryKind.Success, "MobileControl", $"手机控制已启动：{session.Host}:{session.Port}");
             if (showNotification)
@@ -197,9 +249,9 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
             {
                 await notificationService.ShowWarningAsync("启动手机控制失败", ex.Message);
             }
-            else
+            else if (!string.IsNullOrWhiteSpace(failureNotificationTitle))
             {
-                await notificationService.ShowWarningAsync("手机控制重启失败", ex.Message);
+                await notificationService.ShowWarningAsync(failureNotificationTitle, ex.Message);
             }
         }
     }
@@ -256,6 +308,16 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
         OnPropertyChanged(nameof(MobileControlToggleButtonText));
     }
 
+    partial void OnIsMobileControlAutoStartEnabledChanged(bool value)
+    {
+        if (_isApplyingSettings)
+        {
+            return;
+        }
+
+        _ = PersistMobileControlAutoStartAsync(value);
+    }
+
     partial void OnMobileControlConnectedDeviceCountChanged(int value)
     {
         OnPropertyChanged(nameof(MobileControlConnectedDeviceCountText));
@@ -270,6 +332,39 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
         }
 
         Dispatcher.UIThread.Post(() => MobileControlConnectedDeviceCount = e.ConnectedDeviceCount);
+    }
+
+    private async Task PersistMobileControlAutoStartAsync(bool enabled)
+    {
+        try
+        {
+            var settings = await settingsWorkflowService.SaveMobileControlAutoStartAsync(enabled);
+            ApplySettings(settings);
+            activityLogService.Write(
+                LogEntryKind.Info,
+                "MobileControl",
+                enabled ? "手机控制自动开启已启用" : "手机控制自动开启已关闭");
+
+            if (settings.AutoStart)
+            {
+                await StartAutomaticallyIfEnabledAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "MobileControl", $"保存手机控制自动开启设置失败：{ex.Message}");
+            _isApplyingSettings = true;
+            try
+            {
+                IsMobileControlAutoStartEnabled = _lastPersistedAutoStart;
+            }
+            finally
+            {
+                _isApplyingSettings = false;
+            }
+
+            await notificationService.ShowWarningAsync("保存自动开启设置失败", ex.Message);
+        }
     }
 
     private static int CreateDifferentPort(int currentPort)

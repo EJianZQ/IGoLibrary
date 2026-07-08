@@ -283,6 +283,9 @@ public sealed class SqliteSettingsRepository(
         writer.WriteString(
             "accessToken",
             ReadString(mobileControl, "accessToken") ?? defaults.MobileControl.AccessToken);
+        writer.WriteBoolean(
+            "autoStart",
+            ReadBool(mobileControl, "autoStart") ?? defaults.MobileControl.AutoStart);
         writer.WriteEndObject();
 
         writer.WriteEndObject();
@@ -354,7 +357,8 @@ public sealed class SqliteSettingsRepository(
             MobileControl = mobileControl with
             {
                 Port = MobileControlSettings.IsValidPort(mobileControl.Port) ? mobileControl.Port : 0,
-                AccessToken = mobileControl.AccessToken?.Trim() ?? string.Empty
+                AccessToken = mobileControl.AccessToken?.Trim() ?? string.Empty,
+                AutoStart = mobileControl.AutoStart
             }
         };
     }
@@ -403,6 +407,7 @@ public sealed class SqliteSettingsRepository(
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "globalLeak"), "selectedLibraries") ||
                !HasAnyProperty(ReadObject(root, "mobileControl"), "port") ||
                !HasAnyProperty(ReadObject(root, "mobileControl"), "accessToken") ||
+               !HasAnyProperty(ReadObject(root, "mobileControl"), "autoStart") ||
                HasAnyProperty(
                    ReadObject(
                        ReadObject(

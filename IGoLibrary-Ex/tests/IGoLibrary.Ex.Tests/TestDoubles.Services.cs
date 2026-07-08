@@ -400,7 +400,7 @@ internal sealed class FakeSettingsService : ISettingsService
 
         return settings with
         {
-            MobileControl = new MobileControlSettings(49153, "test-mobile-token")
+            MobileControl = new MobileControlSettings(49153, "test-mobile-token", settings.MobileControl.AutoStart)
         };
     }
 }

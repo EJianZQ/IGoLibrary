@@ -52,6 +52,7 @@ public sealed class SettingsSerializationTests
         Assert.True(settings.Updates.CheckOnStartup);
         Assert.Equal(0, settings.MobileControl.Port);
         Assert.Equal(string.Empty, settings.MobileControl.AccessToken);
+        Assert.False(settings.MobileControl.AutoStart);
     }
 
     [Fact]
@@ -219,6 +220,7 @@ public sealed class SettingsSerializationTests
         Assert.True(settings.Updates.CheckOnStartup);
         Assert.Equal(0, settings.MobileControl.Port);
         Assert.Equal(string.Empty, settings.MobileControl.AccessToken);
+        Assert.False(settings.MobileControl.AutoStart);
     }
 
     [Fact]
@@ -273,6 +275,23 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"taskFailed\": true", json);
         Assert.DoesNotContain("appBannerNotificationsEnabled", json);
         Assert.Contains("\"graphQlOverridesEnabled\": true", json);
+        Assert.Contains("\"autoStart\": false", json);
+    }
+
+    [Fact]
+    public void AppSettingsSerialization_PreservesExplicitMobileControlAutoStart()
+    {
+        var json = JsonSerializer.Serialize(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(9527, "token", true)
+        }, AppJson.Default);
+
+        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
+
+        Assert.Equal(9527, settings.MobileControl.Port);
+        Assert.Equal("token", settings.MobileControl.AccessToken);
+        Assert.True(settings.MobileControl.AutoStart);
+        Assert.Contains("\"autoStart\": true", json);
     }
 
     [Fact]
@@ -535,6 +554,7 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"updates\":", migratedJson);
         Assert.Contains("\"checkOnStartup\": true", migratedJson);
         Assert.Contains("\"mobileControl\":", migratedJson);
+        Assert.Contains("\"autoStart\": false", migratedJson);
         Assert.Contains("\"autoRelease\":", migratedJson);
         Assert.Contains("\"leadSeconds\": 60", migratedJson);
         Assert.Contains("\"globalLeak\":", migratedJson);
