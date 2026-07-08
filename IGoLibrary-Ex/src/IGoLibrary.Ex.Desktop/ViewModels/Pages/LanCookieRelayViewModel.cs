@@ -198,6 +198,15 @@ public sealed partial class LanCookieRelayViewModel(
         }
 
         LanCookieRelayStatusText = parseResult.Message;
+        try
+        {
+            await notificationService.ShowWarningAsync("局域网快传失败", parseResult.Message);
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Auth", $"显示局域网快传失败通知失败：{ex.Message}");
+        }
+
         return LanCookieRelaySubmitResult.Failed(parseResult.Message);
     }
 }

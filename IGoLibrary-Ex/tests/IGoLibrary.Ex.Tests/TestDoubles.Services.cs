@@ -66,7 +66,11 @@ internal sealed class FakeLanCookieRelayService : ILanCookieRelayService
         }
 
         var result = await SubmitHandler(linkText, cancellationToken);
-        RaiseStopped(LanCookieRelayStopReason.Submitted);
+        if (result.Success)
+        {
+            RaiseStopped(LanCookieRelayStopReason.Submitted);
+        }
+
         return result;
     }
 

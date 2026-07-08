@@ -135,12 +135,18 @@ public sealed class LanCookieRelayServiceTests
     }
 
     [Fact]
-    public async Task PostSubmit_WhenHandlerFails_ReturnsFailureJsonAndStopsService()
+    public async Task PostSubmit_WhenHandlerFails_ReturnsFailureJsonAndKeepsServiceRunning()
     {
         await using var service = CreateService();
         var stopped = TrackStopped(service);
+        var handlerCalls = 0;
         var session = await service.StartAsync((_, _) =>
-            Task.FromResult(LanCookieRelaySubmitResult.Failed("链接无效")));
+        {
+            handlerCalls++;
+            return Task.FromResult(handlerCalls == 1
+                ? LanCookieRelaySubmitResult.Failed("链接无效")
+                : LanCookieRelaySubmitResult.Succeeded("授权成功"));
+        });
         using var client = new HttpClient();
 
         using var response = await client.PostAsync(
@@ -150,6 +156,16 @@ public sealed class LanCookieRelayServiceTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         AssertJsonResult(json, success: false, "链接无效");
+        Assert.False(stopped.Task.IsCompleted);
+
+        using var retryResponse = await client.PostAsync(
+            BuildSubmitUri(session),
+            JsonContent("""{"link":"https://example.com/?code=1234567890abcdef1234567890abcdef"}"""));
+        var retryJson = await retryResponse.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
+        AssertJsonResult(retryJson, success: true, "授权成功");
+        Assert.Equal(2, handlerCalls);
         Assert.Equal(LanCookieRelayStopReason.Submitted, await stopped.Task.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
@@ -192,7 +208,7 @@ public sealed class LanCookieRelayServiceTests
     }
 
     [Fact]
-    public async Task PostSubmit_WithOversizedBody_IsRejectedWithoutCallingHandler()
+    public async Task PostSubmit_WithOversizedBody_IsRejectedWithoutCallingHandlerAndKeepsServiceRunning()
     {
         await using var service = CreateService();
         var stopped = TrackStopped(service);
@@ -211,6 +227,13 @@ public sealed class LanCookieRelayServiceTests
 
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
         Assert.Equal(0, handlerCalls);
+
+        using var retryResponse = await client.PostAsync(
+            BuildSubmitUri(session),
+            JsonContent("""{"link":"https://example.com/?code=1234567890abcdef1234567890abcdef"}"""));
+
+        Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
+        Assert.Equal(1, handlerCalls);
         Assert.Equal(LanCookieRelayStopReason.Submitted, await stopped.Task.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 

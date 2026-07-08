@@ -1279,7 +1279,10 @@ public sealed class MainWindowViewModelTests
     public async Task LanCookieRelaySubmission_WithInvalidLink_ReturnsFailureAndDoesNotAuthorize()
     {
         var relayService = new FakeLanCookieRelayService();
-        var viewModel = CreateViewModel(lanCookieRelayService: relayService);
+        var notificationService = new FakeNotificationService();
+        var viewModel = CreateViewModel(
+            notificationService: notificationService,
+            lanCookieRelayService: relayService);
 
         await viewModel.InitializeAsync();
         await viewModel.StartLanCookieRelayCommand.ExecuteAsync(null);
@@ -1291,9 +1294,12 @@ public sealed class MainWindowViewModelTests
         Assert.False(result.Success);
         Assert.False(viewModel.IsAuthorized);
         Assert.False(viewModel.CanShowVenueConfiguration);
-        Assert.False(viewModel.IsLanCookieRelayRunning);
+        Assert.True(viewModel.IsLanCookieRelayRunning);
+        Assert.True(viewModel.IsLanCookieRelayDialogOpen);
         Assert.False(viewModel.ShowLanCookieRelayStartedStatusIcon);
         Assert.Contains("未能从链接中提取", viewModel.LanCookieRelayStatusText);
+        var warning = Assert.Single(notificationService.Warnings, item => item.Title == "局域网快传失败");
+        Assert.Contains("未能从链接中提取", warning.Message);
     }
 
     [Fact]

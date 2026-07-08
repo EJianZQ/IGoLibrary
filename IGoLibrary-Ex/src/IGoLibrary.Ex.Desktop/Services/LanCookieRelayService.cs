@@ -17,7 +17,7 @@ public sealed class LanCookieRelayService(
     private WebApplication? _app;
     private CancellationTokenSource? _timeoutCts;
     private LanCookieRelaySession? _session;
-    private int _terminalSubmissionStarted;
+    private SubmitGate? _submitGate;
 
     public event EventHandler<LanCookieRelayStoppedEventArgs>? Stopped;
 
@@ -48,10 +48,11 @@ public sealed class LanCookieRelayService(
                 options.Limits.MaxRequestBodySize = SubmittedLinkReader.MaxRequestBodyBytes;
             });
 
+            var submitGate = new SubmitGate();
             var app = builder.Build();
             app.MapGet("/", context => WriteLandingPageAsync(context, token));
             app.MapGet("/auth-qrcode", context => WriteAuthQrCodeAsync(context, token));
-            app.MapPost("/submit", context => HandleSubmitAsync(context, token, submitHandler));
+            app.MapPost("/submit", context => HandleSubmitAsync(context, token, submitHandler, submitGate));
             app.MapFallback(context => WriteJsonAsync(
                 context,
                 StatusCodes.Status404NotFound,
@@ -62,10 +63,10 @@ public sealed class LanCookieRelayService(
             {
                 await app.StartAsync(cancellationToken);
                 appStarted = true;
-                _terminalSubmissionStarted = 0;
                 var session = BuildSession(app, sessionId, address, token);
                 _app = app;
                 _session = session;
+                _submitGate = submitGate;
                 _timeoutCts = new CancellationTokenSource();
                 _ = StopAfterTimeoutAsync(session.SessionId, _timeoutCts.Token);
                 return session;
@@ -106,7 +107,8 @@ public sealed class LanCookieRelayService(
     private async Task HandleSubmitAsync(
         HttpContext context,
         string token,
-        Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler)
+        Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler,
+        SubmitGate submitGate)
     {
         if (!IsValidToken(context, token))
         {
@@ -117,7 +119,8 @@ public sealed class LanCookieRelayService(
             return;
         }
 
-        if (Interlocked.CompareExchange(ref _terminalSubmissionStarted, 1, 0) != 0)
+        var beginResult = submitGate.TryBegin();
+        if (beginResult == SubmitBeginResult.Completed)
         {
             await TryWriteJsonAsync(
                 context,
@@ -126,9 +129,20 @@ public sealed class LanCookieRelayService(
             return;
         }
 
+        if (beginResult == SubmitBeginResult.InProgress)
+        {
+            await TryWriteJsonAsync(
+                context,
+                StatusCodes.Status409Conflict,
+                LanCookieRelaySubmitResult.Failed("已有提交正在电脑端处理，请稍后再试"));
+            return;
+        }
+
+        var shouldStopSession = false;
         try
         {
             LanCookieRelaySubmitResult result;
+            var statusCode = StatusCodes.Status400BadRequest;
             try
             {
                 var link = await SubmittedLinkReader.ReadLinkAsync(context);
@@ -140,14 +154,15 @@ public sealed class LanCookieRelayService(
                 {
                     result = await submitHandler(link, CancellationToken.None);
                 }
+
+                statusCode = result.Success
+                    ? StatusCodes.Status200OK
+                    : StatusCodes.Status400BadRequest;
             }
             catch (SubmittedLinkBodyTooLargeException)
             {
-                await TryWriteJsonAsync(
-                    context,
-                    StatusCodes.Status413PayloadTooLarge,
-                    LanCookieRelaySubmitResult.Failed("提交内容过大，请只粘贴授权链接"));
-                return;
+                statusCode = StatusCodes.Status413PayloadTooLarge;
+                result = LanCookieRelaySubmitResult.Failed("提交内容过大，请只粘贴授权链接");
             }
             catch (OperationCanceledException)
             {
@@ -159,14 +174,20 @@ public sealed class LanCookieRelayService(
                 result = LanCookieRelaySubmitResult.Failed($"电脑端处理失败：{ex.Message}");
             }
 
-            await TryWriteJsonAsync(
-                context,
-                result.Success ? StatusCodes.Status200OK : StatusCodes.Status400BadRequest,
-                result);
+            shouldStopSession = result.Success;
+            await TryWriteJsonAsync(context, statusCode, result);
         }
         finally
         {
-            _ = Task.Run(() => StopAsync(LanCookieRelayStopReason.Submitted));
+            if (shouldStopSession)
+            {
+                submitGate.Complete();
+                _ = Task.Run(() => StopAsync(LanCookieRelayStopReason.Submitted));
+            }
+            else
+            {
+                submitGate.Release();
+            }
         }
     }
 
@@ -241,14 +262,14 @@ public sealed class LanCookieRelayService(
         var app = _app;
         var timeoutCts = _timeoutCts;
         var session = _session;
-        if (session is not null)
-        {
-            Interlocked.Exchange(ref _terminalSubmissionStarted, 1);
-        }
+        var submitGate = _submitGate;
 
         _app = null;
         _timeoutCts = null;
         _session = null;
+        _submitGate = null;
+
+        submitGate?.Complete();
 
         timeoutCts?.Cancel();
         timeoutCts?.Dispose();
@@ -365,6 +386,51 @@ public sealed class LanCookieRelayService(
     private static string CreateToken()
     {
         return Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
+    }
+
+    private enum SubmitBeginResult
+    {
+        Started,
+        InProgress,
+        Completed
+    }
+
+    private sealed class SubmitGate
+    {
+        private int _submissionInProgress;
+        private int _completed;
+
+        public SubmitBeginResult TryBegin()
+        {
+            if (Volatile.Read(ref _completed) != 0)
+            {
+                return SubmitBeginResult.Completed;
+            }
+
+            if (Interlocked.CompareExchange(ref _submissionInProgress, 1, 0) != 0)
+            {
+                return SubmitBeginResult.InProgress;
+            }
+
+            if (Volatile.Read(ref _completed) == 0)
+            {
+                return SubmitBeginResult.Started;
+            }
+
+            Release();
+            return SubmitBeginResult.Completed;
+        }
+
+        public void Release()
+        {
+            Interlocked.Exchange(ref _submissionInProgress, 0);
+        }
+
+        public void Complete()
+        {
+            Interlocked.Exchange(ref _completed, 1);
+            Interlocked.Exchange(ref _submissionInProgress, 1);
+        }
     }
 
 }
