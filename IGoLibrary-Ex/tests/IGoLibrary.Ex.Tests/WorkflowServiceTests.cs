@@ -498,6 +498,7 @@ public sealed class WorkflowServiceTests
         await service.SendTestTelegramAsync(TelegramAlertChannelSettings.Default);
         await service.SendTestBarkAsync(BarkAlertChannelSettings.Default);
         await service.SendTestWxPusherAsync(WxPusherAlertChannelSettings.Default);
+        await service.SendTestServerChanAsync(ServerChanAlertChannelSettings.Default);
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.SendTestLocalAlertAsync(LocalDesktopAlertSettings.Default));
 
@@ -506,6 +507,7 @@ public sealed class WorkflowServiceTests
         Assert.Single(alertService.TestTelegramRequests);
         Assert.Single(alertService.TestBarkRequests);
         Assert.Single(alertService.TestWxPusherRequests);
+        Assert.Single(alertService.TestServerChanRequests);
     }
 
     private sealed class SlowSettingsRepository(AppSettings settings) : ISettingsRepository

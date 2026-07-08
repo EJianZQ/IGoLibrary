@@ -78,6 +78,8 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
 
     public List<WxPusherAlertChannelSettings> TestWxPusherRequests { get; } = [];
 
+    public List<ServerChanAlertChannelSettings> TestServerChanRequests { get; } = [];
+
     public List<LocalDesktopAlertSettings> TestLocalAlertRequests { get; } = [];
 
     public Exception? SendTestEmailException { get; set; }
@@ -87,6 +89,8 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
     public Exception? SendTestBarkException { get; set; }
 
     public Exception? SendTestWxPusherException { get; set; }
+
+    public Exception? SendTestServerChanException { get; set; }
 
     public Exception? SendTestLocalException { get; set; }
 
@@ -201,6 +205,17 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
         }
 
         TestWxPusherRequests.Add(settings);
+        return Task.CompletedTask;
+    }
+
+    public Task SendTestServerChanAsync(ServerChanAlertChannelSettings settings, CancellationToken cancellationToken = default)
+    {
+        if (SendTestServerChanException is not null)
+        {
+            throw SendTestServerChanException;
+        }
+
+        TestServerChanRequests.Add(settings);
         return Task.CompletedTask;
     }
 
@@ -326,6 +341,30 @@ internal sealed class FakeWxPusherAlertSender : IWxPusherAlertSender
 
     public Task SendAsync(
         WxPusherAlertChannelSettings settings,
+        string title,
+        string body,
+        CancellationToken cancellationToken = default)
+    {
+        if (SendException is not null)
+        {
+            throw SendException;
+        }
+
+        Requests.Add((settings, title, body));
+        return SendCompletion?.Task ?? Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeServerChanAlertSender : IServerChanAlertSender
+{
+    public List<(ServerChanAlertChannelSettings Settings, string Title, string Body)> Requests { get; } = [];
+
+    public Exception? SendException { get; set; }
+
+    public TaskCompletionSource? SendCompletion { get; set; }
+
+    public Task SendAsync(
+        ServerChanAlertChannelSettings settings,
         string title,
         string body,
         CancellationToken cancellationToken = default)

@@ -12,6 +12,7 @@ public sealed class TaskEventAlertService(
     ITelegramAlertSender telegramAlertSender,
     IBarkAlertSender barkAlertSender,
     IWxPusherAlertSender wxPusherAlertSender,
+    IServerChanAlertSender serverChanAlertSender,
     ToastNotificationService toastNotificationService,
     INotificationService notificationService,
     AlertSoundService alertSoundService,
@@ -222,7 +223,7 @@ public sealed class TaskEventAlertService(
             await ShowInAppFallbackAsync(toastKind, toastTitle, toastMessage, cancellationToken);
         }
 
-        var remoteAlertTasks = new List<Task>(capacity: 4);
+        var remoteAlertTasks = new List<Task>(capacity: 5);
         if (alertSettings.Email.Enabled)
         {
             remoteAlertTasks.Add(SendEmailAlertSafelyAsync(
@@ -256,6 +257,16 @@ public sealed class TaskEventAlertService(
         {
             remoteAlertTasks.Add(SendWxPusherAlertSafelyAsync(
                 alertSettings.WxPusher,
+                localLabel,
+                barkTitle,
+                barkBody,
+                cancellationToken));
+        }
+
+        if (alertSettings.ServerChan.Enabled)
+        {
+            remoteAlertTasks.Add(SendServerChanAlertSafelyAsync(
+                alertSettings.ServerChan,
                 localLabel,
                 barkTitle,
                 barkBody,
@@ -348,6 +359,27 @@ public sealed class TaskEventAlertService(
         catch (Exception ex)
         {
             activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{wxPusherLabel}WxPusher提醒失败：{ex.Message}");
+        }
+    }
+
+    private async Task SendServerChanAlertSafelyAsync(
+        ServerChanAlertChannelSettings settings,
+        string serverChanLabel,
+        string serverChanTitle,
+        string serverChanBody,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await serverChanAlertSender.SendAsync(
+                settings,
+                serverChanTitle,
+                serverChanBody,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{serverChanLabel}Server酱提醒失败：{ex.Message}");
         }
     }
 

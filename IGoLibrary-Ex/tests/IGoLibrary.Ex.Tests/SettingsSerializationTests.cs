@@ -101,6 +101,7 @@ public sealed class SettingsSerializationTests
         Assert.Equal(TelegramAlertChannelSettings.Default, alerts.Telegram);
         Assert.Equal(BarkAlertChannelSettings.Default, alerts.Bark);
         Assert.Equal(WxPusherAlertChannelSettings.Default, alerts.WxPusher);
+        Assert.Equal(ServerChanAlertChannelSettings.Default, alerts.ServerChan);
         Assert.Equal(TaskEventAlertEventSettings.Default, alerts.Events);
     }
 
@@ -260,6 +261,9 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"wxPusher\":", json);
         Assert.Contains("\"apiBaseUrl\": \"https://wxpusher.zjiecode.com\"", json);
         Assert.Contains("\"appToken\": \"\"", json);
+        Assert.Contains("\"serverChan\":", json);
+        Assert.Contains("\"sendKey\": \"\"", json);
+        Assert.Contains("\"noIp\": false", json);
         Assert.Contains("\"events\":", json);
         Assert.Contains("\"grabSucceeded\": true", json);
         Assert.Contains("\"occupyReReserveSucceeded\": true", json);
@@ -347,11 +351,14 @@ public sealed class SettingsSerializationTests
         Assert.Equal(TaskEventAlertEventSettings.Default, alerts.Events);
         Assert.Equal(BarkAlertChannelSettings.Default, alerts.Bark);
         Assert.Equal(WxPusherAlertChannelSettings.Default, alerts.WxPusher);
+        Assert.Equal(ServerChanAlertChannelSettings.Default, alerts.ServerChan);
         Assert.Contains("\"events\":", migratedJson);
         Assert.Contains("\"bark\":", migratedJson);
         Assert.Contains("\"apiBaseUrl\": \"https://api.day.app\"", migratedJson);
         Assert.Contains("\"wxPusher\":", migratedJson);
         Assert.Contains("\"apiBaseUrl\": \"https://wxpusher.zjiecode.com\"", migratedJson);
+        Assert.Contains("\"serverChan\":", migratedJson);
+        Assert.Contains("\"sendKey\": \"\"", migratedJson);
         Assert.Contains("\"taskFailed\": true", migratedJson);
     }
 
@@ -454,6 +461,43 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"appToken\": \"AT_xxx\"", json);
         Assert.Contains("\"uids\": \"UID_1,UID_2\"", json);
         Assert.Contains("\"topicIds\": \"1;2\"", json);
+    }
+
+    [Fact]
+    public void AppSettingsSerialization_PreservesExplicitServerChanSettings()
+    {
+        var json = JsonSerializer.Serialize(AppSettings.Default with
+        {
+            Notifications = AppSettings.Default.Notifications with
+            {
+                TaskEventAlerts = new TaskEventAlertSettings(
+                    EmailAlertChannelSettings.Default,
+                    LocalDesktopAlertSettings.Default,
+                    TelegramAlertChannelSettings.Default,
+                    TaskEventAlertEventSettings.Default,
+                    BarkAlertChannelSettings.Default,
+                    WxPusherAlertChannelSettings.Default,
+                    new ServerChanAlertChannelSettings(
+                        true,
+                        "SCT_xxx",
+                        true,
+                        "9|66",
+                        "user-1"))
+            }
+        }, AppJson.Default);
+
+        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
+        var serverChan = Assert.IsType<ServerChanAlertChannelSettings>(settings.Notifications.TaskEventAlerts?.ServerChan);
+        Assert.True(serverChan.Enabled);
+        Assert.Equal("SCT_xxx", serverChan.SendKey);
+        Assert.True(serverChan.NoIp);
+        Assert.Equal("9|66", serverChan.Channel);
+        Assert.Equal("user-1", serverChan.OpenId);
+        Assert.Contains("\"serverChan\":", json);
+        Assert.Contains("\"sendKey\": \"SCT_xxx\"", json);
+        Assert.Contains("\"noIp\": true", json);
+        Assert.Contains("\"channel\": \"9|66\"", json);
+        Assert.Contains("\"openId\": \"user-1\"", json);
     }
 
     [Fact]

@@ -12,5 +12,7 @@ public interface INotificationTestService
 
     Task SendTestWxPusherAsync(WxPusherAlertChannelSettings settings, CancellationToken cancellationToken = default);
 
+    Task SendTestServerChanAsync(ServerChanAlertChannelSettings settings, CancellationToken cancellationToken = default);
+
     Task SendTestLocalAlertAsync(LocalDesktopAlertSettings settings, CancellationToken cancellationToken = default);
 }

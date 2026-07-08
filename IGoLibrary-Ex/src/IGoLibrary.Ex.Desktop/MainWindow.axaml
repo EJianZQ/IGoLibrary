@@ -2561,6 +2561,95 @@
                       <StackPanel Grid.Row="0"
                                   Spacing="0">
                         <TextBlock Classes="field-label"
+                                   Text="Server酱 SendKey" />
+                        <TextBox Text="{Binding ServerChanAlertSendKey}"
+                                 PasswordChar="●"
+                                 Watermark="从 Server酱 SendKey 页面复制"
+                                 HorizontalAlignment="Stretch" />
+                      </StackPanel>
+
+                      <Grid Grid.Row="1"
+                            ColumnDefinitions="*,*"
+                            ColumnSpacing="24">
+                        <StackPanel Grid.Column="0"
+                                    Spacing="4">
+                          <TextBlock Classes="field-label"
+                                     Text="消息通道 channel" />
+                          <TextBox Text="{Binding ServerChanAlertChannel}"
+                                   Watermark="例如 9|66，留空使用网站默认通道"
+                                   HorizontalAlignment="Stretch" />
+                          <TextBlock Classes="helper-text"
+                                     Text="最多两个数字通道，多个通道用竖线 | 分隔" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1"
+                                    Spacing="4">
+                          <TextBlock Classes="field-label"
+                                     Text="抄送 openid / UID" />
+                          <TextBox Text="{Binding ServerChanAlertOpenId}"
+                                   Watermark="测试号 openid 或企业微信 UID，留空发送给默认接收人"
+                                   HorizontalAlignment="Stretch" />
+                          <TextBlock Classes="helper-text"
+                                     Text="按 Server酱通道规则填写，多个接收人使用对应分隔符" />
+                        </StackPanel>
+                      </Grid>
+
+                      <Border Grid.Row="2"
+                              Classes="notify-toggle-card">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                          <StackPanel Spacing="4">
+                            <TextBlock FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Text="隐藏调用 IP" />
+                            <TextBlock Classes="helper-text"
+                                       Text="开启后本次推送会传递 noip=1，请求来源 IP 不展示在消息里" />
+                          </StackPanel>
+                          <ToggleSwitch Grid.Column="1"
+                                        IsChecked="{Binding ServerChanAlertNoIp}"
+                                        OnContent="开"
+                                        OffContent="关"
+                                        VerticalAlignment="Center" />
+                        </Grid>
+                      </Border>
+
+                      <Grid Grid.Row="3"
+                            ColumnDefinitions="*,Auto"
+                            ColumnSpacing="16"
+                            Margin="0,8,0,0">
+                        <Border Classes="notify-toggle-card">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                            <StackPanel Spacing="4">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="开启 Server酱 推送" />
+                              <TextBlock Classes="helper-text"
+                                         Text="Cookie 失效、抢座成功或任务失败时，会通过 Server酱 向配置的微信、企业微信或群机器人通道发送提醒" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          IsChecked="{Binding ServerChanAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Button Grid.Column="1"
+                                Content="发送测试 Server酱"
+                                Command="{Binding SendTestServerChanAlertCommand}"
+                                Background="{DynamicResource SemiAccentBrush}"
+                                Foreground="{DynamicResource AppAccentForegroundBrush}"
+                                MinWidth="184" />
+                      </Grid>
+                    </Grid>
+                  </Grid>
+
+                  <Grid HorizontalAlignment="Stretch">
+                    <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+                          RowSpacing="18"
+                          HorizontalAlignment="Stretch">
+                      <StackPanel Grid.Row="0"
+                                  Spacing="0">
+                        <TextBlock Classes="field-label"
                                    Text="WxPusher API 基础地址" />
                         <TextBox Text="{Binding WxPusherAlertApiBaseUrl}"
                                  Watermark="https://wxpusher.zjiecode.com"

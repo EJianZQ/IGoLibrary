@@ -22,7 +22,7 @@ public sealed partial class NotificationSettingsViewModel
 
     public string[] BarkAlertLevels { get; } = ["默认", "主动 active", "时效 timeSensitive", "静默 passive", "重要 critical"];
 
-    public string[] NotificationSettingsCategories { get; } = ["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "WxPusher 推送配置", "Bark 推送配置", "弹窗提醒配置"];
+    public string[] NotificationSettingsCategories { get; } = ["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "Server酱配置", "WxPusher 推送配置", "Bark 推送配置", "弹窗提醒配置"];
 
     [ObservableProperty]
     private bool emailAlertsEnabled;
@@ -59,6 +59,21 @@ public sealed partial class NotificationSettingsViewModel
 
     [ObservableProperty]
     private string telegramAlertChatId = string.Empty;
+
+    [ObservableProperty]
+    private bool serverChanAlertsEnabled;
+
+    [ObservableProperty]
+    private string serverChanAlertSendKey = string.Empty;
+
+    [ObservableProperty]
+    private bool serverChanAlertNoIp;
+
+    [ObservableProperty]
+    private string serverChanAlertChannel = string.Empty;
+
+    [ObservableProperty]
+    private string serverChanAlertOpenId = string.Empty;
 
     [ObservableProperty]
     private bool barkAlertsEnabled;
@@ -141,6 +156,16 @@ public sealed partial class NotificationSettingsViewModel
 
     partial void OnTelegramAlertChatIdChanged(string value) => ScheduleAutoSave();
 
+    partial void OnServerChanAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnServerChanAlertSendKeyChanged(string value) => ScheduleAutoSave();
+
+    partial void OnServerChanAlertNoIpChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnServerChanAlertChannelChanged(string value) => ScheduleAutoSave();
+
+    partial void OnServerChanAlertOpenIdChanged(string value) => ScheduleAutoSave();
+
     partial void OnBarkAlertsEnabledChanged(bool value) => ScheduleAutoSave();
 
     partial void OnBarkAlertApiBaseUrlChanged(string value) => ScheduleAutoSave();
@@ -195,6 +220,7 @@ public sealed partial class NotificationSettingsViewModel
         var eventSettings = alertSettings.Events ?? TaskEventAlertEventSettings.Default;
         var barkSettings = alertSettings.Bark ?? BarkAlertChannelSettings.Default;
         var wxPusherSettings = alertSettings.WxPusher ?? WxPusherAlertChannelSettings.Default;
+        var serverChanSettings = alertSettings.ServerChan ?? ServerChanAlertChannelSettings.Default;
 
         EmailAlertsEnabled = alertSettings.Email.Enabled;
         EmailAlertSmtpHost = alertSettings.Email.SmtpHost;
@@ -210,6 +236,11 @@ public sealed partial class NotificationSettingsViewModel
             : alertSettings.Telegram.ApiBaseUrl;
         TelegramAlertBotToken = alertSettings.Telegram.BotToken ?? string.Empty;
         TelegramAlertChatId = alertSettings.Telegram.ChatId ?? string.Empty;
+        ServerChanAlertsEnabled = serverChanSettings.Enabled;
+        ServerChanAlertSendKey = serverChanSettings.SendKey ?? string.Empty;
+        ServerChanAlertNoIp = serverChanSettings.NoIp;
+        ServerChanAlertChannel = serverChanSettings.Channel ?? string.Empty;
+        ServerChanAlertOpenId = serverChanSettings.OpenId ?? string.Empty;
         BarkAlertsEnabled = barkSettings.Enabled;
         BarkAlertApiBaseUrl = string.IsNullOrWhiteSpace(barkSettings.ApiBaseUrl)
             ? BarkAlertChannelSettings.DefaultApiBaseUrl
@@ -326,6 +357,23 @@ public sealed partial class NotificationSettingsViewModel
     }
 
     [RelayCommand]
+    private async Task SendTestServerChanAlertAsync()
+    {
+        try
+        {
+            AutoSave.Cancel();
+            await PersistSnapshotAsync();
+            await SendTestServerChanAsync(BuildTaskEventAlertSettingsSnapshot().ServerChan);
+            await notificationService.ShowSuccessAsync("测试 Server酱 已发送", "请检查 Server酱 配置的通知通道，确认当前推送配置可用");
+        }
+        catch (Exception ex)
+        {
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Server酱 失败：{ex.Message}");
+            await errorDialogService.ShowErrorAsync("测试 Server酱 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
+        }
+    }
+
+    [RelayCommand]
     private async Task SendTestLocalAlertAsync()
     {
         try
@@ -382,7 +430,13 @@ public sealed partial class NotificationSettingsViewModel
                 NormalizeWxPusherApiBaseUrlForSnapshot(WxPusherAlertApiBaseUrl),
                 (WxPusherAlertAppToken ?? string.Empty).Trim(),
                 (WxPusherAlertUids ?? string.Empty).Trim(),
-                (WxPusherAlertTopicIds ?? string.Empty).Trim()));
+                (WxPusherAlertTopicIds ?? string.Empty).Trim()),
+            new ServerChanAlertChannelSettings(
+                ServerChanAlertsEnabled,
+                (ServerChanAlertSendKey ?? string.Empty).Trim(),
+                ServerChanAlertNoIp,
+                (ServerChanAlertChannel ?? string.Empty).Trim(),
+                (ServerChanAlertOpenId ?? string.Empty).Trim()));
     }
 
     public Task PersistSnapshotAsync(CancellationToken cancellationToken = default)

@@ -85,6 +85,36 @@ public partial class MainWindowWorkflowViewModel
         set => NotificationSettings.TelegramAlertChatId = value;
     }
 
+    public bool ServerChanAlertsEnabled
+    {
+        get => NotificationSettings.ServerChanAlertsEnabled;
+        set => NotificationSettings.ServerChanAlertsEnabled = value;
+    }
+
+    public string ServerChanAlertSendKey
+    {
+        get => NotificationSettings.ServerChanAlertSendKey;
+        set => NotificationSettings.ServerChanAlertSendKey = value;
+    }
+
+    public bool ServerChanAlertNoIp
+    {
+        get => NotificationSettings.ServerChanAlertNoIp;
+        set => NotificationSettings.ServerChanAlertNoIp = value;
+    }
+
+    public string ServerChanAlertChannel
+    {
+        get => NotificationSettings.ServerChanAlertChannel;
+        set => NotificationSettings.ServerChanAlertChannel = value;
+    }
+
+    public string ServerChanAlertOpenId
+    {
+        get => NotificationSettings.ServerChanAlertOpenId;
+        set => NotificationSettings.ServerChanAlertOpenId = value;
+    }
+
     public bool BarkAlertsEnabled
     {
         get => NotificationSettings.BarkAlertsEnabled;
@@ -209,6 +239,8 @@ public partial class MainWindowWorkflowViewModel
 
     public IAsyncRelayCommand SendTestWxPusherAlertCommand => NotificationSettings.SendTestWxPusherAlertCommand;
 
+    public IAsyncRelayCommand SendTestServerChanAlertCommand => NotificationSettings.SendTestServerChanAlertCommand;
+
     public IAsyncRelayCommand SendTestLocalAlertCommand => NotificationSettings.SendTestLocalAlertCommand;
 
     private void ConfigureNotificationSettingsPropertyBridge(ViewModelPropertyBridge propertyBridge)
@@ -227,6 +259,11 @@ public partial class MainWindowWorkflowViewModel
             nameof(TelegramAlertApiBaseUrl),
             nameof(TelegramAlertBotToken),
             nameof(TelegramAlertChatId),
+            nameof(ServerChanAlertsEnabled),
+            nameof(ServerChanAlertSendKey),
+            nameof(ServerChanAlertNoIp),
+            nameof(ServerChanAlertChannel),
+            nameof(ServerChanAlertOpenId),
             nameof(BarkAlertsEnabled),
             nameof(BarkAlertApiBaseUrl),
             nameof(BarkAlertDeviceKey),

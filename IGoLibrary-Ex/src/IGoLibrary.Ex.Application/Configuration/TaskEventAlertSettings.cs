@@ -8,13 +8,15 @@ public sealed record TaskEventAlertSettings
         TelegramAlertChannelSettings? telegram = null,
         TaskEventAlertEventSettings? events = null,
         BarkAlertChannelSettings? bark = null,
-        WxPusherAlertChannelSettings? wxPusher = null)
+        WxPusherAlertChannelSettings? wxPusher = null,
+        ServerChanAlertChannelSettings? serverChan = null)
     {
         Email = email;
         Local = local;
         Telegram = telegram ?? TelegramAlertChannelSettings.Default;
         Bark = bark ?? BarkAlertChannelSettings.Default;
         WxPusher = wxPusher ?? WxPusherAlertChannelSettings.Default;
+        ServerChan = serverChan ?? ServerChanAlertChannelSettings.Default;
         Events = events ?? TaskEventAlertEventSettings.Default;
     }
 
@@ -28,6 +30,8 @@ public sealed record TaskEventAlertSettings
 
     public WxPusherAlertChannelSettings WxPusher { get; init; }
 
+    public ServerChanAlertChannelSettings ServerChan { get; init; }
+
     public TaskEventAlertEventSettings Events { get; init; }
 
     public static TaskEventAlertSettings Default { get; } = new(
@@ -36,5 +40,6 @@ public sealed record TaskEventAlertSettings
         TelegramAlertChannelSettings.Default,
         TaskEventAlertEventSettings.Default,
         BarkAlertChannelSettings.Default,
-        WxPusherAlertChannelSettings.Default);
+        WxPusherAlertChannelSettings.Default,
+        ServerChanAlertChannelSettings.Default);
 }

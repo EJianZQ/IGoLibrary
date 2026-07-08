@@ -201,7 +201,7 @@ public sealed class MainWindowViewModelTests
     {
         var viewModel = CreateViewModel();
 
-        Assert.Equal(["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "WxPusher 推送配置", "Bark 推送配置", "弹窗提醒配置"], viewModel.NotificationSettingsCategories);
+        Assert.Equal(["通知事件开关", "邮件提醒配置", "Telegram Bot 配置", "Server酱配置", "WxPusher 推送配置", "Bark 推送配置", "弹窗提醒配置"], viewModel.NotificationSettingsCategories);
     }
 
     [Fact]
@@ -773,6 +773,123 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("测试 Telegram 发送失败", error.Title);
         Assert.Equal(nameof(InvalidOperationException), error.ErrorType);
         Assert.Equal("telegram send failed", error.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_LoadsServerChanNotificationSettings()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default,
+                LocalDesktopAlertSettings.Default,
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                BarkAlertChannelSettings.Default,
+                WxPusherAlertChannelSettings.Default,
+                new ServerChanAlertChannelSettings(true, "SCT_xxx", true, "9|66", "user-1"))));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.ServerChanAlertsEnabled);
+        Assert.Equal("SCT_xxx", viewModel.ServerChanAlertSendKey);
+        Assert.True(viewModel.ServerChanAlertNoIp);
+        Assert.Equal("9|66", viewModel.ServerChanAlertChannel);
+        Assert.Equal("user-1", viewModel.ServerChanAlertOpenId);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_DefaultsNullServerChanNotificationStrings()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default,
+                LocalDesktopAlertSettings.Default,
+                TelegramAlertChannelSettings.Default,
+                TaskEventAlertEventSettings.Default,
+                BarkAlertChannelSettings.Default,
+                WxPusherAlertChannelSettings.Default,
+                new ServerChanAlertChannelSettings(true, null!, true, null!, null!))));
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.ServerChanAlertsEnabled);
+        Assert.Equal(string.Empty, viewModel.ServerChanAlertSendKey);
+        Assert.True(viewModel.ServerChanAlertNoIp);
+        Assert.Equal(string.Empty, viewModel.ServerChanAlertChannel);
+        Assert.Equal(string.Empty, viewModel.ServerChanAlertOpenId);
+    }
+
+    [Fact]
+    public async Task NotificationSettings_AutoSaveServerChanAlerts_WhenFieldsChange()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.ServerChanAlertsEnabled = true;
+        viewModel.ServerChanAlertSendKey = " SCT_xxx ";
+        viewModel.ServerChanAlertNoIp = true;
+        viewModel.ServerChanAlertChannel = " 9|66 ";
+        viewModel.ServerChanAlertOpenId = " user-1 ";
+
+        await WaitForAsync(() =>
+            settingsService.SaveCalls > 0 &&
+            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.ServerChan.SendKey == "SCT_xxx");
+
+        var serverChan = Assert.IsType<ServerChanAlertChannelSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.ServerChan);
+        Assert.True(serverChan.Enabled);
+        Assert.Equal("SCT_xxx", serverChan.SendKey);
+        Assert.True(serverChan.NoIp);
+        Assert.Equal("9|66", serverChan.Channel);
+        Assert.Equal("user-1", serverChan.OpenId);
+    }
+
+    [Fact]
+    public async Task SendTestServerChanAlertAsync_UsesCurrentNotificationSettingsSnapshot()
+    {
+        var alertService = new FakeTaskEventAlertDispatcher();
+        var viewModel = CreateViewModel(taskAlertService: alertService);
+        await viewModel.InitializeAsync();
+
+        viewModel.ServerChanAlertsEnabled = true;
+        viewModel.ServerChanAlertSendKey = " SCT_xxx ";
+        viewModel.ServerChanAlertNoIp = true;
+        viewModel.ServerChanAlertChannel = " 9|66 ";
+        viewModel.ServerChanAlertOpenId = " user-1 ";
+
+        await viewModel.SendTestServerChanAlertCommand.ExecuteAsync(null);
+
+        var request = Assert.Single(alertService.TestServerChanRequests);
+        Assert.True(request.Enabled);
+        Assert.Equal("SCT_xxx", request.SendKey);
+        Assert.True(request.NoIp);
+        Assert.Equal("9|66", request.Channel);
+        Assert.Equal("user-1", request.OpenId);
+    }
+
+    [Fact]
+    public async Task SendTestServerChanAlertAsync_ShowsErrorDialog_WhenSendingFails()
+    {
+        var alertService = new FakeTaskEventAlertDispatcher
+        {
+            SendTestServerChanException = new InvalidOperationException("serverchan send failed")
+        };
+        var errorDialogService = new FakeErrorDialogService();
+        var viewModel = CreateViewModel(
+            taskAlertService: alertService,
+            errorDialogService: errorDialogService);
+        await viewModel.InitializeAsync();
+
+        viewModel.ServerChanAlertSendKey = "SCT_xxx";
+
+        await viewModel.SendTestServerChanAlertCommand.ExecuteAsync(null);
+
+        var error = Assert.Single(errorDialogService.Errors);
+        Assert.Equal("测试 Server酱 发送失败", error.Title);
+        Assert.Equal(nameof(InvalidOperationException), error.ErrorType);
+        Assert.Equal("serverchan send failed", error.ErrorMessage);
     }
 
     [Fact]
@@ -1571,6 +1688,29 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("https://telegram.example.com", telegram.ApiBaseUrl);
         Assert.Equal("token-1", telegram.BotToken);
         Assert.Equal("chat-1", telegram.ChatId);
+    }
+
+    [Fact]
+    public async Task SaveSettingsAsync_PersistsServerChanNotificationSettings()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        viewModel.ServerChanAlertsEnabled = true;
+        viewModel.ServerChanAlertSendKey = " SCT_xxx ";
+        viewModel.ServerChanAlertNoIp = true;
+        viewModel.ServerChanAlertChannel = " 9|66 ";
+        viewModel.ServerChanAlertOpenId = " user-1 ";
+
+        await viewModel.SaveSettingsCommand.ExecuteAsync(null);
+
+        var serverChan = Assert.IsType<ServerChanAlertChannelSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.ServerChan);
+        Assert.True(serverChan.Enabled);
+        Assert.Equal("SCT_xxx", serverChan.SendKey);
+        Assert.True(serverChan.NoIp);
+        Assert.Equal("9|66", serverChan.Channel);
+        Assert.Equal("user-1", serverChan.OpenId);
     }
 
     [Fact]

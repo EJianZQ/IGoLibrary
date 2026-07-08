@@ -8,6 +8,7 @@ public sealed class DesktopNotificationTestService(
     ITelegramAlertSender telegramAlertSender,
     IBarkAlertSender barkAlertSender,
     IWxPusherAlertSender wxPusherAlertSender,
+    IServerChanAlertSender serverChanAlertSender,
     ToastNotificationService toastNotificationService,
     AlertSoundService alertSoundService) : INotificationTestService
 {
@@ -71,6 +72,22 @@ public sealed class DesktopNotificationTestService(
             这是一条来自 IGoLibrary-Ex 的 WxPusher 测试推送。
 
             如果你收到了这条推送，说明当前 AppToken、UID 或 Topic ID 已经可以正常工作，
+            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒。
+            """,
+            cancellationToken);
+    }
+
+    public Task SendTestServerChanAsync(
+        ServerChanAlertChannelSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        return serverChanAlertSender.SendAsync(
+            settings,
+            "IGoLibrary-Ex Server酱 测试推送",
+            """
+            这是一条来自 IGoLibrary-Ex 的 Server酱 测试推送。
+
+            如果你收到了这条推送，说明当前 SendKey、通道和收件人配置已经可以正常工作，
             可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒。
             """,
             cancellationToken);

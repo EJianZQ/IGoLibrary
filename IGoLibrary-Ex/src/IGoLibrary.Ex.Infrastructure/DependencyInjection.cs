@@ -35,6 +35,10 @@ public static class DependencyInjection
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
         });
+        services.AddHttpClient<IServerChanAlertSender, ServerChanAlertSender>(client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+        });
         services.AddHttpClient<ITelegramAlertSender, TelegramAlertSender>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;

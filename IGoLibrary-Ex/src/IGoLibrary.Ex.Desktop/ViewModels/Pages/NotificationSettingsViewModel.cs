@@ -46,6 +46,13 @@ public sealed partial class NotificationSettingsViewModel(
         return notificationTestService.SendTestWxPusherAsync(settings, cancellationToken);
     }
 
+    public Task SendTestServerChanAsync(
+        ServerChanAlertChannelSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        return notificationTestService.SendTestServerChanAsync(settings, cancellationToken);
+    }
+
     public Task SendTestLocalAlertAsync(
         LocalDesktopAlertSettings settings,
         CancellationToken cancellationToken = default)
