@@ -164,6 +164,62 @@ public sealed class SessionServiceTests
         Assert.Equal(1, credentialStore.ClearCalls);
     }
 
+    [Fact]
+    public async Task SignOutAsync_ClearsGraphQlAndRemoteCheckInSessions()
+    {
+        var credentialStore = new FakeCredentialStore
+        {
+            StoredSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true),
+            StoredRemoteCheckInSession = new RemoteCheckInSessionCredentials(new string('a', 40), DateTimeOffset.Now, true)
+        };
+        var runtimeState = new AppRuntimeState
+        {
+            Session = credentialStore.StoredSession,
+            RemoteCheckInSession = credentialStore.StoredRemoteCheckInSession
+        };
+        var service = CreateService(new FakeTraceIntApiClient(), credentialStore, runtimeState);
+
+        await service.SignOutAsync();
+
+        Assert.Null(runtimeState.Session);
+        Assert.Null(runtimeState.RemoteCheckInSession);
+        Assert.Null(credentialStore.StoredSession);
+        Assert.Null(credentialStore.StoredRemoteCheckInSession);
+        Assert.Equal(1, credentialStore.ClearRemoteCheckInCalls);
+    }
+
+    [Fact]
+    public async Task SignOutAsync_WhenRemoteCredentialDeleteFails_ClearsRuntimeAndReportsFailure()
+    {
+        var credentialStore = new FakeCredentialStore
+        {
+            StoredSession = new SessionCredentials(
+                "cookie",
+                SessionSource.ManualCookie,
+                DateTimeOffset.Now,
+                true),
+            StoredRemoteCheckInSession = new RemoteCheckInSessionCredentials(
+                new string('a', 40),
+                DateTimeOffset.Now,
+                true),
+            ClearRemoteCheckInException = new InvalidOperationException("credential delete failed")
+        };
+        var runtimeState = new AppRuntimeState
+        {
+            Session = credentialStore.StoredSession,
+            RemoteCheckInSession = credentialStore.StoredRemoteCheckInSession
+        };
+        var service = CreateService(new FakeTraceIntApiClient(), credentialStore, runtimeState);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.SignOutAsync());
+
+        Assert.Contains("清理本地安全凭据失败", exception.Message);
+        Assert.Null(runtimeState.Session);
+        Assert.Null(runtimeState.RemoteCheckInSession);
+        Assert.Null(credentialStore.StoredSession);
+        Assert.NotNull(credentialStore.StoredRemoteCheckInSession);
+    }
+
     private static string BuildAuthorizationCookie(DateTimeOffset expiresAt)
     {
         var header = Base64Url("""{"typ":"JWT","alg":"RS256"}""");
@@ -180,6 +236,7 @@ public sealed class SessionServiceTests
             apiClient,
             credentialStore,
             new ActivityLogService(),
+            runtimeState,
             runtimeState,
             runtimeState,
             runtimeState);

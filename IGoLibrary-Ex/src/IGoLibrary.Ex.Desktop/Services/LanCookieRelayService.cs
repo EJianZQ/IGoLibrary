@@ -25,6 +25,14 @@ public sealed class LanCookieRelayService(
         Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler,
         CancellationToken cancellationToken = default)
     {
+        return await StartAsync(submitHandler, LanAuthLinkRelayPurpose.GraphQlSession, cancellationToken);
+    }
+
+    public async Task<LanCookieRelaySession> StartAsync(
+        Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler,
+        LanAuthLinkRelayPurpose purpose,
+        CancellationToken cancellationToken = default)
+    {
         ArgumentNullException.ThrowIfNull(submitHandler);
 
         await _gate.WaitAsync(cancellationToken);
@@ -50,7 +58,7 @@ public sealed class LanCookieRelayService(
 
             var submitGate = new SubmitGate();
             var app = builder.Build();
-            app.MapGet("/", context => WriteLandingPageAsync(context, token));
+            app.MapGet("/", context => WriteLandingPageAsync(context, token, purpose));
             app.MapGet("/auth-qrcode", context => WriteAuthQrCodeAsync(context, token));
             app.MapPost("/submit", context => HandleSubmitAsync(context, token, submitHandler, submitGate));
             app.MapFallback(context => WriteJsonAsync(
@@ -191,7 +199,10 @@ public sealed class LanCookieRelayService(
         }
     }
 
-    private static async Task WriteLandingPageAsync(HttpContext context, string token)
+    private static async Task WriteLandingPageAsync(
+        HttpContext context,
+        string token,
+        LanAuthLinkRelayPurpose purpose)
     {
         if (!IsValidToken(context, token))
         {
@@ -204,7 +215,7 @@ public sealed class LanCookieRelayService(
 
         SetNoStore(context);
         context.Response.ContentType = "text/html; charset=utf-8";
-        await context.Response.WriteAsync(LanCookieRelayMobilePage.Build(token), context.RequestAborted);
+        await context.Response.WriteAsync(LanCookieRelayMobilePage.Build(token, purpose), context.RequestAborted);
     }
 
     private static async Task WriteAuthQrCodeAsync(HttpContext context, string token)

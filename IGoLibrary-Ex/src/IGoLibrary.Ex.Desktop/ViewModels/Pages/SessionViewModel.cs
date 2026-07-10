@@ -19,9 +19,7 @@ public sealed partial class SessionViewModel : ViewModelBase
     private readonly INotificationService _notificationService;
     private readonly IAppThemeService _appThemeService;
     private readonly TimeProvider _timeProvider;
-    private readonly object _processedAuthCodesGate = new();
-    private readonly HashSet<string> _processedAuthCodes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _inFlightAuthCodes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly OAuthCodeConsumptionRegistry _oauthCodeConsumptionRegistry;
 
     private Func<string, bool, Task<SessionWorkflowResult>>? _authenticateFromCodeAsync;
     private Func<string, bool, Task<SessionWorkflowResult>>? _authenticateFromCookieAsync;
@@ -59,12 +57,14 @@ public sealed partial class SessionViewModel : ViewModelBase
         IActivityLogService activityLogService,
         INotificationService notificationService,
         IAppThemeService appThemeService,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        OAuthCodeConsumptionRegistry oauthCodeConsumptionRegistry)
     {
         _activityLogService = activityLogService;
         _notificationService = notificationService;
         _appThemeService = appThemeService;
         _timeProvider = timeProvider;
+        _oauthCodeConsumptionRegistry = oauthCodeConsumptionRegistry;
 
         var palette = _appThemeService.CurrentPalette;
         _stateIdleBrush = palette.IdleBrush;
@@ -273,9 +273,7 @@ public sealed partial class SessionViewModel : ViewModelBase
                 _activityLogService.Write(
                     LogEntryKind.Info,
                     "Auth",
-                    options.LogDuplicateCodeValue
-                        ? $"授权 code 已处理，跳过重复解析：{code}"
-                        : "授权 code 已处理，跳过重复解析。");
+                    "授权 code 已处理，跳过重复解析。");
                 if (options.NotifyOnInvalidLink && options.ShowDesktopNotifications)
                 {
                     await _notificationService.ShowInfoAsync("链接已处理", message);
@@ -574,6 +572,7 @@ public sealed partial class SessionViewModel : ViewModelBase
     [RelayCommand]
     private async Task SignOutAsync()
     {
+        Exception? credentialClearFailure = null;
         if (_stopLanCookieRelaySessionAsync is not null)
         {
             await _stopLanCookieRelaySessionAsync(true);
@@ -581,7 +580,14 @@ public sealed partial class SessionViewModel : ViewModelBase
 
         if (_signOutAsync is not null)
         {
-            await _signOutAsync();
+            try
+            {
+                await _signOutAsync();
+            }
+            catch (Exception ex)
+            {
+                credentialClearFailure = ex;
+            }
         }
 
         if (_clearStoredLibrarySelectionAsync is not null)
@@ -598,6 +604,17 @@ public sealed partial class SessionViewModel : ViewModelBase
         _resetSessionScopedSelections?.Invoke();
         SessionSummary = "未登录";
         ClearSidebarSessionExpiration();
+
+        if (credentialClearFailure is not null)
+        {
+            _activityLogService.Write(
+                LogEntryKind.Warning,
+                "Auth",
+                $"已退出当前会话，但清理本地安全凭据失败：{credentialClearFailure.Message}");
+            await _notificationService.ShowWarningAsync(
+                "已退出，但凭据清理失败",
+                credentialClearFailure.Message);
+        }
     }
 
     private Task<SessionWorkflowResult> AuthenticateFromCodeAsync(string code, bool remember)
@@ -632,28 +649,12 @@ public sealed partial class SessionViewModel : ViewModelBase
 
     private bool TryReserveAuthCode(string code)
     {
-        lock (_processedAuthCodesGate)
-        {
-            if (_processedAuthCodes.Contains(code) || _inFlightAuthCodes.Contains(code))
-            {
-                return false;
-            }
-
-            _inFlightAuthCodes.Add(code);
-            return true;
-        }
+        return _oauthCodeConsumptionRegistry.TryReserve(code);
     }
 
     private void CompleteAuthCodeReservation(string code, bool markAsProcessed)
     {
-        lock (_processedAuthCodesGate)
-        {
-            _inFlightAuthCodes.Remove(code);
-            if (markAsProcessed)
-            {
-                _processedAuthCodes.Add(code);
-            }
-        }
+        _oauthCodeConsumptionRegistry.Complete(code, markAsProcessed);
     }
 
     private void UpdateHomeCookieState(DateTimeOffset expirationTime, string? cookie)

@@ -68,7 +68,8 @@ public sealed class MobileControlCookieRefreshHandlerTests
             new ActivityLogService(),
             new FakeNotificationService(),
             new FakeAppThemeService(),
-            new FakeTimeProvider());
+            new FakeTimeProvider(),
+            new OAuthCodeConsumptionRegistry());
         viewModel.ConfigureOrchestration(
             authenticateFromCodeAsync,
             (_, _) => throw new InvalidOperationException("Cookie auth is not used by this test."),

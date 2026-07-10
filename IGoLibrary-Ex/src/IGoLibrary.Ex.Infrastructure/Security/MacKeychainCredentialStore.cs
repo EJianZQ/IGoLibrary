@@ -8,13 +8,38 @@ namespace IGoLibrary.Ex.Infrastructure.Security;
 
 public sealed class MacKeychainCredentialStore : ICredentialStore
 {
+    private const int ItemNotFoundExitCode = 44;
     private const string ServiceName = "IGoLibrary-Ex";
-    private const string AccountName = "session";
+    private const string SessionAccountName = "session";
+    private const string RemoteCheckInAccountName = "remote-check-in";
 
     public async Task SaveSessionAsync(SessionCredentials credentials, CancellationToken cancellationToken = default)
+        => await SaveAsync(SessionAccountName, credentials, cancellationToken);
+
+    public Task<SessionCredentials?> LoadSessionAsync(CancellationToken cancellationToken = default)
+        => LoadAsync<SessionCredentials>(SessionAccountName, cancellationToken);
+
+    public Task ClearSessionAsync(CancellationToken cancellationToken = default)
+        => ClearAsync(SessionAccountName, cancellationToken);
+
+    public async Task SaveRemoteCheckInSessionAsync(
+        RemoteCheckInSessionCredentials credentials,
+        CancellationToken cancellationToken = default)
+        => await SaveAsync(RemoteCheckInAccountName, credentials, cancellationToken);
+
+    public Task<RemoteCheckInSessionCredentials?> LoadRemoteCheckInSessionAsync(
+        CancellationToken cancellationToken = default)
+        => LoadAsync<RemoteCheckInSessionCredentials>(RemoteCheckInAccountName, cancellationToken);
+
+    public Task ClearRemoteCheckInSessionAsync(CancellationToken cancellationToken = default)
+        => ClearAsync(RemoteCheckInAccountName, cancellationToken);
+
+    private static async Task SaveAsync<T>(
+        string accountName,
+        T value,
+        CancellationToken cancellationToken)
     {
-        await ClearSessionAsync(cancellationToken);
-        var payload = JsonSerializer.Serialize(credentials, AppJson.Default);
+        var payload = JsonSerializer.Serialize(value, AppJson.Default);
 
         var psi = new ProcessStartInfo("security")
         {
@@ -23,7 +48,7 @@ public sealed class MacKeychainCredentialStore : ICredentialStore
         };
         psi.ArgumentList.Add("add-generic-password");
         psi.ArgumentList.Add("-a");
-        psi.ArgumentList.Add(AccountName);
+        psi.ArgumentList.Add(accountName);
         psi.ArgumentList.Add("-s");
         psi.ArgumentList.Add(ServiceName);
         psi.ArgumentList.Add("-w");
@@ -33,7 +58,7 @@ public sealed class MacKeychainCredentialStore : ICredentialStore
         await RunAsync(psi, cancellationToken);
     }
 
-    public async Task<SessionCredentials?> LoadSessionAsync(CancellationToken cancellationToken = default)
+    private static async Task<T?> LoadAsync<T>(string accountName, CancellationToken cancellationToken)
     {
         var psi = new ProcessStartInfo("security")
         {
@@ -42,21 +67,21 @@ public sealed class MacKeychainCredentialStore : ICredentialStore
         };
         psi.ArgumentList.Add("find-generic-password");
         psi.ArgumentList.Add("-a");
-        psi.ArgumentList.Add(AccountName);
+        psi.ArgumentList.Add(accountName);
         psi.ArgumentList.Add("-s");
         psi.ArgumentList.Add(ServiceName);
         psi.ArgumentList.Add("-w");
 
-        var output = await RunAsync(psi, cancellationToken, tolerateFailure: true);
+        var output = await RunAsync(psi, cancellationToken, tolerateItemNotFound: true);
         if (string.IsNullOrWhiteSpace(output))
         {
-            return null;
+            return default;
         }
 
-        return JsonSerializer.Deserialize<SessionCredentials>(output, AppJson.Default);
+        return JsonSerializer.Deserialize<T>(output, AppJson.Default);
     }
 
-    public async Task ClearSessionAsync(CancellationToken cancellationToken = default)
+    private static async Task ClearAsync(string accountName, CancellationToken cancellationToken)
     {
         var psi = new ProcessStartInfo("security")
         {
@@ -65,25 +90,39 @@ public sealed class MacKeychainCredentialStore : ICredentialStore
         };
         psi.ArgumentList.Add("delete-generic-password");
         psi.ArgumentList.Add("-a");
-        psi.ArgumentList.Add(AccountName);
+        psi.ArgumentList.Add(accountName);
         psi.ArgumentList.Add("-s");
         psi.ArgumentList.Add(ServiceName);
 
-        await RunAsync(psi, cancellationToken, tolerateFailure: true);
+        await RunAsync(psi, cancellationToken, tolerateItemNotFound: true);
     }
 
-    private static async Task<string> RunAsync(ProcessStartInfo psi, CancellationToken cancellationToken, bool tolerateFailure = false)
+    private static async Task<string> RunAsync(
+        ProcessStartInfo psi,
+        CancellationToken cancellationToken,
+        bool tolerateItemNotFound = false)
     {
         using var process = Process.Start(psi) ?? throw new InvalidOperationException("无法启动 security 命令。");
         var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
         var error = await process.StandardError.ReadToEndAsync(cancellationToken);
         await process.WaitForExitAsync(cancellationToken);
 
-        if (!tolerateFailure && process.ExitCode != 0)
-        {
-            throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? "Keychain 操作失败。" : error);
-        }
+        EnsureSuccessfulExit(process.ExitCode, error, tolerateItemNotFound);
 
         return output.Trim();
+    }
+
+    internal static void EnsureSuccessfulExit(
+        int exitCode,
+        string? error,
+        bool tolerateItemNotFound)
+    {
+        if (exitCode == 0 || tolerateItemNotFound && exitCode == ItemNotFoundExitCode)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(error) ? "Keychain 操作失败。" : error.Trim());
     }
 }

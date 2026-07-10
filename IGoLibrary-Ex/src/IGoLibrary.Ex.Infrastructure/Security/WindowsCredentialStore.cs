@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using IGoLibrary.Ex.Application.Abstractions;
@@ -8,11 +9,34 @@ namespace IGoLibrary.Ex.Infrastructure.Security;
 
 public sealed class WindowsCredentialStore : ICredentialStore
 {
-    private const string TargetName = "IGoLibrary-Ex.Session";
+    private const int ErrorNotFound = 1168;
+    private const string SessionTargetName = "IGoLibrary-Ex.Session";
+    private const string RemoteCheckInTargetName = "IGoLibrary-Ex.RemoteCheckIn";
 
     public Task SaveSessionAsync(SessionCredentials credentials, CancellationToken cancellationToken = default)
+        => SaveAsync(SessionTargetName, credentials);
+
+    public Task<SessionCredentials?> LoadSessionAsync(CancellationToken cancellationToken = default)
+        => LoadAsync<SessionCredentials>(SessionTargetName);
+
+    public Task ClearSessionAsync(CancellationToken cancellationToken = default)
+        => ClearAsync(SessionTargetName);
+
+    public Task SaveRemoteCheckInSessionAsync(
+        RemoteCheckInSessionCredentials credentials,
+        CancellationToken cancellationToken = default)
+        => SaveAsync(RemoteCheckInTargetName, credentials);
+
+    public Task<RemoteCheckInSessionCredentials?> LoadRemoteCheckInSessionAsync(
+        CancellationToken cancellationToken = default)
+        => LoadAsync<RemoteCheckInSessionCredentials>(RemoteCheckInTargetName);
+
+    public Task ClearRemoteCheckInSessionAsync(CancellationToken cancellationToken = default)
+        => ClearAsync(RemoteCheckInTargetName);
+
+    private static Task SaveAsync<T>(string targetName, T value)
     {
-        var payload = JsonSerializer.Serialize(credentials, AppJson.Default);
+        var payload = JsonSerializer.Serialize(value, AppJson.Default);
         var bytes = System.Text.Encoding.Unicode.GetBytes(payload);
         if (bytes.Length > 5120)
         {
@@ -22,7 +46,7 @@ public sealed class WindowsCredentialStore : ICredentialStore
         var credential = new NativeCredential
         {
             Type = 1,
-            TargetName = TargetName,
+            TargetName = targetName,
             CredentialBlobSize = (uint)bytes.Length,
             CredentialBlob = Marshal.StringToCoTaskMemUni(payload),
             Persist = 2,
@@ -50,11 +74,11 @@ public sealed class WindowsCredentialStore : ICredentialStore
         return Task.CompletedTask;
     }
 
-    public Task<SessionCredentials?> LoadSessionAsync(CancellationToken cancellationToken = default)
+    private static Task<T?> LoadAsync<T>(string targetName)
     {
-        if (!CredRead(TargetName, 1, 0, out var credentialPtr))
+        if (!CredRead(targetName, 1, 0, out var credentialPtr))
         {
-            return Task.FromResult<SessionCredentials?>(null);
+            return Task.FromResult<T?>(default);
         }
 
         try
@@ -62,11 +86,11 @@ public sealed class WindowsCredentialStore : ICredentialStore
             var credential = Marshal.PtrToStructure<NativeCredential>(credentialPtr);
             if (credential.CredentialBlob == IntPtr.Zero)
             {
-                return Task.FromResult<SessionCredentials?>(null);
+                return Task.FromResult<T?>(default);
             }
 
             var json = Marshal.PtrToStringUni(credential.CredentialBlob, (int)credential.CredentialBlobSize / 2);
-            return Task.FromResult(JsonSerializer.Deserialize<SessionCredentials>(json!, AppJson.Default));
+            return Task.FromResult(JsonSerializer.Deserialize<T>(json!, AppJson.Default));
         }
         finally
         {
@@ -74,10 +98,24 @@ public sealed class WindowsCredentialStore : ICredentialStore
         }
     }
 
-    public Task ClearSessionAsync(CancellationToken cancellationToken = default)
+    private static Task ClearAsync(string targetName)
     {
-        CredDelete(TargetName, 1, 0);
+        var deleted = CredDelete(targetName, 1, 0);
+        var errorCode = deleted ? 0 : Marshal.GetLastWin32Error();
+        EnsureCredentialDeleted(deleted, errorCode);
         return Task.CompletedTask;
+    }
+
+    internal static void EnsureCredentialDeleted(bool deleted, int errorCode)
+    {
+        if (deleted || errorCode == ErrorNotFound)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"删除 Windows 安全凭据失败（Win32 错误 {errorCode}）。",
+            new Win32Exception(errorCode));
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]

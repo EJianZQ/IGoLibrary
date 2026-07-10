@@ -20,5 +20,7 @@ public sealed record AppSettings
 
     public MobileControlSettings MobileControl { get; init; } = MobileControlSettings.Default;
 
+    public RemoteCheckInSettings RemoteCheckIn { get; init; } = RemoteCheckInSettings.Default;
+
     public static AppSettings Default { get; } = new();
 }

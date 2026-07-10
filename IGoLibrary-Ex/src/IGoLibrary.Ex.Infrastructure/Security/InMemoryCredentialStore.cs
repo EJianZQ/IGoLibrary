@@ -6,6 +6,7 @@ namespace IGoLibrary.Ex.Infrastructure.Security;
 public sealed class InMemoryCredentialStore : ICredentialStore
 {
     private SessionCredentials? _session;
+    private RemoteCheckInSessionCredentials? _remoteCheckInSession;
 
     public Task SaveSessionAsync(SessionCredentials credentials, CancellationToken cancellationToken = default)
     {
@@ -21,6 +22,26 @@ public sealed class InMemoryCredentialStore : ICredentialStore
     public Task ClearSessionAsync(CancellationToken cancellationToken = default)
     {
         _session = null;
+        return Task.CompletedTask;
+    }
+
+    public Task SaveRemoteCheckInSessionAsync(
+        RemoteCheckInSessionCredentials credentials,
+        CancellationToken cancellationToken = default)
+    {
+        _remoteCheckInSession = credentials;
+        return Task.CompletedTask;
+    }
+
+    public Task<RemoteCheckInSessionCredentials?> LoadRemoteCheckInSessionAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(_remoteCheckInSession);
+    }
+
+    public Task ClearRemoteCheckInSessionAsync(CancellationToken cancellationToken = default)
+    {
+        _remoteCheckInSession = null;
         return Task.CompletedTask;
     }
 }

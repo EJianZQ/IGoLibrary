@@ -92,6 +92,8 @@ public partial class MainWindowWorkflowViewModel
                 {
                     await BindSelectedLibraryAsync();
                 }
+
+                await RemoteCheckInPage.InitializeAsync();
             }
             catch (Exception ex)
             {

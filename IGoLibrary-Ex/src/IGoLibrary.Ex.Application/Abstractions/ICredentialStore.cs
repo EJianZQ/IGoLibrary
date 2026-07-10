@@ -9,4 +9,13 @@ public interface ICredentialStore
     Task<SessionCredentials?> LoadSessionAsync(CancellationToken cancellationToken = default);
 
     Task ClearSessionAsync(CancellationToken cancellationToken = default);
+
+    Task SaveRemoteCheckInSessionAsync(
+        RemoteCheckInSessionCredentials credentials,
+        CancellationToken cancellationToken = default);
+
+    Task<RemoteCheckInSessionCredentials?> LoadRemoteCheckInSessionAsync(
+        CancellationToken cancellationToken = default);
+
+    Task ClearRemoteCheckInSessionAsync(CancellationToken cancellationToken = default);
 }

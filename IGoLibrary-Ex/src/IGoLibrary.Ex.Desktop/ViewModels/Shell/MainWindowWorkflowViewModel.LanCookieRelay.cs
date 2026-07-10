@@ -44,6 +44,12 @@ public partial class MainWindowWorkflowViewModel
         set => LanCookieRelay.ShowLanCookieRelayStartedStatusIcon = value;
     }
 
+    public string LanCookieRelayDialogTitle
+    {
+        get => LanCookieRelay.LanCookieRelayDialogTitle;
+        set => LanCookieRelay.LanCookieRelayDialogTitle = value;
+    }
+
     public IImage? LanCookieRelayQrImage
     {
         get => LanCookieRelay.LanCookieRelayQrImage;
@@ -115,6 +121,7 @@ public partial class MainWindowWorkflowViewModel
             nameof(LanCookieRelay.LanCookieRelayUrlText),
             nameof(LanCookieRelay.LanCookieRelayStatusText),
             nameof(LanCookieRelay.ShowLanCookieRelayStartedStatusIcon),
+            nameof(LanCookieRelay.LanCookieRelayDialogTitle),
             nameof(LanCookieRelay.LanCookieRelayQrImage),
             nameof(LanCookieRelay.HasLanCookieRelayQrImage),
             nameof(LanCookieRelay.HasNoLanCookieRelayQrImage));

@@ -262,6 +262,7 @@ public partial class MainWindowWorkflowViewModel
             },
             () =>
             {
+                WorkflowState.LockedLibrary = AccountVenue.LockedLibrary;
                 UpdateHomeHeroPresentation(GetCurrentTime());
                 UpdateHomeSystemInfoPresentation();
             });

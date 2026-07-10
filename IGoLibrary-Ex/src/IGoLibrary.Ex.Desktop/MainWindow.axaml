@@ -1997,7 +1997,211 @@
           </Grid>
         </Grid>
 
-        <!-- Tab 6: Mobile Control -->
+        <!-- Tab 6: Remote Check-In -->
+        <ScrollViewer>
+          <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+                RowSpacing="16"
+                Margin="0,0,16,0">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="page-title" Text="远程签到" Margin="0" />
+              </StackPanel>
+              <Border Grid.Column="1"
+                      Padding="14,10"
+                      CornerRadius="16"
+                      Background="{DynamicResource SemiAccentGlowBrush}"
+                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                      BorderThickness="1"
+                      VerticalAlignment="Center">
+                <TextBlock Text="{Binding RemoteCheckInPage.AuthorizationStatusText}"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource SemiTextSecondaryBrush}" />
+              </Border>
+            </Grid>
+
+            <Border Grid.Row="1" Classes="semi-card Shadow" Padding="22">
+              <Grid ColumnDefinitions="Auto,*,210" ColumnSpacing="20">
+                <Border Background="White"
+                        BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="14"
+                        Padding="10"
+                        VerticalAlignment="Center">
+                  <Image Source="/Assets/qrcode.png"
+                         Width="150"
+                         Height="150"
+                         Stretch="Uniform" />
+                </Border>
+
+                <StackPanel Grid.Column="1" Spacing="9" VerticalAlignment="Center">
+                  <TextBlock Classes="section-title" Margin="0" Text="签到专用授权" />
+                  <TextBox Text="{Binding RemoteCheckInPage.AuthorizationLinkText}"
+                           AcceptsReturn="True"
+                           TextWrapping="Wrap"
+                           MinHeight="104"
+                           Watermark="自动读取剪贴板，也可粘贴包含 32 位 code 的新授权链接" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Spacing="12" VerticalAlignment="Center">
+                  <Button Content="解析并获取授权"
+                          Command="{Binding RemoteCheckInPage.AuthorizeFromLinkCommand}"
+                          IsEnabled="{Binding RemoteCheckInPage.CanAuthorize}"
+                          HorizontalAlignment="Stretch"
+                          Background="{DynamicResource AppAccentBrush}"
+                          Foreground="{DynamicResource AppAccentForegroundBrush}" />
+                  <Button Content="局域网快传签到授权"
+                          Command="{Binding RemoteCheckInPage.StartRemoteCheckInLanRelayCommand}"
+                          IsEnabled="{Binding RemoteCheckInPage.CanAuthorize}"
+                          HorizontalAlignment="Stretch"
+                          Classes="Secondary" />
+                  <CheckBox Content="记住签到授权"
+                            IsChecked="{Binding RemoteCheckInPage.RememberRemoteCheckInSession}"
+                            HorizontalAlignment="Left" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Grid Grid.Row="2"
+                  ColumnDefinitions="0.78*,1.22*"
+                  ColumnSpacing="16"
+                  IsVisible="{Binding RemoteCheckInPage.HasRemoteCheckInSession}">
+              <Border Classes="semi-card Shadow" Padding="22">
+                <StackPanel Spacing="14">
+                  <TextBlock Classes="section-title" Margin="0" Text="提交前置状态" />
+                  <Border Classes="card" Padding="14">
+                    <StackPanel Spacing="5">
+                      <TextBlock Classes="grab-stat-title" Text="锁定场馆" />
+                      <TextBlock Text="{Binding RemoteCheckInPage.LockedLibraryText}"
+                                 FontWeight="SemiBold" />
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="card" Padding="14">
+                    <StackPanel Spacing="5">
+                      <TextBlock Classes="grab-stat-title" Text="当前预约" />
+                      <TextBlock Text="{Binding RemoteCheckInPage.CurrentReservationText}"
+                                 TextWrapping="Wrap"
+                                 FontWeight="SemiBold" />
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="card" Padding="14">
+                    <StackPanel Spacing="5">
+                      <TextBlock Classes="grab-stat-title" Text="签到账号" />
+                      <TextBlock Text="{Binding RemoteCheckInPage.AccountSummaryText}"
+                                 TextWrapping="Wrap"
+                                 FontWeight="SemiBold" />
+                    </StackPanel>
+                  </Border>
+                  <TextBlock Text="{Binding RemoteCheckInPage.DeviceStatusText}"
+                             Classes="helper-text"
+                             TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                    <Button Content="刷新信标"
+                            Command="{Binding RemoteCheckInPage.RefreshDevicesCommand}"
+                            IsEnabled="{Binding RemoteCheckInPage.CanRefreshDevices}"
+                            HorizontalAlignment="Stretch"
+                            Classes="Secondary" />
+                    <Button Grid.Column="1"
+                            Content="清除签到授权"
+                            Command="{Binding RemoteCheckInPage.ClearAuthorizationCommand}"
+                            IsEnabled="{Binding RemoteCheckInPage.HasRemoteCheckInSession}"
+                            HorizontalAlignment="Stretch"
+                            Background="Transparent"
+                            BorderBrush="{DynamicResource SemiCardBorderBrush}" />
+                  </Grid>
+                </StackPanel>
+              </Border>
+
+              <Border Grid.Column="1" Classes="semi-card Shadow" Padding="22">
+                <StackPanel Spacing="14">
+                  <TextBlock Classes="section-title" Margin="0" Text="当前场馆 Beacon 与位置配置" />
+
+                  <StackPanel Spacing="7">
+                    <TextBlock Classes="field-label" Text="服务端允许的 Beacon UUID" />
+                    <ComboBox ItemsSource="{Binding RemoteCheckInPage.AllowedBeaconUuids}"
+                              SelectedItem="{Binding RemoteCheckInPage.SelectedBeaconUuid}"
+                              HorizontalAlignment="Stretch"
+                              PlaceholderText="请先刷新信标" />
+                  </StackPanel>
+
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <StackPanel Spacing="7">
+                      <TextBlock Classes="field-label" Text="Major（0~65535）" />
+                      <NumericUpDown Minimum="0"
+                                     Maximum="65535"
+                                     Value="{Binding RemoteCheckInPage.BeaconMajor}"
+                                     HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="7">
+                      <TextBlock Classes="field-label" Text="Minor（0~65535）" />
+                      <NumericUpDown Minimum="0"
+                                     Maximum="65535"
+                                     Value="{Binding RemoteCheckInPage.BeaconMinor}"
+                                     HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                  </Grid>
+
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <StackPanel Spacing="7">
+                      <TextBlock Classes="field-label" Text="GCJ-02 纬度" />
+                      <NumericUpDown Minimum="-90"
+                                     Maximum="90"
+                                     Increment="0.000001"
+                                     FormatString="0.########"
+                                     Value="{Binding RemoteCheckInPage.Latitude}"
+                                     HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="7">
+                      <TextBlock Classes="field-label" Text="GCJ-02 经度" />
+                      <NumericUpDown Minimum="-180"
+                                     Maximum="180"
+                                     Increment="0.000001"
+                                     FormatString="0.########"
+                                     Value="{Binding RemoteCheckInPage.Longitude}"
+                                     HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                  </Grid>
+
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <TextBlock Text="{Binding RemoteCheckInPage.ProfileStatusText}"
+                               Classes="helper-text"
+                               TextWrapping="Wrap"
+                               VerticalAlignment="Center" />
+                    <Button Grid.Column="1"
+                            Content="保存场馆配置"
+                            Command="{Binding RemoteCheckInPage.SaveProfileCommand}"
+                            IsEnabled="{Binding RemoteCheckInPage.CanSaveProfile}"
+                            Classes="Secondary" />
+                  </Grid>
+                </StackPanel>
+              </Border>
+            </Grid>
+
+            <Border Grid.Row="3"
+                    Classes="semi-card Shadow"
+                    Padding="22"
+                    IsVisible="{Binding RemoteCheckInPage.HasRemoteCheckInSession}">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="18">
+                <TextBlock Text="{Binding RemoteCheckInPage.LastResultText}"
+                           TextWrapping="Wrap"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Content="立即远程签到"
+                        Command="{Binding RemoteCheckInPage.SignCommand}"
+                        IsEnabled="{Binding RemoteCheckInPage.CanSign}"
+                        Background="{DynamicResource AppAccentBrush}"
+                        Foreground="{DynamicResource AppAccentForegroundBrush}"
+                        FontWeight="Bold"
+                        MinWidth="180"
+                        MinHeight="46"
+                        VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+          </Grid>
+        </ScrollViewer>
+
+        <!-- Tab 7: Mobile Control -->
         <ScrollViewer>
           <Grid RowDefinitions="Auto,Auto"
                 RowSpacing="16"
@@ -2209,7 +2413,7 @@
           </Grid>
         </ScrollViewer>
 
-        <!-- Tab 7: Notification Settings -->
+        <!-- Tab 8: Notification Settings -->
         <ScrollViewer>
           <Grid RowDefinitions="Auto,*"
                 RowSpacing="18"
@@ -2896,7 +3100,7 @@
           </Grid>
         </ScrollViewer>
 
-        <!-- Tab 7: Settings -->
+        <!-- Tab 9: Settings -->
         <Grid RowDefinitions="Auto,*"
               RowSpacing="18"
               Margin="0,0,16,0">
@@ -3330,7 +3534,7 @@
               <Grid ColumnDefinitions="*,Auto"
                     ColumnSpacing="12">
                 <StackPanel Spacing="4">
-                  <TextBlock Text="局域网快传"
+                  <TextBlock Text="{Binding LanCookieRelayDialogTitle}"
                              FontSize="22"
                              FontWeight="Bold" />
                   <StackPanel Orientation="Horizontal"

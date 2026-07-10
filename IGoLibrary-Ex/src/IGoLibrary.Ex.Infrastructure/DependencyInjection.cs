@@ -67,6 +67,17 @@ public static class DependencyInjection
                 AutomaticDecompression = DecompressionMethods.All,
                 UseCookies = false
             });
+        services.AddHttpClient<TraceIntRemoteCheckInTransport>(client =>
+            {
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = false,
+                AutomaticDecompression = DecompressionMethods.All,
+                UseCookies = false
+            });
+        services.AddTransient<IRemoteCheckInApiClient, TraceIntRemoteCheckInApiClient>();
         services.AddTransient<ITraceIntApiClient, TraceIntApiClient>();
 
         return services;

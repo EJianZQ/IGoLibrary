@@ -53,6 +53,79 @@ public sealed class SettingsSerializationTests
         Assert.Equal(0, settings.MobileControl.Port);
         Assert.Equal(string.Empty, settings.MobileControl.AccessToken);
         Assert.False(settings.MobileControl.AutoStart);
+        Assert.Empty(settings.RemoteCheckIn.VenueProfiles);
+    }
+
+    [Fact]
+    public void RemoteCheckInProfiles_RoundTripAndNormalizeInvalidValues()
+    {
+        var settings = Normalize(AppSettings.Default with
+        {
+            RemoteCheckIn = new RemoteCheckInSettings
+            {
+                VenueProfiles =
+                [
+                    new RemoteCheckInVenueProfileSettings
+                    {
+                        LibraryId = 7,
+                        LibraryName = " 测试馆 ",
+                        BeaconUuid = "e2c56db5-dffb-48d2-b060-d0f5a71096e0",
+                        Major = 10001,
+                        Minor = 20002,
+                        Latitude = 39.908722m,
+                        Longitude = 116.397499m
+                    },
+                    new RemoteCheckInVenueProfileSettings
+                    {
+                        LibraryId = 8,
+                        LibraryName = "坏配置",
+                        BeaconUuid = "invalid",
+                        Major = 70000,
+                        Minor = -1,
+                        Latitude = 91m,
+                        Longitude = -181m
+                    }
+                ]
+            }
+        });
+
+        var valid = Assert.Single(settings.RemoteCheckIn.VenueProfiles, profile => profile.LibraryId == 7);
+        Assert.Equal("测试馆", valid.LibraryName);
+        Assert.Equal("E2C56DB5-DFFB-48D2-B060-D0F5A71096E0", valid.BeaconUuid);
+        var invalid = Assert.Single(settings.RemoteCheckIn.VenueProfiles, profile => profile.LibraryId == 8);
+        Assert.Equal(string.Empty, invalid.BeaconUuid);
+        Assert.Null(invalid.Major);
+        Assert.Null(invalid.Minor);
+        Assert.Null(invalid.Latitude);
+        Assert.Null(invalid.Longitude);
+
+        var json = JsonSerializer.Serialize(settings, AppJson.Default);
+        Assert.Contains("remoteCheckIn", json);
+        Assert.DoesNotContain("wechatSESS_ID", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CanonicalSettingsWithoutRemoteCheckIn_MigratesEmptySection()
+    {
+        var migrated = MigrateLegacyAppSettingsJson(
+            """
+            {
+              "notifications": {},
+              "traceIntProtocol": { "graphQlOverridesEnabled": false },
+              "network": { "timeoutSeconds": 5, "maxRetries": 3 },
+              "tasks": {
+                "grab": {}, "occupy": {}, "autoRelease": {},
+                "tomorrowReservation": {}, "globalLeak": {}
+              },
+              "updates": {},
+              "mobileControl": {}
+            }
+            """);
+        using var document = JsonDocument.Parse(migrated);
+
+        Assert.Equal(
+            JsonValueKind.Array,
+            document.RootElement.GetProperty("remoteCheckIn").GetProperty("venueProfiles").ValueKind);
     }
 
     [Fact]

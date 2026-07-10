@@ -4,9 +4,17 @@ namespace IGoLibrary.Ex.Desktop.Services;
 
 internal static class LanCookieRelayMobilePage
 {
-  public static string Build(string token)
+  public static string Build(
+    string token,
+    LanAuthLinkRelayPurpose purpose = LanAuthLinkRelayPurpose.GraphQlSession)
   {
     var tokenJson = JsonSerializer.Serialize(token);
+    var purposeTitle = purpose == LanAuthLinkRelayPurpose.RemoteCheckIn
+      ? "远程签到授权局域网快传"
+      : "登录授权局域网快传";
+    var purposeHint = purpose == LanAuthLinkRelayPurpose.RemoteCheckIn
+      ? "请重新扫码获取一个未被普通登录使用的新授权链接，提交后仅用于远程签到"
+      : "提交后用于获取普通登录 Cookie";
     return $$"""
 <!doctype html>
 <html lang="zh-CN">
@@ -14,7 +22,7 @@ internal static class LanCookieRelayMobilePage
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Cache-Control" content="no-store">
-  <title>局域网快传</title>
+  <title>{{purposeTitle}}</title>
   <style>
     :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     body { margin: 0; background: #f5f7fb; color: #1d2129; }
@@ -39,8 +47,8 @@ internal static class LanCookieRelayMobilePage
 <body>
   <main>
     <section>
-      <h1>局域网快传</h1>
-      <p>在微信内长按识别下方授权二维码，完成授权后复制包含 code 的链接，返回本页提交到电脑端</p>
+      <h1>{{purposeTitle}}</h1>
+      <p>在微信内长按识别下方授权二维码，完成授权后复制包含 code 的链接，返回本页提交到电脑端。{{purposeHint}}</p>
       <div class="qr-card">
         <div class="qr-title">微信授权二维码</div>
         <div class="qr-frame">

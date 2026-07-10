@@ -26,6 +26,7 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
     private Action<CoordinatorStatus>? _statusApplied;
     private bool _statusSubscribed;
     private bool _isAutoReleaseRefreshingReservation;
+    private long _reservationPresentationVersion;
     private string? _lastAutoReleaseFailedReservationToken;
     private DateTimeOffset? _lastAutoReleaseFailedAt;
     private DateTimeOffset? _lastRecordedOccupySuccessAt;
@@ -223,6 +224,7 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
 
     public void UpdateReservationPresentation(ReservationInfo? info)
     {
+        Interlocked.Increment(ref _reservationPresentationVersion);
         var previousReservationToken = CurrentReservation?.ReservationToken;
         CurrentReservation = info;
         if (info is null ||
@@ -303,9 +305,15 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
 
     public async Task RefreshReservationAsync(bool showNotificationOnError)
     {
+        var presentationVersion = Volatile.Read(ref _reservationPresentationVersion);
         try
         {
             var result = await RefreshReservationOperationAsync();
+            if (Volatile.Read(ref _reservationPresentationVersion) != presentationVersion)
+            {
+                return;
+            }
+
             if (!result.HasSession)
             {
                 UpdateReservationPresentation(null);

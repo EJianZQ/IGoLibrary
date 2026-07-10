@@ -89,6 +89,7 @@ public sealed class SqliteSettingsRepository(
         var globalLeak = ReadObject(tasks, "globalLeak");
         var updates = ReadObject(root, "updates");
         var mobileControl = ReadObject(root, "mobileControl");
+        var remoteCheckIn = ReadObject(root, "remoteCheckIn");
 
         var legacyRetryCount = ReadInt(root, "retryCount")
             ?? ReadInt(legacyRequestPolicy, "retryCount");
@@ -288,6 +289,21 @@ public sealed class SqliteSettingsRepository(
             ReadBool(mobileControl, "autoStart") ?? defaults.MobileControl.AutoStart);
         writer.WriteEndObject();
 
+        writer.WritePropertyName("remoteCheckIn");
+        writer.WriteStartObject();
+        writer.WritePropertyName("venueProfiles");
+        var venueProfiles = ReadArray(remoteCheckIn, "venueProfiles");
+        if (venueProfiles.ValueKind == JsonValueKind.Array)
+        {
+            venueProfiles.WriteTo(writer);
+        }
+        else
+        {
+            writer.WriteStartArray();
+            writer.WriteEndArray();
+        }
+        writer.WriteEndObject();
+
         writer.WriteEndObject();
         writer.Flush();
         return Encoding.UTF8.GetString(stream.ToArray());
@@ -306,6 +322,7 @@ public sealed class SqliteSettingsRepository(
         var globalLeak = tasks.GlobalLeak ?? GlobalLeakTaskSettings.Default;
         var updates = settings.Updates ?? UpdateCheckSettings.Default;
         var mobileControl = settings.MobileControl ?? MobileControlSettings.Default;
+        var remoteCheckIn = settings.RemoteCheckIn ?? RemoteCheckInSettings.Default;
         return settings with
         {
             Notifications = notifications with
@@ -359,6 +376,10 @@ public sealed class SqliteSettingsRepository(
                 Port = MobileControlSettings.IsValidPort(mobileControl.Port) ? mobileControl.Port : 0,
                 AccessToken = mobileControl.AccessToken?.Trim() ?? string.Empty,
                 AutoStart = mobileControl.AutoStart
+            },
+            RemoteCheckIn = remoteCheckIn with
+            {
+                VenueProfiles = NormalizeRemoteCheckInVenueProfiles(remoteCheckIn.VenueProfiles)
             }
         };
     }
@@ -380,7 +401,39 @@ public sealed class SqliteSettingsRepository(
                tasks.TryGetProperty("tomorrowReservation", out _) &&
                tasks.TryGetProperty("globalLeak", out _) &&
                root.TryGetProperty("updates", out _) &&
-               root.TryGetProperty("mobileControl", out _);
+               root.TryGetProperty("mobileControl", out _) &&
+               root.TryGetProperty("remoteCheckIn", out _);
+    }
+
+    private static IReadOnlyList<RemoteCheckInVenueProfileSettings> NormalizeRemoteCheckInVenueProfiles(
+        IReadOnlyList<RemoteCheckInVenueProfileSettings>? profiles)
+    {
+        if (profiles is null || profiles.Count == 0)
+        {
+            return [];
+        }
+
+        return profiles
+            .Where(static profile => profile is not null && profile.LibraryId > 0)
+            .Select(static profile =>
+            {
+                var beaconUuid = Guid.TryParse(profile.BeaconUuid?.Trim(), out var uuid)
+                    ? uuid.ToString("D").ToUpperInvariant()
+                    : string.Empty;
+                return profile with
+                {
+                    LibraryName = profile.LibraryName?.Trim() ?? string.Empty,
+                    BeaconUuid = beaconUuid,
+                    Major = profile.Major is >= ushort.MinValue and <= ushort.MaxValue ? profile.Major : null,
+                    Minor = profile.Minor is >= ushort.MinValue and <= ushort.MaxValue ? profile.Minor : null,
+                    Latitude = profile.Latitude is >= -90m and <= 90m ? profile.Latitude : null,
+                    Longitude = profile.Longitude is >= -180m and <= 180m ? profile.Longitude : null
+                };
+            })
+            .GroupBy(static profile => profile.LibraryId)
+            .Select(static group => group.Last())
+            .OrderBy(static profile => profile.LibraryId)
+            .ToArray();
     }
 
     private static bool ContainsLegacySettingsFields(JsonElement root)

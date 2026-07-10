@@ -33,6 +33,8 @@ public partial class MainWindowWorkflowViewModel
 
     public bool IsAccountAndVenuePageActive => Navigation.IsAccountAndVenuePageActive;
 
+    public bool IsRemoteCheckInPageActive => Navigation.IsRemoteCheckInPageActive;
+
     public int SelectedNotificationSettingsTabIndex
     {
         get => Navigation.SelectedNotificationSettingsTabIndex;
@@ -57,11 +59,16 @@ public partial class MainWindowWorkflowViewModel
             Navigation,
             nameof(ShellNavigationViewModel.SelectedTabIndex),
             nameof(SelectedTabIndex),
-            nameof(IsAccountAndVenuePageActive));
+            nameof(IsAccountAndVenuePageActive),
+            nameof(IsRemoteCheckInPageActive));
         propertyBridge.Forward(
             Navigation,
             nameof(ShellNavigationViewModel.IsAccountAndVenuePageActive),
             nameof(IsAccountAndVenuePageActive));
+        propertyBridge.Forward(
+            Navigation,
+            nameof(ShellNavigationViewModel.IsRemoteCheckInPageActive),
+            nameof(IsRemoteCheckInPageActive));
         propertyBridge.ForwardSame(
             Navigation,
             nameof(SelectedSidebarItem),

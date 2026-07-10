@@ -38,6 +38,9 @@ public sealed partial class LanCookieRelayViewModel(
     private bool showLanCookieRelayStartedStatusIcon;
 
     [ObservableProperty]
+    private string lanCookieRelayDialogTitle = "登录授权快传";
+
+    [ObservableProperty]
     private IImage? lanCookieRelayQrImage;
 
     public bool HasLanCookieRelayQrImage => LanCookieRelayQrImage is not null;
@@ -118,20 +121,34 @@ public sealed partial class LanCookieRelayViewModel(
     [RelayCommand]
     private async Task StartLanCookieRelayAsync()
     {
+        var handler = _submitLinkAsync
+            ?? throw new InvalidOperationException("局域网快传尚未完成初始化");
+        await StartSessionAsync(LanAuthLinkRelayPurpose.GraphQlSession, handler);
+    }
+
+    public async Task StartSessionAsync(
+        LanAuthLinkRelayPurpose purpose,
+        Func<string, Task<LanCookieRelayLinkSubmitResult>> submitLinkAsync)
+    {
         if (IsLanCookieRelayRunning)
         {
-            return;
+            await StopSessionAsync(closeDialog: false);
         }
 
         try
         {
             IsLanCookieRelayDialogOpen = true;
+            LanCookieRelayDialogTitle = purpose == LanAuthLinkRelayPurpose.RemoteCheckIn
+                ? "远程签到授权快传"
+                : "登录授权快传";
             LanCookieRelayStatusText = "正在启动局域网快传...";
             ShowLanCookieRelayStartedStatusIcon = false;
             LanCookieRelayUrlText = string.Empty;
             LanCookieRelayQrImage = null;
 
-            var session = await lanCookieRelayService.StartAsync(SubmitLanCookieRelayLinkAsync);
+            var session = await lanCookieRelayService.StartAsync(
+                (link, cancellationToken) => SubmitLanCookieRelayLinkAsync(link, submitLinkAsync, cancellationToken),
+                purpose);
             _activeLanCookieRelaySessionId = session.SessionId;
             LanCookieRelayUrlText = session.Url.ToString();
             LanCookieRelayQrImage = qrCodeImageFactory.Create(LanCookieRelayUrlText);
@@ -159,11 +176,12 @@ public sealed partial class LanCookieRelayViewModel(
 
     private async Task<LanCookieRelaySubmitResult> SubmitLanCookieRelayLinkAsync(
         string linkText,
+        Func<string, Task<LanCookieRelayLinkSubmitResult>> submitLinkAsync,
         CancellationToken cancellationToken)
     {
         if (Dispatcher.UIThread.CheckAccess())
         {
-            return await SubmitLanCookieRelayLinkOnUiThreadAsync(linkText);
+            return await SubmitLanCookieRelayLinkOnUiThreadAsync(linkText, submitLinkAsync);
         }
 
         var completion = new TaskCompletionSource<LanCookieRelaySubmitResult>(
@@ -172,7 +190,7 @@ public sealed partial class LanCookieRelayViewModel(
         {
             try
             {
-                completion.SetResult(await SubmitLanCookieRelayLinkOnUiThreadAsync(linkText));
+                completion.SetResult(await SubmitLanCookieRelayLinkOnUiThreadAsync(linkText, submitLinkAsync));
             }
             catch (Exception ex)
             {
@@ -183,13 +201,13 @@ public sealed partial class LanCookieRelayViewModel(
         return await completion.Task.WaitAsync(cancellationToken);
     }
 
-    private async Task<LanCookieRelaySubmitResult> SubmitLanCookieRelayLinkOnUiThreadAsync(string linkText)
+    private async Task<LanCookieRelaySubmitResult> SubmitLanCookieRelayLinkOnUiThreadAsync(
+        string linkText,
+        Func<string, Task<LanCookieRelayLinkSubmitResult>> submitLinkAsync)
     {
         LanCookieRelayStatusText = "已收到手机提交，正在解析授权链接...";
         ShowLanCookieRelayStartedStatusIcon = false;
-        var parseResult = _submitLinkAsync is null
-            ? new LanCookieRelayLinkSubmitResult(false, "局域网快传尚未完成初始化")
-            : await _submitLinkAsync(linkText.Trim());
+        var parseResult = await submitLinkAsync(linkText.Trim());
         if (parseResult.Authenticated)
         {
             LanCookieRelayStatusText = "授权成功，局域网快传已完成";

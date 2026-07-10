@@ -175,7 +175,7 @@ public sealed class MainWindowViewModelTests
         var pageIndexes = viewModel.SidebarItems.Select(item => item.PageIndex).ToArray();
 
         Assert.Equal(["首页", "账户与场馆", "系统设置"], titles);
-        Assert.Equal([0, 1, 8], pageIndexes);
+        Assert.Equal([0, 1, 9], pageIndexes);
     }
 
     [Fact]
@@ -200,9 +200,9 @@ public sealed class MainWindowViewModelTests
     {
         var viewModel = CreateViewModel();
 
-        viewModel.SelectedTabIndex = 8;
+        viewModel.SelectedTabIndex = 9;
 
-        Assert.Equal(8, viewModel.SelectedTabIndex);
+        Assert.Equal(9, viewModel.SelectedTabIndex);
 
         viewModel.SelectedTabIndex = 2;
 
@@ -219,8 +219,8 @@ public sealed class MainWindowViewModelTests
         var titles = viewModel.SidebarItems.Select(item => item.Title).ToArray();
         var pageIndexes = viewModel.SidebarItems.Select(item => item.PageIndex).ToArray();
 
-        Assert.Equal(["首页", "账户与场馆", "抢座", "全域捡漏", "明日预约", "占座", "手机控制", "自动通知", "系统设置"], titles);
-        Assert.Equal([0, 1, 2, 3, 4, 5, 6, 7, 8], pageIndexes);
+        Assert.Equal(["首页", "账户与场馆", "抢座", "全域捡漏", "明日预约", "占座", "远程签到", "手机控制", "自动通知", "系统设置"], titles);
+        Assert.Equal([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], pageIndexes);
     }
 
     [Fact]
@@ -1358,6 +1358,33 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SignOutAsync_WhenCredentialClearFails_CompletesUiSignOutAndWarns()
+    {
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials(
+                "cookie",
+                SessionSource.ManualCookie,
+                DateTimeOffset.Now,
+                true),
+            SignOutException = new InvalidOperationException("credential delete failed")
+        };
+        var notifications = new FakeNotificationService();
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            notificationService: notifications);
+        viewModel.IsAuthorized = true;
+
+        await viewModel.SignOutCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsAuthorized);
+        Assert.Equal("未登录", viewModel.SessionSummary);
+        Assert.Contains(
+            notifications.Warnings,
+            item => item.Title == "已退出，但凭据清理失败");
+    }
+
+    [Fact]
     public async Task InitializeAsync_ShowsSuccessToast_WhenStoredJwtCookieIsRestored()
     {
         var notificationService = new FakeNotificationService();
@@ -1481,7 +1508,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task OpenVenuePickerAsync_PreservesCurrentLockedLibrary_WhenOneIsAlreadyBound()
+    public async Task LockedVenueState_SynchronizesToRemoteCheckIn_AcrossPreviewSwitchAndClear()
     {
         var libraryA = new LibrarySummary(1, "场馆A", "3层", true, 120, 20, 10);
         var libraryB = new LibrarySummary(2, "场馆B", "5层", true, 80, 10, 5);
@@ -1505,6 +1532,15 @@ public sealed class MainWindowViewModelTests
             10,
             20,
             [new SeatSnapshot("seat-1", "1", false, 0, 0)]);
+        libraryService.LayoutsByLibraryId[libraryB.LibraryId] = new LibraryLayout(
+            libraryB.LibraryId,
+            libraryB.Name,
+            libraryB.Floor,
+            libraryB.IsOpen,
+            80,
+            5,
+            10,
+            [new SeatSnapshot("seat-2", "2", false, 0, 0)]);
 
         var apiClient = new FakeTraceIntApiClient
         {
@@ -1533,11 +1569,27 @@ public sealed class MainWindowViewModelTests
         viewModel.SelectedLibrary = libraryA;
 
         await viewModel.BindSelectedLibraryCommand.ExecuteAsync(null);
+
+        Assert.Equal(libraryA, viewModel.WorkflowState.LockedLibrary);
+        Assert.Equal("场馆A · 3层", viewModel.RemoteCheckInPage.LockedLibraryText);
+
         await viewModel.OpenVenuePickerCommand.ExecuteAsync(null);
 
         Assert.True(viewModel.IsVenuePickerOpen);
         Assert.Equal(libraryA.LibraryId, viewModel.SelectedLibrary?.LibraryId);
+        Assert.Equal(libraryA, viewModel.WorkflowState.LockedLibrary);
         Assert.Equal(1, libraryService.LoadLibrariesCalls);
+
+        viewModel.SelectedLibrary = libraryB;
+        await viewModel.BindSelectedLibraryCommand.ExecuteAsync(null);
+
+        Assert.Equal(libraryB, viewModel.WorkflowState.LockedLibrary);
+        Assert.Equal("场馆B · 5层", viewModel.RemoteCheckInPage.LockedLibraryText);
+
+        viewModel.AccountVenue.ClearVenueState();
+
+        Assert.Null(viewModel.WorkflowState.LockedLibrary);
+        Assert.Equal("尚未锁定场馆", viewModel.RemoteCheckInPage.LockedLibraryText);
     }
 
     [Fact]
@@ -2077,9 +2129,60 @@ public sealed class MainWindowViewModelTests
         await viewModel.CancelCurrentReservationCommand.ExecuteAsync(null);
 
         Assert.True(viewModel.HasNoCurrentReservation);
+        Assert.Null(viewModel.WorkflowState.CurrentReservation);
+        Assert.Equal("当前未查询到预约", viewModel.RemoteCheckInPage.CurrentReservationText);
         Assert.Equal("--", viewModel.HomeReservationSeatNumberText);
         Assert.Equal(0, viewModel.HomeReservationProgressValue);
         Assert.Contains(notifications.Successes, x => x.Title == "已取消预约");
+    }
+
+    [Fact]
+    public async Task CancelCurrentReservationAsync_IgnoresRefreshThatStartedBeforeCancellation()
+    {
+        var reservation = new ReservationInfo(
+            "token-1",
+            1,
+            "自科阅览区一",
+            "seat-4",
+            "4",
+            DateTimeOffset.Now.AddMinutes(30));
+        var sessionService = new FakeSessionService
+        {
+            CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+        };
+        var staleRefreshStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var staleRefreshResult = new TaskCompletionSource<ReservationInfo?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var refreshCalls = 0;
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetReservationInfoAsync = (_, _) =>
+            {
+                refreshCalls++;
+                if (refreshCalls == 1)
+                {
+                    return Task.FromResult<ReservationInfo?>(reservation);
+                }
+
+                staleRefreshStarted.TrySetResult(true);
+                return staleRefreshResult.Task;
+            },
+            OnCancelReservationAsync = (_, _, _) => Task.FromResult(true)
+        };
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            apiClient: apiClient);
+
+        await viewModel.RefreshReservationCommand.ExecuteAsync(null);
+        var pendingRefresh = viewModel.RefreshReservationCommand.ExecuteAsync(null);
+        await staleRefreshStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+
+        await viewModel.CancelCurrentReservationCommand.ExecuteAsync(null);
+        staleRefreshResult.SetResult(reservation);
+        await pendingRefresh;
+
+        Assert.Null(viewModel.WorkflowState.CurrentReservation);
+        Assert.True(viewModel.HasNoCurrentReservation);
+        Assert.Equal("当前未查询到预约", viewModel.RemoteCheckInPage.CurrentReservationText);
     }
 
     [Fact]

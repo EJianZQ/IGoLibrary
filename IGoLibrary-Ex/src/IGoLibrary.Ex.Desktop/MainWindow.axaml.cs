@@ -163,7 +163,7 @@ public partial class MainWindow : Window
         }
 
         if (e.PropertyName == nameof(MainWindowViewModel.SelectedTabIndex) &&
-            viewModel.IsAccountAndVenuePageActive)
+            (viewModel.IsAccountAndVenuePageActive || viewModel.IsRemoteCheckInPageActive))
         {
             _ = RunUiEventHandlerAsync(
                 () => TryAutoParseClipboardAsync(viewModel, isWindowInteractionReady: true),
@@ -264,9 +264,21 @@ public partial class MainWindow : Window
 
             _isAutoParsingClipboard = true;
             _lastProcessedClipboardText = clipboardText;
+            var isRemoteCheckIn = viewModel.IsRemoteCheckInPageActive;
             await TryShowNotificationAsync(
-                () => _notificationService.ShowInfoAsync("已从剪贴板读取", "检测到授权链接，已自动填入并开始解析"));
-            await viewModel.TryAutoParseClipboardLinkAsync(clipboardText);
+                () => _notificationService.ShowInfoAsync(
+                    "已从剪贴板读取",
+                    isRemoteCheckIn
+                        ? "检测到新授权链接，正在获取远程签到授权"
+                        : "检测到授权链接，已自动填入并开始解析"));
+            if (isRemoteCheckIn)
+            {
+                await viewModel.RemoteCheckInPage.TryAutoParseClipboardLinkAsync(clipboardText);
+            }
+            else
+            {
+                await viewModel.TryAutoParseClipboardLinkAsync(clipboardText);
+            }
         }
         finally
         {
@@ -284,8 +296,8 @@ public partial class MainWindow : Window
                clipboardAvailable &&
                !isAutoParsingClipboard &&
                viewModel.IsInitializationComplete &&
-               !viewModel.IsAuthorized &&
-               viewModel.IsAccountAndVenuePageActive;
+               ((!viewModel.IsAuthorized && viewModel.IsAccountAndVenuePageActive) ||
+                (viewModel.IsAuthorized && viewModel.IsRemoteCheckInPageActive));
     }
 
     internal static bool ShouldSkipClipboardText(string clipboardText, string? lastProcessedClipboardText)

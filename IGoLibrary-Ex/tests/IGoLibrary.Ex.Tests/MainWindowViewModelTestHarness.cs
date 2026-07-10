@@ -31,9 +31,20 @@ internal static class MainWindowViewModelTestHarness
         IStartupEntryService startupEntryService,
         ILanCookieRelayService lanCookieRelayService,
         IQrCodeImageFactory qrCodeImageFactory,
-        IMobileControlService? mobileControlService = null)
+        IMobileControlService? mobileControlService = null,
+        IRemoteCheckInWorkflowService? remoteCheckInWorkflowService = null,
+        IRemoteCheckInProfileService? remoteCheckInProfileService = null)
     {
         mobileControlService ??= new FakeMobileControlService();
+        remoteCheckInWorkflowService ??= new FakeRemoteCheckInWorkflowService();
+        remoteCheckInProfileService ??= new FakeRemoteCheckInProfileService();
+        var workflowState = new ShellWorkflowState();
+        var oauthCodeRegistry = new OAuthCodeConsumptionRegistry();
+        var lanCookieRelayViewModel = new LanCookieRelayViewModel(
+            lanCookieRelayService,
+            qrCodeImageFactory,
+            activityLogService,
+            notificationService);
         var pages = new MainWindowWorkflowPages(
             new HomeDashboardViewModel(
                 activityLogService,
@@ -43,7 +54,8 @@ internal static class MainWindowViewModelTestHarness
                 activityLogService,
                 notificationService,
                 appThemeService,
-                timeProvider),
+                timeProvider,
+                oauthCodeRegistry),
             new AccountVenueViewModel(
                 sessionWorkflowService,
                 venueWorkflowService,
@@ -82,9 +94,14 @@ internal static class MainWindowViewModelTestHarness
                 notificationService,
                 appThemeService,
                 timeProvider),
-            new LanCookieRelayViewModel(
-                lanCookieRelayService,
-                qrCodeImageFactory,
+            lanCookieRelayViewModel,
+            new RemoteCheckInPageViewModel(
+                remoteCheckInWorkflowService,
+                remoteCheckInProfileService,
+                reservationWorkflowService,
+                workflowState,
+                oauthCodeRegistry,
+                lanCookieRelayViewModel,
                 activityLogService,
                 notificationService),
             new MobileControlPageViewModel(
@@ -129,7 +146,7 @@ internal static class MainWindowViewModelTestHarness
 
         return new MainWindowViewModel(
             pages,
-            new ShellWorkflowState(),
+            workflowState,
             activityLogService,
             notificationService,
             appThemeService,

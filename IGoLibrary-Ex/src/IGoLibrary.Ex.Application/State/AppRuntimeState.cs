@@ -21,7 +21,12 @@ public interface IReservationState
     ReservationInfo? CurrentReservation { get; set; }
 }
 
-public sealed class AppRuntimeState : ISessionState, IVenueState, IReservationState
+public interface IRemoteCheckInSessionState
+{
+    RemoteCheckInSessionCredentials? RemoteCheckInSession { get; set; }
+}
+
+public sealed class AppRuntimeState : ISessionState, IVenueState, IReservationState, IRemoteCheckInSessionState
 {
     public SessionCredentials? Session { get; set; }
 
@@ -32,4 +37,6 @@ public sealed class AppRuntimeState : ISessionState, IVenueState, IReservationSt
     public LibraryLayout? CurrentLayout { get; set; }
 
     public ReservationInfo? CurrentReservation { get; set; }
+
+    public RemoteCheckInSessionCredentials? RemoteCheckInSession { get; set; }
 }

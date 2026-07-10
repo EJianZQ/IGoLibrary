@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddSingleton<ISessionState>(serviceProvider => serviceProvider.GetRequiredService<AppRuntimeState>());
         services.AddSingleton<IVenueState>(serviceProvider => serviceProvider.GetRequiredService<AppRuntimeState>());
         services.AddSingleton<IReservationState>(serviceProvider => serviceProvider.GetRequiredService<AppRuntimeState>());
+        services.AddSingleton<IRemoteCheckInSessionState>(serviceProvider => serviceProvider.GetRequiredService<AppRuntimeState>());
         services.AddSingleton<IActivityLogService, ActivityLogService>();
         services.TryAddSingleton<IAppSettingsDefaults, DefaultAppSettingsDefaults>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
@@ -27,6 +28,8 @@ public static class DependencyInjection
         services.AddSingleton<ISettingsWorkflowService, SettingsWorkflowService>();
         services.AddSingleton<IUpdateCheckService, UpdateCheckService>();
         services.AddSingleton<IProtocolTemplateEditorService, ProtocolTemplateEditorService>();
+        services.AddSingleton<IRemoteCheckInProfileService, RemoteCheckInProfileService>();
+        services.AddSingleton<IRemoteCheckInWorkflowService, RemoteCheckInWorkflowService>();
         services.AddSingleton<ICoordinatorRuntime, SystemCoordinatorRuntime>();
         services.AddSingleton<IGrabReservationAttemptStrategy, QueryThenReserveGrabReservationStrategy>();
         services.AddSingleton<IGrabReservationAttemptStrategy, DirectReserveGrabReservationStrategy>();

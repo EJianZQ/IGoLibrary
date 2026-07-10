@@ -65,6 +65,8 @@ public partial class MainWindowWorkflowViewModel(
 
     public LanCookieRelayViewModel LanCookieRelay => Pages.LanCookieRelay;
 
+    public RemoteCheckInPageViewModel RemoteCheckInPage => Pages.RemoteCheckInPage;
+
     public MobileControlPageViewModel MobileControl => Pages.MobileControl;
 
     public NotificationSettingsViewModel NotificationSettings => Pages.NotificationSettings;

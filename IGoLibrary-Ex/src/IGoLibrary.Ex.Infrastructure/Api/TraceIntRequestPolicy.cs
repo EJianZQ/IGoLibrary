@@ -5,6 +5,27 @@ namespace IGoLibrary.Ex.Infrastructure.Api;
 
 internal sealed class TraceIntRequestPolicy(ISettingsService settingsService)
 {
+    public async Task<T> ExecuteOnceAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        string timeoutMessagePrefix,
+        CancellationToken cancellationToken)
+    {
+        var settings = await LoadNetworkSettingsAsync(cancellationToken);
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(settings.Timeout);
+
+        try
+        {
+            return await operation(timeoutCts.Token);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"{timeoutMessagePrefix}超时（>{settings.Timeout.TotalSeconds:0} 秒）。",
+                ex);
+        }
+    }
+
     public async Task<T> ExecuteAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         string timeoutMessagePrefix,

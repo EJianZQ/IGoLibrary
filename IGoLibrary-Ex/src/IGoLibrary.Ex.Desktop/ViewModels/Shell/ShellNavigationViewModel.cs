@@ -18,9 +18,10 @@ public sealed partial class ShellNavigationViewModel(
     private const int GlobalLeakTabIndex = 3;
     private const int TomorrowReservationTabIndex = 4;
     private const int OccupyTabIndex = 5;
-    private const int MobileControlTabIndex = 6;
-    private const int NotificationSettingsTabIndex = 7;
-    private const int SystemSettingsTabIndex = 8;
+    public const int RemoteCheckInTabIndex = 6;
+    private const int MobileControlTabIndex = 7;
+    private const int NotificationSettingsTabIndex = 8;
+    private const int SystemSettingsTabIndex = 9;
 
     private static readonly SidebarNavigationItem HomeSidebarItem = new(
         0,
@@ -57,6 +58,11 @@ public sealed partial class ShellNavigationViewModel(
         "手机控制",
         "M17 1H7C5.9 1 5 1.9 5 3v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 17H7V4h10v14zm-3 3h-4v-1h4v1z");
 
+    private static readonly SidebarNavigationItem RemoteCheckInSidebarItem = new(
+        RemoteCheckInTabIndex,
+        "远程签到",
+        "M12 2a5 5 0 0 0-5 5v2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-2V7a5 5 0 0 0-5-5zm-3 7V7a3 3 0 0 1 6 0v2H9zm3 3 4 4-1.4 1.4-1.6-1.6V20h-2v-4.2l-1.6 1.6L8 16l4-4z");
+
     private static readonly SidebarNavigationItem NotificationSettingsSidebarItem = new(
         NotificationSettingsTabIndex,
         "自动通知",
@@ -82,6 +88,7 @@ public sealed partial class ShellNavigationViewModel(
         GlobalLeakSidebarItem,
         TomorrowReservationSidebarItem,
         OccupySidebarItem,
+        RemoteCheckInSidebarItem,
         MobileControlSidebarItem,
         NotificationSettingsSidebarItem,
         SettingsSidebarItem
@@ -111,6 +118,8 @@ public sealed partial class ShellNavigationViewModel(
 
     public bool IsAccountAndVenuePageActive => SelectedTabIndex == AccountAndVenueTabIndex;
 
+    public bool IsRemoteCheckInPageActive => SelectedTabIndex == RemoteCheckInTabIndex;
+
     public bool ShouldHideToTrayOnClose =>
         _minimizeToTrayEnabled() &&
         (IsTaskActive(grabSeatCoordinator.GetStatus()) ||
@@ -134,6 +143,7 @@ public sealed partial class ShellNavigationViewModel(
 
         SyncSelectedSidebarItem();
         OnPropertyChanged(nameof(IsAccountAndVenuePageActive));
+        OnPropertyChanged(nameof(IsRemoteCheckInPageActive));
     }
 
     partial void OnSelectedSidebarItemChanged(SidebarNavigationItem? value)

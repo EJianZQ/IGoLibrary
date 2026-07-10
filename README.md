@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  IGoLibrary-Ex 是基于 <code>Avalonia</code> 重构的新一代跨平台桌面端实现。可运行在 <code>Windows 10 22H2</code> 及以上与 <code>macOS 15 Sequoia</code> 及以上。已实现 <strong>扫码获取 Cookie</strong>、<strong>座位实时监控并抢座</strong>、<strong>跨场馆全域捡漏</strong>、<strong>明日预约</strong>、<strong>利用退座机制进行占座</strong> 和 <strong>Cookie 过期提醒</strong> 等实用功能
+  IGoLibrary-Ex 是基于 <code>Avalonia</code> 重构的新一代跨平台桌面端实现。可运行在 <code>Windows 10 22H2</code> 及以上与 <code>macOS 15 Sequoia</code> 及以上。已实现 <strong>扫码获取 Cookie</strong>、<strong>座位实时监控并抢座</strong>、<strong>跨场馆全域捡漏</strong>、<strong>明日预约</strong>、<strong>利用退座机制进行占座</strong>、<strong>远程蓝牙签到</strong> 和 <strong>自动事件提醒</strong> 等实用功能
 </p>
 
 <p align="center">
@@ -29,6 +29,7 @@
 - 🧭 支持全域捡漏，可多选账号下的场馆并按间隔扫描空座，发现可预约座位后自动尝试预约
 - 📅 支持明日预约，可设置触发时间到点执行
 - ♻️ 支持占座流程，在预约即将到期时自动取消并重新预约
+- 📡 支持远程蓝牙签到，使用独立微信授权、场馆 Beacon 参数和坐标完成签到
 - ⭐ 支持收藏常用座位，并为每个场馆分别持久化座位收藏
 - 📊 首页面板展示当前场馆、预约状态、累计成功次数和守护时长
 - 🔔 支持 Cookie 失效、抢座成功、全域捡漏成功、占座成功、明日预约成功和任务失败提醒，可通过右下角 Toast 弹窗、提示音、SMTP 邮件、 Telegram Bot、 Bark、 Server酱 和 WxPusher 通知用户
@@ -106,7 +107,16 @@ IGoLibrary-Ex/
 2. 设置 `重新预约间隔`。每个学校都不一样，需要你自己事先看一下。随便预约一个座位，然后取消。取消之后再立刻去预约座位，会提示**取消预约后 N 分钟不可再次预约**之类的文案，把 N 分钟折算成秒数填入软件
 3. 点击 `开始占座` 按钮，确认任务开始后把软件挂在后台即可
 
-### 7️⃣ 系统提醒
+### 7️⃣ 远程签到
+> [!IMPORTANT]
+> 远程签到使用独立的 `wechatSESS_ID`，不能复用普通登录已经消费过的授权链接。Major、Minor 和 GCJ-02 坐标必须来自场馆实际配置。
+1. 完成普通登录、锁定当前预约所在场馆，并确认软件能够查询到当前预约
+2. 进入 `远程签到` 页面，重新扫描授权二维码获取一条新的授权链接；可直接粘贴、读取剪贴板或使用签到专用局域网快传
+3. 点击 `刷新信标` 获取服务端允许的 iBeacon UUID。若返回多个 UUID，请选择与场馆实际信标匹配的一项
+4. 填写 Major、Minor 与 GCJ-02 经纬度并保存当前场馆配置
+5. 点击 `立即远程签到`。软件会再次校验当前预约、允许 UUID 和服务器时间，然后只提交一次签到请求；网络超时不会自动重试
+
+### 8️⃣ 系统提醒
 系统提醒目前包含 Cookie 过期提醒、抢座成功提醒、全域捡漏成功提醒、占座成功提醒、明日预约成功提醒和任务失败提醒，可按需开启本地弹窗、提示音、SMTP 邮件、Telegram Bot 和 Bark 推送通知
 ####  邮件提醒配置
 参见 [SMTP 邮件提醒配置指南](docs/smtp-email-alert-configuration.md)

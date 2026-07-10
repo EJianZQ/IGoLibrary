@@ -58,6 +58,7 @@ internal static class HostBuilderFactory
                 services.AddSingleton<ITaskEventAlertDispatcher, TaskEventAlertService>();
                 services.AddSingleton<INotificationTestService, DesktopNotificationTestService>();
                 services.AddSingleton<ICoordinatorEventPublisher, DesktopCoordinatorEventPublisher>();
+                services.AddSingleton<OAuthCodeConsumptionRegistry>();
                 services.AddSingleton<ShellWorkflowState>();
                 services.AddSingleton<HomeDashboardViewModel>();
                 services.AddSingleton<SessionViewModel>();
@@ -68,6 +69,7 @@ internal static class HostBuilderFactory
                 services.AddSingleton<OccupyPageViewModel>();
                 services.AddSingleton<TomorrowReservationPageViewModel>();
                 services.AddSingleton<LanCookieRelayViewModel>();
+                services.AddSingleton<RemoteCheckInPageViewModel>();
                 services.AddSingleton<MobileControlPageViewModel>();
                 services.AddSingleton<NotificationSettingsViewModel>();
                 services.AddSingleton<SystemSettingsViewModel>();

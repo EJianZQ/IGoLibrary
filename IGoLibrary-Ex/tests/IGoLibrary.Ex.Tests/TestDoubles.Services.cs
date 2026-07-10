@@ -23,6 +23,8 @@ internal sealed class FakeLanCookieRelayService : ILanCookieRelayService
 
     public Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>>? SubmitHandler { get; private set; }
 
+    public LanAuthLinkRelayPurpose LastPurpose { get; private set; }
+
     public LanCookieRelaySession NextSession { get; set; } = new(
         Guid.NewGuid(),
         new Uri("http://127.0.0.1:49152/?token=test-token"),
@@ -36,9 +38,16 @@ internal sealed class FakeLanCookieRelayService : ILanCookieRelayService
     public Task<LanCookieRelaySession> StartAsync(
         Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler,
         CancellationToken cancellationToken = default)
+        => StartAsync(submitHandler, LanAuthLinkRelayPurpose.GraphQlSession, cancellationToken);
+
+    public Task<LanCookieRelaySession> StartAsync(
+        Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler,
+        LanAuthLinkRelayPurpose purpose,
+        CancellationToken cancellationToken = default)
     {
         StartCalls++;
         SubmitHandler = submitHandler;
+        LastPurpose = purpose;
         if (StartException is not null)
         {
             throw StartException;
@@ -498,6 +507,8 @@ internal sealed class FakeSessionService : ISessionService
 
     public Exception? AuthenticateFromCookieException { get; set; }
 
+    public Exception? SignOutException { get; set; }
+
     public int AuthenticateFromCookieCalls { get; private set; }
 
     public int RestoreCalls { get; private set; }
@@ -541,6 +552,11 @@ internal sealed class FakeSessionService : ISessionService
     {
         SignOutCalls++;
         CurrentSession = null;
+        if (SignOutException is not null)
+        {
+            throw SignOutException;
+        }
+
         return Task.CompletedTask;
     }
 }

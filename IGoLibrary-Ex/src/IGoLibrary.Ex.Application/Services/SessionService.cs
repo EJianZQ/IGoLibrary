@@ -12,7 +12,8 @@ public sealed class SessionService(
     IActivityLogService activityLogService,
     ISessionState sessionState,
     IVenueState venueState,
-    IReservationState reservationState) : ISessionService
+    IReservationState reservationState,
+    IRemoteCheckInSessionState remoteCheckInSessionState) : ISessionService
 {
     public SessionCredentials? CurrentSession => sessionState.Session;
 
@@ -89,8 +90,32 @@ public sealed class SessionService(
         venueState.BoundLibrary = null;
         venueState.CurrentLayout = null;
         reservationState.CurrentReservation = null;
+        remoteCheckInSessionState.RemoteCheckInSession = null;
         venueState.Libraries = [];
-        await credentialStore.ClearSessionAsync(cancellationToken);
+        Exception? clearFailure = null;
+        try
+        {
+            await credentialStore.ClearSessionAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            clearFailure = ex;
+        }
+
+        try
+        {
+            await credentialStore.ClearRemoteCheckInSessionAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            clearFailure ??= ex;
+        }
+
+        if (clearFailure is not null)
+        {
+            throw new InvalidOperationException("清理本地安全凭据失败，请手动检查系统凭据管理器。", clearFailure);
+        }
+
         activityLogService.Write(LogEntryKind.Info, "Auth", "已清除当前会话。");
     }
 

@@ -8,6 +8,11 @@ public interface ILanCookieRelayService
         Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler,
         CancellationToken cancellationToken = default);
 
+    Task<LanCookieRelaySession> StartAsync(
+        Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler,
+        LanAuthLinkRelayPurpose purpose,
+        CancellationToken cancellationToken = default);
+
     Task StopAsync(
         LanCookieRelayStopReason reason = LanCookieRelayStopReason.Manual,
         CancellationToken cancellationToken = default);
@@ -53,4 +58,10 @@ public enum LanCookieRelayStopReason
     Submitted,
     Timeout,
     Failed
+}
+
+public enum LanAuthLinkRelayPurpose
+{
+    GraphQlSession,
+    RemoteCheckIn
 }
