@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.ComponentModel;
@@ -25,7 +26,7 @@ public partial class MainWindowWorkflowViewModel(
     IAppThemeService appThemeService,
     TimeProvider timeProvider,
     ILanCookieRelayService lanCookieRelayService,
-    IMobileControlService mobileControlService) : ViewModelBase
+    IMobileControlService mobileControlService) : ViewModelBase, INotifyDataErrorInfo
 {
     private readonly IAppThemeService _appThemeService = appThemeService;
 

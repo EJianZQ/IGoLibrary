@@ -14,6 +14,72 @@ public sealed class RemoteCheckInProtocolTests
     private const string BeaconUuid = "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0";
 
     [Fact]
+    public async Task ApiClient_UsesConfiguredEndpointsCallbacksAndReferers()
+    {
+        var token = new string('a', 40);
+        var handler = new SequenceHttpMessageHandler(
+            (request, _) =>
+            {
+                Assert.Equal(
+                    $"https://proxy.example.com/oauth/exchange?r=https%3A%2F%2Freturn.example.com%2Fdone%3Fx%3D1&code={new string('b', 32)}",
+                    request.RequestUri!.AbsoluteUri);
+                Assert.Equal("https://oauth-referer.example.com/start", request.Headers.Referrer!.AbsoluteUri);
+                var response = new HttpResponseMessage(HttpStatusCode.SeeOther);
+                response.Headers.TryAddWithoutValidation("Set-Cookie", $"wechatSESS_ID={token}; Path=/; HttpOnly");
+                return Task.FromResult(response);
+            },
+            (request, _) =>
+            {
+                Assert.Equal("https://proxy.example.com/api/devices", request.RequestUri!.AbsoluteUri);
+                Assert.Equal("https://mini.example.com/page-frame", request.Headers.Referrer!.AbsoluteUri);
+                var json = JsonSerializer.Serialize(new
+                {
+                    code = 0,
+                    msg = "",
+                    data = new
+                    {
+                        user = new { user_nick = "N" },
+                        devices = new[] { BeaconUuid }
+                    }
+                });
+                return SequenceHttpMessageHandler.JsonResponseAsync(json);
+            },
+            (request, _) =>
+            {
+                Assert.Equal("https://proxy.example.com/api/time", request.RequestUri!.AbsoluteUri);
+                Assert.Equal("https://mini.example.com/page-frame", request.Headers.Referrer!.AbsoluteUri);
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("1782346868")
+                });
+            },
+            (request, _) =>
+            {
+                Assert.Equal("https://proxy.example.com/api/sign", request.RequestUri!.AbsoluteUri);
+                Assert.Equal("https://mini.example.com/page-frame", request.Headers.Referrer!.AbsoluteUri);
+                return SequenceHttpMessageHandler.JsonResponseAsync("""{"code":0,"msg":"验证成功","data":{}}""");
+            });
+        var templates = CreateRemoteTemplates() with
+        {
+            RemoteCheckInAuthUrlTemplate = "https://proxy.example.com/oauth/exchange?r=ReplaceMeByReturnUrl&code=ReplaceMeByCode",
+            RemoteCheckInAuthorizationReturnUrl = "https://return.example.com/done?x=1",
+            RemoteCheckInAuthRefererUrl = "https://oauth-referer.example.com/start",
+            RemoteCheckInDevicesEndpointUrl = "https://proxy.example.com/api/devices",
+            RemoteCheckInTimeEndpointUrl = "https://proxy.example.com/api/time",
+            RemoteCheckInSignEndpointUrl = "https://proxy.example.com/api/sign",
+            RemoteCheckInApiRefererUrl = "https://mini.example.com/page-frame"
+        };
+        var client = CreateClient(handler, templates);
+
+        await client.ExchangeOAuthCodeAsync(new string('b', 32));
+        await client.GetDeviceInfoAsync(token);
+        await client.GetServerTimeAsync();
+        await client.SignAsync(token, CreateRequest());
+
+        Assert.Equal(4, handler.CallCount);
+    }
+
+    [Fact]
     public void PayloadEncoder_MatchesDocumentedExamples()
     {
         var request = CreateRequest();
@@ -241,7 +307,9 @@ public sealed class RemoteCheckInProtocolTests
     private static RemoteCheckInSignRequest CreateRequest()
         => new(BeaconUuid, 10001, 20002, 39.908722m, 116.397499m, "1782346868");
 
-    private static TraceIntRemoteCheckInApiClient CreateClient(HttpMessageHandler handler)
+    private static TraceIntRemoteCheckInApiClient CreateClient(
+        HttpMessageHandler handler,
+        TraceIntProtocolTemplates? templates = null)
     {
         var settingsService = new FakeSettingsService(AppSettings.Default with
         {
@@ -249,6 +317,21 @@ public sealed class RemoteCheckInProtocolTests
         });
         var httpClient = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
         return new TraceIntRemoteCheckInApiClient(
-            new TraceIntRemoteCheckInTransport(httpClient, new TraceIntRequestPolicy(settingsService)));
+            new TraceIntRemoteCheckInTransport(httpClient, new TraceIntRequestPolicy(settingsService)),
+            new FakeProtocolTemplateStore(templates ?? CreateRemoteTemplates()));
+    }
+
+    private static TraceIntProtocolTemplates CreateRemoteTemplates()
+    {
+        return TestProtocolTemplates.Create() with
+        {
+            RemoteCheckInAuthUrlTemplate = "https://wechat.v2.traceint.com/index.php/wxApp/wechatAuth.html?r=ReplaceMeByReturnUrl&code=ReplaceMeByCode&state=1",
+            RemoteCheckInAuthorizationReturnUrl = "https://web.traceint.com/web/index.html",
+            RemoteCheckInAuthRefererUrl = "https://open.weixin.qq.com/",
+            RemoteCheckInDevicesEndpointUrl = "https://wechat.v2.traceint.com/index.php/wxApp/devices.html",
+            RemoteCheckInTimeEndpointUrl = "https://wechat.v2.traceint.com/index.php/wxApp/getTime.html",
+            RemoteCheckInSignEndpointUrl = "https://wechat.v2.traceint.com/index.php/wxApp/sign.html",
+            RemoteCheckInApiRefererUrl = "https://servicewechat.com/wx3b9352e6b254ed2b/25/page-frame.html"
+        };
     }
 }

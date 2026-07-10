@@ -63,6 +63,7 @@ internal sealed class TraceIntTomorrowReservationQueueTransport
     public async Task<TomorrowReservationQueueResult> EnterAsync(
         string queueUrl,
         string cookie,
+        string origin,
         CancellationToken cancellationToken = default)
     {
         if (!Uri.TryCreate(queueUrl, UriKind.Absolute, out var uri) ||
@@ -78,8 +79,8 @@ internal sealed class TraceIntTomorrowReservationQueueTransport
         {
             using var socket = _socketFactory();
             socket.SetRequestHeader("Cookie", cookie);
-            socket.SetRequestHeader("Origin", TraceIntGraphQlTransport.TomorrowReservationProfile.Origin);
-            socket.SetRequestHeader("User-Agent", TraceIntGraphQlTransport.TomorrowReservationProfile.UserAgent);
+            socket.SetRequestHeader("Origin", origin);
+            socket.SetRequestHeader("User-Agent", TraceIntGraphQlTransport.TomorrowReservationUserAgent);
 
             await socket.ConnectAsync(uri, timeoutCts.Token);
             await socket.SendAsync(QueuePayloadBytes, timeoutCts.Token);

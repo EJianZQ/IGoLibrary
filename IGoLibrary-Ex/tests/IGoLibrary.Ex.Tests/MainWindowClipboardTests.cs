@@ -144,7 +144,7 @@ public sealed class MainWindowClipboardTests
             new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
             new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),
             new SettingsWorkflowService(settingsService),
-            new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates("", "", "", "", "", "", ""))),
+            new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(TestProtocolTemplates.Create())),
             taskAlertService,
             new FakeGrabSeatCoordinator(),
             new FakeGlobalLeakCoordinator(),

@@ -10,34 +10,43 @@ public sealed class DefaultProtocolTemplateStore(
 {
     private const string OverridesKey = "protocol-overrides";
 
-    public async Task<TraceIntGraphQlTemplates> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default)
+    public Task<TraceIntProtocolTemplates> GetDefaultTemplatesAsync(
+        CancellationToken cancellationToken = default)
     {
-        var defaults = DefaultTraceIntGraphQlTemplates.Instance;
+        return Task.FromResult(TraceIntProtocolValidator.Normalize(DefaultTraceIntProtocolTemplates.Instance));
+    }
+
+    public async Task<TraceIntProtocolTemplates> GetEffectiveTemplatesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var defaults = await GetDefaultTemplatesAsync(cancellationToken);
         var settings = await settingsService.LoadAsync(cancellationToken);
         if (!settings.TraceIntProtocol.GraphQlOverridesEnabled)
         {
             return defaults;
         }
 
-        var overrides = await LoadOverridesAsync(cancellationToken);
-
-        return new TraceIntGraphQlTemplates(
-            overrides.GetCookieUrlTemplate ?? defaults.GetCookieUrlTemplate,
-            overrides.QueryLibrariesTemplate ?? defaults.QueryLibrariesTemplate,
-            overrides.QueryLibraryLayoutTemplate ?? defaults.QueryLibraryLayoutTemplate,
-            overrides.QueryLibraryRuleTemplate ?? defaults.QueryLibraryRuleTemplate,
-            overrides.QueryReservationInfoTemplate ?? defaults.QueryReservationInfoTemplate,
-            overrides.ReserveSeatTemplate ?? defaults.ReserveSeatTemplate,
-            overrides.CancelReservationTemplate ?? defaults.CancelReservationTemplate,
-            overrides.TomorrowReservationQueueUrlTemplate ?? defaults.TomorrowReservationQueueUrlTemplate,
-            overrides.TomorrowReservationWarmUpTemplate ?? defaults.TomorrowReservationWarmUpTemplate,
-            overrides.TomorrowReservationSaveTemplate ?? defaults.TomorrowReservationSaveTemplate,
-            overrides.TomorrowReservationInfoTemplate ?? defaults.TomorrowReservationInfoTemplate);
+        return Merge(defaults, await LoadOverridesAsync(cancellationToken));
     }
 
-    public async Task SaveOverridesAsync(TraceIntGraphQlTemplateOverrides overrides, CancellationToken cancellationToken = default)
+    public async Task<TraceIntProtocolTemplates> GetEditableTemplatesAsync(
+        CancellationToken cancellationToken = default)
     {
-        var json = JsonSerializer.Serialize(overrides, AppJson.Default);
+        var defaults = await GetDefaultTemplatesAsync(cancellationToken);
+        return Merge(defaults, await LoadOverridesAsync(cancellationToken));
+    }
+
+    public async Task SaveOverridesAsync(
+        TraceIntProtocolTemplateOverrides overrides,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(overrides);
+        var defaults = await GetDefaultTemplatesAsync(cancellationToken);
+        var normalizedOverrides = NormalizeLegacyOverrides(TraceIntProtocolValidator.Normalize(overrides));
+        var editableTemplates = Merge(defaults, normalizedOverrides);
+        TraceIntProtocolValidator.EnsureValid(editableTemplates);
+        var sparseOverrides = TraceIntProtocolTemplateOverrides.FromDifferences(editableTemplates, defaults);
+        var json = JsonSerializer.Serialize(sparseOverrides, AppJson.Default);
 
         await using var connection = connectionFactory.Create();
         await connection.OpenAsync(cancellationToken);
@@ -65,7 +74,56 @@ public sealed class DefaultProtocolTemplateStore(
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private async Task<TraceIntGraphQlTemplateOverrides> LoadOverridesAsync(CancellationToken cancellationToken)
+    private static TraceIntProtocolTemplates Merge(
+        TraceIntProtocolTemplates defaults,
+        TraceIntProtocolTemplateOverrides rawOverrides)
+    {
+        var overrides = NormalizeLegacyOverrides(rawOverrides);
+        return TraceIntProtocolValidator.Normalize(defaults with
+        {
+            GetCookieUrlTemplate = overrides.GetCookieUrlTemplate ?? defaults.GetCookieUrlTemplate,
+            CookieAuthorizationReturnUrl = overrides.CookieAuthorizationReturnUrl ?? defaults.CookieAuthorizationReturnUrl,
+            GraphQlEndpointUrl = overrides.GraphQlEndpointUrl ?? defaults.GraphQlEndpointUrl,
+            GraphQlDefaultRefererUrl = overrides.GraphQlDefaultRefererUrl ?? defaults.GraphQlDefaultRefererUrl,
+            GraphQlDefaultOriginUrl = overrides.GraphQlDefaultOriginUrl ?? defaults.GraphQlDefaultOriginUrl,
+            GraphQlTomorrowRefererUrl = overrides.GraphQlTomorrowRefererUrl ?? defaults.GraphQlTomorrowRefererUrl,
+            GraphQlTomorrowOriginUrl = overrides.GraphQlTomorrowOriginUrl ?? defaults.GraphQlTomorrowOriginUrl,
+            TomorrowReservationQueueUrlTemplate = overrides.TomorrowReservationQueueUrlTemplate ?? defaults.TomorrowReservationQueueUrlTemplate,
+            RemoteCheckInAuthUrlTemplate = overrides.RemoteCheckInAuthUrlTemplate ?? defaults.RemoteCheckInAuthUrlTemplate,
+            RemoteCheckInAuthorizationReturnUrl = overrides.RemoteCheckInAuthorizationReturnUrl ?? defaults.RemoteCheckInAuthorizationReturnUrl,
+            RemoteCheckInAuthRefererUrl = overrides.RemoteCheckInAuthRefererUrl ?? defaults.RemoteCheckInAuthRefererUrl,
+            RemoteCheckInDevicesEndpointUrl = overrides.RemoteCheckInDevicesEndpointUrl ?? defaults.RemoteCheckInDevicesEndpointUrl,
+            RemoteCheckInTimeEndpointUrl = overrides.RemoteCheckInTimeEndpointUrl ?? defaults.RemoteCheckInTimeEndpointUrl,
+            RemoteCheckInSignEndpointUrl = overrides.RemoteCheckInSignEndpointUrl ?? defaults.RemoteCheckInSignEndpointUrl,
+            RemoteCheckInApiRefererUrl = overrides.RemoteCheckInApiRefererUrl ?? defaults.RemoteCheckInApiRefererUrl,
+            QueryLibrariesTemplate = overrides.QueryLibrariesTemplate ?? defaults.QueryLibrariesTemplate,
+            QueryLibraryLayoutTemplate = overrides.QueryLibraryLayoutTemplate ?? defaults.QueryLibraryLayoutTemplate,
+            QueryLibraryRuleTemplate = overrides.QueryLibraryRuleTemplate ?? defaults.QueryLibraryRuleTemplate,
+            QueryReservationInfoTemplate = overrides.QueryReservationInfoTemplate ?? defaults.QueryReservationInfoTemplate,
+            ReserveSeatTemplate = overrides.ReserveSeatTemplate ?? defaults.ReserveSeatTemplate,
+            CancelReservationTemplate = overrides.CancelReservationTemplate ?? defaults.CancelReservationTemplate,
+            TomorrowReservationWarmUpTemplate = overrides.TomorrowReservationWarmUpTemplate ?? defaults.TomorrowReservationWarmUpTemplate,
+            TomorrowReservationSaveTemplate = overrides.TomorrowReservationSaveTemplate ?? defaults.TomorrowReservationSaveTemplate,
+            TomorrowReservationInfoTemplate = overrides.TomorrowReservationInfoTemplate ?? defaults.TomorrowReservationInfoTemplate
+        });
+    }
+
+    private static TraceIntProtocolTemplateOverrides NormalizeLegacyOverrides(
+        TraceIntProtocolTemplateOverrides overrides)
+    {
+        return string.Equals(
+                overrides.GetCookieUrlTemplate,
+                DefaultTraceIntProtocolTemplates.LegacyGetCookieUrlTemplate,
+                StringComparison.Ordinal)
+            ? overrides with
+            {
+                GetCookieUrlTemplate = DefaultTraceIntProtocolTemplates.Instance.GetCookieUrlTemplate
+            }
+            : overrides;
+    }
+
+    private async Task<TraceIntProtocolTemplateOverrides> LoadOverridesAsync(
+        CancellationToken cancellationToken)
     {
         await using var connection = connectionFactory.Create();
         await connection.OpenAsync(cancellationToken);
@@ -77,9 +135,10 @@ public sealed class DefaultProtocolTemplateStore(
         var result = await command.ExecuteScalarAsync(cancellationToken);
         if (result is string json && !string.IsNullOrWhiteSpace(json))
         {
-            return JsonSerializer.Deserialize<TraceIntGraphQlTemplateOverrides>(json, AppJson.Default) ?? new TraceIntGraphQlTemplateOverrides();
+            return JsonSerializer.Deserialize<TraceIntProtocolTemplateOverrides>(json, AppJson.Default)
+                   ?? new TraceIntProtocolTemplateOverrides();
         }
 
-        return new TraceIntGraphQlTemplateOverrides();
+        return new TraceIntProtocolTemplateOverrides();
     }
 }

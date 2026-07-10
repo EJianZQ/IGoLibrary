@@ -216,13 +216,13 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         return _settingsWorkflowService.SaveDashboardMetricsAsync(metrics, cancellationToken);
     }
 
-    public Task<TraceIntGraphQlTemplates> LoadProtocolTemplatesAsync(CancellationToken cancellationToken = default)
+    public Task<TraceIntProtocolTemplates> LoadProtocolTemplatesAsync(CancellationToken cancellationToken = default)
     {
         return _protocolTemplateEditorService.LoadTemplatesAsync(cancellationToken);
     }
 
     public Task SaveProtocolOverridesAsync(
-        TraceIntGraphQlTemplateOverrides overrides,
+        TraceIntProtocolTemplateOverrides overrides,
         CancellationToken cancellationToken = default)
     {
         return _protocolTemplateEditorService.SaveOverridesAsync(overrides, cancellationToken);

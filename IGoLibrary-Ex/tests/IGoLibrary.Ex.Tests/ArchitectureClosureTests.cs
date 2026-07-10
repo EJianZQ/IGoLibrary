@@ -142,6 +142,30 @@ public sealed class ArchitectureClosureTests
     }
 
     [Fact]
+    public void TraceIntApiProductionFiles_DoNotHardCodeProtocolUrls()
+    {
+        var apiRoot = Path.Combine(
+            GetRepositoryRoot().FullName,
+            "src",
+            "IGoLibrary.Ex.Infrastructure",
+            "Api");
+        var files = Directory.EnumerateFiles(apiRoot, "TraceInt*.cs", SearchOption.AllDirectories)
+            .ToArray();
+
+        Assert.NotEmpty(files);
+        Assert.Contains(files, static path => Path.GetFileName(path) == "TraceIntApiClient.cs");
+        Assert.Contains(files, static path => Path.GetFileName(path) == "TraceIntRemoteCheckInApiClient.cs");
+        foreach (var file in files)
+        {
+            var text = File.ReadAllText(file);
+            Assert.DoesNotContain("http://", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("https://", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("ws://", text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("wss://", text, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
     public void MainWindowViewModelShellFiles_StaySmallAndDoNotContainPageBusinessCommands()
     {
         var shellViewModelRoot = Path.Combine(GetRepositoryRoot().FullName, "src", "IGoLibrary.Ex.Desktop", "ViewModels", "Shell");

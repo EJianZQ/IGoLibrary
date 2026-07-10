@@ -6,7 +6,9 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Infrastructure.Api;
 
-internal sealed class TraceIntRemoteCheckInApiClient(TraceIntRemoteCheckInTransport transport)
+internal sealed class TraceIntRemoteCheckInApiClient(
+    TraceIntRemoteCheckInTransport transport,
+    IProtocolTemplateStore protocolTemplateStore)
     : IRemoteCheckInApiClient
 {
     private static readonly string[] CookieExpirationFormats =
@@ -25,7 +27,15 @@ internal sealed class TraceIntRemoteCheckInApiClient(TraceIntRemoteCheckInTransp
             throw new ArgumentException("签到授权 code 必须是 32 位字母数字", nameof(code));
         }
 
-        using var response = await transport.SendAuthorizationAsync(code, cancellationToken);
+        var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
+        var requestUrl = TraceIntProtocolValidator.BuildAuthorizationUrl(
+            templates.RemoteCheckInAuthUrlTemplate,
+            code,
+            templates.RemoteCheckInAuthorizationReturnUrl);
+        using var response = await transport.SendAuthorizationAsync(
+            requestUrl,
+            templates.RemoteCheckInAuthRefererUrl,
+            cancellationToken);
         var session = ExtractSession(response);
         if (session is not null)
         {
@@ -47,14 +57,23 @@ internal sealed class TraceIntRemoteCheckInApiClient(TraceIntRemoteCheckInTransp
         string sessionToken,
         CancellationToken cancellationToken = default)
     {
-        using var response = await transport.SendDevicesAsync(sessionToken, cancellationToken);
+        var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
+        using var response = await transport.SendDevicesAsync(
+            templates.RemoteCheckInDevicesEndpointUrl,
+            templates.RemoteCheckInApiRefererUrl,
+            sessionToken,
+            cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         return TraceIntRemoteCheckInResponseMapper.MapDeviceInfo(raw);
     }
 
     public async Task<RemoteCheckInServerTime> GetServerTimeAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await transport.SendServerTimeAsync(cancellationToken);
+        var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
+        using var response = await transport.SendServerTimeAsync(
+            templates.RemoteCheckInTimeEndpointUrl,
+            templates.RemoteCheckInApiRefererUrl,
+            cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         return TraceIntRemoteCheckInResponseMapper.MapServerTime(raw);
     }
@@ -71,7 +90,12 @@ internal sealed class TraceIntRemoteCheckInApiClient(TraceIntRemoteCheckInTransp
             ["location"] = TraceIntRemoteCheckInPayloadEncoder.EncodeLocation(request),
             ["pass"] = TraceIntRemoteCheckInPayloadEncoder.EncryptTimestamp(request.ServerTimestamp)
         };
-        using var response = await transport.SendSignAsync(form, cancellationToken);
+        var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
+        using var response = await transport.SendSignAsync(
+            templates.RemoteCheckInSignEndpointUrl,
+            templates.RemoteCheckInApiRefererUrl,
+            form,
+            cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         return TraceIntRemoteCheckInResponseMapper.MapSignResult(raw);
     }

@@ -9,6 +9,33 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class TraceIntApiClientTests
 {
     [Fact]
+    public async Task GetLibrariesAsync_UsesConfiguredEndpointRefererAndOrigin()
+    {
+        var handler = new SequenceHttpMessageHandler((request, _) =>
+        {
+            Assert.Equal("https://proxy.example.com:8443/custom/graphql?tenant=school", request.RequestUri!.AbsoluteUri);
+            Assert.Equal("proxy.example.com:8443", request.RequestUri.Authority);
+            Assert.Equal("https://portal.example.com/app", request.Headers.Referrer!.AbsoluteUri);
+            Assert.True(request.Headers.TryGetValues("Origin", out var origins));
+            Assert.Equal("https://portal.example.com", Assert.Single(origins));
+            return SequenceHttpMessageHandler.JsonResponseAsync(
+                """{"data":{"userAuth":{"reserve":{"libs":[]}}}}""");
+        });
+        var templates = CreateTemplates() with
+        {
+            GraphQlEndpointUrl = "https://proxy.example.com:8443/custom/graphql?tenant=school",
+            GraphQlDefaultRefererUrl = "https://portal.example.com/app",
+            GraphQlDefaultOriginUrl = "https://portal.example.com"
+        };
+        var client = CreateClient(handler, templates: templates);
+
+        var libraries = await client.GetLibrariesAsync("Authorization=a; SERVERID=b");
+
+        Assert.Empty(libraries);
+        Assert.Equal(1, handler.CallCount);
+    }
+
+    [Fact]
     public async Task GetLibrariesAsync_RetriesTransientHttpFailures_UsingSavedMaxRetries()
     {
         var handler = new SequenceHttpMessageHandler(
@@ -459,7 +486,8 @@ public sealed class TraceIntApiClientTests
     private static TraceIntApiClient CreateClient(
         HttpMessageHandler handler,
         AppSettings? settings = null,
-        ITraceIntCookieHttpClient? cookieHttpClient = null)
+        ITraceIntCookieHttpClient? cookieHttpClient = null,
+        TraceIntProtocolTemplates? templates = null)
     {
         var httpClient = new HttpClient(handler)
         {
@@ -468,7 +496,7 @@ public sealed class TraceIntApiClientTests
         var settingsService = new FakeSettingsService(settings ?? AppSettings.Default);
         var requestPolicy = new TraceIntRequestPolicy(settingsService);
         var graphQlTransport = new TraceIntGraphQlTransport(httpClient, requestPolicy);
-        var protocolTemplateStore = new FakeProtocolTemplateStore(CreateTemplates());
+        var protocolTemplateStore = new FakeProtocolTemplateStore(templates ?? CreateTemplates());
         var cookieTransport = new TraceIntCookieTransport(
             protocolTemplateStore,
             requestPolicy,
@@ -485,20 +513,28 @@ public sealed class TraceIntApiClientTests
             new TraceIntTomorrowReservationQueueTransport());
     }
 
-    private static TraceIntGraphQlTemplates CreateTemplates()
+    private static TraceIntProtocolTemplates CreateTemplates()
     {
-        return new TraceIntGraphQlTemplates(
-            "https://example.com/ReplaceMeByCode",
-            "{\"query\":\"libraries\"}",
-            "{\"query\":\"layout\"}",
-            "{\"query\":\"rule\"}",
-            "{\"query\":\"reservation\"}",
-            "{\"query\":\"reserve\"}",
-            "{\"query\":\"cancel\"}",
-            "wss://wechat.v2.traceint.com/ws?ns=prereserve/queue",
-            "{\"query\":\"warm\",\"variables\":{\"libId\":ReplaceMeByLibID}}",
-            "{\"query\":\"save\",\"variables\":{\"key\":\"ReplaceMeBySeatKey\",\"libid\":ReplaceMeByLibID}}",
-            "{\"query\":\"info\"}");
+        return TestProtocolTemplates.Create() with
+        {
+            GetCookieUrlTemplate = "https://example.com/auth?r=ReplaceMeByReturnUrl&code=ReplaceMeByCode",
+            CookieAuthorizationReturnUrl = "https://web.traceint.com/web/index.html",
+            GraphQlEndpointUrl = "https://wechat.v2.traceint.com/index.php/graphql/",
+            GraphQlDefaultRefererUrl = "https://web.traceint.com/web/index.html",
+            GraphQlDefaultOriginUrl = "https://web.traceint.com",
+            GraphQlTomorrowRefererUrl = "https://web.traceint.com/",
+            GraphQlTomorrowOriginUrl = "https://web.traceint.com",
+            TomorrowReservationQueueUrlTemplate = "wss://wechat.v2.traceint.com/ws?ns=prereserve/queue",
+            QueryLibrariesTemplate = "{\"query\":\"libraries\"}",
+            QueryLibraryLayoutTemplate = "{\"query\":\"layout\"}",
+            QueryLibraryRuleTemplate = "{\"query\":\"rule\"}",
+            QueryReservationInfoTemplate = "{\"query\":\"reservation\"}",
+            ReserveSeatTemplate = "{\"query\":\"reserve\"}",
+            CancelReservationTemplate = "{\"query\":\"cancel\"}",
+            TomorrowReservationWarmUpTemplate = "{\"query\":\"warm\",\"variables\":{\"libId\":ReplaceMeByLibID}}",
+            TomorrowReservationSaveTemplate = "{\"query\":\"save\",\"variables\":{\"key\":\"ReplaceMeBySeatKey\",\"libid\":ReplaceMeByLibID}}",
+            TomorrowReservationInfoTemplate = "{\"query\":\"info\"}"
+        };
     }
 
     private static TraceIntCookieHttpResponse CookieResponse(

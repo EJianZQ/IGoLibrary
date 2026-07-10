@@ -1,3 +1,4 @@
+using System.Text.Json;
 using IGoLibrary.Ex.Domain.Models;
 using IGoLibrary.Ex.Infrastructure.Persistence;
 using IGoLibrary.Ex.Infrastructure.Protocol;
@@ -27,9 +28,11 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
-        await store.SaveOverridesAsync(new TraceIntGraphQlTemplateOverrides(
-            QueryLibrariesTemplate: "override-libraries",
-            ReserveSeatTemplate: "override-reserve"));
+        await store.SaveOverridesAsync(new TraceIntProtocolTemplateOverrides
+        {
+            QueryLibrariesTemplate = "override-libraries",
+            ReserveSeatTemplate = "override-reserve"
+        });
 
         var effective = await store.GetEffectiveTemplatesAsync();
 
@@ -41,6 +44,53 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveOverridesAsync_CompactsFullEditableSnapshotToSparseOverrides()
+    {
+        var store = await CreateStoreAsync(AppSettings.Default with
+        {
+            TraceIntProtocol = new TraceIntProtocolSettings(true)
+        });
+        var defaults = await store.GetDefaultTemplatesAsync();
+        const string customEndpoint = "https://proxy.example.com/graphql";
+
+        await store.SaveOverridesAsync(new TraceIntProtocolTemplateOverrides
+        {
+            GetCookieUrlTemplate = defaults.GetCookieUrlTemplate,
+            CookieAuthorizationReturnUrl = defaults.CookieAuthorizationReturnUrl,
+            GraphQlEndpointUrl = customEndpoint,
+            GraphQlDefaultRefererUrl = defaults.GraphQlDefaultRefererUrl,
+            GraphQlDefaultOriginUrl = defaults.GraphQlDefaultOriginUrl + "/",
+            GraphQlTomorrowRefererUrl = defaults.GraphQlTomorrowRefererUrl,
+            GraphQlTomorrowOriginUrl = defaults.GraphQlTomorrowOriginUrl,
+            TomorrowReservationQueueUrlTemplate = defaults.TomorrowReservationQueueUrlTemplate,
+            RemoteCheckInAuthUrlTemplate = defaults.RemoteCheckInAuthUrlTemplate,
+            RemoteCheckInAuthorizationReturnUrl = defaults.RemoteCheckInAuthorizationReturnUrl,
+            RemoteCheckInAuthRefererUrl = defaults.RemoteCheckInAuthRefererUrl,
+            RemoteCheckInDevicesEndpointUrl = defaults.RemoteCheckInDevicesEndpointUrl,
+            RemoteCheckInTimeEndpointUrl = defaults.RemoteCheckInTimeEndpointUrl,
+            RemoteCheckInSignEndpointUrl = defaults.RemoteCheckInSignEndpointUrl,
+            RemoteCheckInApiRefererUrl = defaults.RemoteCheckInApiRefererUrl,
+            QueryLibrariesTemplate = defaults.QueryLibrariesTemplate,
+            QueryLibraryLayoutTemplate = defaults.QueryLibraryLayoutTemplate,
+            QueryLibraryRuleTemplate = defaults.QueryLibraryRuleTemplate,
+            QueryReservationInfoTemplate = defaults.QueryReservationInfoTemplate,
+            ReserveSeatTemplate = defaults.ReserveSeatTemplate,
+            CancelReservationTemplate = defaults.CancelReservationTemplate,
+            TomorrowReservationWarmUpTemplate = defaults.TomorrowReservationWarmUpTemplate,
+            TomorrowReservationSaveTemplate = defaults.TomorrowReservationSaveTemplate,
+            TomorrowReservationInfoTemplate = defaults.TomorrowReservationInfoTemplate
+        });
+
+        using var document = JsonDocument.Parse(await LoadRawOverridesJsonAsync());
+        var properties = document.RootElement.EnumerateObject().ToArray();
+
+        var savedProperty = Assert.Single(properties);
+        Assert.Equal("graphQlEndpointUrl", savedProperty.Name);
+        Assert.Equal(customEndpoint, savedProperty.Value.GetString());
+        Assert.Equal(customEndpoint, (await store.GetEditableTemplatesAsync()).GraphQlEndpointUrl);
+    }
+
+    [Fact]
     public async Task SaveOverridesAsync_MergesTomorrowReservationOverridesWithDefaults()
     {
         var store = await CreateStoreAsync(AppSettings.Default with
@@ -49,11 +99,13 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
-        await store.SaveOverridesAsync(new TraceIntGraphQlTemplateOverrides(
-            TomorrowReservationQueueUrlTemplate: "wss://override.example.com/ws?ns=prereserve/queue",
-            TomorrowReservationWarmUpTemplate: "override-warm-up",
-            TomorrowReservationSaveTemplate: "override-save",
-            TomorrowReservationInfoTemplate: "override-info"));
+        await store.SaveOverridesAsync(new TraceIntProtocolTemplateOverrides
+        {
+            TomorrowReservationQueueUrlTemplate = "wss://override.example.com/ws?ns=prereserve/queue",
+            TomorrowReservationWarmUpTemplate = "override-warm-up",
+            TomorrowReservationSaveTemplate = "override-save",
+            TomorrowReservationInfoTemplate = "override-info"
+        });
 
         var effective = await store.GetEffectiveTemplatesAsync();
 
@@ -100,7 +152,10 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
-        await store.SaveOverridesAsync(new TraceIntGraphQlTemplateOverrides(QueryReservationInfoTemplate: "temporary"));
+        await store.SaveOverridesAsync(new TraceIntProtocolTemplateOverrides
+        {
+            QueryReservationInfoTemplate = "temporary"
+        });
         await store.ResetOverridesAsync();
 
         var effective = await store.GetEffectiveTemplatesAsync();
@@ -119,14 +174,94 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
         });
         var defaults = await store.GetEffectiveTemplatesAsync();
 
-        await store.SaveOverridesAsync(new TraceIntGraphQlTemplateOverrides(
-            GetCookieUrlTemplate: "https://override.example.com/ReplaceMeByCode",
-            QueryLibrariesTemplate: "override-libraries"));
+        await store.SaveOverridesAsync(new TraceIntProtocolTemplateOverrides
+        {
+            GetCookieUrlTemplate = "https://override.example.com/ReplaceMeByCode",
+            QueryLibrariesTemplate = "override-libraries"
+        });
 
         var effective = await store.GetEffectiveTemplatesAsync();
+        var editable = await store.GetEditableTemplatesAsync();
 
         Assert.Equal(defaults.GetCookieUrlTemplate, effective.GetCookieUrlTemplate);
         Assert.Equal(defaults.QueryLibrariesTemplate, effective.QueryLibrariesTemplate);
+        Assert.Equal("https://override.example.com/ReplaceMeByCode", editable.GetCookieUrlTemplate);
+        Assert.Equal("override-libraries", editable.QueryLibrariesTemplate);
+    }
+
+    [Fact]
+    public async Task SaveOverridesAsync_MergesAllProtocolAddressOverrides()
+    {
+        var store = await CreateStoreAsync(AppSettings.Default with
+        {
+            TraceIntProtocol = new TraceIntProtocolSettings(true)
+        });
+
+        await store.SaveOverridesAsync(new TraceIntProtocolTemplateOverrides
+        {
+            GraphQlEndpointUrl = "https://proxy.example.com/graphql/",
+            GraphQlDefaultRefererUrl = "https://proxy.example.com/app",
+            GraphQlDefaultOriginUrl = "https://proxy.example.com/",
+            GraphQlTomorrowRefererUrl = "https://proxy.example.com/tomorrow",
+            GraphQlTomorrowOriginUrl = "https://proxy.example.com/",
+            RemoteCheckInAuthUrlTemplate = "https://proxy.example.com/auth?r=ReplaceMeByReturnUrl&code=ReplaceMeByCode",
+            RemoteCheckInAuthorizationReturnUrl = "https://proxy.example.com/return",
+            RemoteCheckInAuthRefererUrl = "https://proxy.example.com/oauth",
+            RemoteCheckInDevicesEndpointUrl = "https://proxy.example.com/devices",
+            RemoteCheckInTimeEndpointUrl = "https://proxy.example.com/time",
+            RemoteCheckInSignEndpointUrl = "https://proxy.example.com/sign",
+            RemoteCheckInApiRefererUrl = "https://proxy.example.com/mini-program"
+        });
+
+        var effective = await store.GetEffectiveTemplatesAsync();
+
+        Assert.Equal("https://proxy.example.com/graphql/", effective.GraphQlEndpointUrl);
+        Assert.Equal("https://proxy.example.com", effective.GraphQlDefaultOriginUrl);
+        Assert.Equal("https://proxy.example.com", effective.GraphQlTomorrowOriginUrl);
+        Assert.Equal("https://proxy.example.com/auth?r=ReplaceMeByReturnUrl&code=ReplaceMeByCode", effective.RemoteCheckInAuthUrlTemplate);
+        Assert.Equal("https://proxy.example.com/devices", effective.RemoteCheckInDevicesEndpointUrl);
+        Assert.Equal("https://proxy.example.com/sign", effective.RemoteCheckInSignEndpointUrl);
+    }
+
+    [Fact]
+    public async Task GetEditableTemplatesAsync_UpgradesLegacyBuiltInCookieTemplate()
+    {
+        var store = await CreateStoreAsync(AppSettings.Default with
+        {
+            TraceIntProtocol = new TraceIntProtocolSettings(true)
+        });
+        await SaveRawOverridesJsonAsync("""
+            {
+              "getCookieUrlTemplate": "http://wechat.v2.traceint.com/index.php/urlNew/auth.html?r=https%3A%2F%2Fweb.traceint.com%2Fweb%2Findex.html&code=ReplaceMeByCode&state=1"
+            }
+            """);
+
+        var editable = await store.GetEditableTemplatesAsync();
+
+        Assert.Contains(TraceIntProtocolValidator.ReturnUrlPlaceholder, editable.GetCookieUrlTemplate);
+        Assert.Equal("https://web.traceint.com/web/index.html", editable.CookieAuthorizationReturnUrl);
+    }
+
+    [Fact]
+    public async Task SaveOverridesAsync_RejectsInvalidAddressWithoutReplacingStoredValue()
+    {
+        var store = await CreateStoreAsync(AppSettings.Default with
+        {
+            TraceIntProtocol = new TraceIntProtocolSettings(true)
+        });
+        await store.SaveOverridesAsync(new TraceIntProtocolTemplateOverrides
+        {
+            GraphQlEndpointUrl = "https://valid.example.com/graphql"
+        });
+
+        await Assert.ThrowsAsync<TraceIntProtocolValidationException>(() =>
+            store.SaveOverridesAsync(new TraceIntProtocolTemplateOverrides
+            {
+                GraphQlEndpointUrl = "ftp://invalid.example.com/graphql"
+            }));
+
+        var editable = await store.GetEditableTemplatesAsync();
+        Assert.Equal("https://valid.example.com/graphql", editable.GraphQlEndpointUrl);
     }
 
     public void Dispose()
@@ -176,5 +311,17 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
         command.Parameters.AddWithValue("$key", "protocol-overrides");
         command.Parameters.AddWithValue("$value", json);
         await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task<string> LoadRawOverridesJsonAsync()
+    {
+        var connectionFactory = new SqliteConnectionFactory();
+        await using var connection = connectionFactory.Create();
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT Value FROM ProtocolOverrides WHERE Key = $key;";
+        command.Parameters.AddWithValue("$key", "protocol-overrides");
+        return Assert.IsType<string>(await command.ExecuteScalarAsync());
     }
 }

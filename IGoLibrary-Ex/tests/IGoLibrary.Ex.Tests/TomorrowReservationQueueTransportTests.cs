@@ -51,13 +51,14 @@ public sealed class TomorrowReservationQueueTransportTests
         };
         var transport = CreateTransport(socket);
 
-        var result = await transport.EnterAsync("wss://wechat.v2.traceint.com/ws?ns=prereserve/queue", "cookie");
+        var result = await transport.EnterAsync("wss://proxy.example.com/custom-queue", "cookie", "https://portal.example.com");
 
         Assert.False(result.ShouldStop);
         Assert.Contains("排队成功", result.Message);
         Assert.Equal("""{"ns":"prereserve/queue","msg":""}""", Assert.Single(socket.SentMessages));
         Assert.Equal("cookie", socket.Headers["Cookie"]);
-        Assert.Equal("https://web.traceint.com", socket.Headers["Origin"]);
+        Assert.Equal("https://portal.example.com", socket.Headers["Origin"]);
+        Assert.Equal("wss://proxy.example.com/custom-queue", socket.ConnectedUri!.AbsoluteUri);
     }
 
     [Fact]
@@ -69,7 +70,7 @@ public sealed class TomorrowReservationQueueTransportTests
         };
         var transport = CreateTransport(socket);
 
-        var result = await transport.EnterAsync("wss://wechat.v2.traceint.com/ws?ns=prereserve/queue", "cookie");
+        var result = await transport.EnterAsync("wss://wechat.v2.traceint.com/ws?ns=prereserve/queue", "cookie", "https://web.traceint.com");
 
         Assert.True(result.ShouldStop);
         Assert.Contains("未开始", result.Message);
@@ -84,7 +85,7 @@ public sealed class TomorrowReservationQueueTransportTests
         };
         var transport = CreateTransport(socket);
 
-        var result = await transport.EnterAsync("wss://wechat.v2.traceint.com/ws?ns=prereserve/queue", "cookie");
+        var result = await transport.EnterAsync("wss://wechat.v2.traceint.com/ws?ns=prereserve/queue", "cookie", "https://web.traceint.com");
 
         Assert.False(result.ShouldStop);
         Assert.Contains("连接异常", result.Message);
@@ -100,7 +101,7 @@ public sealed class TomorrowReservationQueueTransportTests
             sendInterval: TimeSpan.FromMilliseconds(5),
             maxWait: TimeSpan.FromMilliseconds(35));
 
-        var result = await transport.EnterAsync("wss://wechat.v2.traceint.com/ws?ns=prereserve/queue", "cookie");
+        var result = await transport.EnterAsync("wss://wechat.v2.traceint.com/ws?ns=prereserve/queue", "cookie", "https://web.traceint.com");
 
         Assert.False(result.ShouldStop);
         Assert.Contains("未明确拦截", result.Message);
@@ -122,7 +123,7 @@ public sealed class TomorrowReservationQueueTransportTests
             cleanupTimeout: TimeSpan.FromMilliseconds(5));
 
         var result = await transport
-            .EnterAsync("wss://wechat.v2.traceint.com/ws?ns=prereserve/queue", "cookie")
+            .EnterAsync("wss://wechat.v2.traceint.com/ws?ns=prereserve/queue", "cookie", "https://web.traceint.com")
             .WaitAsync(TimeSpan.FromSeconds(1));
 
         Assert.False(result.ShouldStop);
@@ -143,7 +144,7 @@ public sealed class TomorrowReservationQueueTransportTests
             cleanupTimeout: TimeSpan.FromMilliseconds(5));
 
         var result = await transport
-            .EnterAsync("wss://wechat.v2.traceint.com/ws?ns=prereserve/queue", "cookie")
+            .EnterAsync("wss://wechat.v2.traceint.com/ws?ns=prereserve/queue", "cookie", "https://web.traceint.com")
             .WaitAsync(TimeSpan.FromSeconds(1));
 
         Assert.False(result.ShouldStop);
@@ -180,6 +181,8 @@ public sealed class TomorrowReservationQueueTransportTests
 
         public int AbortCalls { get; private set; }
 
+        public Uri? ConnectedUri { get; private set; }
+
         public WebSocketState State { get; private set; } = WebSocketState.None;
 
         public void SetRequestHeader(string name, string value)
@@ -189,6 +192,7 @@ public sealed class TomorrowReservationQueueTransportTests
 
         public Task ConnectAsync(Uri uri, CancellationToken cancellationToken)
         {
+            ConnectedUri = uri;
             if (ConnectException is not null)
             {
                 throw ConnectException;

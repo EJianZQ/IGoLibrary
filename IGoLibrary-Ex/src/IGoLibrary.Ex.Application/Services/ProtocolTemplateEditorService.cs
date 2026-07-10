@@ -6,13 +6,18 @@ namespace IGoLibrary.Ex.Application.Services;
 public sealed class ProtocolTemplateEditorService(
     IProtocolTemplateStore protocolTemplateStore) : IProtocolTemplateEditorService
 {
-    public Task<TraceIntGraphQlTemplates> LoadTemplatesAsync(CancellationToken cancellationToken = default)
+    public Task<TraceIntProtocolTemplates> LoadDefaultTemplatesAsync(CancellationToken cancellationToken = default)
     {
-        return protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
+        return protocolTemplateStore.GetDefaultTemplatesAsync(cancellationToken);
+    }
+
+    public Task<TraceIntProtocolTemplates> LoadTemplatesAsync(CancellationToken cancellationToken = default)
+    {
+        return protocolTemplateStore.GetEditableTemplatesAsync(cancellationToken);
     }
 
     public Task SaveOverridesAsync(
-        TraceIntGraphQlTemplateOverrides overrides,
+        TraceIntProtocolTemplateOverrides overrides,
         CancellationToken cancellationToken = default)
     {
         return protocolTemplateStore.SaveOverridesAsync(overrides, cancellationToken);

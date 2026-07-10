@@ -491,15 +491,21 @@ public sealed class WorkflowServiceTests
     [Fact]
     public async Task ProtocolTemplateEditorService_DelegatesLoadSaveAndReset()
     {
-        var templates = new TraceIntGraphQlTemplates("cookie", "libs", "layout", "rule", "reservation", "reserve", "cancel");
+        var templates = TestProtocolTemplates.Create();
         var store = new FakeProtocolTemplateStore(templates);
         var service = new ProtocolTemplateEditorService(store);
-        var overrides = new TraceIntGraphQlTemplateOverrides("a", "b", "c", "d", "e", "f", "g");
+        var overrides = new TraceIntProtocolTemplateOverrides
+        {
+            QueryLibrariesTemplate = "libraries-override",
+            ReserveSeatTemplate = "reserve-override"
+        };
 
+        var defaults = await service.LoadDefaultTemplatesAsync();
         var loaded = await service.LoadTemplatesAsync();
         await service.SaveOverridesAsync(overrides);
         await service.ResetOverridesAsync();
 
+        Assert.Equal(templates, defaults);
         Assert.Equal(templates, loaded);
         Assert.Equal(1, store.SaveCalls);
         Assert.Equal(overrides, store.LastOverrides);

@@ -65,20 +65,26 @@ internal sealed class FakeTraceIntApiClient : ITraceIntApiClient
         => OnGetTomorrowReservationInfoAsync?.Invoke(cookie, cancellationToken) ?? Task.FromResult<TomorrowReservationInfo?>(null);
 }
 
-internal sealed class FakeProtocolTemplateStore(TraceIntGraphQlTemplates templates) : IProtocolTemplateStore
+internal sealed class FakeProtocolTemplateStore(TraceIntProtocolTemplates templates) : IProtocolTemplateStore
 {
-    public TraceIntGraphQlTemplates Templates { get; private set; } = templates;
+    public TraceIntProtocolTemplates Templates { get; private set; } = templates;
 
     public int SaveCalls { get; private set; }
 
     public int ResetCalls { get; private set; }
 
-    public TraceIntGraphQlTemplateOverrides? LastOverrides { get; private set; }
+    public TraceIntProtocolTemplateOverrides? LastOverrides { get; private set; }
 
-    public Task<TraceIntGraphQlTemplates> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default)
+    public Task<TraceIntProtocolTemplates> GetDefaultTemplatesAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(Templates);
 
-    public Task SaveOverridesAsync(TraceIntGraphQlTemplateOverrides overrides, CancellationToken cancellationToken = default)
+    public Task<TraceIntProtocolTemplates> GetEffectiveTemplatesAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(Templates);
+
+    public Task<TraceIntProtocolTemplates> GetEditableTemplatesAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(Templates);
+
+    public Task SaveOverridesAsync(TraceIntProtocolTemplateOverrides overrides, CancellationToken cancellationToken = default)
     {
         SaveCalls++;
         LastOverrides = overrides;
@@ -89,6 +95,40 @@ internal sealed class FakeProtocolTemplateStore(TraceIntGraphQlTemplates templat
     {
         ResetCalls++;
         return Task.CompletedTask;
+    }
+}
+
+internal static class TestProtocolTemplates
+{
+    public static TraceIntProtocolTemplates Create()
+    {
+        return new TraceIntProtocolTemplates
+        {
+            GetCookieUrlTemplate = "https://example.com/auth?r=ReplaceMeByReturnUrl&code=ReplaceMeByCode",
+            CookieAuthorizationReturnUrl = "https://example.com/app",
+            GraphQlEndpointUrl = "https://example.com/graphql/",
+            GraphQlDefaultRefererUrl = "https://example.com/app",
+            GraphQlDefaultOriginUrl = "https://example.com",
+            GraphQlTomorrowRefererUrl = "https://example.com/tomorrow",
+            GraphQlTomorrowOriginUrl = "https://example.com",
+            TomorrowReservationQueueUrlTemplate = "wss://example.com/ws?ns=prereserve/queue",
+            RemoteCheckInAuthUrlTemplate = "https://example.com/wxApp/wechatAuth.html?r=ReplaceMeByReturnUrl&code=ReplaceMeByCode",
+            RemoteCheckInAuthorizationReturnUrl = "https://example.com/app",
+            RemoteCheckInAuthRefererUrl = "https://example.com/oauth",
+            RemoteCheckInDevicesEndpointUrl = "https://example.com/wxApp/devices.html",
+            RemoteCheckInTimeEndpointUrl = "https://example.com/wxApp/getTime.html",
+            RemoteCheckInSignEndpointUrl = "https://example.com/wxApp/sign.html",
+            RemoteCheckInApiRefererUrl = "https://example.com/mini-program",
+            QueryLibrariesTemplate = "{}",
+            QueryLibraryLayoutTemplate = "{}",
+            QueryLibraryRuleTemplate = "{}",
+            QueryReservationInfoTemplate = "{}",
+            ReserveSeatTemplate = "{}",
+            CancelReservationTemplate = "{}",
+            TomorrowReservationWarmUpTemplate = "{}",
+            TomorrowReservationSaveTemplate = "{}",
+            TomorrowReservationInfoTemplate = "{}"
+        };
     }
 }
 

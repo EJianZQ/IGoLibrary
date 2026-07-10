@@ -14,7 +14,10 @@ internal sealed class TraceIntCookieTransport(
         CancellationToken cancellationToken = default)
     {
         var templates = await protocolTemplateStore.GetEffectiveTemplatesAsync(cancellationToken);
-        var requestUrl = templates.GetCookieUrlTemplate.Replace("ReplaceMeByCode", code, StringComparison.Ordinal);
+        var requestUrl = TraceIntProtocolValidator.BuildAuthorizationUrl(
+            templates.GetCookieUrlTemplate,
+            code,
+            templates.CookieAuthorizationReturnUrl);
 
         return await requestPolicy.ExecuteAsync(async requestToken =>
         {

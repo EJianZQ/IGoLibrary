@@ -3152,18 +3152,7 @@ public sealed class MainWindowViewModelTests
         {
             TraceIntProtocol = new TraceIntProtocolSettings(true)
         });
-        var protocolTemplateStore = new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates(
-            "cookie-default",
-            "libraries-default",
-            "layout-default",
-            "rule-default",
-            "reservation-default",
-            "reserve-default",
-            "cancel-default",
-            "queue-default",
-            "warm-default",
-            "save-default",
-            "info-default"));
+        var protocolTemplateStore = new FakeProtocolTemplateStore(TestProtocolTemplates.Create());
         var viewModel = CreateViewModel(
             settingsService: settingsService,
             protocolTemplateStore: protocolTemplateStore);
@@ -3179,20 +3168,12 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task SaveProtocolOverridesAsync_IncludesTomorrowReservationTemplates()
     {
-        var protocolTemplateStore = new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates(
-            "cookie-default",
-            "libraries-default",
-            "layout-default",
-            "rule-default",
-            "reservation-default",
-            "reserve-default",
-            "cancel-default",
-            "queue-default",
-            "warm-default",
-            "save-default",
-            "info-default"));
+        var protocolTemplateStore = new FakeProtocolTemplateStore(TestProtocolTemplates.Create());
         var viewModel = CreateViewModel(protocolTemplateStore: protocolTemplateStore);
-        viewModel.TomorrowReservationQueueUrlTemplateText = "queue-override";
+        await viewModel.InitializeAsync();
+        viewModel.TomorrowReservationQueueUrlTemplateText = "wss://override.example/ws";
+        viewModel.GraphQlEndpointUrlText = "https://override.example/graphql";
+        viewModel.RemoteCheckInSignEndpointUrlText = "https://override.example/sign";
         viewModel.TomorrowReservationWarmUpTemplateText = "warm-override";
         viewModel.TomorrowReservationSaveTemplateText = "save-override";
         viewModel.TomorrowReservationInfoTemplateText = "info-override";
@@ -3201,10 +3182,48 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(1, protocolTemplateStore.SaveCalls);
         Assert.NotNull(protocolTemplateStore.LastOverrides);
-        Assert.Equal("queue-override", protocolTemplateStore.LastOverrides.TomorrowReservationQueueUrlTemplate);
+        Assert.Equal("wss://override.example/ws", protocolTemplateStore.LastOverrides.TomorrowReservationQueueUrlTemplate);
+        Assert.Equal("https://override.example/graphql", protocolTemplateStore.LastOverrides.GraphQlEndpointUrl);
+        Assert.Equal("https://override.example/sign", protocolTemplateStore.LastOverrides.RemoteCheckInSignEndpointUrl);
         Assert.Equal("warm-override", protocolTemplateStore.LastOverrides.TomorrowReservationWarmUpTemplate);
         Assert.Equal("save-override", protocolTemplateStore.LastOverrides.TomorrowReservationSaveTemplate);
         Assert.Equal("info-override", protocolTemplateStore.LastOverrides.TomorrowReservationInfoTemplate);
+        Assert.Null(protocolTemplateStore.LastOverrides.GetCookieUrlTemplate);
+        Assert.Null(protocolTemplateStore.LastOverrides.GraphQlDefaultRefererUrl);
+        Assert.Null(protocolTemplateStore.LastOverrides.RemoteCheckInDevicesEndpointUrl);
+        Assert.Null(protocolTemplateStore.LastOverrides.QueryLibrariesTemplate);
+        Assert.Null(protocolTemplateStore.LastOverrides.ReserveSeatTemplate);
+    }
+
+    [Fact]
+    public async Task ProtocolAddressChanges_BlockInvalidAutoSave_AndResumeAfterCorrection()
+    {
+        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings() with
+        {
+            TraceIntProtocol = new TraceIntProtocolSettings(true)
+        });
+        var protocolTemplateStore = new FakeProtocolTemplateStore(TestProtocolTemplates.Create());
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            protocolTemplateStore: protocolTemplateStore);
+        await viewModel.InitializeAsync();
+
+        viewModel.GraphQlEndpointUrlText = "relative/graphql";
+        await Task.Delay(650);
+
+        Assert.True(viewModel.HasProtocolValidationErrors);
+        Assert.False(viewModel.SaveProtocolOverridesCommand.CanExecute(null));
+        Assert.NotEmpty(viewModel.GetErrors(nameof(viewModel.GraphQlEndpointUrlText)).Cast<string>());
+        Assert.Equal(0, protocolTemplateStore.SaveCalls);
+
+        viewModel.GraphQlEndpointUrlText = "http://127.0.0.1:18080/graphql";
+        await WaitForAsync(() => protocolTemplateStore.SaveCalls > 0);
+
+        Assert.False(viewModel.HasProtocolValidationErrors);
+        Assert.True(viewModel.SaveProtocolOverridesCommand.CanExecute(null));
+        Assert.Equal("http://127.0.0.1:18080/graphql", protocolTemplateStore.LastOverrides?.GraphQlEndpointUrl);
+        Assert.Null(protocolTemplateStore.LastOverrides?.GetCookieUrlTemplate);
+        Assert.Null(protocolTemplateStore.LastOverrides?.QueryLibrariesTemplate);
     }
 
     [Fact]
@@ -3360,7 +3379,7 @@ public sealed class MainWindowViewModelTests
             new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
             new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),
             new SettingsWorkflowService(settingsService),
-            new ProtocolTemplateEditorService(protocolTemplateStore ?? new FakeProtocolTemplateStore(new TraceIntGraphQlTemplates("", "", "", "", "", "", ""))),
+            new ProtocolTemplateEditorService(protocolTemplateStore ?? new FakeProtocolTemplateStore(TestProtocolTemplates.Create())),
             taskAlertService,
             grabSeatCoordinator,
             globalLeakCoordinator,
