@@ -30,6 +30,14 @@ public sealed class RemoteCheckInOutcomeUnknownException : InvalidOperationExcep
     }
 }
 
+public sealed class RemoteCheckInSessionExpiredException : InvalidOperationException
+{
+    public RemoteCheckInSessionExpiredException()
+        : base("签到授权已到期，请重新扫码获取签到授权")
+    {
+    }
+}
+
 public sealed class RemoteCheckInAuthorizationException : InvalidOperationException
 {
     public RemoteCheckInAuthorizationException(

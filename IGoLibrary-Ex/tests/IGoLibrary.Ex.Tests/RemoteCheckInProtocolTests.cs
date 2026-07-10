@@ -66,7 +66,8 @@ public sealed class RemoteCheckInProtocolTests
 
         var result = await client.ExchangeOAuthCodeAsync(new string('b', 32));
 
-        Assert.Equal(token, result);
+        Assert.Equal(token, result.Token);
+        Assert.Null(result.ExpiresAt);
         Assert.Equal(1, handler.CallCount);
     }
 
@@ -89,8 +90,11 @@ public sealed class RemoteCheckInProtocolTests
 
         var result = await client.ExchangeOAuthCodeAsync(new string('b', 32));
 
-        Assert.Equal(token.ToLowerInvariant(), result);
-        Assert.Equal(48, result.Length);
+        Assert.Equal(token.ToLowerInvariant(), result.Token);
+        Assert.Equal(48, result.Token.Length);
+        Assert.Equal(
+            new DateTimeOffset(2026, 7, 10, 2, 33, 4, TimeSpan.Zero),
+            result.ExpiresAt);
     }
 
     [Fact]

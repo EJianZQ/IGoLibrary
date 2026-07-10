@@ -19,5 +19,7 @@ public interface IRemoteCheckInWorkflowService
         RemoteCheckInSignPlan plan,
         CancellationToken cancellationToken = default);
 
+    Task<bool> ClearExpiredSessionAsync(CancellationToken cancellationToken = default);
+
     Task ClearSessionAsync(CancellationToken cancellationToken = default);
 }

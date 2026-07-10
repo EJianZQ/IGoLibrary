@@ -52,13 +52,34 @@ public sealed class RemoteCheckInWorkflowTests
     }
 
     [Fact]
+    public async Task Authorize_PreservesCookieExpirationInSessionAndCredentialStore()
+    {
+        var now = new DateTimeOffset(2026, 7, 10, 1, 0, 0, TimeSpan.Zero);
+        var expiresAt = new DateTimeOffset(2026, 7, 10, 2, 33, 4, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider(now);
+        var credentials = new FakeCredentialStore();
+        var api = new FakeRemoteCheckInApiClient
+        {
+            OnExchangeOAuthCodeAsync = (_, _) => Task.FromResult(
+                new RemoteCheckInOAuthExchangeResult(new string('a', 40), expiresAt))
+        };
+        var service = CreateService(api, credentials, new AppRuntimeState(), timeProvider);
+
+        var result = await service.AuthorizeFromCodeAsync(new string('b', 32), remember: true);
+
+        Assert.Equal(expiresAt, result.Session.ExpiresAt);
+        Assert.Equal(expiresAt, credentials.StoredRemoteCheckInSession!.ExpiresAt);
+    }
+
+    [Fact]
     public async Task Authorize_AcceptsAndNormalizes48CharacterSessionToken()
     {
         var credentials = new FakeCredentialStore();
         var state = new AppRuntimeState();
         var api = new FakeRemoteCheckInApiClient
         {
-            OnExchangeOAuthCodeAsync = (_, _) => Task.FromResult(new string('A', 48))
+            OnExchangeOAuthCodeAsync = (_, _) => Task.FromResult(
+                new RemoteCheckInOAuthExchangeResult(new string('A', 48), null))
         };
         var service = CreateService(api, credentials, state);
 
@@ -89,6 +110,96 @@ public sealed class RemoteCheckInWorkflowTests
     }
 
     [Fact]
+    public async Task Restore_WhenPersistedSessionExpired_ClearsOnlyRemoteAuthorization()
+    {
+        var now = new DateTimeOffset(2026, 7, 10, 3, 0, 0, TimeSpan.Zero);
+        var graphQl = new SessionCredentials(
+            "cookie",
+            IGoLibrary.Ex.Domain.Enums.SessionSource.ManualCookie,
+            now,
+            true);
+        var credentials = new FakeCredentialStore
+        {
+            StoredSession = graphQl,
+            StoredRemoteCheckInSession = new RemoteCheckInSessionCredentials(
+                new string('a', 40),
+                now.AddHours(-2),
+                true,
+                now.AddSeconds(-1))
+        };
+        var state = new AppRuntimeState();
+        var service = CreateService(
+            new FakeRemoteCheckInApiClient(),
+            credentials,
+            state,
+            new FakeTimeProvider(now));
+
+        var restored = await service.RestoreAsync();
+
+        Assert.Null(restored);
+        Assert.Null(state.RemoteCheckInSession);
+        Assert.Null(credentials.StoredRemoteCheckInSession);
+        Assert.Same(graphQl, credentials.StoredSession);
+    }
+
+    [Fact]
+    public async Task ClearExpiredSession_ClearsAtExpirationButNotBefore()
+    {
+        var now = new DateTimeOffset(2026, 7, 10, 2, 33, 3, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider(now);
+        var session = new RemoteCheckInSessionCredentials(
+            new string('a', 40),
+            now.AddMinutes(-30),
+            true,
+            now.AddSeconds(1));
+        var credentials = new FakeCredentialStore { StoredRemoteCheckInSession = session };
+        var state = new AppRuntimeState { RemoteCheckInSession = session };
+        var service = CreateService(
+            new FakeRemoteCheckInApiClient(),
+            credentials,
+            state,
+            timeProvider);
+
+        Assert.False(await service.ClearExpiredSessionAsync());
+
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.True(await service.ClearExpiredSessionAsync());
+        Assert.Null(state.RemoteCheckInSession);
+        Assert.Null(credentials.StoredRemoteCheckInSession);
+    }
+
+    [Fact]
+    public async Task GetDeviceInfo_WhenSessionExpired_ClearsAuthorizationBeforeApiCall()
+    {
+        var now = new DateTimeOffset(2026, 7, 10, 2, 33, 4, TimeSpan.Zero);
+        var apiCalled = false;
+        var api = new FakeRemoteCheckInApiClient
+        {
+            OnGetDeviceInfoAsync = (_, _) =>
+            {
+                apiCalled = true;
+                throw new InvalidOperationException("API should not be called");
+            }
+        };
+        var session = new RemoteCheckInSessionCredentials(
+            new string('a', 40),
+            now.AddHours(-1),
+            true,
+            now);
+        var credentials = new FakeCredentialStore { StoredRemoteCheckInSession = session };
+        var state = new AppRuntimeState { RemoteCheckInSession = session };
+        var service = CreateService(api, credentials, state, new FakeTimeProvider(now));
+
+        await Assert.ThrowsAsync<RemoteCheckInSessionExpiredException>(() =>
+            service.GetDeviceInfoAsync());
+
+        Assert.False(apiCalled);
+        Assert.Null(state.RemoteCheckInSession);
+        Assert.Null(credentials.StoredRemoteCheckInSession);
+    }
+
+    [Fact]
     public async Task Reauthorize_WhenCandidateSessionIsInvalid_RetainsPreviousSession()
     {
         var previous = new RemoteCheckInSessionCredentials(new string('a', 40), DateTimeOffset.UtcNow, true);
@@ -96,7 +207,8 @@ public sealed class RemoteCheckInWorkflowTests
         var state = new AppRuntimeState { RemoteCheckInSession = previous };
         var api = new FakeRemoteCheckInApiClient
         {
-            OnExchangeOAuthCodeAsync = (_, _) => Task.FromResult(new string('b', 40)),
+            OnExchangeOAuthCodeAsync = (_, _) => Task.FromResult(
+                new RemoteCheckInOAuthExchangeResult(new string('b', 40), null)),
             OnGetDeviceInfoAsync = (_, _) => throw new RemoteCheckInApiException(
                 "未登录",
                 isSessionInvalid: true)
@@ -133,7 +245,8 @@ public sealed class RemoteCheckInWorkflowTests
         var state = new AppRuntimeState { RemoteCheckInSession = previous };
         var api = new FakeRemoteCheckInApiClient
         {
-            OnExchangeOAuthCodeAsync = (_, _) => Task.FromResult(new string('b', 40))
+            OnExchangeOAuthCodeAsync = (_, _) => Task.FromResult(
+                new RemoteCheckInOAuthExchangeResult(new string('b', 40), null))
         };
         var service = CreateService(api, credentials, state);
 
@@ -296,13 +409,14 @@ public sealed class RemoteCheckInWorkflowTests
     private static RemoteCheckInWorkflowService CreateService(
         IRemoteCheckInApiClient api,
         FakeCredentialStore credentials,
-        AppRuntimeState state)
+        AppRuntimeState state,
+        FakeTimeProvider? timeProvider = null)
     {
         return new RemoteCheckInWorkflowService(
             api,
             credentials,
             state,
             new ActivityLogService(),
-            new FakeTimeProvider());
+            timeProvider ?? new FakeTimeProvider());
     }
 }

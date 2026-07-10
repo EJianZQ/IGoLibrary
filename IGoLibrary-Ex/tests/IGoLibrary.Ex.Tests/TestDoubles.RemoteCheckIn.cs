@@ -7,13 +7,16 @@ namespace IGoLibrary.Ex.Tests;
 
 internal sealed class FakeRemoteCheckInApiClient : IRemoteCheckInApiClient
 {
-    public Func<string, CancellationToken, Task<string>>? OnExchangeOAuthCodeAsync { get; set; }
+    public Func<string, CancellationToken, Task<RemoteCheckInOAuthExchangeResult>>? OnExchangeOAuthCodeAsync { get; set; }
     public Func<string, CancellationToken, Task<RemoteCheckInDeviceInfo>>? OnGetDeviceInfoAsync { get; set; }
     public Func<CancellationToken, Task<RemoteCheckInServerTime>>? OnGetServerTimeAsync { get; set; }
     public Func<string, RemoteCheckInSignRequest, CancellationToken, Task<RemoteCheckInResult>>? OnSignAsync { get; set; }
 
-    public Task<string> ExchangeOAuthCodeAsync(string code, CancellationToken cancellationToken = default)
-        => OnExchangeOAuthCodeAsync?.Invoke(code, cancellationToken) ?? Task.FromResult(new string('a', 40));
+    public Task<RemoteCheckInOAuthExchangeResult> ExchangeOAuthCodeAsync(
+        string code,
+        CancellationToken cancellationToken = default)
+        => OnExchangeOAuthCodeAsync?.Invoke(code, cancellationToken)
+           ?? Task.FromResult(new RemoteCheckInOAuthExchangeResult(new string('a', 40), null));
 
     public Task<RemoteCheckInDeviceInfo> GetDeviceInfoAsync(string sessionToken, CancellationToken cancellationToken = default)
         => OnGetDeviceInfoAsync?.Invoke(sessionToken, cancellationToken)
@@ -43,6 +46,8 @@ internal sealed class FakeRemoteCheckInWorkflowService : IRemoteCheckInWorkflowS
     public Func<RemoteCheckInSignPlan, CancellationToken, Task<RemoteCheckInResult>>? OnSignAsync { get; set; }
 
     public Exception? ClearException { get; set; }
+
+    public Func<CancellationToken, Task<bool>>? OnClearExpiredSessionAsync { get; set; }
 
     public Task<RemoteCheckInSessionCredentials?> RestoreAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(CurrentSession);
@@ -88,6 +93,22 @@ internal sealed class FakeRemoteCheckInWorkflowService : IRemoteCheckInWorkflowS
 
         CurrentSession = null;
         return Task.CompletedTask;
+    }
+
+    public async Task<bool> ClearExpiredSessionAsync(CancellationToken cancellationToken = default)
+    {
+        if (OnClearExpiredSessionAsync is not null)
+        {
+            var cleared = await OnClearExpiredSessionAsync(cancellationToken);
+            if (cleared)
+            {
+                CurrentSession = null;
+            }
+
+            return cleared;
+        }
+
+        return false;
     }
 }
 

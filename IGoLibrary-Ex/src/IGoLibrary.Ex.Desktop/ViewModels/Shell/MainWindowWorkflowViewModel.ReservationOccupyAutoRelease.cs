@@ -259,5 +259,6 @@ public partial class MainWindowWorkflowViewModel
         GlobalLeakPage.UpdateRuntimeClock();
         RefreshSidebarSessionExpirationPresentation(GetCurrentTime());
         UpdateHomeDashboardClock();
+        RemoteCheckInPage.QueueAuthorizationExpirationCheck(GetCurrentTime());
     }
 }

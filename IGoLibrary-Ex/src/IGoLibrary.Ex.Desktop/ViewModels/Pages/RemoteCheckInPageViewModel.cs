@@ -107,6 +107,9 @@ public sealed partial class RemoteCheckInPageViewModel : ViewModelBase
     private string authorizationStatusText = "尚未获取签到授权";
 
     [ObservableProperty]
+    private string authorizationExpirationText = "签到授权到期时间：尚未获取授权";
+
+    [ObservableProperty]
     private string accountSummaryText = "等待获取签到账号信息";
 
     [ObservableProperty]
@@ -146,6 +149,7 @@ public sealed partial class RemoteCheckInPageViewModel : ViewModelBase
         _initialized = true;
         var restored = await _workflowService.RestoreAsync(cancellationToken);
         HasRemoteCheckInSession = restored is not null;
+        UpdateAuthorizationExpirationPresentation(restored);
         AuthorizationStatusText = restored is null
             ? "尚未获取签到授权"
             : "已加载安全保存的签到授权，等待服务端验证";
@@ -188,6 +192,7 @@ public sealed partial class RemoteCheckInPageViewModel : ViewModelBase
         if (e.PropertyName == nameof(ShellWorkflowState.IsAuthorized) && !_workflowState.IsAuthorized)
         {
             HasRemoteCheckInSession = false;
+            UpdateAuthorizationExpirationPresentation(null);
             AccountSummaryText = "等待获取签到账号信息";
             AllowedBeaconUuids.Clear();
         }
@@ -211,6 +216,15 @@ public sealed partial class RemoteCheckInPageViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanRefreshDevices));
         OnPropertyChanged(nameof(CanSaveProfile));
         OnPropertyChanged(nameof(CanSign));
+    }
+
+    private void UpdateAuthorizationExpirationPresentation(RemoteCheckInSessionCredentials? session)
+    {
+        AuthorizationExpirationText = session?.ExpiresAt is { } expiresAt
+            ? $"签到授权到期时间：{expiresAt.ToLocalTime():M月d日 HH:mm:ss}"
+            : session is null
+                ? "签到授权到期时间：尚未获取授权"
+                : "签到授权到期时间：服务端未提供";
     }
 
     private async Task LoadProfileAfterLockedLibraryChangedAsync()

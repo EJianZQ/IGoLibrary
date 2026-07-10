@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
@@ -8,20 +9,27 @@ namespace IGoLibrary.Ex.Infrastructure.Api;
 internal sealed class TraceIntRemoteCheckInApiClient(TraceIntRemoteCheckInTransport transport)
     : IRemoteCheckInApiClient
 {
-    public async Task<string> ExchangeOAuthCodeAsync(
+    private static readonly string[] CookieExpirationFormats =
+    [
+        "r",
+        "ddd, dd-MMM-yyyy HH:mm:ss 'GMT'",
+        "ddd, dd MMM yyyy HH:mm:ss 'GMT'"
+    ];
+
+    public async Task<RemoteCheckInOAuthExchangeResult> ExchangeOAuthCodeAsync(
         string code,
         CancellationToken cancellationToken = default)
     {
         if (code.Length != 32 || !code.All(char.IsAsciiLetterOrDigit))
         {
-            throw new ArgumentException("签到授权 code 必须是 32 位字母数字。", nameof(code));
+            throw new ArgumentException("签到授权 code 必须是 32 位字母数字", nameof(code));
         }
 
         using var response = await transport.SendAuthorizationAsync(code, cancellationToken);
-        var token = ExtractSessionToken(response);
-        if (token is not null)
+        var session = ExtractSession(response);
+        if (session is not null)
         {
-            return token;
+            return session;
         }
 
         if ((int)response.StatusCode >= 400)
@@ -32,7 +40,7 @@ internal sealed class TraceIntRemoteCheckInApiClient(TraceIntRemoteCheckInTransp
                 response.StatusCode);
         }
 
-        throw new InvalidOperationException("授权响应未返回 wechatSESS_ID，授权链接可能已被使用或已过期，请重新扫码获取。");
+        throw new InvalidOperationException("授权响应未返回 wechatSESS_ID，授权链接可能已被使用或已过期，请重新扫码获取");
     }
 
     public async Task<RemoteCheckInDeviceInfo> GetDeviceInfoAsync(
@@ -69,6 +77,9 @@ internal sealed class TraceIntRemoteCheckInApiClient(TraceIntRemoteCheckInTransp
     }
 
     internal static string? ExtractSessionToken(HttpResponseMessage response)
+        => ExtractSession(response)?.Token;
+
+    internal static RemoteCheckInOAuthExchangeResult? ExtractSession(HttpResponseMessage response)
     {
         if (!response.Headers.TryGetValues("Set-Cookie", out var values))
         {
@@ -95,8 +106,38 @@ internal sealed class TraceIntRemoteCheckInApiClient(TraceIntRemoteCheckInTransp
             if (name.Equals("wechatSESS_ID", StringComparison.OrdinalIgnoreCase) &&
                 RemoteCheckInSessionTokenValidator.TryNormalize(rawToken, out var token))
             {
-                return token;
+                return new RemoteCheckInOAuthExchangeResult(
+                    token,
+                    ParseExpiration(cookieHeader));
             }
+        }
+
+        return null;
+    }
+
+    private static DateTimeOffset? ParseExpiration(string cookieHeader)
+    {
+        foreach (var segment in cookieHeader.Split(';').Skip(1))
+        {
+            var separatorIndex = segment.IndexOf('=');
+            if (separatorIndex <= 0 ||
+                !segment[..separatorIndex].Trim().Equals("expires", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var value = segment[(separatorIndex + 1)..].Trim();
+            if (DateTimeOffset.TryParseExact(
+                    value,
+                    CookieExpirationFormats,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                    out var expiresAt))
+            {
+                return expiresAt;
+            }
+
+            return null;
         }
 
         return null;

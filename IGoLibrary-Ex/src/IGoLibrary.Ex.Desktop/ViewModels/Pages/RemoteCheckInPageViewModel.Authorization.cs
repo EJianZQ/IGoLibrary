@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.Input;
 using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Desktop.Services;
+using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Helpers;
 using IGoLibrary.Ex.Domain.Models;
 
@@ -8,6 +9,8 @@ namespace IGoLibrary.Ex.Desktop.ViewModels;
 
 public sealed partial class RemoteCheckInPageViewModel
 {
+    private int _expirationCheckInProgress;
+
     public async Task<bool> TryAutoParseClipboardLinkAsync(string clipboardText)
     {
         AuthorizationLinkText = clipboardText.Trim();
@@ -41,6 +44,7 @@ public sealed partial class RemoteCheckInPageViewModel
         {
             await _workflowService.ClearSessionAsync();
             HasRemoteCheckInSession = false;
+            UpdateAuthorizationExpirationPresentation(null);
             AllowedBeaconUuids.Clear();
             AccountSummaryText = "等待获取签到账号信息";
             AuthorizationStatusText = "签到授权已清除";
@@ -49,6 +53,11 @@ public sealed partial class RemoteCheckInPageViewModel
         catch (Exception ex)
         {
             HasRemoteCheckInSession = _workflowService.CurrentSession is not null;
+            if (!HasRemoteCheckInSession)
+            {
+                UpdateAuthorizationExpirationPresentation(null);
+            }
+
             AuthorizationStatusText = HasRemoteCheckInSession
                 ? $"清除签到授权失败，原授权仍保留：{ex.Message}"
                 : $"清除本地签到授权时发生错误：{ex.Message}";
@@ -126,6 +135,7 @@ public sealed partial class RemoteCheckInPageViewModel
                 RememberRemoteCheckInSession);
             consumed = true;
             HasRemoteCheckInSession = true;
+            UpdateAuthorizationExpirationPresentation(authorization.Session);
             if (authorization.DeviceInfo is not null)
             {
                 ApplyDeviceInfo(authorization.DeviceInfo);
@@ -159,6 +169,7 @@ public sealed partial class RemoteCheckInPageViewModel
                 : $"获取签到授权失败：{ex.Message}";
             if (!HasRemoteCheckInSession)
             {
+                UpdateAuthorizationExpirationPresentation(null);
                 AccountSummaryText = "等待重新获取签到账号信息";
                 AllowedBeaconUuids.Clear();
             }
@@ -173,6 +184,11 @@ public sealed partial class RemoteCheckInPageViewModel
         catch (Exception ex)
         {
             HasRemoteCheckInSession = _workflowService.CurrentSession is not null;
+            if (!HasRemoteCheckInSession)
+            {
+                UpdateAuthorizationExpirationPresentation(null);
+            }
+
             AuthorizationStatusText = hadPreviousSession && HasRemoteCheckInSession
                 ? $"重新授权失败，已保留原签到授权：{ex.Message}"
                 : $"获取签到授权失败：{ex.Message}";
@@ -191,13 +207,81 @@ public sealed partial class RemoteCheckInPageViewModel
         }
     }
 
+    public void QueueAuthorizationExpirationCheck(DateTimeOffset currentTime)
+    {
+        if (!HasRemoteCheckInSession ||
+            _workflowService.CurrentSession?.ExpiresAt is not { } expiresAt ||
+            expiresAt > currentTime ||
+            Interlocked.CompareExchange(ref _expirationCheckInProgress, 1, 0) != 0)
+        {
+            return;
+        }
+
+        _ = ClearExpiredAuthorizationIfNeededAsync();
+    }
+
+    private async Task ClearExpiredAuthorizationIfNeededAsync()
+    {
+        var enteredOperation = false;
+        try
+        {
+            enteredOperation = await TryEnterOperationAsync();
+            if (!enteredOperation)
+            {
+                return;
+            }
+
+            if (!await _workflowService.ClearExpiredSessionAsync())
+            {
+                return;
+            }
+
+            HasRemoteCheckInSession = false;
+            AuthorizationStatusText = "签到授权已到期，请重新扫码授权";
+            AuthorizationExpirationText = "签到授权到期时间：已到期";
+            AccountSummaryText = "等待重新获取签到账号信息";
+            DeviceStatusText = "请重新扫码获取签到授权";
+            AllowedBeaconUuids.Clear();
+            await _notificationService.ShowWarningAsync("签到授权已到期", "远程签到授权已自动取消，请重新扫码授权");
+        }
+        catch (Exception ex)
+        {
+            AuthorizationStatusText = $"签到授权到期清理失败，将自动重试：{ex.Message}";
+            _activityLogService.Write(
+                LogEntryKind.Warning,
+                "RemoteCheckIn",
+                $"自动清理到期签到授权失败：{ex.Message}");
+        }
+        finally
+        {
+            if (enteredOperation)
+            {
+                ExitOperation();
+            }
+
+            Volatile.Write(ref _expirationCheckInProgress, 0);
+        }
+    }
+
     private void HandleSessionFailure(Exception exception)
     {
         if (exception is RemoteCheckInApiException { IsSessionInvalid: true } ||
             _workflowService.CurrentSession is null)
         {
+            var expired = exception is RemoteCheckInSessionExpiredException;
             HasRemoteCheckInSession = false;
-            AuthorizationStatusText = "签到授权已失效，请重新扫码";
+            if (expired)
+            {
+                AuthorizationExpirationText = "签到授权到期时间：已到期";
+            }
+            else
+            {
+                UpdateAuthorizationExpirationPresentation(null);
+            }
+
+            AuthorizationStatusText = expired
+                ? "签到授权已到期，请重新扫码授权"
+                : "签到授权已失效，请重新扫码";
             AccountSummaryText = "等待重新获取签到账号信息";
             AllowedBeaconUuids.Clear();
         }

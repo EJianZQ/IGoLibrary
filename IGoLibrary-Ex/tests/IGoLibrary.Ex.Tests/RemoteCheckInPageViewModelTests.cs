@@ -31,6 +31,60 @@ public sealed class RemoteCheckInPageViewModelTests
     }
 
     [Fact]
+    public async Task Authorization_DisplaysCookieExpirationInLocalTime()
+    {
+        var (viewModel, state, workflow, _, _) = CreateViewModel();
+        var expiresAt = new DateTimeOffset(2026, 7, 10, 2, 33, 4, TimeSpan.Zero);
+        workflow.OnAuthorizeAsync = (_, remember, _) =>
+        {
+            var session = new RemoteCheckInSessionCredentials(
+                new string('a', 40),
+                DateTimeOffset.UtcNow,
+                remember,
+                expiresAt);
+            return Task.FromResult(new RemoteCheckInAuthorizationResult(
+                session,
+                new RemoteCheckInDeviceInfo(
+                    new RemoteCheckInUserSummary("测试用户", "测试学校", "测试学生", "20240001"),
+                    [BeaconUuid]),
+                null));
+        };
+        state.IsAuthorized = true;
+        state.LockedLibrary = CreateLibrary();
+        await viewModel.InitializeAsync();
+        viewModel.AuthorizationLinkText = $"https://example.test/?code={new string('b', 32)}";
+
+        await viewModel.AuthorizeFromLinkCommand.ExecuteAsync(null);
+
+        Assert.Equal(
+            $"签到授权到期时间：{expiresAt.ToLocalTime():M月d日 HH:mm:ss}",
+            viewModel.AuthorizationExpirationText);
+    }
+
+    [Fact]
+    public async Task ExpirationCheck_ClearsPresentationAndRequestsReauthorization()
+    {
+        var (viewModel, state, workflow, _, notifications) = CreateViewModel();
+        var expiresAt = DateTimeOffset.UtcNow.AddSeconds(-1);
+        workflow.CurrentSession = new RemoteCheckInSessionCredentials(
+            new string('a', 40),
+            expiresAt.AddHours(-1),
+            true,
+            expiresAt);
+        workflow.OnClearExpiredSessionAsync = _ => Task.FromResult(true);
+        state.IsAuthorized = true;
+        state.LockedLibrary = CreateLibrary();
+        await viewModel.InitializeAsync();
+
+        viewModel.QueueAuthorizationExpirationCheck(expiresAt.AddSeconds(1));
+
+        Assert.False(viewModel.HasRemoteCheckInSession);
+        Assert.Equal("签到授权到期时间：已到期", viewModel.AuthorizationExpirationText);
+        Assert.Contains("已到期", viewModel.AuthorizationStatusText);
+        Assert.Contains(notifications.Warnings, item => item.Title == "签到授权已到期");
+    }
+
+    [Fact]
     public async Task Reauthorization_WhenCandidateIsInvalid_RetainsPreviousSessionAndReportsFailure()
     {
         var (viewModel, state, workflow, _, notifications) = CreateViewModel();

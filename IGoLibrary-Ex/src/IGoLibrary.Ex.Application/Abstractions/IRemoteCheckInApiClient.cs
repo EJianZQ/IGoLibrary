@@ -4,7 +4,9 @@ namespace IGoLibrary.Ex.Application.Abstractions;
 
 public interface IRemoteCheckInApiClient
 {
-    Task<string> ExchangeOAuthCodeAsync(string code, CancellationToken cancellationToken = default);
+    Task<RemoteCheckInOAuthExchangeResult> ExchangeOAuthCodeAsync(
+        string code,
+        CancellationToken cancellationToken = default);
 
     Task<RemoteCheckInDeviceInfo> GetDeviceInfoAsync(
         string sessionToken,

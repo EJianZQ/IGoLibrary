@@ -2035,6 +2035,9 @@
 
                 <StackPanel Grid.Column="1" Spacing="9" VerticalAlignment="Center">
                   <TextBlock Classes="section-title" Margin="0" Text="签到专用授权" />
+                  <TextBlock Text="{Binding RemoteCheckInPage.AuthorizationExpirationText}"
+                             Classes="helper-text"
+                             TextWrapping="Wrap" />
                   <TextBox Text="{Binding RemoteCheckInPage.AuthorizationLinkText}"
                            AcceptsReturn="True"
                            TextWrapping="Wrap"

@@ -3,7 +3,12 @@ namespace IGoLibrary.Ex.Domain.Models;
 public sealed record RemoteCheckInSessionCredentials(
     string Token,
     DateTimeOffset SavedAt,
-    bool CanAutoRestore);
+    bool CanAutoRestore,
+    DateTimeOffset? ExpiresAt = null);
+
+public sealed record RemoteCheckInOAuthExchangeResult(
+    string Token,
+    DateTimeOffset? ExpiresAt);
 
 public sealed record RemoteCheckInUserSummary(
     string Nickname,
