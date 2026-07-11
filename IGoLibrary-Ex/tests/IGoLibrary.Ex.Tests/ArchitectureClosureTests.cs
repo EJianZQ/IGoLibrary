@@ -256,7 +256,8 @@ public sealed class ArchitectureClosureTests
             Path.Combine("Pages", "OccupyPageViewModel.cs"),
             Path.Combine("Pages", "SessionViewModel.cs"),
             Path.Combine("Pages", "HomeDashboardViewModel.cs"),
-            Path.Combine("Pages", "SystemSettingsViewModel.cs")
+            Path.Combine("Pages", "SystemSettingsViewModel.cs"),
+            Path.Combine("Pages", "StorageSettingsViewModel.cs")
         };
 
         foreach (var fileName in extractedFiles)

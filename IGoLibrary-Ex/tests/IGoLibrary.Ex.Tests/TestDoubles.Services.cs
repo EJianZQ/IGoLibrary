@@ -851,3 +851,142 @@ internal sealed class FakeStartupEntryService : IStartupEntryService
         IsSupported = true;
     }
 }
+
+internal sealed class FakeStorageLocationService : IStorageLocationService
+{
+    public FakeStorageLocationService()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "IGoLibrary-Ex-Tests");
+        Current = new StorageLocations(Path.Combine(root, "data"), Path.Combine(root, "logs"));
+        Defaults = Current;
+    }
+
+    public StorageLocations Current { get; set; }
+
+    public StorageLocations Defaults { get; set; }
+
+    public StorageLocationChangeRequest? StagedChange { get; private set; }
+
+    public StorageLocationStartupResult? StartupResult { get; set; }
+
+    public StorageTargetDatabaseInspection TargetDatabaseInspection { get; set; } =
+        new(false, true, null);
+
+    public Task ValidateAsync(StorageLocations locations, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task<StorageTargetDatabaseInspection> InspectTargetDatabaseAsync(
+        string dataDirectory,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(TargetDatabaseInspection);
+
+    public Task StageChangeAsync(
+        StorageLocationChangeRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        StagedChange = request;
+        return Task.CompletedTask;
+    }
+
+    public Task CancelPendingChangeAsync(CancellationToken cancellationToken = default)
+    {
+        StagedChange = null;
+        return Task.CompletedTask;
+    }
+
+    public Task<StorageLocationStartupResult?> ConsumeStartupResultAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var result = StartupResult;
+        StartupResult = null;
+        return Task.FromResult(result);
+    }
+}
+
+internal sealed class FakeFolderPickerService : IFolderPickerService
+{
+    public string? SelectedPath { get; set; }
+
+    public Task<string?> PickFolderAsync(string title, CancellationToken cancellationToken = default)
+        => Task.FromResult(SelectedPath);
+}
+
+internal sealed class FakeStorageChangeWorkflowService : IStorageChangeWorkflowService
+{
+    public StorageLocations? LastTarget { get; private set; }
+
+    public bool Result { get; set; }
+
+    public Task<bool> ApplyAsync(StorageLocations target, CancellationToken cancellationToken = default)
+    {
+        LastTarget = target;
+        return Task.FromResult(Result);
+    }
+}
+
+internal sealed class FakeStorageChangeDialogService : IStorageChangeDialogService
+{
+    public StorageMigrationDecision MigrationDecision { get; set; } = StorageMigrationDecision.Migrate;
+
+    public bool ConfirmOverwriteResult { get; set; } = true;
+
+    public bool ConfirmUseExistingResult { get; set; } = true;
+
+    public bool ConfirmStopTasksResult { get; set; } = true;
+
+    public int MigrationPrompts { get; private set; }
+
+    public int OverwritePrompts { get; private set; }
+
+    public int UseExistingPrompts { get; private set; }
+
+    public IReadOnlyList<string>? LastStopTaskNames { get; private set; }
+
+    public Task<StorageMigrationDecision> ConfirmMigrationAsync(
+        StorageLocations current,
+        StorageLocations target,
+        bool dataDirectoryChanged,
+        bool logDirectoryChanged,
+        CancellationToken cancellationToken = default)
+    {
+        MigrationPrompts++;
+        return Task.FromResult(MigrationDecision);
+    }
+
+    public Task<bool> ConfirmOverwriteDatabaseAsync(
+        string databasePath,
+        CancellationToken cancellationToken = default)
+    {
+        OverwritePrompts++;
+        return Task.FromResult(ConfirmOverwriteResult);
+    }
+
+    public Task<bool> ConfirmUseExistingDatabaseAsync(
+        string databasePath,
+        CancellationToken cancellationToken = default)
+    {
+        UseExistingPrompts++;
+        return Task.FromResult(ConfirmUseExistingResult);
+    }
+
+    public Task<bool> ConfirmStopTasksAsync(
+        IReadOnlyList<string> taskNames,
+        CancellationToken cancellationToken = default)
+    {
+        LastStopTaskNames = taskNames;
+        return Task.FromResult(ConfirmStopTasksResult);
+    }
+}
+
+internal sealed class FakeApplicationRestartService : IApplicationRestartService
+{
+    public int RestartCalls { get; private set; }
+
+    public Exception? Exception { get; set; }
+
+    public Task RestartAsync(CancellationToken cancellationToken = default)
+    {
+        RestartCalls++;
+        return Exception is null ? Task.CompletedTask : Task.FromException(Exception);
+    }
+}

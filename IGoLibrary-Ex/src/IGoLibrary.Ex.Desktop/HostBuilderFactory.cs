@@ -4,6 +4,7 @@ using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Infrastructure;
 using IGoLibrary.Ex.Infrastructure.Logging;
+using IGoLibrary.Ex.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,7 +14,11 @@ namespace IGoLibrary.Ex.Desktop;
 
 internal static class HostBuilderFactory
 {
-    public static IHostBuilder Create(string[] args, IAppLogWriter? sharedLogWriter = null)
+    public static IHostBuilder Create(
+        string[] args,
+        IAppLogWriter? sharedLogWriter = null,
+        StorageLocationManager? storageLocationManager = null,
+        StorageLocations? storageLocations = null)
     {
         return Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder(args)
             .ConfigureAppConfiguration(config =>
@@ -35,6 +40,13 @@ internal static class HostBuilderFactory
                     services.AddSingleton(sharedLogWriter);
                 }
 
+                if (storageLocationManager is not null && storageLocations is not null)
+                {
+                    services.AddSingleton(storageLocationManager);
+                    services.AddSingleton<IStorageLocationService>(storageLocationManager);
+                    services.AddSingleton(storageLocations);
+                }
+
                 services.AddApplication();
                 services.AddSingleton<IAppSettingsDefaults, DesktopAppSettingsDefaults>();
                 services.AddInfrastructure();
@@ -44,6 +56,10 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IUpdateDialogService, UpdateDialogService>();
                 services.AddSingleton<IExternalLinkService, ExternalLinkService>();
                 services.AddSingleton<IStartupEntryService, StartupEntryService>();
+                services.AddSingleton<IApplicationRestartService, ApplicationRestartService>();
+                services.AddSingleton<IFolderPickerService, FolderPickerService>();
+                services.AddSingleton<IStorageChangeDialogService, StorageChangeDialogService>();
+                services.AddSingleton<IStorageChangeWorkflowService, StorageChangeWorkflowService>();
                 services.AddSingleton<ILanAddressProvider, LanAddressProvider>();
                 services.AddSingleton<IQrCodeImageFactory, QrCodeImageFactory>();
                 services.AddSingleton<ILanCookieRelayService, LanCookieRelayService>();
@@ -73,6 +89,7 @@ internal static class HostBuilderFactory
                 services.AddSingleton<MobileControlPageViewModel>();
                 services.AddSingleton<NotificationSettingsViewModel>();
                 services.AddSingleton<SystemSettingsViewModel>();
+                services.AddSingleton<StorageSettingsViewModel>();
                 services.AddSingleton<ProtocolTemplatesViewModel>();
                 services.AddSingleton<ShellNavigationViewModel>();
                 services.AddSingleton<ActivityLogPanelViewModel>();

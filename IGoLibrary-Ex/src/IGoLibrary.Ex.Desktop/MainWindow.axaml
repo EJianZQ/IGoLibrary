@@ -70,10 +70,23 @@
     <PathGeometry x:Key="IconBuilding">M3 21V3h10v18H3zm12 0v-8h6v8h-6zM5 5v2h2V5H5zm4 0v2h2V5H9zM5 9v2h2V9H5zm4 0v2h2V9H9zm-4 4v2h2v-2H5zm4 0v2h2v-2H9zm8 2v4h2v-4h-2z</PathGeometry>
     <PathGeometry x:Key="IconClock">M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 5h-2v6l5 3 .9-1.5-3.9-2.3V7z</PathGeometry>
     <PathGeometry x:Key="IconHourglass">M6 2h12v6c0 1.5-.8 2.8-2.1 4 1.3 1.2 2.1 2.5 2.1 4v6H6v-6c0-1.5.8-2.8 2.1-4C6.8 10.8 6 9.5 6 8V2zm2 2v4c0 1.1.9 2.1 2.6 3l1.4.8 1.4-.8C15.1 10.1 16 9.1 16 8V4H8zm4 8.9-1.4.8C8.9 14.6 8 15.6 8 16.7V20h8v-3.3c0-1.1-.9-2.1-2.6-3l-1.4-.8z</PathGeometry>
+    <PathGeometry x:Key="IconFolderOpen">M20 6h-8l-2-2H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z</PathGeometry>
+    <PathGeometry x:Key="IconRestore">M13 3a9 9 0 0 0-9 9H1l4 4 4-4H6a7 7 0 1 1 2.05 4.95l-1.42 1.42A9 9 0 1 0 13 3z</PathGeometry>
 
   </Window.Resources>
 
   <Window.Styles>
+    <Style Selector="Button.storage-text-action">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource SemiAccentBrush}" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
     <Style Selector="TextBlock.page-title">
       <Setter Property="FontSize" Value="32" />
       <Setter Property="FontWeight" Value="Bold" />
@@ -3480,6 +3493,124 @@
                         <TextBlock Text="明日预约结果验证模板" FontSize="13" FontWeight="SemiBold"/>
                         <TextBox Text="{Binding TomorrowReservationInfoTemplateText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="90" TextWrapping="Wrap" FontFamily="Consolas, monospace" FontSize="11"/>
                       </StackPanel>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="16"
+                            Margin="0,18,12,0">
+                  <Border Classes="card">
+                    <StackPanel Spacing="16">
+                      <StackPanel Spacing="6">
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Text="存储位置" />
+                        <TextBlock Classes="helper-text"
+                                   Text="数据和日志目录会在重启后生效；应用前可选择是否迁移现有文件" />
+                      </StackPanel>
+
+                      <Grid RowDefinitions="Auto,Auto,Auto"
+                            ColumnDefinitions="140,*,Auto,Auto"
+                            RowSpacing="12"
+                            ColumnSpacing="10">
+                        <TextBlock Classes="field-label"
+                                   Text="数据存储位置"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding SystemSettings.StorageSettings.PendingDataDirectory}"
+                                 IsReadOnly="True"
+                                 TextWrapping="NoWrap"
+                                 HorizontalAlignment="Stretch" />
+                        <Button Grid.Column="2"
+                                Command="{Binding SystemSettings.StorageSettings.SelectDataDirectoryCommand}"
+                                Classes="Tertiary storage-text-action"
+                                ToolTip.Tip="选择数据存储文件夹">
+                          <StackPanel Orientation="Horizontal"
+                                      Spacing="6"
+                                      VerticalAlignment="Center">
+                            <PathIcon Data="{StaticResource IconFolderOpen}"
+                                      Width="16"
+                                      Height="16" />
+                            <TextBlock Text="选择文件夹"
+                                       VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Button>
+                        <Button Grid.Column="3"
+                                Command="{Binding SystemSettings.StorageSettings.RestoreDefaultDataDirectoryCommand}"
+                                Classes="Tertiary storage-text-action"
+                                ToolTip.Tip="恢复默认数据存储位置">
+                          <StackPanel Orientation="Horizontal"
+                                      Spacing="6"
+                                      VerticalAlignment="Center">
+                            <PathIcon Data="{StaticResource IconRestore}"
+                                      Width="16"
+                                      Height="16" />
+                            <TextBlock Text="恢复默认"
+                                       VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Button>
+
+                        <TextBlock Grid.Row="1"
+                                   Classes="field-label"
+                                   Text="日志文件位置"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Row="1"
+                                 Grid.Column="1"
+                                 Text="{Binding SystemSettings.StorageSettings.PendingLogDirectory}"
+                                 IsReadOnly="True"
+                                 TextWrapping="NoWrap"
+                                 HorizontalAlignment="Stretch" />
+                        <Button Grid.Row="1"
+                                Grid.Column="2"
+                                Command="{Binding SystemSettings.StorageSettings.SelectLogDirectoryCommand}"
+                                Classes="Tertiary storage-text-action"
+                                ToolTip.Tip="选择日志文件存储文件夹">
+                          <StackPanel Orientation="Horizontal"
+                                      Spacing="6"
+                                      VerticalAlignment="Center">
+                            <PathIcon Data="{StaticResource IconFolderOpen}"
+                                      Width="16"
+                                      Height="16" />
+                            <TextBlock Text="选择文件夹"
+                                       VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Button>
+                        <Button Grid.Row="1"
+                                Grid.Column="3"
+                                Command="{Binding SystemSettings.StorageSettings.RestoreDefaultLogDirectoryCommand}"
+                                Classes="Tertiary storage-text-action"
+                                ToolTip.Tip="恢复默认日志文件位置">
+                          <StackPanel Orientation="Horizontal"
+                                      Spacing="6"
+                                      VerticalAlignment="Center">
+                            <PathIcon Data="{StaticResource IconRestore}"
+                                      Width="16"
+                                      Height="16" />
+                            <TextBlock Text="恢复默认"
+                                       VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Button>
+
+                        <StackPanel Grid.Row="2"
+                                    Grid.Column="1"
+                                    Grid.ColumnSpan="3"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Right"
+                                    Spacing="12">
+                          <TextBlock Classes="helper-text"
+                                     Text="已修改，应用后将立即重启"
+                                     IsVisible="{Binding SystemSettings.StorageSettings.HasStorageLocationChanges}"
+                                     VerticalAlignment="Center" />
+                          <Button Content="应用并重启"
+                                  Command="{Binding SystemSettings.StorageSettings.ApplyStorageLocationChangesCommand}"
+                                  IsEnabled="{Binding SystemSettings.StorageSettings.CanApplyStorageLocationChanges}"
+                                  Background="{DynamicResource SemiAccentBrush}"
+                                  Foreground="{DynamicResource AppAccentForegroundBrush}"
+                                  MinWidth="132" />
+                        </StackPanel>
+                      </Grid>
                     </StackPanel>
                   </Border>
                 </StackPanel>

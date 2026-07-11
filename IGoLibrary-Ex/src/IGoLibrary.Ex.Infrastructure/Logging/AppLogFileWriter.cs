@@ -30,6 +30,11 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
     {
     }
 
+    public AppLogFileWriter(StorageLocations locations)
+        : this(locations.LogDirectory)
+    {
+    }
+
     public AppLogFileWriter(
         string? logDirectory,
         int retainedFileCount = DefaultRetainedFileCount,
@@ -46,7 +51,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
         TimeSpan simulatedWriteDelay)
     {
         _logDirectory = string.IsNullOrWhiteSpace(logDirectory)
-            ? AppDataPaths.LogsDirectory
+            ? StorageLocationDefaults.GetDefaults().LogDirectory
             : Path.GetFullPath(logDirectory);
         _retainedFileCount = Math.Max(1, retainedFileCount);
         _clock = clock ?? (() => DateTimeOffset.Now);

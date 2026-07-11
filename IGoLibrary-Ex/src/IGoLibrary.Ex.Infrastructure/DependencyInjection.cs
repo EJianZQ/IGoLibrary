@@ -16,6 +16,11 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
+        services.TryAddSingleton<StorageLocationManager>();
+        services.TryAddSingleton<IStorageLocationService>(serviceProvider =>
+            serviceProvider.GetRequiredService<StorageLocationManager>());
+        services.TryAddSingleton(serviceProvider =>
+            serviceProvider.GetRequiredService<StorageLocationManager>().Current);
         services.AddSingleton<SqliteConnectionFactory>();
         services.AddSingleton<IAppDataInitializer, SqliteAppDataInitializer>();
         services.TryAddSingleton<IAppLogWriter, AppLogFileWriter>();

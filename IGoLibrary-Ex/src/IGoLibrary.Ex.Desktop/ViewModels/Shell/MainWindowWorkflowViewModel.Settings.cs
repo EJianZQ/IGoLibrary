@@ -25,7 +25,9 @@ public partial class MainWindowWorkflowViewModel
 
     public bool IsSystemSettingsNetworkActive => SystemSettings.IsSystemSettingsNetworkActive;
 
-    public bool IsSystemSettingsStorageUpdateActive => SystemSettings.IsSystemSettingsStorageUpdateActive;
+    public bool IsSystemSettingsStorageActive => SystemSettings.IsSystemSettingsStorageActive;
+
+    public bool IsSystemSettingsAboutActive => SystemSettings.IsSystemSettingsAboutActive;
 
     public bool LaunchOnStartupSupported => SystemSettings.LaunchOnStartupSupported;
 
@@ -120,7 +122,8 @@ public partial class MainWindowWorkflowViewModel
             nameof(SystemSettings.IsSystemSettingsGeneralActive),
             nameof(SystemSettings.IsSystemSettingsAppearanceActive),
             nameof(SystemSettings.IsSystemSettingsNetworkActive),
-            nameof(SystemSettings.IsSystemSettingsStorageUpdateActive),
+            nameof(SystemSettings.IsSystemSettingsStorageActive),
+            nameof(SystemSettings.IsSystemSettingsAboutActive),
             nameof(SystemSettings.MinimizeToTrayEnabled),
             nameof(SystemSettings.LaunchOnStartupEnabled),
             nameof(SystemSettings.CheckUpdatesOnStartup),

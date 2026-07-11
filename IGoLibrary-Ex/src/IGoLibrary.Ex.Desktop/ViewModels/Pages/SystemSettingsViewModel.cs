@@ -36,7 +36,8 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         IAppThemeService appThemeService,
         IActivityLogService activityLogService,
         INotificationService notificationService,
-        IStartupEntryService startupEntryService)
+        IStartupEntryService startupEntryService,
+        StorageSettingsViewModel storageSettings)
     {
         _settingsWorkflowService = settingsWorkflowService;
         _protocolTemplateEditorService = protocolTemplateEditorService;
@@ -44,12 +45,15 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         _activityLogService = activityLogService;
         _notificationService = notificationService;
         _startupEntryService = startupEntryService;
+        StorageSettings = storageSettings;
         _systemSettingsAutoSave = new DeferredAutoSaveController(
             TimeSpan.FromMilliseconds(300),
             cancellationToken => PersistSystemSettingsAsync(showNotification: false, cancellationToken));
     }
 
-    public string[] SystemSettingsCategories { get; } = ["常规", "外观", "网络与接口", "存储与更新"];
+    public string[] SystemSettingsCategories { get; } = ["常规", "外观", "网络与接口", "存储与日志", "关于"];
+
+    public StorageSettingsViewModel StorageSettings { get; }
 
     public string[] ThemeModes { get; } = ["跟随系统", "浅色", "深色"];
 
@@ -62,7 +66,9 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
 
     public bool IsSystemSettingsNetworkActive => SelectedSystemSettingsCategoryIndex == 2;
 
-    public bool IsSystemSettingsStorageUpdateActive => SelectedSystemSettingsCategoryIndex == 3;
+    public bool IsSystemSettingsStorageActive => SelectedSystemSettingsCategoryIndex == 3;
+
+    public bool IsSystemSettingsAboutActive => SelectedSystemSettingsCategoryIndex == 4;
 
     public bool LaunchOnStartupSupported => _startupEntryService.IsSupported;
 
@@ -134,6 +140,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         }
 
         await SyncStartupEntryAfterLoadAsync();
+        await StorageSettings.InitializeAsync(cancellationToken);
     }
 
     public void ApplySettings(AppSettings settings)
@@ -238,7 +245,8 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsSystemSettingsGeneralActive));
         OnPropertyChanged(nameof(IsSystemSettingsAppearanceActive));
         OnPropertyChanged(nameof(IsSystemSettingsNetworkActive));
-        OnPropertyChanged(nameof(IsSystemSettingsStorageUpdateActive));
+        OnPropertyChanged(nameof(IsSystemSettingsStorageActive));
+        OnPropertyChanged(nameof(IsSystemSettingsAboutActive));
     }
 
     partial void OnMinimizeToTrayEnabledChanged(bool value) => ScheduleAutoSave();

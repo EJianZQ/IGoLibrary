@@ -228,13 +228,23 @@ public sealed class MainWindowViewModelTests
     {
         var viewModel = CreateViewModel();
 
-        Assert.Equal(["常规", "外观", "网络与接口", "存储与更新"], viewModel.SystemSettingsCategories);
+        Assert.Equal(["常规", "外观", "网络与接口", "存储与日志", "关于"], viewModel.SystemSettingsCategories);
         Assert.True(viewModel.IsSystemSettingsGeneralActive);
 
         viewModel.SelectedSystemSettingsCategoryIndex = 2;
 
         Assert.False(viewModel.IsSystemSettingsGeneralActive);
         Assert.True(viewModel.IsSystemSettingsNetworkActive);
+
+        viewModel.SelectedSystemSettingsCategoryIndex = 3;
+
+        Assert.True(viewModel.IsSystemSettingsStorageActive);
+        Assert.False(viewModel.IsSystemSettingsAboutActive);
+
+        viewModel.SelectedSystemSettingsCategoryIndex = 4;
+
+        Assert.False(viewModel.IsSystemSettingsStorageActive);
+        Assert.True(viewModel.IsSystemSettingsAboutActive);
     }
 
     [Fact]

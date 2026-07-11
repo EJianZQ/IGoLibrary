@@ -2,6 +2,7 @@ using Avalonia;
 using System.Diagnostics;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Infrastructure.Logging;
+using IGoLibrary.Ex.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -17,15 +18,26 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        using var sharedLogWriter = new AppLogFileWriter();
+        var restartArguments = RestartArguments.Parse(args);
+        var storageLocationManager = new StorageLocationManager();
+        var storageLocations = storageLocationManager
+            .InitializeAsync(restartArguments.ParentProcessId)
+            .GetAwaiter()
+            .GetResult();
+        using var sharedLogWriter = new AppLogFileWriter(storageLocations);
         RegisterGlobalExceptionLogging(sharedLogWriter);
 
         try
         {
-            Host = HostBuilderFactory.Create(args, sharedLogWriter).Build();
+            Host = HostBuilderFactory.Create(
+                    restartArguments.ApplicationArguments,
+                    sharedLogWriter,
+                    storageLocationManager,
+                    storageLocations)
+                .Build();
             Host.Start();
             Host.Services.GetRequiredService<TraceListenerRegistrar>().Attach();
-            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(restartArguments.ApplicationArguments);
         }
         catch (Exception ex)
         {

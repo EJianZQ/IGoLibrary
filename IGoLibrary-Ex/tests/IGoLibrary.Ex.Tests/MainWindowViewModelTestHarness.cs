@@ -122,7 +122,13 @@ internal static class MainWindowViewModelTestHarness
                 appThemeService,
                 activityLogService,
                 notificationService,
-                startupEntryService),
+                startupEntryService,
+                new StorageSettingsViewModel(
+                    new FakeStorageLocationService(),
+                    new FakeFolderPickerService(),
+                    new FakeStorageChangeWorkflowService(),
+                    activityLogService,
+                    notificationService)),
             new ProtocolTemplatesViewModel(
                 protocolTemplateEditorService,
                 activityLogService,
