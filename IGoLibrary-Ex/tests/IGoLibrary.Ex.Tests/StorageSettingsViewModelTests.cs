@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 
@@ -65,7 +66,7 @@ public sealed class StorageSettingsViewModelTests
             new FakeStorageChangeWorkflowService(),
             out var notification);
 
-        await viewModel.InitializeAsync();
+        await viewModel.InitializeAsync(LogFileSettings.Default);
 
         if (succeeded)
         {
@@ -77,17 +78,80 @@ public sealed class StorageSettingsViewModelTests
         }
     }
 
+    [Fact]
+    public async Task InitializeAsync_AppliesLoggingSettingsWithoutSaving()
+    {
+        var loggingWorkflow = new FakeLoggingSettingsWorkflowService();
+        var viewModel = Create(
+            new FakeStorageLocationService(),
+            new FakeFolderPickerService(),
+            new FakeStorageChangeWorkflowService(),
+            out _,
+            loggingWorkflow);
+
+        await viewModel.InitializeAsync(new LogFileSettings(false, 42));
+
+        Assert.False(viewModel.IsFileLoggingEnabled);
+        Assert.Equal(42, viewModel.RetainedLogFileCount);
+        Assert.Empty(loggingWorkflow.SavedSettings);
+    }
+
+    [Fact]
+    public async Task LoggingChanges_PersistLatestSnapshotImmediately()
+    {
+        var loggingWorkflow = new FakeLoggingSettingsWorkflowService();
+        var viewModel = Create(
+            new FakeStorageLocationService(),
+            new FakeFolderPickerService(),
+            new FakeStorageChangeWorkflowService(),
+            out _,
+            loggingWorkflow);
+        await viewModel.InitializeAsync(LogFileSettings.Default);
+
+        viewModel.IsFileLoggingEnabled = false;
+        viewModel.RetainedLogFileCount = 12;
+        await viewModel.FlushPendingLoggingSettingsSaveAsync();
+
+        Assert.NotEmpty(loggingWorkflow.SavedSettings);
+        Assert.Equal(new LogFileSettings(false, 12), loggingWorkflow.SavedSettings[^1]);
+    }
+
+    [Fact]
+    public async Task LoggingSaveFailure_RollsBackToLastPersistedSettings()
+    {
+        var loggingWorkflow = new FakeLoggingSettingsWorkflowService
+        {
+            SaveHandler = _ => Task.FromException<LoggingSettingsUpdateResult>(
+                new IOException("database unavailable"))
+        };
+        var viewModel = Create(
+            new FakeStorageLocationService(),
+            new FakeFolderPickerService(),
+            new FakeStorageChangeWorkflowService(),
+            out var notification,
+            loggingWorkflow);
+        await viewModel.InitializeAsync(LogFileSettings.Default);
+
+        viewModel.IsFileLoggingEnabled = false;
+        await viewModel.FlushPendingLoggingSettingsSaveAsync();
+
+        Assert.True(viewModel.IsFileLoggingEnabled);
+        Assert.Contains(notification.Warnings, item => item.Title == "无法保存日志设置");
+    }
+
     private static StorageSettingsViewModel Create(
         FakeStorageLocationService storage,
         FakeFolderPickerService picker,
         FakeStorageChangeWorkflowService workflow,
-        out FakeNotificationService notification)
+        out FakeNotificationService notification,
+        FakeLoggingSettingsWorkflowService? loggingWorkflow = null)
     {
         notification = new FakeNotificationService();
         return new StorageSettingsViewModel(
             storage,
             picker,
             workflow,
+            loggingWorkflow ?? new FakeLoggingSettingsWorkflowService(),
             new ActivityLogService(),
             notification);
     }

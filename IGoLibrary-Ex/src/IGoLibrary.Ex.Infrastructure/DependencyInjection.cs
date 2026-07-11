@@ -24,6 +24,8 @@ public static class DependencyInjection
         services.AddSingleton<SqliteConnectionFactory>();
         services.AddSingleton<IAppDataInitializer, SqliteAppDataInitializer>();
         services.TryAddSingleton<IAppLogWriter, AppLogFileWriter>();
+        services.TryAddSingleton<IAppLogRuntimeController>(serviceProvider =>
+            (IAppLogRuntimeController)serviceProvider.GetRequiredService<IAppLogWriter>());
         services.AddSingleton<AppTraceListener>();
         services.AddSingleton<TraceListenerRegistrar>();
         services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();

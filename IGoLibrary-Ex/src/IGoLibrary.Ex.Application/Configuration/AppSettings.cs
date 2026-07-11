@@ -22,5 +22,7 @@ public sealed record AppSettings
 
     public RemoteCheckInSettings RemoteCheckIn { get; init; } = RemoteCheckInSettings.Default;
 
+    public LogFileSettings Logging { get; init; } = LogFileSettings.Default;
+
     public static AppSettings Default { get; } = new();
 }

@@ -135,6 +135,15 @@ public partial class MainWindowWorkflowViewModel
             _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存系统设置失败：{ex.Message}");
         }
 
+        try
+        {
+            await SystemSettings.StorageSettings.FlushPendingLoggingSettingsSaveAsync();
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存日志设置失败：{ex.Message}");
+        }
+
         if (hasPendingProtocolTemplates)
         {
             try

@@ -127,6 +127,7 @@ internal static class MainWindowViewModelTestHarness
                     new FakeStorageLocationService(),
                     new FakeFolderPickerService(),
                     new FakeStorageChangeWorkflowService(),
+                    new FakeLoggingSettingsWorkflowService(),
                     activityLogService,
                     notificationService)),
             new ProtocolTemplatesViewModel(

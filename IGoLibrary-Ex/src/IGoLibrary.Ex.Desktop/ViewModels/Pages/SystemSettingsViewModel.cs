@@ -140,7 +140,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         }
 
         await SyncStartupEntryAfterLoadAsync();
-        await StorageSettings.InitializeAsync(cancellationToken);
+        await StorageSettings.InitializeAsync(settings.Logging, cancellationToken);
     }
 
     public void ApplySettings(AppSettings settings)

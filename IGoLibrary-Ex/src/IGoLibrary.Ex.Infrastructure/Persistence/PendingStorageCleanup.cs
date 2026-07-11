@@ -1,3 +1,5 @@
+using IGoLibrary.Ex.Infrastructure.Logging;
+
 namespace IGoLibrary.Ex.Infrastructure.Persistence;
 
 internal enum StorageCleanupKind
@@ -71,8 +73,9 @@ internal sealed record PendingStorageCleanup(
         return kind switch
         {
             StorageCleanupKind.DatabaseArtifact => StorageLocationDefaults.IsDatabaseArtifactFileName(fileName),
-            StorageCleanupKind.LogFile => fileName.StartsWith("app-", StringComparison.OrdinalIgnoreCase) &&
-                                          fileName.EndsWith(".log", StringComparison.OrdinalIgnoreCase),
+            StorageCleanupKind.LogFile =>
+                AppLogFileCatalog.IsLegacyDailyFileName(fileName) ||
+                AppLogFileCatalog.TryParseRunFileName(fileName, out _),
             _ => false
         };
     }

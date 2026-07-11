@@ -22,7 +22,6 @@ public partial class App : Avalonia.Application
             Program.Host is not null)
         {
             var services = Program.Host.Services;
-            services.GetRequiredService<IAppDataInitializer>().InitializeAsync().GetAwaiter().GetResult();
             services.GetRequiredService<IAppThemeService>().InitializeAsync().GetAwaiter().GetResult();
 
             var mainWindow = services.GetRequiredService<MainWindow>();

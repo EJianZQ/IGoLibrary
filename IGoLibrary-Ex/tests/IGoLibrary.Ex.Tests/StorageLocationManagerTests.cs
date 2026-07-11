@@ -50,7 +50,7 @@ public sealed class StorageLocationManagerTests : IDisposable
         var target = CreateLocations("target");
         await CreateDatabaseAsync(source, "source-value");
         Directory.CreateDirectory(source.LogDirectory);
-        var sourceLog = Path.Combine(source.LogDirectory, "app-20260710.log");
+        var sourceLog = Path.Combine(source.LogDirectory, "app-20260710-090000-000.log");
         await File.WriteAllTextAsync(sourceLog, "source-log");
         var manager = CreateManager(source);
         await manager.InitializeAsync();
@@ -61,7 +61,7 @@ public sealed class StorageLocationManagerTests : IDisposable
 
         Assert.Equal(target, actual);
         Assert.Equal("source-value", await ReadMarkerAsync(target));
-        Assert.Equal("source-log", await File.ReadAllTextAsync(Path.Combine(target.LogDirectory, "app-20260710.log")));
+        Assert.Equal("source-log", await File.ReadAllTextAsync(Path.Combine(target.LogDirectory, "app-20260710-090000-000.log")));
         Assert.False(File.Exists(DatabasePath(source)));
         Assert.False(File.Exists(sourceLog));
     }
@@ -134,8 +134,8 @@ public sealed class StorageLocationManagerTests : IDisposable
         var target = CreateLocations("target");
         Directory.CreateDirectory(source.LogDirectory);
         Directory.CreateDirectory(target.LogDirectory);
-        await File.WriteAllTextAsync(Path.Combine(source.LogDirectory, "app-20260710.log"), "source");
-        await File.WriteAllTextAsync(Path.Combine(target.LogDirectory, "app-20260710.log"), "target");
+        await File.WriteAllTextAsync(Path.Combine(source.LogDirectory, "app-20260710-090000-000.log"), "source");
+        await File.WriteAllTextAsync(Path.Combine(target.LogDirectory, "app-20260710-090000-000.log"), "target");
         var manager = CreateManager(source);
         await manager.InitializeAsync();
         await manager.StageChangeAsync(new StorageLocationChangeRequest(target, false, true, false));
@@ -147,6 +147,32 @@ public sealed class StorageLocationManagerTests : IDisposable
         Assert.Equal(2, logs.Length);
         Assert.Contains(logs, path => File.ReadAllText(path) == "source");
         Assert.Contains(logs, path => File.ReadAllText(path) == "target");
+    }
+
+    [Fact]
+    public async Task InitializeAsync_WithoutLogMigration_StillDiscardsLegacyDailyLogs()
+    {
+        var source = CreateLocations("source");
+        var target = CreateLocations("target");
+        Directory.CreateDirectory(source.LogDirectory);
+        Directory.CreateDirectory(target.LogDirectory);
+        var sourceLegacy = Path.Combine(source.LogDirectory, "app-20260710.log");
+        var targetLegacy = Path.Combine(target.LogDirectory, "app-20260709.log");
+        var unrelated = Path.Combine(source.LogDirectory, "app-backup.log");
+        await File.WriteAllTextAsync(sourceLegacy, "source-legacy");
+        await File.WriteAllTextAsync(targetLegacy, "target-legacy");
+        await File.WriteAllTextAsync(unrelated, "unrelated");
+        var manager = CreateManager(source);
+        await manager.InitializeAsync();
+        await manager.StageChangeAsync(new StorageLocationChangeRequest(target, false, false, false));
+
+        var restarted = CreateManager(source);
+        var actual = await restarted.InitializeAsync();
+
+        Assert.Equal(target, actual);
+        Assert.False(File.Exists(sourceLegacy));
+        Assert.False(File.Exists(targetLegacy));
+        Assert.True(File.Exists(unrelated));
     }
 
     [Fact]

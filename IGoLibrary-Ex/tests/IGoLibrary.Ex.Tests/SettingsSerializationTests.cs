@@ -705,6 +705,51 @@ public sealed class SettingsSerializationTests
         Assert.DoesNotContain("themeMode", json);
     }
 
+    [Fact]
+    public void LoggingSettings_DefaultsToEnabledAndThirtyFiles()
+    {
+        Assert.True(AppSettings.Default.Logging.Enabled);
+        Assert.Equal(30, AppSettings.Default.Logging.RetainedFileCount);
+    }
+
+    [Fact]
+    public void LegacySettingsWithoutLogging_MigrateWithLoggingDefaults()
+    {
+        var settings = MigrateAndDeserialize("{}");
+
+        Assert.Equal(LogFileSettings.Default, settings.Logging);
+    }
+
+    [Fact]
+    public void LoggingSettingsWithMissingCount_PreserveEnabledAndDefaultTheCount()
+    {
+        var settings = MigrateAndDeserialize("""
+            {
+              "logging": {
+                "enabled": false
+              }
+            }
+            """);
+
+        Assert.Equal(new LogFileSettings(false, 30), settings.Logging);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-10, 1)]
+    [InlineData(366, 365)]
+    [InlineData(10000, 365)]
+    public void LoggingSettings_NormalizeRetainedFileCount(int value, int expected)
+    {
+        var settings = Normalize(AppSettings.Default with
+        {
+            Logging = new LogFileSettings(false, value)
+        });
+
+        Assert.False(settings.Logging.Enabled);
+        Assert.Equal(expected, settings.Logging.RetainedFileCount);
+    }
+
     private static AppSettings MigrateAndDeserialize(string json)
     {
         var migratedJson = MigrateLegacyAppSettingsJson(json);

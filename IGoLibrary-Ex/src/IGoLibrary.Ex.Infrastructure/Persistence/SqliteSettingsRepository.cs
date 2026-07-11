@@ -90,6 +90,7 @@ public sealed class SqliteSettingsRepository(
         var updates = ReadObject(root, "updates");
         var mobileControl = ReadObject(root, "mobileControl");
         var remoteCheckIn = ReadObject(root, "remoteCheckIn");
+        var logging = ReadObject(root, "logging");
 
         var legacyRetryCount = ReadInt(root, "retryCount")
             ?? ReadInt(legacyRequestPolicy, "retryCount");
@@ -304,6 +305,19 @@ public sealed class SqliteSettingsRepository(
         }
         writer.WriteEndObject();
 
+        writer.WritePropertyName("logging");
+        writer.WriteStartObject();
+        writer.WriteBoolean(
+            "enabled",
+            ReadBool(logging, "enabled") ?? defaults.Logging.Enabled);
+        writer.WriteNumber(
+            "retainedFileCount",
+            LogFileSettings.Normalize(new LogFileSettings(
+                ReadBool(logging, "enabled") ?? defaults.Logging.Enabled,
+                ReadInt(logging, "retainedFileCount") ?? defaults.Logging.RetainedFileCount))
+                .RetainedFileCount);
+        writer.WriteEndObject();
+
         writer.WriteEndObject();
         writer.Flush();
         return Encoding.UTF8.GetString(stream.ToArray());
@@ -380,7 +394,8 @@ public sealed class SqliteSettingsRepository(
             RemoteCheckIn = remoteCheckIn with
             {
                 VenueProfiles = NormalizeRemoteCheckInVenueProfiles(remoteCheckIn.VenueProfiles)
-            }
+            },
+            Logging = LogFileSettings.Normalize(settings.Logging)
         };
     }
 
@@ -391,6 +406,7 @@ public sealed class SqliteSettingsRepository(
 
     private static bool IsCanonicalShape(JsonElement root)
     {
+        var logging = ReadObject(root, "logging");
         return root.TryGetProperty("traceIntProtocol", out _) &&
                root.TryGetProperty("network", out _) &&
                root.TryGetProperty("tasks", out var tasks) &&
@@ -402,7 +418,10 @@ public sealed class SqliteSettingsRepository(
                tasks.TryGetProperty("globalLeak", out _) &&
                root.TryGetProperty("updates", out _) &&
                root.TryGetProperty("mobileControl", out _) &&
-               root.TryGetProperty("remoteCheckIn", out _);
+               root.TryGetProperty("remoteCheckIn", out _) &&
+               logging.ValueKind == JsonValueKind.Object &&
+               ReadBool(logging, "enabled").HasValue &&
+               ReadInt(logging, "retainedFileCount").HasValue;
     }
 
     private static IReadOnlyList<RemoteCheckInVenueProfileSettings> NormalizeRemoteCheckInVenueProfiles(

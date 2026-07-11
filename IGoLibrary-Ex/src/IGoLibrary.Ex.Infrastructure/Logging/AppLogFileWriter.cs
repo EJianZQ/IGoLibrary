@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.Text;
 using System.Threading.Channels;
 using IGoLibrary.Ex.Application.Abstractions;
@@ -8,21 +7,24 @@ using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Infrastructure.Logging;
 
-public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
+public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, IDisposable
 {
-    private const int DefaultRetainedFileCount = 14;
     private const int DefaultQueueCapacity = 2048;
     private const int FlushBatchSize = 20;
     private static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(1);
 
     private readonly string _logDirectory;
-    private readonly int _retainedFileCount;
+    private readonly DateTimeOffset _runStartedAt;
     private readonly Func<DateTimeOffset> _clock;
     private readonly Channel<QueuedWorkItem> _queue;
+    private readonly TaskCompletionSource<InitialConfiguration> _initialConfiguration =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Task _processingTask;
-    private readonly object _disposeGate = new();
+    private readonly object _stateGate = new();
     private readonly TimeSpan _simulatedWriteDelay;
     private long _droppedEntryCount;
+    private int _acceptingWrites = 1;
+    private bool _configured;
     private bool _disposed;
 
     public AppLogFileWriter()
@@ -30,16 +32,28 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
     {
     }
 
-    public AppLogFileWriter(StorageLocations locations)
-        : this(locations.LogDirectory)
+    public AppLogFileWriter(StorageLocations locations, bool startUnconfigured = false)
+        : this(
+            locations.LogDirectory,
+            LogFileSettings.DefaultRetainedFileCount,
+            clock: null,
+            DefaultQueueCapacity,
+            TimeSpan.Zero,
+            startUnconfigured)
     {
     }
 
     public AppLogFileWriter(
         string? logDirectory,
-        int retainedFileCount = DefaultRetainedFileCount,
+        int retainedFileCount = LogFileSettings.DefaultRetainedFileCount,
         Func<DateTimeOffset>? clock = null)
-        : this(logDirectory, retainedFileCount, clock, DefaultQueueCapacity, TimeSpan.Zero)
+        : this(
+            logDirectory,
+            retainedFileCount,
+            clock,
+            DefaultQueueCapacity,
+            TimeSpan.Zero,
+            startUnconfigured: false)
     {
     }
 
@@ -48,13 +62,14 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
         int retainedFileCount,
         Func<DateTimeOffset>? clock,
         int queueCapacity,
-        TimeSpan simulatedWriteDelay)
+        TimeSpan simulatedWriteDelay,
+        bool startUnconfigured = false)
     {
         _logDirectory = string.IsNullOrWhiteSpace(logDirectory)
             ? StorageLocationDefaults.GetDefaults().LogDirectory
             : Path.GetFullPath(logDirectory);
-        _retainedFileCount = Math.Max(1, retainedFileCount);
         _clock = clock ?? (() => DateTimeOffset.Now);
+        _runStartedAt = _clock();
         _simulatedWriteDelay = simulatedWriteDelay > TimeSpan.Zero ? simulatedWriteDelay : TimeSpan.Zero;
         _queue = Channel.CreateBounded<QueuedWorkItem>(new BoundedChannelOptions(Math.Max(16, queueCapacity))
         {
@@ -64,6 +79,11 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
             FullMode = BoundedChannelFullMode.Wait
         });
         _processingTask = Task.Run(ProcessQueueAsync);
+
+        if (!startUnconfigured)
+        {
+            ConfigureInitial(new LogFileSettings(true, retainedFileCount));
+        }
     }
 
     public void Write(
@@ -74,7 +94,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
         EventId eventId = default,
         DateTimeOffset? timestamp = null)
     {
-        if (level == LogLevel.None)
+        if (level == LogLevel.None || Volatile.Read(ref _acceptingWrites) == 0)
         {
             return;
         }
@@ -83,7 +103,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
         var line = BuildLine(effectiveTimestamp, level, category, message, exception, eventId);
         var requiresFlush = level >= LogLevel.Error || exception is not null;
 
-        lock (_disposeGate)
+        lock (_stateGate)
         {
             if (_disposed)
             {
@@ -97,10 +117,54 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
         }
     }
 
+    public async Task<LogRuntimeApplyResult> ApplyAsync(
+        LogFileSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var normalized = LogFileSettings.Normalize(settings);
+        Task<LogRuntimeApplyResult> completionTask;
+        ApplySettingsRequest? request = null;
+        lock (_stateGate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_configured)
+            {
+                completionTask = ConfigureInitial(normalized);
+            }
+            else
+            {
+                if (!normalized.Enabled)
+                {
+                    Volatile.Write(ref _acceptingWrites, 0);
+                }
+
+                var completion = new TaskCompletionSource<LogRuntimeApplyResult>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                completionTask = completion.Task;
+                request = new ApplySettingsRequest(normalized, completion);
+            }
+        }
+
+        if (request is not null)
+        {
+            await _queue.Writer.WriteAsync(request, CancellationToken.None);
+        }
+
+        var result = await completionTask;
+        if (normalized.Enabled)
+        {
+            Volatile.Write(ref _acceptingWrites, 1);
+        }
+
+        return result;
+    }
+
     public void Flush()
     {
+        EnsureConfiguredForShutdown();
         TaskCompletionSource flushCompletion;
-        lock (_disposeGate)
+        lock (_stateGate)
         {
             if (_disposed)
             {
@@ -122,7 +186,8 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
 
     public void Dispose()
     {
-        lock (_disposeGate)
+        EnsureConfiguredForShutdown();
+        lock (_stateGate)
         {
             if (_disposed)
             {
@@ -130,6 +195,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
             }
 
             _disposed = true;
+            Volatile.Write(ref _acceptingWrites, 0);
             _queue.Writer.TryComplete();
         }
 
@@ -142,33 +208,64 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
         }
     }
 
+    private Task<LogRuntimeApplyResult> ConfigureInitial(LogFileSettings settings)
+    {
+        var normalized = LogFileSettings.Normalize(settings);
+        var completion = new TaskCompletionSource<LogRuntimeApplyResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _configured = true;
+        if (!normalized.Enabled)
+        {
+            Volatile.Write(ref _acceptingWrites, 0);
+        }
+
+        _initialConfiguration.TrySetResult(new InitialConfiguration(normalized, completion));
+        return completion.Task;
+    }
+
+    private void EnsureConfiguredForShutdown()
+    {
+        lock (_stateGate)
+        {
+            if (!_configured && !_disposed)
+            {
+                ConfigureInitial(LogFileSettings.Default);
+            }
+        }
+    }
+
     private async Task ProcessQueueAsync()
     {
         StreamWriter? activeWriter = null;
         string? activeFilePath = null;
-        DateOnly activeDate = default;
-        DateOnly lastCleanupDate = default;
         var pendingWriteCount = 0;
         var flushStopwatch = Stopwatch.StartNew();
+        var initial = await _initialConfiguration.Task;
+        var currentSettings = initial.Settings;
 
         try
         {
+            initial.Completion.SetResult(ApplyFilePolicies(
+                currentSettings,
+                activeFilePath,
+                deleteLegacyFiles: true,
+                enforceRetention: true));
             await foreach (var workItem in _queue.Reader.ReadAllAsync())
             {
                 switch (workItem)
                 {
-                    case QueuedLogEntry entry:
+                    case QueuedLogEntry entry when currentSettings.Enabled:
                         try
                         {
-                            activeWriter = await EnsureWriterAsync(
-                                entry.Timestamp,
-                                activeWriter,
-                                activeFilePath,
-                                activeDate,
-                                lastCleanupDate);
-                            activeFilePath = BuildLogFilePath(entry.Timestamp);
-                            activeDate = DateOnly.FromDateTime(entry.Timestamp.LocalDateTime.Date);
-                            lastCleanupDate = activeDate;
+                            if (activeWriter is null)
+                            {
+                                (activeFilePath, activeWriter) = CreateWriter(activeFilePath);
+                                var creationCleanup = AppLogFileCatalog.EnforceRetention(
+                                    _logDirectory,
+                                    currentSettings.RetainedFileCount,
+                                    activeFilePath);
+                                _ = creationCleanup;
+                            }
 
                             pendingWriteCount += await WriteDroppedEntryWarningAsync(activeWriter, entry.Timestamp);
                             if (_simulatedWriteDelay > TimeSpan.Zero)
@@ -178,7 +275,6 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
 
                             await activeWriter.WriteAsync(entry.Line);
                             pendingWriteCount++;
-
                             if (entry.RequiresFlush ||
                                 pendingWriteCount >= FlushBatchSize ||
                                 flushStopwatch.Elapsed >= FlushInterval)
@@ -195,7 +291,6 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
                                 await activeWriter.DisposeAsync();
                                 activeWriter = null;
                                 activeFilePath = null;
-                                activeDate = default;
                             }
 
                             pendingWriteCount = 0;
@@ -203,33 +298,48 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
                         }
 
                         break;
+
+                    case ApplySettingsRequest request:
+                        try
+                        {
+                            if (activeWriter is not null &&
+                                (!request.Settings.Enabled ||
+                                 request.Settings.RetainedFileCount != currentSettings.RetainedFileCount))
+                            {
+                                await FlushWriterAsync(activeWriter, pendingWriteCount);
+                                pendingWriteCount = 0;
+                            }
+
+                            if (!request.Settings.Enabled && activeWriter is not null)
+                            {
+                                await activeWriter.DisposeAsync();
+                                activeWriter = null;
+                            }
+
+                            var retainedFileCountChanged =
+                                request.Settings.RetainedFileCount != currentSettings.RetainedFileCount;
+                            currentSettings = request.Settings;
+                            request.Completion.SetResult(ApplyFilePolicies(
+                                currentSettings,
+                                activeFilePath,
+                                deleteLegacyFiles: true,
+                                enforceRetention: retainedFileCountChanged));
+                            flushStopwatch.Restart();
+                        }
+                        catch (Exception ex)
+                        {
+                            request.Completion.SetException(ex);
+                        }
+
+                        break;
+
                     case FlushRequest flushRequest:
                         try
                         {
-                            if (activeWriter is null && Interlocked.Read(ref _droppedEntryCount) <= 0)
+                            if (activeWriter is not null)
                             {
-                                flushRequest.Completion.SetResult();
-                                break;
-                            }
-
-                            if (activeWriter is null)
-                            {
-                                var flushTimestamp = _clock();
-                                activeWriter = await EnsureWriterAsync(
-                                    flushTimestamp,
-                                    activeWriter,
-                                    activeFilePath,
-                                    activeDate,
-                                    lastCleanupDate);
-                                activeFilePath = BuildLogFilePath(flushTimestamp);
-                                activeDate = DateOnly.FromDateTime(flushTimestamp.LocalDateTime.Date);
-                                lastCleanupDate = activeDate;
-                            }
-
-                            pendingWriteCount += await WriteDroppedEntryWarningAsync(activeWriter, _clock());
-                            if (pendingWriteCount > 0)
-                            {
-                                await activeWriter.FlushAsync();
+                                pendingWriteCount += await WriteDroppedEntryWarningAsync(activeWriter, _clock());
+                                await FlushWriterAsync(activeWriter, pendingWriteCount);
                                 pendingWriteCount = 0;
                                 flushStopwatch.Restart();
                             }
@@ -250,109 +360,59 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
             if (activeWriter is not null)
             {
                 pendingWriteCount += await WriteDroppedEntryWarningAsync(activeWriter, _clock());
-                if (pendingWriteCount > 0)
-                {
-                    await activeWriter.FlushAsync();
-                }
-
+                await FlushWriterAsync(activeWriter, pendingWriteCount);
                 await activeWriter.DisposeAsync();
             }
         }
     }
 
-    private async Task<StreamWriter> EnsureWriterAsync(
-        DateTimeOffset timestamp,
-        StreamWriter? activeWriter,
+    private (string Path, StreamWriter Writer) CreateWriter(string? existingPath)
+    {
+        if (!string.IsNullOrWhiteSpace(existingPath))
+        {
+            var existingStream = new FileStream(
+                existingPath,
+                FileMode.Append,
+                FileAccess.Write,
+                FileShare.ReadWrite,
+                bufferSize: 4096,
+                useAsync: true);
+            return (existingPath, new StreamWriter(existingStream, Encoding.UTF8));
+        }
+
+        var (path, stream) = AppLogFileCatalog.CreateRunFile(_logDirectory, _runStartedAt);
+        return (path, new StreamWriter(stream, Encoding.UTF8));
+    }
+
+    private LogRuntimeApplyResult ApplyFilePolicies(
+        LogFileSettings settings,
         string? activeFilePath,
-        DateOnly activeDate,
-        DateOnly lastCleanupDate)
-    {
-        Directory.CreateDirectory(_logDirectory);
-
-        var currentDate = DateOnly.FromDateTime(timestamp.LocalDateTime.Date);
-        var filePath = BuildLogFilePath(timestamp);
-        if (activeWriter is not null &&
-            activeFilePath is not null &&
-            activeDate == currentDate &&
-            string.Equals(activeFilePath, filePath, StringComparison.OrdinalIgnoreCase))
-        {
-            return activeWriter;
-        }
-
-        if (activeWriter is not null)
-        {
-            await activeWriter.DisposeAsync();
-        }
-
-        var stream = new FileStream(
-            filePath,
-            FileMode.Append,
-            FileAccess.Write,
-            FileShare.ReadWrite,
-            bufferSize: 4096,
-            useAsync: true);
-        var writer = new StreamWriter(stream, Encoding.UTF8);
-
-        if (lastCleanupDate != currentDate)
-        {
-            CleanupOldFiles();
-        }
-
-        return writer;
-    }
-
-    private string BuildLogFilePath(DateTimeOffset timestamp)
-    {
-        return Path.Combine(_logDirectory, $"app-{timestamp:yyyyMMdd}.log");
-    }
-
-    private void CleanupOldFiles()
+        bool deleteLegacyFiles,
+        bool enforceRetention)
     {
         try
         {
-            var files = new DirectoryInfo(_logDirectory)
-                .GetFiles("app-*.log", SearchOption.TopDirectoryOnly)
-                .Select(file =>
-                {
-                    var hasParsedDate = TryParseLogDate(file.Name, out var parsedDate);
-                    return new
-                    {
-                        File = file,
-                        ParsedDate = hasParsedDate ? parsedDate : DateOnly.MinValue,
-                        HasParsedDate = hasParsedDate
-                    };
-                })
-                .OrderByDescending(item => item.HasParsedDate)
-                .ThenByDescending(item => item.ParsedDate)
-                .ThenByDescending(item => item.File.Name, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            foreach (var file in files.Skip(_retainedFileCount))
-            {
-                file.File.Delete();
-            }
+            Directory.CreateDirectory(_logDirectory);
         }
         catch
         {
+            return new LogRuntimeApplyResult(1, 1);
         }
+        var legacyFailures = deleteLegacyFiles
+            ? AppLogFileCatalog.DeleteLegacyDailyFiles(_logDirectory)
+            : 0;
+        var retentionFailures = enforceRetention
+            ? AppLogFileCatalog.EnforceRetention(
+                _logDirectory,
+                settings.RetainedFileCount,
+                activeFilePath)
+            : 0;
+        return new LogRuntimeApplyResult(legacyFailures, retentionFailures);
     }
 
-    private static bool TryParseLogDate(string fileName, out DateOnly date)
+    private static Task FlushWriterAsync(StreamWriter writer, int pendingWriteCount)
     {
-        const string prefix = "app-";
-        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
-        if (!fileNameWithoutExtension.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-        {
-            date = default;
-            return false;
-        }
-
-        return DateOnly.TryParseExact(
-            fileNameWithoutExtension[prefix.Length..],
-            "yyyyMMdd",
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.None,
-            out date);
+        return pendingWriteCount > 0 ? writer.FlushAsync() : Task.CompletedTask;
     }
 
     private static string BuildLine(
@@ -407,14 +467,13 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
             return 0;
         }
 
-        var line = BuildLine(
+        await writer.WriteAsync(BuildLine(
             timestamp,
             LogLevel.Warning,
             "Logging",
             $"日志队列已满，已丢弃 {droppedCount} 条日志。",
             exception: null,
-            eventId: default);
-        await writer.WriteAsync(line);
+            eventId: default));
         return 1;
     }
 
@@ -451,7 +510,18 @@ public sealed class AppLogFileWriter : IAppLogWriter, IDisposable
 
     private abstract record QueuedWorkItem;
 
-    private sealed record QueuedLogEntry(DateTimeOffset Timestamp, string Line, bool RequiresFlush) : QueuedWorkItem;
+    private sealed record QueuedLogEntry(
+        DateTimeOffset Timestamp,
+        string Line,
+        bool RequiresFlush) : QueuedWorkItem;
+
+    private sealed record ApplySettingsRequest(
+        LogFileSettings Settings,
+        TaskCompletionSource<LogRuntimeApplyResult> Completion) : QueuedWorkItem;
 
     private sealed record FlushRequest(TaskCompletionSource Completion) : QueuedWorkItem;
+
+    private sealed record InitialConfiguration(
+        LogFileSettings Settings,
+        TaskCompletionSource<LogRuntimeApplyResult> Completion);
 }

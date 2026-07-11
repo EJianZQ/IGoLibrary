@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddSingleton<IVenueWorkflowService, VenueWorkflowService>();
         services.AddSingleton<IReservationWorkflowService, ReservationWorkflowService>();
         services.AddSingleton<ISettingsWorkflowService, SettingsWorkflowService>();
+        services.AddSingleton<ILoggingSettingsWorkflowService, LoggingSettingsWorkflowService>();
         services.AddSingleton<IUpdateCheckService, UpdateCheckService>();
         services.AddSingleton<IProtocolTemplateEditorService, ProtocolTemplateEditorService>();
         services.AddSingleton<IRemoteCheckInProfileService, RemoteCheckInProfileService>();

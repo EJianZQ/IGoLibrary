@@ -54,8 +54,9 @@ internal static class Program
             .InitializeAsync()
             .GetAwaiter()
             .GetResult();
-        using var sharedLogWriter = new AppLogFileWriter(storageLocations);
+        using var sharedLogWriter = new AppLogFileWriter(storageLocations, startUnconfigured: true);
         RegisterGlobalExceptionLogging(sharedLogWriter);
+        var logWriterConfigured = false;
 
         try
         {
@@ -65,12 +66,57 @@ internal static class Program
                     storageLocationManager,
                     storageLocations)
                 .Build();
+
+            Host.Services.GetRequiredService<IAppDataInitializer>()
+                .InitializeAsync()
+                .GetAwaiter()
+                .GetResult();
+
+            LogFileSettings loggingSettings;
+            try
+            {
+                loggingSettings = Host.Services.GetRequiredService<ISettingsService>()
+                    .LoadAsync()
+                    .GetAwaiter()
+                    .GetResult()
+                    .Logging;
+            }
+            catch (Exception ex)
+            {
+                loggingSettings = LogFileSettings.Default;
+                var fallbackResult = sharedLogWriter.ApplyAsync(loggingSettings)
+                    .GetAwaiter()
+                    .GetResult();
+                logWriterConfigured = true;
+                sharedLogWriter.Write(
+                    LogLevel.Warning,
+                    "Bootstrap",
+                    "读取日志设置失败，已使用默认日志设置。",
+                    ex);
+                WriteLogCleanupWarning(sharedLogWriter, fallbackResult);
+            }
+
+            if (!logWriterConfigured)
+            {
+                var applyResult = sharedLogWriter.ApplyAsync(loggingSettings)
+                    .GetAwaiter()
+                    .GetResult();
+                logWriterConfigured = true;
+                WriteLogCleanupWarning(sharedLogWriter, applyResult);
+            }
+
             Host.Start();
             Host.Services.GetRequiredService<TraceListenerRegistrar>().Attach();
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(restartArguments.ApplicationArguments);
         }
         catch (Exception ex)
         {
+            if (!logWriterConfigured)
+            {
+                sharedLogWriter.ApplyAsync(LogFileSettings.Default).GetAwaiter().GetResult();
+                logWriterConfigured = true;
+            }
+
             Interlocked.Exchange(ref _skipNextUnhandledExceptionLog, 1);
             sharedLogWriter.Write(LogLevel.Critical, "Bootstrap", "应用启动失败。", ex);
             sharedLogWriter.Flush();
@@ -115,6 +161,21 @@ internal static class Program
                 }
             }
         }
+    }
+
+    private static void WriteLogCleanupWarning(
+        IAppLogWriter logWriter,
+        LogRuntimeApplyResult result)
+    {
+        if (result.TotalDeleteFailureCount <= 0)
+        {
+            return;
+        }
+
+        logWriter.Write(
+            LogLevel.Warning,
+            "Logging",
+            $"有 {result.TotalDeleteFailureCount} 个旧日志文件暂时无法清理，将在后续启动或设置变更时重试。");
     }
 
     private static void RegisterGlobalExceptionLogging(IAppLogWriter logWriter)

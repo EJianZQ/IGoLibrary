@@ -38,6 +38,10 @@ internal static class HostBuilderFactory
                 if (sharedLogWriter is not null)
                 {
                     services.AddSingleton(sharedLogWriter);
+                    if (sharedLogWriter is IAppLogRuntimeController runtimeController)
+                    {
+                        services.AddSingleton(runtimeController);
+                    }
                 }
 
                 if (storageLocationManager is not null && storageLocations is not null)

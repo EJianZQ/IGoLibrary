@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using IGoLibrary.Ex.Infrastructure.Logging;
 
 namespace IGoLibrary.Ex.Infrastructure.Persistence;
 
@@ -125,24 +126,59 @@ internal sealed class StorageMigrationTransaction(PendingStorageLocationChange c
 
     private void StageLogs()
     {
-        if (!change.MigrateLogs ||
-            StoragePathRules.DirectoriesReferToSameLocation(
+        if (StoragePathRules.DirectoriesReferToSameLocation(
                 change.Source.LogDirectory,
-                change.Target.LogDirectory) ||
-            !Directory.Exists(change.Source.LogDirectory))
+                change.Target.LogDirectory))
+        {
+            return;
+        }
+
+        if (Directory.Exists(change.Target.LogDirectory))
+        {
+            foreach (var targetLegacyLog in Directory.GetFiles(
+                         change.Target.LogDirectory,
+                         "app-*.log",
+                         SearchOption.TopDirectoryOnly)
+                     .Where(path => AppLogFileCatalog.IsLegacyDailyFileName(Path.GetFileName(path))))
+            {
+                _sourceFiles.Add(new PendingStorageCleanup(
+                    change.Target.LogDirectory,
+                    Path.GetFileName(targetLegacyLog),
+                    StorageCleanupKind.LogFile));
+            }
+        }
+
+        if (!Directory.Exists(change.Source.LogDirectory))
         {
             return;
         }
 
         var sourceLogs = Directory.GetFiles(change.Source.LogDirectory, "app-*.log", SearchOption.TopDirectoryOnly);
-        if (sourceLogs.Length == 0)
+        foreach (var legacyLog in sourceLogs.Where(path =>
+                     AppLogFileCatalog.IsLegacyDailyFileName(Path.GetFileName(path))))
+        {
+            _sourceFiles.Add(new PendingStorageCleanup(
+                change.Source.LogDirectory,
+                Path.GetFileName(legacyLog),
+                StorageCleanupKind.LogFile));
+        }
+
+        if (!change.MigrateLogs)
+        {
+            return;
+        }
+
+        var runLogs = sourceLogs
+            .Where(path => AppLogFileCatalog.TryParseRunFileName(Path.GetFileName(path), out _))
+            .ToArray();
+        if (runLogs.Length == 0)
         {
             return;
         }
 
         _logStageDirectory = Path.Combine(change.Target.LogDirectory, $".igolibrary-ex-log-migration-{_id}");
         Directory.CreateDirectory(_logStageDirectory);
-        foreach (var source in sourceLogs)
+        foreach (var source in runLogs)
         {
             var staged = Path.Combine(_logStageDirectory, Path.GetFileName(source));
             File.Copy(source, staged, overwrite: false);
@@ -200,18 +236,12 @@ internal sealed class StorageMigrationTransaction(PendingStorageLocationChange c
             return candidate;
         }
 
-        var baseName = Path.GetFileNameWithoutExtension(fileName);
-        var extension = Path.GetExtension(fileName);
-        for (var index = 1; ; index++)
+        if (!AppLogFileCatalog.TryParseRunFileName(fileName, out var startedAt))
         {
-            candidate = Path.Combine(
-                targetDirectory,
-                $"{baseName}-migrated-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}-{index}{extension}");
-            if (!File.Exists(candidate))
-            {
-                return candidate;
-            }
+            throw new InvalidDataException($"无法识别运行日志文件名：{fileName}");
         }
+
+        return AppLogFileCatalog.GetAvailableRunPath(targetDirectory, startedAt);
     }
 
     private static List<PendingStorageCleanup> TryDeleteFiles(IEnumerable<PendingStorageCleanup> cleanups)

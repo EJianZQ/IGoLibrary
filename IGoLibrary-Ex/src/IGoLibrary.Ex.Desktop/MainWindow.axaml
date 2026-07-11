@@ -3506,6 +3506,53 @@
                       <StackPanel Spacing="6">
                         <TextBlock FontSize="15"
                                    FontWeight="SemiBold"
+                                   Text="日志管理" />
+                        <TextBlock Classes="helper-text"
+                                   Text="每次运行使用一份独立日志" />
+                      </StackPanel>
+
+                      <Grid RowDefinitions="Auto,Auto"
+                            ColumnDefinitions="*,160"
+                            RowSpacing="12"
+                            ColumnSpacing="12">
+                        <StackPanel Spacing="4">
+                          <TextBlock Classes="field-label"
+                                     Text="记录运行日志" />
+                          <TextBlock Classes="helper-text"
+                                     Text="更改后立即保存并应用到当前运行" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1"
+                                      IsChecked="{Binding SystemSettings.StorageSettings.IsFileLoggingEnabled}"
+                                      OnContent="开"
+                                      OffContent="关"
+                                      HorizontalAlignment="Right"
+                                      VerticalAlignment="Center" />
+
+                        <StackPanel Grid.Row="1"
+                                    Spacing="4">
+                          <TextBlock Classes="field-label"
+                                     Text="最多保留日志" />
+                          <TextBlock Classes="helper-text"
+                                     Text="调小数量后会立即清理最旧的运行日志" />
+                        </StackPanel>
+                        <NumericUpDown Grid.Row="1"
+                                       Grid.Column="1"
+                                       Minimum="1"
+                                       Maximum="365"
+                                       Increment="1"
+                                       FormatString="0"
+                                       Value="{Binding SystemSettings.StorageSettings.RetainedLogFileCount}"
+                                       HorizontalAlignment="Stretch"
+                                       VerticalAlignment="Center" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="card">
+                    <StackPanel Spacing="16">
+                      <StackPanel Spacing="6">
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
                                    Text="存储位置" />
                         <TextBlock Classes="helper-text"
                                    Text="数据和日志目录会在重启后生效；应用前可选择是否迁移现有文件" />

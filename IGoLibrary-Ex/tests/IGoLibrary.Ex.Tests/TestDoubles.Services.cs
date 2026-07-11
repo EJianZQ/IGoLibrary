@@ -924,6 +924,24 @@ internal sealed class FakeStorageChangeWorkflowService : IStorageChangeWorkflowS
     }
 }
 
+internal sealed class FakeLoggingSettingsWorkflowService : ILoggingSettingsWorkflowService
+{
+    public List<LogFileSettings> SavedSettings { get; } = [];
+
+    public Func<LogFileSettings, Task<LoggingSettingsUpdateResult>>? SaveHandler { get; set; }
+
+    public Task<LoggingSettingsUpdateResult> SaveAsync(
+        LogFileSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        SavedSettings.Add(settings);
+        return SaveHandler?.Invoke(settings)
+               ?? Task.FromResult(new LoggingSettingsUpdateResult(
+                   LogFileSettings.Normalize(settings),
+                   LogRuntimeApplyResult.Success));
+    }
+}
+
 internal sealed class FakeStorageChangeDialogService : IStorageChangeDialogService
 {
     public StorageMigrationDecision MigrationDecision { get; set; } = StorageMigrationDecision.Migrate;
