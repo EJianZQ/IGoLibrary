@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="IGoLibrary.Ex.Desktop.Startup.StartupNoticeWindow"
+        Width="440"
+        MinHeight="200"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen"
+        Icon="/Assets/main.ico">
+  <Border Margin="12"
+          Padding="24"
+          CornerRadius="16"
+          BorderThickness="1"
+          BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+    <Grid RowDefinitions="Auto,Auto,Auto"
+          RowSpacing="18">
+      <TextBlock x:Name="TitleText"
+                 FontSize="20"
+                 FontWeight="Bold" />
+      <TextBlock x:Name="MessageText"
+                 Grid.Row="1"
+                 FontSize="14"
+                 TextWrapping="Wrap" />
+      <Button x:Name="ConfirmButton"
+              Grid.Row="2"
+              Content="确定"
+              MinWidth="96"
+              HorizontalAlignment="Right" />
+    </Grid>
+  </Border>
+</Window>

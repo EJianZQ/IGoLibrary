@@ -8,9 +8,11 @@
     <ProjectReference Include="..\..\src\IGoLibrary.Ex.Desktop\IGoLibrary.Ex.Desktop.csproj" />
     <ProjectReference Include="..\..\src\IGoLibrary.Ex.Domain\IGoLibrary.Ex.Domain.csproj" />
     <ProjectReference Include="..\..\src\IGoLibrary.Ex.Infrastructure\IGoLibrary.Ex.Infrastructure.csproj" />
+    <ProjectReference Include="..\IGoLibrary.Ex.TestProcess\IGoLibrary.Ex.TestProcess.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="11.3.12" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />

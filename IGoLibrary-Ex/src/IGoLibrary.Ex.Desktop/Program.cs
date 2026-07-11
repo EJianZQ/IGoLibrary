@@ -1,6 +1,7 @@
 using Avalonia;
 using System.Diagnostics;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Desktop.Startup;
 using IGoLibrary.Ex.Infrastructure.Logging;
 using IGoLibrary.Ex.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,9 +20,38 @@ internal static class Program
     public static void Main(string[] args)
     {
         var restartArguments = RestartArguments.Parse(args);
+        new SingleInstanceStartupCoordinator(
+                parentProcessId => RestartParentProcessWaiter.WaitForExitAsync(parentProcessId),
+                () => SingleInstanceLock.TryAcquire(),
+                ShowStartupNotice,
+                RunPrimaryApplication)
+            .Run(restartArguments);
+    }
+
+    public static AppBuilder BuildAvaloniaApp()
+        => AppBuilder.Configure<App>()
+            .UsePlatformDetect()
+            .WithInterFont()
+            .LogToTrace();
+
+    internal static AppBuilder BuildStartupNoticeApp(StartupNotice notice)
+    {
+        StartupNoticeApp.Configure(notice);
+        return AppBuilder.Configure<StartupNoticeApp>()
+            .UsePlatformDetect()
+            .WithInterFont();
+    }
+
+    private static void ShowStartupNotice(StartupNotice notice)
+    {
+        BuildStartupNoticeApp(notice).StartWithClassicDesktopLifetime([]);
+    }
+
+    private static void RunPrimaryApplication(RestartArguments restartArguments)
+    {
         var storageLocationManager = new StorageLocationManager();
         var storageLocations = storageLocationManager
-            .InitializeAsync(restartArguments.ParentProcessId)
+            .InitializeAsync()
             .GetAwaiter()
             .GetResult();
         using var sharedLogWriter = new AppLogFileWriter(storageLocations);
@@ -86,12 +116,6 @@ internal static class Program
             }
         }
     }
-
-    public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-            .WithInterFont()
-            .LogToTrace();
 
     private static void RegisterGlobalExceptionLogging(IAppLogWriter logWriter)
     {

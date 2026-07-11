@@ -1,12 +1,9 @@
-using System.Diagnostics;
 using IGoLibrary.Ex.Application.Abstractions;
 
 namespace IGoLibrary.Ex.Infrastructure.Persistence;
 
 public sealed class StorageLocationManager : IStorageLocationService
 {
-    private static readonly TimeSpan ParentExitTimeout = TimeSpan.FromSeconds(60);
-
     private readonly StorageLocatorStore _locatorStore;
     private readonly StorageLocations _recoveryLocations;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -35,15 +32,8 @@ public sealed class StorageLocationManager : IStorageLocationService
 
     public StorageLocations Defaults { get; }
 
-    public async Task<StorageLocations> InitializeAsync(
-        int? restartParentProcessId = null,
-        CancellationToken cancellationToken = default)
+    public async Task<StorageLocations> InitializeAsync(CancellationToken cancellationToken = default)
     {
-        if (restartParentProcessId is > 0 && restartParentProcessId.Value != Environment.ProcessId)
-        {
-            await WaitForParentExitAsync(restartParentProcessId, cancellationToken);
-        }
-
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -372,28 +362,4 @@ public sealed class StorageLocationManager : IStorageLocationService
         }
     }
 
-    private static async Task WaitForParentExitAsync(int? processId, CancellationToken cancellationToken)
-    {
-        if (processId is not > 0 || processId == Environment.ProcessId)
-        {
-            return;
-        }
-
-        Process process;
-        try
-        {
-            process = Process.GetProcessById(processId.Value);
-        }
-        catch (ArgumentException)
-        {
-            return;
-        }
-
-        using (process)
-        using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
-        {
-            timeout.CancelAfter(ParentExitTimeout);
-            await process.WaitForExitAsync(timeout.Token);
-        }
-    }
 }
