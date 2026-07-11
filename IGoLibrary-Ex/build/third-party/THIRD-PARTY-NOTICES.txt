@@ -1,0 +1,8 @@
+IGoLibrary-Ex includes the unmodified cloudflared executable.
+
+Project: cloudflare/cloudflared
+Version: 2026.7.0
+Source: https://github.com/cloudflare/cloudflared
+License: Apache License 2.0 (see LICENSE.txt in this directory)
+
+Cloudflare, the Cloudflare logo, and Cloudflare Tunnel are trademarks of Cloudflare, Inc.

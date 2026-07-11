@@ -248,6 +248,113 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_CloudflareModeUpdatesAllQuickTransferLabels()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(
+                9527,
+                "token",
+                NetworkMode: MobileControlNetworkMode.CloudflareTunnel)
+        });
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal(1, viewModel.SystemSettings.SelectedMobileControlNetworkModeIndex);
+        Assert.Equal("公网快传", viewModel.SystemSettings.CookieQuickTransferButtonText);
+        Assert.Equal("公网快传签到授权", viewModel.SystemSettings.RemoteCheckInQuickTransferButtonText);
+    }
+
+    [Fact]
+    public async Task CloudflareProxySettings_LoadAndApplyManualProxy()
+    {
+        var exposureManager = new FakeNetworkExposureManager();
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(
+                9527,
+                "token",
+                TunnelProxyMode: CloudflareTunnelProxyMode.SystemProxy)
+        });
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            networkExposureManager: exposureManager);
+        await viewModel.InitializeAsync();
+
+        Assert.Equal((int)CloudflareTunnelProxyMode.SystemProxy,
+            viewModel.SystemSettings.SelectedCloudflareTunnelProxyModeIndex);
+
+        viewModel.SystemSettings.SelectedCloudflareTunnelProxyModeIndex =
+            (int)CloudflareTunnelProxyMode.ManualHttpProxy;
+        viewModel.SystemSettings.CloudflareTunnelManualProxyUrl = "http://127.0.0.1:7897";
+        await viewModel.SystemSettings.ApplyCloudflareTunnelProxySettingsCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.SystemSettings.IsManualCloudflareTunnelProxy);
+        Assert.Equal(CloudflareTunnelProxyMode.ManualHttpProxy, exposureManager.TunnelProxyMode);
+        Assert.Equal("http://127.0.0.1:7897", exposureManager.TunnelManualProxyUrl);
+    }
+
+    [Fact]
+    public async Task CloudflareFallbackSetting_LoadsAndAppliesImmediately()
+    {
+        var exposureManager = new FakeNetworkExposureManager();
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(
+                9527,
+                "token",
+                NetworkMode: MobileControlNetworkMode.CloudflareTunnel,
+                FallbackToLocalNetworkOnTunnelFailure: false)
+        });
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            networkExposureManager: exposureManager);
+        await viewModel.InitializeAsync();
+
+        Assert.False(viewModel.SystemSettings.FallbackToLocalNetworkOnTunnelFailure);
+        Assert.False(exposureManager.FallbackToLocalNetworkOnTunnelFailure);
+
+        viewModel.SystemSettings.FallbackToLocalNetworkOnTunnelFailure = true;
+        await WaitForAsync(() => exposureManager.FallbackToLocalNetworkOnTunnelFailure);
+
+        Assert.True(viewModel.SystemSettings.IsCloudflareTunnelSelected);
+    }
+
+    [Fact]
+    public async Task ClashMihomoCompatibilitySettings_LoadAndApplyGenericConfiguration()
+    {
+        var exposureManager = new FakeNetworkExposureManager();
+        var initialPath = Path.GetFullPath("initial-mihomo.yaml");
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(
+                9527,
+                "token",
+                ClashMihomoCompatibilityEnabled: true,
+                ClashMihomoConfigPath: initialPath,
+                ClashMihomoRoutePolicy: "Initial Group")
+        });
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            networkExposureManager: exposureManager);
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.SystemSettings.ClashMihomoCompatibilityEnabled);
+        Assert.Equal(initialPath, viewModel.SystemSettings.ClashMihomoConfigPath);
+        Assert.Equal("Initial Group", viewModel.SystemSettings.ClashMihomoRoutePolicy);
+
+        var updatedPath = Path.GetFullPath("custom-mihomo.yaml");
+        viewModel.SystemSettings.ClashMihomoConfigPath = updatedPath;
+        viewModel.SystemSettings.ClashMihomoRoutePolicy = "Cloudflare 专线";
+        await viewModel.SystemSettings.ApplyClashMihomoCompatibilitySettingsCommand.ExecuteAsync(null);
+
+        Assert.True(exposureManager.ClashMihomoCompatibilityEnabled);
+        Assert.Equal(updatedPath, exposureManager.ClashMihomoConfigPath);
+        Assert.Equal("Cloudflare 专线", exposureManager.ClashMihomoRoutePolicy);
+    }
+
+    [Fact]
     public void NotificationSettingsCategories_ExposeTabStripItems()
     {
         var viewModel = CreateViewModel();
@@ -1278,7 +1385,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsLanCookieRelayDialogOpen);
         Assert.True(viewModel.IsLanCookieRelayRunning);
         Assert.True(viewModel.ShowLanCookieRelayStartedStatusIcon);
-        Assert.Equal("服务已启动，监听端口 49152", viewModel.LanCookieRelayStatusText);
+        Assert.Equal("局域网快传已启动，监听端口 49152", viewModel.LanCookieRelayStatusText);
         Assert.True(viewModel.HasLanCookieRelayQrImage);
         Assert.False(viewModel.HasNoLanCookieRelayQrImage);
         Assert.Equal(relayService.NextSession.Url.ToString(), viewModel.LanCookieRelayUrlText);
@@ -1349,7 +1456,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsLanCookieRelayDialogOpen);
         Assert.False(viewModel.ShowLanCookieRelayStartedStatusIcon);
         Assert.Contains("未能从链接中提取", viewModel.LanCookieRelayStatusText);
-        var warning = Assert.Single(notificationService.Warnings, item => item.Title == "局域网快传失败");
+        var warning = Assert.Single(notificationService.Warnings, item => item.Title == "快传失败");
         Assert.Contains("未能从链接中提取", warning.Message);
     }
 
@@ -3371,7 +3478,8 @@ public sealed class MainWindowViewModelTests
         FakeLanCookieRelayService? lanCookieRelayService = null,
         FakeQrCodeImageFactory? qrCodeImageFactory = null,
         FakeMobileControlService? mobileControlService = null,
-        FakeTimeProvider? timeProvider = null)
+        FakeTimeProvider? timeProvider = null,
+        FakeNetworkExposureManager? networkExposureManager = null)
     {
         sessionService ??= new FakeSessionService();
         libraryService ??= new FakeLibraryService();
@@ -3408,7 +3516,8 @@ public sealed class MainWindowViewModelTests
             startupEntryService ?? new FakeStartupEntryService(),
             lanCookieRelayService ?? new FakeLanCookieRelayService(),
             qrCodeImageFactory ?? new FakeQrCodeImageFactory(),
-            mobileControlService);
+            mobileControlService,
+            networkExposureManager: networkExposureManager);
     }
 
     private static ReleaseUpdateInfo CreateReleaseUpdateInfo(string tagName)

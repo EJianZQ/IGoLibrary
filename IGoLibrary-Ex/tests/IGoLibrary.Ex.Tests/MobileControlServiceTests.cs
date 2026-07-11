@@ -315,12 +315,49 @@ public sealed class MobileControlServiceTests
         Assert.False(document.RootElement.GetProperty("success").GetBoolean());
     }
 
+    [Fact]
+    public async Task StartAsync_InCloudflareMode_ReturnsPublicUrlAndKeepsLanUrl()
+    {
+        var exposureManager = new FakeNetworkExposureManager();
+        exposureManager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
+        await using var service = CreateService(exposureManager: exposureManager);
+        var port = GetFreeTcpPort();
+
+        var session = await service.StartAsync(new MobileControlSettings(port, "token"));
+
+        Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, session.EffectiveMode);
+        Assert.Equal("https://unit-test.trycloudflare.com/?token=token", session.Url.ToString());
+        Assert.Equal($"http://127.0.0.1:{port}/?token=token", session.LanUrl.ToString());
+    }
+
+    [Fact]
+    public async Task ActiveSession_LiveModeSwitchPreservesKestrelSessionAndPort()
+    {
+        var exposureManager = new FakeNetworkExposureManager();
+        await using var service = CreateService(exposureManager: exposureManager);
+        var original = await service.StartAsync(new MobileControlSettings(GetFreeTcpPort(), "token"));
+        MobileControlSession? changed = null;
+        service.EndpointChanged += (_, e) => changed = e.Session;
+
+        await exposureManager.SetModeAsync(MobileControlNetworkMode.CloudflareTunnel);
+
+        var updated = Assert.IsType<MobileControlSession>(changed);
+        Assert.Equal(original.SessionId, updated.SessionId);
+        Assert.Equal(original.Port, updated.Port);
+        Assert.Equal(original.LanUrl, updated.LanUrl);
+        Assert.Equal("https", updated.Url.Scheme);
+        using var response = await new HttpClient().GetAsync(original.LanUrl);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     private static MobileControlService CreateService(
         IMobileControlStatusSnapshotProvider? statusSnapshotProvider = null,
-        IMobileControlActionService? actionService = null)
+        IMobileControlActionService? actionService = null,
+        INetworkExposureManager? exposureManager = null)
     {
         return new MobileControlService(
             new FixedLanAddressProvider(IPAddress.Loopback),
+            exposureManager ?? new FakeNetworkExposureManager(),
             statusSnapshotProvider ?? new FakeMobileControlStatusSnapshotProvider(),
             actionService ?? new FakeMobileControlActionService(),
             NullLogger<MobileControlService>.Instance);

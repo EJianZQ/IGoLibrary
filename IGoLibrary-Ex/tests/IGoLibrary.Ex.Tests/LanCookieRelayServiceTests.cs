@@ -275,10 +275,47 @@ public sealed class LanCookieRelayServiceTests
         Assert.Equal(IPAddress.Parse("172.20.0.10"), selected);
     }
 
-    private static LanCookieRelayService CreateService()
+    [Fact]
+    public async Task StartAsync_InCloudflareMode_ReturnsPublicUrlAndKeepsLanUrl()
+    {
+        var exposureManager = new FakeNetworkExposureManager();
+        exposureManager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
+        await using var service = CreateService(exposureManager);
+
+        var session = await service.StartAsync((_, _) =>
+            Task.FromResult(LanCookieRelaySubmitResult.Succeeded("ok")));
+
+        Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, session.EffectiveMode);
+        Assert.Equal("https", session.Url.Scheme);
+        Assert.Equal("unit-test.trycloudflare.com", session.Url.Host);
+        Assert.Equal("http", session.LanUrl.Scheme);
+        Assert.Equal(session.LanUrl.Query, session.Url.Query);
+    }
+
+    [Fact]
+    public async Task ActiveSession_LiveModeSwitchChangesOnlyPublishedEndpoint()
+    {
+        var exposureManager = new FakeNetworkExposureManager();
+        await using var service = CreateService(exposureManager);
+        var original = await service.StartAsync((_, _) =>
+            Task.FromResult(LanCookieRelaySubmitResult.Succeeded("ok")));
+        LanCookieRelaySession? changed = null;
+        service.EndpointChanged += (_, e) => changed = e.Session;
+
+        await exposureManager.SetModeAsync(MobileControlNetworkMode.CloudflareTunnel);
+
+        var updated = Assert.IsType<LanCookieRelaySession>(changed);
+        Assert.Equal(original.SessionId, updated.SessionId);
+        Assert.Equal(original.Port, updated.Port);
+        Assert.Equal(original.LanUrl, updated.LanUrl);
+        Assert.Equal("https", updated.Url.Scheme);
+    }
+
+    private static LanCookieRelayService CreateService(INetworkExposureManager? exposureManager = null)
     {
         return new LanCookieRelayService(
             new FixedLanAddressProvider(IPAddress.Loopback),
+            exposureManager ?? new FakeNetworkExposureManager(),
             NullLogger<LanCookieRelayService>.Instance);
     }
 

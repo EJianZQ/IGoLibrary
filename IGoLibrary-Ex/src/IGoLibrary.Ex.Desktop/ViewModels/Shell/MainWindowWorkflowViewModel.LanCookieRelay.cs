@@ -110,6 +110,17 @@ public partial class MainWindowWorkflowViewModel
         Dispatcher.UIThread.Post(() => LanCookieRelay.ApplyStopped(e));
     }
 
+    private void OnLanCookieRelayEndpointChanged(object? sender, LanCookieRelayEndpointChangedEventArgs e)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            LanCookieRelay.ApplyEndpointChanged(e);
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() => LanCookieRelay.ApplyEndpointChanged(e));
+    }
+
     private void ConfigureLanCookieRelayPropertyBridge(ViewModelPropertyBridge propertyBridge)
     {
         propertyBridge.ForwardSame(

@@ -10,6 +10,7 @@ namespace IGoLibrary.Ex.Desktop.Services;
 
 public sealed class LanCookieRelayService(
     ILanAddressProvider addressProvider,
+    INetworkExposureManager networkExposureManager,
     ILogger<LanCookieRelayService> logger) : ILanCookieRelayService, IAsyncDisposable
 {
     private static readonly TimeSpan DefaultSessionTimeout = TimeSpan.FromMinutes(10);
@@ -18,8 +19,11 @@ public sealed class LanCookieRelayService(
     private CancellationTokenSource? _timeoutCts;
     private LanCookieRelaySession? _session;
     private SubmitGate? _submitGate;
+    private INetworkExposureLease? _exposureLease;
 
     public event EventHandler<LanCookieRelayStoppedEventArgs>? Stopped;
+
+    public event EventHandler<LanCookieRelayEndpointChangedEventArgs>? EndpointChanged;
 
     public async Task<LanCookieRelaySession> StartAsync(
         Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler,
@@ -44,6 +48,7 @@ public sealed class LanCookieRelayService(
                 ?? throw new InvalidOperationException("没有找到可用的局域网 IPv4 地址，请确认电脑已连接到局域网");
             var token = CreateToken();
             var sessionId = Guid.NewGuid();
+            var healthCheckPath = $"/_igolibrary/health/{CreateToken()}";
 
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -60,6 +65,7 @@ public sealed class LanCookieRelayService(
             var app = builder.Build();
             app.MapGet("/", context => WriteLandingPageAsync(context, token, purpose));
             app.MapGet("/auth-qrcode", context => WriteAuthQrCodeAsync(context, token));
+            app.MapGet(healthCheckPath, WriteHealthCheckAsync);
             app.MapPost("/submit", context => HandleSubmitAsync(context, token, submitHandler, submitGate));
             app.MapFallback(context => WriteJsonAsync(
                 context,
@@ -71,10 +77,17 @@ public sealed class LanCookieRelayService(
             {
                 await app.StartAsync(cancellationToken);
                 appStarted = true;
-                var session = BuildSession(app, sessionId, address, token);
+                var lanSession = BuildLanSession(app, sessionId, address, token);
+                var exposureLease = await networkExposureManager.PublishAsync(
+                    lanSession.LanUrl,
+                    healthCheckPath,
+                    cancellationToken);
+                var session = ApplyExposure(lanSession, exposureLease);
                 _app = app;
                 _session = session;
                 _submitGate = submitGate;
+                _exposureLease = exposureLease;
+                exposureLease.EndpointChanged += OnExposureEndpointChanged;
                 _timeoutCts = new CancellationTokenSource();
                 _ = StopAfterTimeoutAsync(session.SessionId, _timeoutCts.Token);
                 return session;
@@ -123,7 +136,7 @@ public sealed class LanCookieRelayService(
             await WriteJsonAsync(
                 context,
                 StatusCodes.Status403Forbidden,
-                LanCookieRelaySubmitResult.Failed("快传会话无效，请重新在电脑端启动局域网快传"));
+                LanCookieRelaySubmitResult.Failed("快传会话无效，请重新在电脑端启动快传"));
             return;
         }
 
@@ -133,7 +146,7 @@ public sealed class LanCookieRelayService(
             await TryWriteJsonAsync(
                 context,
                 StatusCodes.Status409Conflict,
-                LanCookieRelaySubmitResult.Failed("快传会话已完成，请重新在电脑端启动局域网快传"));
+                LanCookieRelaySubmitResult.Failed("快传会话已完成，请重新在电脑端启动快传"));
             return;
         }
 
@@ -199,7 +212,7 @@ public sealed class LanCookieRelayService(
         }
     }
 
-    private static async Task WriteLandingPageAsync(
+    private async Task WriteLandingPageAsync(
         HttpContext context,
         string token,
         LanAuthLinkRelayPurpose purpose)
@@ -209,13 +222,18 @@ public sealed class LanCookieRelayService(
             await WriteJsonAsync(
                 context,
                 StatusCodes.Status403Forbidden,
-                LanCookieRelaySubmitResult.Failed("快传会话无效，请重新在电脑端启动局域网快传"));
+                LanCookieRelaySubmitResult.Failed("快传会话无效，请重新在电脑端启动快传"));
             return;
         }
 
         SetNoStore(context);
         context.Response.ContentType = "text/html; charset=utf-8";
-        await context.Response.WriteAsync(LanCookieRelayMobilePage.Build(token, purpose), context.RequestAborted);
+        await context.Response.WriteAsync(
+            LanCookieRelayMobilePage.Build(
+                token,
+                purpose,
+                _session?.EffectiveMode ?? IGoLibrary.Ex.Application.Configuration.MobileControlNetworkMode.LocalNetwork),
+            context.RequestAborted);
     }
 
     private static async Task WriteAuthQrCodeAsync(HttpContext context, string token)
@@ -225,7 +243,7 @@ public sealed class LanCookieRelayService(
             await WriteJsonAsync(
                 context,
                 StatusCodes.Status403Forbidden,
-                LanCookieRelaySubmitResult.Failed("快传会话无效，请重新在电脑端启动局域网快传"));
+                LanCookieRelaySubmitResult.Failed("快传会话无效，请重新在电脑端启动快传"));
             return;
         }
 
@@ -255,7 +273,7 @@ public sealed class LanCookieRelayService(
             {
                 await StopCurrentSessionAsync(
                     LanCookieRelayStopReason.Timeout,
-                    "局域网快传已超时关闭",
+                    "快传已超时关闭",
                     CancellationToken.None);
             }
         }
@@ -274,16 +292,24 @@ public sealed class LanCookieRelayService(
         var timeoutCts = _timeoutCts;
         var session = _session;
         var submitGate = _submitGate;
+        var exposureLease = _exposureLease;
 
         _app = null;
         _timeoutCts = null;
         _session = null;
         _submitGate = null;
+        _exposureLease = null;
 
         submitGate?.Complete();
 
         timeoutCts?.Cancel();
         timeoutCts?.Dispose();
+
+        if (exposureLease is not null)
+        {
+            exposureLease.EndpointChanged -= OnExposureEndpointChanged;
+            await exposureLease.DisposeAsync();
+        }
 
         if (app is not null)
         {
@@ -303,14 +329,14 @@ public sealed class LanCookieRelayService(
         }
     }
 
-    private static LanCookieRelaySession BuildSession(
+    private static LanCookieRelaySession BuildLanSession(
         WebApplication app,
         Guid sessionId,
         IPAddress address,
         string token)
     {
         var serverAddress = app.Urls.FirstOrDefault()
-            ?? throw new InvalidOperationException("局域网快传服务启动成功，但未能读取监听地址");
+            ?? throw new InvalidOperationException("快传本机服务启动成功，但未能读取监听地址");
         var builder = new UriBuilder(serverAddress)
         {
             Host = address.ToString(),
@@ -318,13 +344,51 @@ public sealed class LanCookieRelayService(
             Query = $"token={Uri.EscapeDataString(token)}"
         };
 
+        var lanUrl = builder.Uri;
         return new LanCookieRelaySession(
             sessionId,
-            builder.Uri,
+            lanUrl,
+            lanUrl,
             address.ToString(),
             builder.Port,
             DateTimeOffset.Now,
-            DefaultSessionTimeout);
+            DefaultSessionTimeout,
+            IGoLibrary.Ex.Application.Configuration.MobileControlNetworkMode.LocalNetwork);
+    }
+
+    private static LanCookieRelaySession ApplyExposure(
+        LanCookieRelaySession session,
+        INetworkExposureLease exposureLease)
+    {
+        return session with
+        {
+            Url = exposureLease.Url,
+            EffectiveMode = exposureLease.EffectiveMode
+        };
+    }
+
+    private void OnExposureEndpointChanged(object? sender, NetworkExposureChangedEventArgs e)
+    {
+        var session = _session;
+        if (session is null || sender is not INetworkExposureLease lease || lease.Id != _exposureLease?.Id)
+        {
+            return;
+        }
+
+        session = session with
+        {
+            Url = e.Url,
+            EffectiveMode = e.EffectiveMode
+        };
+        _session = session;
+        EndpointChanged?.Invoke(this, new LanCookieRelayEndpointChangedEventArgs(session));
+    }
+
+    private static Task WriteHealthCheckAsync(HttpContext context)
+    {
+        SetNoStore(context);
+        context.Response.StatusCode = StatusCodes.Status204NoContent;
+        return Task.CompletedTask;
     }
 
     private static bool IsValidToken(HttpContext context, string expectedToken)

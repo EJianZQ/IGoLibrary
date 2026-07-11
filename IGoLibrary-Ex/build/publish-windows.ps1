@@ -47,6 +47,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE."
 }
 
+$prepareCloudflared = Join-Path $PSScriptRoot 'prepare-cloudflared.ps1'
+$cloudflaredDestination = Join-Path $output 'tools\cloudflared'
+& $prepareCloudflared -Runtime $Runtime -DestinationDirectory $cloudflaredDestination
+
 $publishedExecutable = Join-Path $output "IGoLibrary.Ex.Desktop.exe"
 if (-not (Test-Path -LiteralPath $publishedExecutable -PathType Leaf)) {
     throw "Published executable was not found: $publishedExecutable"

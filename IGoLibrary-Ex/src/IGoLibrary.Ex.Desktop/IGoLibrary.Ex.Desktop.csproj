@@ -43,4 +43,11 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
+
+  <Target Name="PrepareCloudflaredForVisualStudioDebug"
+          AfterTargets="Build"
+          Condition="'$(Configuration)' == 'Debug' and '$(BuildingInsideVisualStudio)' == 'true' and '$(OS)' == 'Windows_NT'">
+    <Exec Command="pwsh.exe -NoLogo -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)\..\..\build\prepare-cloudflared.ps1&quot; -Runtime win-x64 -DestinationDirectory &quot;$(TargetDir)tools\cloudflared&quot; -Offline"
+          ContinueOnError="WarnAndContinue" />
+  </Target>
 </Project>

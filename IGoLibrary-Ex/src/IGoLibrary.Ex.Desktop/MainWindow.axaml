@@ -677,7 +677,7 @@
                                FontWeight="Bold"
                                Foreground="{DynamicResource SemiTextPrimaryBrush}"
                                HorizontalAlignment="Center" />
-                    <TextBlock Text="去配置一个新任务吧，首页会在这里展示最新的预约状态与生效结果。"
+                    <TextBlock Text="去配置一个新任务吧，首页会在这里展示最新的预约状态与生效结果"
                                Classes="dashboard-detail"
                                MaxWidth="380"
                                HorizontalAlignment="Center"
@@ -808,7 +808,7 @@
                                FontWeight="Bold"
                                Foreground="{DynamicResource SemiTextPrimaryBrush}"
                                HorizontalAlignment="Center" />
-                    <TextBlock Text="登录后这里会显示 Cookie 到期时间、剩余有效时间与过期进度。"
+                    <TextBlock Text="登录后这里会显示 Cookie 到期时间、剩余有效时间与过期进度"
                                Classes="dashboard-detail"
                                MaxWidth="420"
                                HorizontalAlignment="Center"
@@ -888,7 +888,7 @@
                               Foreground="{DynamicResource AppAccentForegroundBrush}"
                               FontWeight="Bold" />
                       <Button Grid.Column="1"
-                              Content="局域网快传"
+                              Content="{Binding SystemSettings.CookieQuickTransferButtonText}"
                               Command="{Binding StartLanCookieRelayCommand}"
                               IsEnabled="{Binding CanStartLanCookieRelay}"
                               Classes="Secondary"
@@ -2065,7 +2065,7 @@
                           HorizontalAlignment="Stretch"
                           Background="{DynamicResource AppAccentBrush}"
                           Foreground="{DynamicResource AppAccentForegroundBrush}" />
-                  <Button Content="局域网快传签到授权"
+                  <Button Content="{Binding SystemSettings.RemoteCheckInQuickTransferButtonText}"
                           Command="{Binding RemoteCheckInPage.StartRemoteCheckInLanRelayCommand}"
                           IsEnabled="{Binding RemoteCheckInPage.CanAuthorize}"
                           HorizontalAlignment="Stretch"
@@ -3348,6 +3348,139 @@
                   </Border>
 
                   <Border Classes="card">
+                    <Grid ColumnDefinitions="*,280"
+                          ColumnSpacing="20">
+                      <StackPanel Spacing="6">
+                        <TextBlock Classes="field-label"
+                                   Text="手机控制网络方式" />
+                        <TextBlock Classes="helper-text"
+                                   Text="控制 Cookie 快传、签到授权快传和手机控制页面使用的访问地址" />
+                      </StackPanel>
+                      <ComboBox Grid.Column="1"
+                                ItemsSource="{Binding SystemSettings.MobileControlNetworkModes}"
+                                SelectedIndex="{Binding SystemSettings.SelectedMobileControlNetworkModeIndex}"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+
+                  <Border Classes="card"
+                          IsVisible="{Binding SystemSettings.IsCloudflareTunnelSelected}">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="20">
+                      <StackPanel Spacing="6">
+                        <TextBlock Classes="field-label"
+                                   Text="Tunnel 故障时回退到本机局域网" />
+                        <TextBlock Classes="helper-text"
+                                   Text="开启后，Cloudflare Tunnel 启动失败或运行中断时会自动改用局域网地址。关闭后将保持 Tunnel 模式并报告错误，不会降级" />
+                      </StackPanel>
+                      <ToggleSwitch Grid.Column="1"
+                                    IsChecked="{Binding SystemSettings.FallbackToLocalNetworkOnTunnelFailure}"
+                                    OnContent="开"
+                                    OffContent="关"
+                                    VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+
+                  <Border Classes="card"
+                          IsVisible="{Binding SystemSettings.IsCloudflareTunnelSelected}">
+                    <StackPanel Spacing="14">
+                      <Grid ColumnDefinitions="*,280"
+                            ColumnSpacing="20">
+                        <StackPanel Spacing="6">
+                          <TextBlock Classes="field-label"
+                                     Text="Cloudflare Tunnel 代理方式" />
+                          <TextBlock Classes="helper-text"
+                                     Text="自动模式会读取系统 HTTP 代理。Tunnel 数据连接使用 HTTP2 并继续由 TUN 或本机网络承载，TUN 分流规则仍由代理软件控制" />
+                        </StackPanel>
+                        <ComboBox Grid.Column="1"
+                                  ItemsSource="{Binding SystemSettings.CloudflareTunnelProxyModes}"
+                                  SelectedIndex="{Binding SystemSettings.SelectedCloudflareTunnelProxyModeIndex}"
+                                  HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Center" />
+                      </Grid>
+
+                      <Grid ColumnDefinitions="*,280"
+                            ColumnSpacing="20"
+                            IsVisible="{Binding SystemSettings.IsManualCloudflareTunnelProxy}">
+                        <StackPanel Spacing="6">
+                          <TextBlock Classes="field-label"
+                                     Text="手动 HTTP 代理地址" />
+                          <TextBlock Classes="helper-text"
+                                     Text="例如 Clash/Mihomo Mixed Port：http://127.0.0.1:7897；不支持在地址中保存账号密码" />
+                        </StackPanel>
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding SystemSettings.CloudflareTunnelManualProxyUrl, UpdateSourceTrigger=PropertyChanged}"
+                                 Watermark="http://127.0.0.1:7897"
+                                 HorizontalAlignment="Stretch"
+                                 VerticalAlignment="Center" />
+                      </Grid>
+
+                      <Button HorizontalAlignment="Right"
+                              Classes="accent"
+                              Command="{Binding SystemSettings.ApplyCloudflareTunnelProxySettingsCommand}"
+                              Content="应用代理设置" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="card"
+                          IsVisible="{Binding SystemSettings.IsCloudflareTunnelSelected}">
+                    <StackPanel Spacing="14">
+                      <Grid ColumnDefinitions="*,Auto"
+                            ColumnSpacing="20">
+                        <StackPanel Spacing="6">
+                          <TextBlock Classes="field-label"
+                                     Text="Clash/Mihomo 兼容模式" />
+                          <TextBlock Classes="helper-text"
+                                     Text="通过 Mihomo 标准本机控制接口临时加载 Cloudflare Tunnel 专用规则，当关闭 Tunnel 时自动撤销临时更改" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1"
+                                      IsChecked="{Binding SystemSettings.ClashMihomoCompatibilityEnabled}"
+                                      OnContent="开"
+                                      OffContent="关"
+                                      VerticalAlignment="Center" />
+                      </Grid>
+
+                      <Grid ColumnDefinitions="*,280"
+                            ColumnSpacing="20"
+                            IsVisible="{Binding SystemSettings.ClashMihomoCompatibilityEnabled}">
+                        <StackPanel Spacing="6">
+                          <TextBlock Classes="field-label"
+                                     Text="活动配置文件（可选）" />
+                          <TextBlock Classes="helper-text"
+                                     Text="留空会自动发现常见客户端。其他客户端请填写包含 rules，以及 external-controller 或 Windows external-controller-pipe 的绝对 YAML 路径" />
+                        </StackPanel>
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding SystemSettings.ClashMihomoConfigPath, UpdateSourceTrigger=PropertyChanged}"
+                                 Watermark="留空自动发现，或填写 config.yaml"
+                                 HorizontalAlignment="Stretch"
+                                 VerticalAlignment="Center" />
+                      </Grid>
+
+                      <Grid ColumnDefinitions="*,280"
+                            ColumnSpacing="20"
+                            IsVisible="{Binding SystemSettings.ClashMihomoCompatibilityEnabled}">
+                        <StackPanel Spacing="6">
+                          <TextBlock Classes="field-label"
+                                     Text="Cloudflare 路由策略" />
+                          <TextBlock Classes="helper-text"
+                                     Text="填写 DIRECT，或活动配置中已有的策略组名称" />
+                        </StackPanel>
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding SystemSettings.ClashMihomoRoutePolicy, UpdateSourceTrigger=PropertyChanged}"
+                                 Watermark="DIRECT"
+                                 HorizontalAlignment="Stretch"
+                                 VerticalAlignment="Center" />
+                      </Grid>
+
+                      <Button HorizontalAlignment="Right"
+                              Classes="accent"
+                              Command="{Binding SystemSettings.ApplyClashMihomoCompatibilitySettingsCommand}"
+                              Content="应用兼容设置" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="card">
                     <Grid ColumnDefinitions="*,Auto"
                           ColumnSpacing="16">
                       <StackPanel Spacing="6">
@@ -3812,11 +3945,11 @@
 
               <StackPanel Grid.Row="1"
                           Spacing="8">
-                <TextBlock Text="扫描局域网快传页"
+                <TextBlock Text="扫描快传页"
                            FontSize="16"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource SemiTextPrimaryBrush}" />
-                <TextBlock Text="用微信扫描下方二维码打开提交页；页面内可长按识别授权二维码，复制链接后直接提交。"
+                <TextBlock Text="用微信扫描下方二维码打开提交页；页面内可长按识别授权二维码，复制链接后直接提交"
                            Classes="helper-text" />
               </StackPanel>
 
@@ -3932,7 +4065,7 @@
                           HorizontalAlignment="Center"
                           VerticalAlignment="Center"
                           IsVisible="{Binding HasNoSeatLayout}">
-                    <TextBlock Text="当前场馆暂无可编辑的座位布局，请先刷新或重新绑定场馆。"
+                    <TextBlock Text="当前场馆暂无可编辑的座位布局，请先刷新或重新绑定场馆"
                                Classes="helper-text"
                                HorizontalAlignment="Center"
                                TextAlignment="Center" />
@@ -3944,7 +4077,7 @@
                           HorizontalAlignment="Center"
                           VerticalAlignment="Center"
                           IsVisible="{Binding ShowSeatFilterEmptyState}">
-                    <TextBlock Text="当前筛选条件下没有可显示的座位。"
+                    <TextBlock Text="当前筛选条件下没有可显示的座位"
                                Classes="helper-text"
                                HorizontalAlignment="Center"
                                TextAlignment="Center" />
@@ -3972,7 +4105,7 @@
               <Grid Grid.Row="3"
                     ColumnDefinitions="*,Auto"
                     ColumnSpacing="12">
-                <TextBlock Text="只有点击“确认完成”才会同步本次勾选结果；直接关闭或点击遮罩空白处会放弃本次修改。"
+                <TextBlock Text="只有点击“确认完成”才会同步本次勾选结果；直接关闭或点击遮罩空白处会放弃本次修改"
                            Classes="helper-text"
                            VerticalAlignment="Center" />
                 <Button Grid.Column="1"
@@ -4098,7 +4231,7 @@
               <Grid Grid.Row="1"
                     ColumnDefinitions="*,Auto,Auto,Auto"
                     ColumnSpacing="12">
-                <TextBlock Text="多选场馆后按确认同步到全域捡漏任务。"
+                <TextBlock Text="多选场馆后按确认同步到全域捡漏任务"
                            Classes="helper-text"
                            VerticalAlignment="Center" />
                 <Button Grid.Column="1"
@@ -4179,7 +4312,7 @@
                           HorizontalAlignment="Center"
                           VerticalAlignment="Center"
                           IsVisible="{Binding HasNoGlobalLeakLibraries}">
-                    <TextBlock Text="当前账号暂无可选择的场馆，请刷新后重试。"
+                    <TextBlock Text="当前账号暂无可选择的场馆，请刷新后重试"
                                Classes="helper-text"
                                HorizontalAlignment="Center"
                                TextAlignment="Center" />
@@ -4190,7 +4323,7 @@
               <Grid Grid.Row="3"
                     ColumnDefinitions="*,Auto"
                     ColumnSpacing="12">
-                <TextBlock Text="选择顺序以当前列表顺序为准；任务运行时不能修改扫描范围。"
+                <TextBlock Text="选择顺序以当前列表顺序为准；任务运行时不能修改扫描范围"
                            Classes="helper-text"
                            VerticalAlignment="Center" />
                 <Button Grid.Column="1"
@@ -4349,7 +4482,7 @@
                 </Grid>
 
                 <TextBlock Grid.Row="1"
-                           Text="下方已自动刷新最新场馆列表，点击一个场馆后，Dashboard 会立即刷新为该场馆预览。"
+                           Text="下方已自动刷新最新场馆列表，点击一个场馆后，Dashboard 会立即刷新为该场馆预览"
                            Classes="helper-text" />
               </Grid>
 

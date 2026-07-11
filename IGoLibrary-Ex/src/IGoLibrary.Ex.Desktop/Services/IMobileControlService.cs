@@ -8,6 +8,8 @@ public interface IMobileControlService
 
     event EventHandler<MobileControlDeviceCountChangedEventArgs>? DeviceCountChanged;
 
+    event EventHandler<MobileControlEndpointChangedEventArgs>? EndpointChanged;
+
     MobileControlSession? CurrentSession { get; }
 
     int ConnectedDeviceCount { get; }
@@ -24,9 +26,16 @@ public interface IMobileControlService
 public sealed record MobileControlSession(
     Guid SessionId,
     Uri Url,
+    Uri LanUrl,
     string Host,
     int Port,
-    DateTimeOffset StartedAt);
+    DateTimeOffset StartedAt,
+    MobileControlNetworkMode EffectiveMode);
+
+public sealed class MobileControlEndpointChangedEventArgs(MobileControlSession session) : EventArgs
+{
+    public MobileControlSession Session { get; } = session;
+}
 
 public sealed class MobileControlDeviceCountChangedEventArgs(int connectedDeviceCount) : EventArgs
 {

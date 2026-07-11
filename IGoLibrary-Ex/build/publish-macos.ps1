@@ -158,6 +158,7 @@ function Get-ZipEntryMode {
     $leafName = $Item.Name
     $executableEntryName = "$AppName.app/Contents/MacOS/$ExecutableName"
     if ($EntryName -eq $executableEntryName -or
+        $leafName -eq "cloudflared" -or
         $leafName -eq "createdump" -or
         $leafName.EndsWith(".dylib", [StringComparison]::OrdinalIgnoreCase) -or
         $leafName.EndsWith(".command", [StringComparison]::OrdinalIgnoreCase)) {
@@ -304,6 +305,10 @@ if (-not $SkipPublish) {
 else {
     Write-Host "Skipping dotnet publish; packaging existing files from $PublishOutput"
 }
+
+$prepareCloudflared = Join-Path $PSScriptRoot 'prepare-cloudflared.ps1'
+$cloudflaredDestination = Join-Path $PublishOutput 'tools\cloudflared'
+& $prepareCloudflared -Runtime $Runtime -DestinationDirectory $cloudflaredDestination
 
 $publishedExecutable = Join-Path $PublishOutput $ExecutableName
 if (-not (Test-Path -LiteralPath $publishedExecutable -PathType Leaf)) {

@@ -11,6 +11,7 @@ namespace IGoLibrary.Ex.Desktop.Services;
 
 public sealed class MobileControlService(
     ILanAddressProvider addressProvider,
+    INetworkExposureManager networkExposureManager,
     IMobileControlStatusSnapshotProvider statusSnapshotProvider,
     IMobileControlActionService actionService,
     ILogger<MobileControlService> logger) : IMobileControlService, IAsyncDisposable
@@ -29,12 +30,15 @@ public sealed class MobileControlService(
     private readonly Dictionary<string, DateTimeOffset> _deviceLastSeenByKey = new(StringComparer.Ordinal);
     private WebApplication? _app;
     private MobileControlSession? _session;
+    private INetworkExposureLease? _exposureLease;
     private System.Threading.Timer? _devicePruneTimer;
     private int _connectedDeviceCount;
 
     public event EventHandler<MobileControlStoppedEventArgs>? Stopped;
 
     public event EventHandler<MobileControlDeviceCountChangedEventArgs>? DeviceCountChanged;
+
+    public event EventHandler<MobileControlEndpointChangedEventArgs>? EndpointChanged;
 
     public MobileControlSession? CurrentSession => _session;
 
@@ -64,6 +68,7 @@ public sealed class MobileControlService(
                 ?? throw new InvalidOperationException("没有找到可用的局域网 IPv4 地址，请确认电脑已连接到局域网");
             var sessionId = Guid.NewGuid();
             var token = settings.AccessToken.Trim();
+            var healthCheckPath = $"/_igolibrary/health/{Guid.NewGuid():N}";
 
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -77,6 +82,7 @@ public sealed class MobileControlService(
 
             var app = builder.Build();
             app.MapGet("/", context => WriteLandingPageAsync(context, token));
+            app.MapGet(healthCheckPath, WriteHealthCheckAsync);
             app.MapGet("/api/status", context => WriteStatusAsync(context, token));
             app.MapGet("/api/session/auth-qrcode", context => WriteAuthQrCodeAsync(context, token));
             app.MapPost("/api/tasks/{kind}/cancel", context => WriteCancelTaskAsync(context, token));
@@ -92,9 +98,16 @@ public sealed class MobileControlService(
             {
                 await app.StartAsync(cancellationToken);
                 appStarted = true;
-                var session = BuildSession(sessionId, address, settings.Port, token);
+                var lanSession = BuildLanSession(sessionId, address, settings.Port, token);
+                var exposureLease = await networkExposureManager.PublishAsync(
+                    lanSession.LanUrl,
+                    healthCheckPath,
+                    cancellationToken);
+                var session = ApplyExposure(lanSession, exposureLease);
                 _app = app;
                 _session = session;
+                _exposureLease = exposureLease;
+                exposureLease.EndpointChanged += OnExposureEndpointChanged;
                 _devicePruneTimer = new System.Threading.Timer(
                     _ => PruneConnectedDevices(),
                     null,
@@ -305,13 +318,21 @@ public sealed class MobileControlService(
     {
         var app = _app;
         var session = _session;
+        var exposureLease = _exposureLease;
         var pruneTimer = _devicePruneTimer;
         _app = null;
         _session = null;
+        _exposureLease = null;
         _devicePruneTimer = null;
 
         pruneTimer?.Dispose();
         ResetConnectedDevices();
+
+        if (exposureLease is not null)
+        {
+            exposureLease.EndpointChanged -= OnExposureEndpointChanged;
+            await exposureLease.DisposeAsync();
+        }
 
         if (app is not null)
         {
@@ -333,7 +354,10 @@ public sealed class MobileControlService(
 
     private void TrackConnectedDevice(HttpContext context)
     {
-        var key = context.Connection.RemoteIpAddress?.ToString();
+        var key = _session?.EffectiveMode == MobileControlNetworkMode.CloudflareTunnel &&
+                  IPAddress.TryParse(context.Request.Headers["CF-Connecting-IP"].ToString(), out var connectingAddress)
+            ? connectingAddress.ToString()
+            : context.Connection.RemoteIpAddress?.ToString();
         if (string.IsNullOrWhiteSpace(key))
         {
             key = context.Connection.Id;
@@ -394,7 +418,7 @@ public sealed class MobileControlService(
         DeviceCountChanged?.Invoke(this, new MobileControlDeviceCountChangedEventArgs(count));
     }
 
-    private static MobileControlSession BuildSession(
+    private static MobileControlSession BuildLanSession(
         Guid sessionId,
         IPAddress address,
         int port,
@@ -406,7 +430,50 @@ public sealed class MobileControlService(
             Query = $"token={Uri.EscapeDataString(token)}"
         };
 
-        return new MobileControlSession(sessionId, builder.Uri, address.ToString(), port, DateTimeOffset.Now);
+        var lanUrl = builder.Uri;
+        return new MobileControlSession(
+            sessionId,
+            lanUrl,
+            lanUrl,
+            address.ToString(),
+            port,
+            DateTimeOffset.Now,
+            MobileControlNetworkMode.LocalNetwork);
+    }
+
+    private static MobileControlSession ApplyExposure(
+        MobileControlSession session,
+        INetworkExposureLease exposureLease)
+    {
+        return session with
+        {
+            Url = exposureLease.Url,
+            EffectiveMode = exposureLease.EffectiveMode
+        };
+    }
+
+    private void OnExposureEndpointChanged(object? sender, NetworkExposureChangedEventArgs e)
+    {
+        var session = _session;
+        if (session is null || sender is not INetworkExposureLease lease || lease.Id != _exposureLease?.Id)
+        {
+            return;
+        }
+
+        session = session with
+        {
+            Url = e.Url,
+            EffectiveMode = e.EffectiveMode
+        };
+        _session = session;
+        EndpointChanged?.Invoke(this, new MobileControlEndpointChangedEventArgs(session));
+    }
+
+    private static Task WriteHealthCheckAsync(HttpContext context)
+    {
+        SetNoStore(context);
+        context.Response.StatusCode = StatusCodes.Status204NoContent;
+        return Task.CompletedTask;
     }
 
     private async Task DisposeUnpublishedAppAsync(WebApplication app, bool appStarted)

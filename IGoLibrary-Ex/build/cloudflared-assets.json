@@ -1,0 +1,20 @@
+{
+  "version": "2026.7.0",
+  "assets": {
+    "win-x64": {
+      "fileName": "cloudflared-windows-amd64.exe",
+      "sha256": "b11ee950a12b15604e6b0a0f30a226516adc7aec75de2e3c642b28e50ddef9ea",
+      "archiveType": "binary"
+    },
+    "osx-x64": {
+      "fileName": "cloudflared-darwin-amd64.tgz",
+      "sha256": "dd1fb6a914a21dc52c64bad96987bbbc72d6c65553a2cfee1dd5bc886742ddfb",
+      "archiveType": "tgz"
+    },
+    "osx-arm64": {
+      "fileName": "cloudflared-darwin-arm64.tgz",
+      "sha256": "276f4ae3119c88d1708b0f884a35a1c87d9ae459b0dab6313f2daddbddab2bec",
+      "archiveType": "tgz"
+    }
+  }
+}

@@ -321,6 +321,118 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
         return settings.MobileControl;
     }
 
+    public async Task<MobileControlSettings> SaveMobileControlNetworkModeAsync(
+        MobileControlNetworkMode networkMode,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedMode = MobileControlSettings.NormalizeNetworkMode(networkMode);
+        var settings = await settingsService.UpdateAsync(current =>
+        {
+            var mobileControl = NormalizeMobileControlSettings(current.MobileControl) with
+            {
+                NetworkMode = normalizedMode
+            };
+            if (mobileControl == current.MobileControl)
+            {
+                return current;
+            }
+
+            return current with
+            {
+                MobileControl = mobileControl
+            };
+        }, cancellationToken);
+
+        return settings.MobileControl;
+    }
+
+    public async Task<MobileControlSettings> SaveCloudflareTunnelProxyAsync(
+        CloudflareTunnelProxyMode proxyMode,
+        string manualProxyUrl,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedMode = MobileControlSettings.NormalizeTunnelProxyMode(proxyMode);
+        var hasValidManualUrl = MobileControlSettings.TryNormalizeManualProxyUrl(
+            manualProxyUrl,
+            out var normalizedManualUrl);
+        if (normalizedMode == CloudflareTunnelProxyMode.ManualHttpProxy && !hasValidManualUrl)
+        {
+            throw new ArgumentException(
+                "手动代理地址必须是无用户名、密码、路径或查询参数的 HTTP 地址，例如 http://127.0.0.1:7897",
+                nameof(manualProxyUrl));
+        }
+
+        var settings = await settingsService.UpdateAsync(current =>
+        {
+            var mobileControl = NormalizeMobileControlSettings(current.MobileControl) with
+            {
+                TunnelProxyMode = normalizedMode,
+                TunnelManualProxyUrl = hasValidManualUrl ? normalizedManualUrl : string.Empty
+            };
+            if (mobileControl == current.MobileControl)
+            {
+                return current;
+            }
+
+            return current with
+            {
+                MobileControl = mobileControl
+            };
+        }, cancellationToken);
+
+        return settings.MobileControl;
+    }
+
+    public async Task<MobileControlSettings> SaveCloudflareTunnelFallbackAsync(
+        bool fallbackToLocalNetworkOnTunnelFailure,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = await settingsService.UpdateAsync(current =>
+        {
+            var mobileControl = NormalizeMobileControlSettings(current.MobileControl) with
+            {
+                FallbackToLocalNetworkOnTunnelFailure = fallbackToLocalNetworkOnTunnelFailure
+            };
+            return mobileControl == current.MobileControl
+                ? current
+                : current with { MobileControl = mobileControl };
+        }, cancellationToken);
+
+        return settings.MobileControl;
+    }
+
+    public async Task<MobileControlSettings> SaveClashMihomoCompatibilityAsync(
+        bool enabled,
+        string configPath,
+        string routePolicy,
+        CancellationToken cancellationToken = default)
+    {
+        if (!MobileControlSettings.TryNormalizeClashMihomoConfigPath(configPath, out var normalizedConfigPath))
+        {
+            throw new ArgumentException("Mihomo 活动配置必须是绝对路径的 .yaml 或 .yml 文件。", nameof(configPath));
+        }
+
+        if (!MobileControlSettings.TryNormalizeClashMihomoRoutePolicy(routePolicy, out var normalizedRoutePolicy))
+        {
+            throw new ArgumentException("Mihomo 路由策略不能为空、不能包含逗号或 #，且最多 128 个字符。", nameof(routePolicy));
+        }
+
+        var settings = await settingsService.UpdateAsync(current =>
+        {
+            var mobileControl = NormalizeMobileControlSettings(current.MobileControl) with
+            {
+                ClashMihomoCompatibilityEnabled = enabled,
+                ClashMihomoConfigPath = normalizedConfigPath,
+                ClashMihomoRoutePolicy = normalizedRoutePolicy
+            };
+            return mobileControl == current.MobileControl
+                ? current
+                : current with { MobileControl = mobileControl };
+        }, cancellationToken);
+
+        return settings.MobileControl;
+    }
+
     private static bool IsTimeOfDay(TimeSpan value)
     {
         return value >= TimeSpan.Zero && value < TimeSpan.FromDays(1);
@@ -329,6 +441,22 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
     private static MobileControlSettings NormalizeMobileControlSettings(MobileControlSettings? settings)
     {
         var current = settings ?? MobileControlSettings.Default;
+        var proxyMode = MobileControlSettings.NormalizeTunnelProxyMode(current.TunnelProxyMode);
+        var hasValidManualUrl = MobileControlSettings.TryNormalizeManualProxyUrl(
+            current.TunnelManualProxyUrl,
+            out var normalizedManualUrl);
+        if (proxyMode == CloudflareTunnelProxyMode.ManualHttpProxy && !hasValidManualUrl)
+        {
+            proxyMode = CloudflareTunnelProxyMode.Auto;
+        }
+
+        var hasValidClashConfigPath = MobileControlSettings.TryNormalizeClashMihomoConfigPath(
+            current.ClashMihomoConfigPath,
+            out var normalizedClashConfigPath);
+        var hasValidClashRoutePolicy = MobileControlSettings.TryNormalizeClashMihomoRoutePolicy(
+            current.ClashMihomoRoutePolicy,
+            out var normalizedClashRoutePolicy);
+
         return new MobileControlSettings(
             MobileControlSettings.IsValidPort(current.Port)
                 ? current.Port
@@ -336,7 +464,16 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
             string.IsNullOrWhiteSpace(current.AccessToken)
                 ? CreateMobileControlAccessToken()
                 : current.AccessToken.Trim(),
-            current.AutoStart);
+            current.AutoStart,
+            MobileControlSettings.NormalizeNetworkMode(current.NetworkMode),
+            proxyMode,
+            hasValidManualUrl ? normalizedManualUrl : string.Empty,
+            current.ClashMihomoCompatibilityEnabled,
+            hasValidClashConfigPath ? normalizedClashConfigPath : string.Empty,
+            hasValidClashRoutePolicy
+                ? normalizedClashRoutePolicy
+                : MobileControlSettings.DefaultClashMihomoRoutePolicy,
+            current.FallbackToLocalNetworkOnTunnelFailure);
     }
 
     public static int CreateRandomMobileControlPort()

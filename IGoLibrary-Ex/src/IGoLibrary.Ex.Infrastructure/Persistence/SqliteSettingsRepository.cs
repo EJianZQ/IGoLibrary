@@ -288,6 +288,48 @@ public sealed class SqliteSettingsRepository(
         writer.WriteBoolean(
             "autoStart",
             ReadBool(mobileControl, "autoStart") ?? defaults.MobileControl.AutoStart);
+        writer.WriteNumber(
+            "networkMode",
+            (int)MobileControlSettings.NormalizeNetworkMode(
+                (MobileControlNetworkMode)(ReadInt(mobileControl, "networkMode")
+                    ?? (int)defaults.MobileControl.NetworkMode)));
+        var proxyMode = MobileControlSettings.NormalizeTunnelProxyMode(
+            (CloudflareTunnelProxyMode)(ReadInt(mobileControl, "tunnelProxyMode")
+                ?? (int)defaults.MobileControl.TunnelProxyMode));
+        var proxyUrlValue = ReadString(mobileControl, "tunnelManualProxyUrl")
+            ?? defaults.MobileControl.TunnelManualProxyUrl;
+        var hasValidProxyUrl = MobileControlSettings.TryNormalizeManualProxyUrl(
+            proxyUrlValue,
+            out var normalizedProxyUrl);
+        if (proxyMode == CloudflareTunnelProxyMode.ManualHttpProxy && !hasValidProxyUrl)
+        {
+            proxyMode = CloudflareTunnelProxyMode.Auto;
+        }
+
+        writer.WriteNumber("tunnelProxyMode", (int)proxyMode);
+        writer.WriteString("tunnelManualProxyUrl", hasValidProxyUrl ? normalizedProxyUrl : string.Empty);
+        writer.WriteBoolean(
+            "fallbackToLocalNetworkOnTunnelFailure",
+            ReadBool(mobileControl, "fallbackToLocalNetworkOnTunnelFailure")
+            ?? defaults.MobileControl.FallbackToLocalNetworkOnTunnelFailure);
+        writer.WriteBoolean(
+            "clashMihomoCompatibilityEnabled",
+            ReadBool(mobileControl, "clashMihomoCompatibilityEnabled")
+            ?? defaults.MobileControl.ClashMihomoCompatibilityEnabled);
+        var clashConfigPath = ReadString(mobileControl, "clashMihomoConfigPath")
+            ?? defaults.MobileControl.ClashMihomoConfigPath;
+        writer.WriteString(
+            "clashMihomoConfigPath",
+            MobileControlSettings.TryNormalizeClashMihomoConfigPath(clashConfigPath, out var normalizedClashConfigPath)
+                ? normalizedClashConfigPath
+                : string.Empty);
+        var clashRoutePolicy = ReadString(mobileControl, "clashMihomoRoutePolicy")
+            ?? defaults.MobileControl.ClashMihomoRoutePolicy;
+        writer.WriteString(
+            "clashMihomoRoutePolicy",
+            MobileControlSettings.TryNormalizeClashMihomoRoutePolicy(clashRoutePolicy, out var normalizedClashRoutePolicy)
+                ? normalizedClashRoutePolicy
+                : MobileControlSettings.DefaultClashMihomoRoutePolicy);
         writer.WriteEndObject();
 
         writer.WritePropertyName("remoteCheckIn");
@@ -336,6 +378,21 @@ public sealed class SqliteSettingsRepository(
         var globalLeak = tasks.GlobalLeak ?? GlobalLeakTaskSettings.Default;
         var updates = settings.Updates ?? UpdateCheckSettings.Default;
         var mobileControl = settings.MobileControl ?? MobileControlSettings.Default;
+        var tunnelProxyMode = MobileControlSettings.NormalizeTunnelProxyMode(mobileControl.TunnelProxyMode);
+        var hasValidTunnelProxyUrl = MobileControlSettings.TryNormalizeManualProxyUrl(
+            mobileControl.TunnelManualProxyUrl,
+            out var normalizedTunnelProxyUrl);
+        if (tunnelProxyMode == CloudflareTunnelProxyMode.ManualHttpProxy && !hasValidTunnelProxyUrl)
+        {
+            tunnelProxyMode = CloudflareTunnelProxyMode.Auto;
+        }
+        var hasValidClashConfigPath = MobileControlSettings.TryNormalizeClashMihomoConfigPath(
+            mobileControl.ClashMihomoConfigPath,
+            out var normalizedClashConfigPath);
+        var hasValidClashRoutePolicy = MobileControlSettings.TryNormalizeClashMihomoRoutePolicy(
+            mobileControl.ClashMihomoRoutePolicy,
+            out var normalizedClashRoutePolicy);
+
         var remoteCheckIn = settings.RemoteCheckIn ?? RemoteCheckInSettings.Default;
         return settings with
         {
@@ -389,7 +446,15 @@ public sealed class SqliteSettingsRepository(
             {
                 Port = MobileControlSettings.IsValidPort(mobileControl.Port) ? mobileControl.Port : 0,
                 AccessToken = mobileControl.AccessToken?.Trim() ?? string.Empty,
-                AutoStart = mobileControl.AutoStart
+                AutoStart = mobileControl.AutoStart,
+                NetworkMode = MobileControlSettings.NormalizeNetworkMode(mobileControl.NetworkMode),
+                TunnelProxyMode = tunnelProxyMode,
+                TunnelManualProxyUrl = hasValidTunnelProxyUrl ? normalizedTunnelProxyUrl : string.Empty,
+                ClashMihomoCompatibilityEnabled = mobileControl.ClashMihomoCompatibilityEnabled,
+                ClashMihomoConfigPath = hasValidClashConfigPath ? normalizedClashConfigPath : string.Empty,
+                ClashMihomoRoutePolicy = hasValidClashRoutePolicy
+                    ? normalizedClashRoutePolicy
+                    : MobileControlSettings.DefaultClashMihomoRoutePolicy
             },
             RemoteCheckIn = remoteCheckIn with
             {
@@ -480,6 +545,13 @@ public sealed class SqliteSettingsRepository(
                !HasAnyProperty(ReadObject(root, "mobileControl"), "port") ||
                !HasAnyProperty(ReadObject(root, "mobileControl"), "accessToken") ||
                !HasAnyProperty(ReadObject(root, "mobileControl"), "autoStart") ||
+                !HasAnyProperty(ReadObject(root, "mobileControl"), "networkMode") ||
+                !HasAnyProperty(ReadObject(root, "mobileControl"), "tunnelProxyMode") ||
+                !HasAnyProperty(ReadObject(root, "mobileControl"), "tunnelManualProxyUrl") ||
+                !HasAnyProperty(ReadObject(root, "mobileControl"), "fallbackToLocalNetworkOnTunnelFailure") ||
+                !HasAnyProperty(ReadObject(root, "mobileControl"), "clashMihomoCompatibilityEnabled") ||
+               !HasAnyProperty(ReadObject(root, "mobileControl"), "clashMihomoConfigPath") ||
+               !HasAnyProperty(ReadObject(root, "mobileControl"), "clashMihomoRoutePolicy") ||
                HasAnyProperty(
                    ReadObject(
                        ReadObject(

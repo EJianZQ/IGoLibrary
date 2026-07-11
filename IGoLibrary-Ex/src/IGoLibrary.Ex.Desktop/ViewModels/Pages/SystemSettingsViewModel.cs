@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IGoLibrary.Ex.Application.Abstractions;
@@ -15,6 +16,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
     private readonly IActivityLogService _activityLogService;
     private readonly INotificationService _notificationService;
     private readonly IStartupEntryService _startupEntryService;
+    private readonly INetworkExposureManager _networkExposureManager;
     private readonly DeferredAutoSaveController _systemSettingsAutoSave;
 
     private Func<bool> _isInitialized = static () => false;
@@ -29,6 +31,16 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
     private Func<TaskEventAlertSettings> _taskEventAlertSettings = static () => TaskEventAlertSettings.Default;
     private Action _cancelPendingNotificationSettingsAutoSave = static () => { };
     private bool _isRollingBackStartupEntry;
+    private bool _isApplyingNetworkMode;
+    private bool _isApplyingTunnelFallbackSetting;
+    private bool _isApplyingTunnelProxySettings;
+    private bool _isApplyingClashMihomoCompatibility;
+    private CloudflareTunnelProxyMode _appliedTunnelProxyMode = CloudflareTunnelProxyMode.Auto;
+    private string _appliedTunnelManualProxyUrl = string.Empty;
+    private bool _appliedClashMihomoCompatibilityEnabled;
+    private string _appliedClashMihomoConfigPath = string.Empty;
+    private string _appliedClashMihomoRoutePolicy = MobileControlSettings.DefaultClashMihomoRoutePolicy;
+    private bool _appliedFallbackToLocalNetworkOnTunnelFailure = true;
 
     public SystemSettingsViewModel(
         ISettingsWorkflowService settingsWorkflowService,
@@ -37,7 +49,8 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         IActivityLogService activityLogService,
         INotificationService notificationService,
         IStartupEntryService startupEntryService,
-        StorageSettingsViewModel storageSettings)
+        StorageSettingsViewModel storageSettings,
+        INetworkExposureManager networkExposureManager)
     {
         _settingsWorkflowService = settingsWorkflowService;
         _protocolTemplateEditorService = protocolTemplateEditorService;
@@ -45,6 +58,8 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         _activityLogService = activityLogService;
         _notificationService = notificationService;
         _startupEntryService = startupEntryService;
+        _networkExposureManager = networkExposureManager;
+        _networkExposureManager.ModeChanged += OnNetworkModeChanged;
         StorageSettings = storageSettings;
         _systemSettingsAutoSave = new DeferredAutoSaveController(
             TimeSpan.FromMilliseconds(300),
@@ -56,6 +71,49 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
     public StorageSettingsViewModel StorageSettings { get; }
 
     public string[] ThemeModes { get; } = ["跟随系统", "浅色", "深色"];
+
+    public string[] MobileControlNetworkModes { get; } = ["本机局域网", "Cloudflare Tunnel"];
+
+    public string[] CloudflareTunnelProxyModes { get; } =
+        ["自动检测（推荐）", "使用系统代理", "手动 HTTP 代理", "不使用显式代理"];
+
+    [ObservableProperty]
+    private int selectedMobileControlNetworkModeIndex;
+
+    [ObservableProperty]
+    private int selectedCloudflareTunnelProxyModeIndex;
+
+    [ObservableProperty]
+    private string cloudflareTunnelManualProxyUrl = string.Empty;
+
+    [ObservableProperty]
+    private bool fallbackToLocalNetworkOnTunnelFailure = true;
+
+    [ObservableProperty]
+    private bool clashMihomoCompatibilityEnabled;
+
+    [ObservableProperty]
+    private string clashMihomoConfigPath = string.Empty;
+
+    [ObservableProperty]
+    private string clashMihomoRoutePolicy = MobileControlSettings.DefaultClashMihomoRoutePolicy;
+
+    public bool IsManualCloudflareTunnelProxy =>
+        SelectedCloudflareTunnelProxyModeIndex == (int)CloudflareTunnelProxyMode.ManualHttpProxy;
+
+    public bool IsCloudflareTunnelSelected =>
+        CurrentMobileControlNetworkMode == MobileControlNetworkMode.CloudflareTunnel;
+
+    public MobileControlNetworkMode CurrentMobileControlNetworkMode =>
+        MobileControlSettings.NormalizeNetworkMode((MobileControlNetworkMode)SelectedMobileControlNetworkModeIndex);
+
+    public string CookieQuickTransferButtonText =>
+        CurrentMobileControlNetworkMode == MobileControlNetworkMode.CloudflareTunnel ? "公网快传" : "局域网快传";
+
+    public string RemoteCheckInQuickTransferButtonText =>
+        CurrentMobileControlNetworkMode == MobileControlNetworkMode.CloudflareTunnel
+            ? "公网快传签到授权"
+            : "局域网快传签到授权";
 
     [ObservableProperty]
     private int selectedSystemSettingsCategoryIndex;
@@ -153,6 +211,18 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         CheckUpdatesOnStartup = settings.Updates.CheckOnStartup;
         RequestTimeoutSeconds = settings.Network.TimeoutSeconds;
         NetworkMaxRetries = settings.Network.MaxRetries;
+        _networkExposureManager.Initialize(
+            settings.MobileControl.NetworkMode,
+            settings.MobileControl.TunnelProxyMode,
+            settings.MobileControl.TunnelManualProxyUrl,
+            settings.MobileControl.ClashMihomoCompatibilityEnabled,
+            settings.MobileControl.ClashMihomoConfigPath,
+            settings.MobileControl.ClashMihomoRoutePolicy,
+            settings.MobileControl.FallbackToLocalNetworkOnTunnelFailure);
+        ApplyNetworkModeSelection(settings.MobileControl.NetworkMode);
+        ApplyTunnelProxySelection(settings.MobileControl);
+        ApplyTunnelFallbackSelection(settings.MobileControl.FallbackToLocalNetworkOnTunnelFailure);
+        ApplyClashMihomoCompatibilitySelection(settings.MobileControl);
         SelectedAppThemeModeIndex = (int)theme.Mode;
         UseSystemAccent = theme.UseSystemAccent;
     }
@@ -307,6 +377,211 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         }
 
         ScheduleAutoSave();
+    }
+
+    partial void OnSelectedMobileControlNetworkModeIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(CurrentMobileControlNetworkMode));
+        OnPropertyChanged(nameof(IsCloudflareTunnelSelected));
+        OnPropertyChanged(nameof(CookieQuickTransferButtonText));
+        OnPropertyChanged(nameof(RemoteCheckInQuickTransferButtonText));
+        if (IsLoadingSettings || _isApplyingNetworkMode)
+        {
+            return;
+        }
+
+        _ = ApplyNetworkModeAsync((MobileControlNetworkMode)value);
+    }
+
+    partial void OnSelectedCloudflareTunnelProxyModeIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsManualCloudflareTunnelProxy));
+    }
+
+    partial void OnFallbackToLocalNetworkOnTunnelFailureChanged(bool value)
+    {
+        if (IsLoadingSettings || _isApplyingTunnelFallbackSetting)
+        {
+            return;
+        }
+
+        _ = PersistTunnelFallbackSettingAsync(value);
+    }
+
+    private async Task PersistTunnelFallbackSettingAsync(bool enabled)
+    {
+        try
+        {
+            var saved = await _networkExposureManager.SetCloudflareTunnelFallbackAsync(enabled);
+            ApplyTunnelFallbackSelection(saved.FallbackToLocalNetworkOnTunnelFailure);
+        }
+        catch (Exception ex)
+        {
+            ApplyTunnelFallbackSelection(_appliedFallbackToLocalNetworkOnTunnelFailure);
+            _activityLogService.Write(LogEntryKind.Warning, "Network", $"保存 Tunnel 故障回退设置失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("保存故障回退设置失败", ex.Message);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ApplyCloudflareTunnelProxySettingsAsync()
+    {
+        if (_isApplyingTunnelProxySettings)
+        {
+            return;
+        }
+
+        _isApplyingTunnelProxySettings = true;
+        try
+        {
+            var saved = await _networkExposureManager.SetCloudflareTunnelProxyAsync(
+                (CloudflareTunnelProxyMode)SelectedCloudflareTunnelProxyModeIndex,
+                CloudflareTunnelManualProxyUrl);
+            ApplyTunnelProxySelection(saved);
+        }
+        catch (Exception ex)
+        {
+            ApplyTunnelProxySelection(_appliedTunnelProxyMode, _appliedTunnelManualProxyUrl);
+            _activityLogService.Write(LogEntryKind.Warning, "Network", $"应用 Cloudflare Tunnel 代理设置失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("代理设置应用失败", ex.Message);
+        }
+        finally
+        {
+            _isApplyingTunnelProxySettings = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ApplyClashMihomoCompatibilitySettingsAsync()
+    {
+        if (_isApplyingClashMihomoCompatibility)
+        {
+            return;
+        }
+
+        _isApplyingClashMihomoCompatibility = true;
+        try
+        {
+            var saved = await _networkExposureManager.SetClashMihomoCompatibilityAsync(
+                ClashMihomoCompatibilityEnabled,
+                ClashMihomoConfigPath,
+                ClashMihomoRoutePolicy);
+            ApplyClashMihomoCompatibilitySelection(saved);
+        }
+        catch (Exception ex)
+        {
+            ApplyClashMihomoCompatibilitySelection(
+                _appliedClashMihomoCompatibilityEnabled,
+                _appliedClashMihomoConfigPath,
+                _appliedClashMihomoRoutePolicy);
+            _activityLogService.Write(LogEntryKind.Warning, "Network", $"应用 Clash/Mihomo 兼容模式失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("兼容模式应用失败", ex.Message);
+        }
+        finally
+        {
+            _isApplyingClashMihomoCompatibility = false;
+        }
+    }
+
+    private async Task ApplyNetworkModeAsync(MobileControlNetworkMode requestedMode)
+    {
+        try
+        {
+            var effectiveMode = await _networkExposureManager.SetModeAsync(requestedMode);
+            ApplyNetworkModeSelection(effectiveMode);
+        }
+        catch (Exception ex)
+        {
+            ApplyNetworkModeSelection(_networkExposureManager.CurrentMode);
+            _activityLogService.Write(LogEntryKind.Warning, "Network", $"切换手机控制网络方式失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("切换网络方式失败", ex.Message);
+        }
+    }
+
+    private void OnNetworkModeChanged(object? sender, NetworkModeChangedEventArgs e)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            ApplyNetworkModeSelection(e.Mode);
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() => ApplyNetworkModeSelection(e.Mode));
+    }
+
+    private void ApplyNetworkModeSelection(MobileControlNetworkMode mode)
+    {
+        _isApplyingNetworkMode = true;
+        try
+        {
+            SelectedMobileControlNetworkModeIndex = (int)MobileControlSettings.NormalizeNetworkMode(mode);
+        }
+        finally
+        {
+            _isApplyingNetworkMode = false;
+        }
+    }
+
+    private void ApplyTunnelProxySelection(MobileControlSettings settings)
+    {
+        ApplyTunnelProxySelection(settings.TunnelProxyMode, settings.TunnelManualProxyUrl);
+    }
+
+    private void ApplyTunnelProxySelection(
+        CloudflareTunnelProxyMode mode,
+        string manualProxyUrl)
+    {
+        _appliedTunnelProxyMode = MobileControlSettings.NormalizeTunnelProxyMode(mode);
+        _appliedTunnelManualProxyUrl = MobileControlSettings.TryNormalizeManualProxyUrl(
+            manualProxyUrl,
+            out var normalizedManualProxyUrl)
+            ? normalizedManualProxyUrl
+            : string.Empty;
+        SelectedCloudflareTunnelProxyModeIndex = (int)_appliedTunnelProxyMode;
+        CloudflareTunnelManualProxyUrl = _appliedTunnelManualProxyUrl;
+    }
+
+    private void ApplyTunnelFallbackSelection(bool enabled)
+    {
+        _appliedFallbackToLocalNetworkOnTunnelFailure = enabled;
+        _isApplyingTunnelFallbackSetting = true;
+        try
+        {
+            FallbackToLocalNetworkOnTunnelFailure = enabled;
+        }
+        finally
+        {
+            _isApplyingTunnelFallbackSetting = false;
+        }
+    }
+
+    private void ApplyClashMihomoCompatibilitySelection(MobileControlSettings settings)
+    {
+        ApplyClashMihomoCompatibilitySelection(
+            settings.ClashMihomoCompatibilityEnabled,
+            settings.ClashMihomoConfigPath,
+            settings.ClashMihomoRoutePolicy);
+    }
+
+    private void ApplyClashMihomoCompatibilitySelection(
+        bool enabled,
+        string configPath,
+        string routePolicy)
+    {
+        _appliedClashMihomoCompatibilityEnabled = enabled;
+        _appliedClashMihomoConfigPath = MobileControlSettings.TryNormalizeClashMihomoConfigPath(
+            configPath,
+            out var normalizedConfigPath)
+            ? normalizedConfigPath
+            : string.Empty;
+        _appliedClashMihomoRoutePolicy = MobileControlSettings.TryNormalizeClashMihomoRoutePolicy(
+            routePolicy,
+            out var normalizedRoutePolicy)
+            ? normalizedRoutePolicy
+            : MobileControlSettings.DefaultClashMihomoRoutePolicy;
+        ClashMihomoCompatibilityEnabled = _appliedClashMihomoCompatibilityEnabled;
+        ClashMihomoConfigPath = _appliedClashMihomoConfigPath;
+        ClashMihomoRoutePolicy = _appliedClashMihomoRoutePolicy;
     }
 
     partial void OnSelectedAppThemeModeIndexChanged(int value)

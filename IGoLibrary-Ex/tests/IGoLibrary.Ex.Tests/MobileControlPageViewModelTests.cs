@@ -1,4 +1,5 @@
 using IGoLibrary.Ex.Application.Services;
+using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 
 namespace IGoLibrary.Ex.Tests;
@@ -193,6 +194,36 @@ public sealed class MobileControlPageViewModelTests
 
         Assert.Equal(0, mobileControlService.StartCalls);
         Assert.False(viewModel.IsMobileControlRunning);
+    }
+
+    [Fact]
+    public async Task EndpointChanged_RefreshesPublicUrlQrAndModeWithoutRestartingService()
+    {
+        var mobileControlService = new FakeMobileControlService();
+        var qrCodeFactory = new FakeQrCodeImageFactory();
+        var viewModel = new MobileControlPageViewModel(
+            mobileControlService,
+            new SettingsWorkflowService(new FakeSettingsService(AppSettings.Default with
+            {
+                MobileControl = new MobileControlSettings(9527, "token")
+            })),
+            qrCodeFactory,
+            new ActivityLogService(),
+            new FakeNotificationService());
+
+        await viewModel.StartMobileControlCommand.ExecuteAsync(null);
+        var original = Assert.IsType<MobileControlSession>(mobileControlService.CurrentSession);
+        mobileControlService.RaiseEndpointChanged(original with
+        {
+            Url = new Uri("https://unit-test.trycloudflare.com/?token=token"),
+            EffectiveMode = MobileControlNetworkMode.CloudflareTunnel
+        });
+
+        Assert.Equal(1, mobileControlService.StartCalls);
+        Assert.Equal("https://unit-test.trycloudflare.com/?token=token", viewModel.MobileControlUrlText);
+        Assert.Equal("运行中 · Cloudflare Tunnel", viewModel.MobileControlStatusText);
+        Assert.Equal("unit-test.trycloudflare.com", viewModel.MobileControlHostText);
+        Assert.Equal(viewModel.MobileControlUrlText, qrCodeFactory.CreatedTexts[^1]);
     }
 
     private static async Task WaitForAsync(Func<bool> predicate)

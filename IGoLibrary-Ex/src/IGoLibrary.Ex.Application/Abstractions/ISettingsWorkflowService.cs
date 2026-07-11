@@ -50,4 +50,23 @@ public interface ISettingsWorkflowService
     Task<MobileControlSettings> SaveMobileControlAutoStartAsync(
         bool autoStart,
         CancellationToken cancellationToken = default);
+
+    Task<MobileControlSettings> SaveMobileControlNetworkModeAsync(
+        MobileControlNetworkMode networkMode,
+        CancellationToken cancellationToken = default);
+
+    Task<MobileControlSettings> SaveCloudflareTunnelProxyAsync(
+        CloudflareTunnelProxyMode proxyMode,
+        string manualProxyUrl,
+        CancellationToken cancellationToken = default);
+
+    Task<MobileControlSettings> SaveCloudflareTunnelFallbackAsync(
+        bool fallbackToLocalNetworkOnTunnelFailure,
+        CancellationToken cancellationToken = default);
+
+    Task<MobileControlSettings> SaveClashMihomoCompatibilityAsync(
+        bool enabled,
+        string configPath,
+        string routePolicy,
+        CancellationToken cancellationToken = default);
 }

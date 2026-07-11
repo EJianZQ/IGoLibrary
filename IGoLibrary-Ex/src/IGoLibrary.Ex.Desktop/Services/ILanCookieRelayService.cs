@@ -1,8 +1,12 @@
 namespace IGoLibrary.Ex.Desktop.Services;
 
+using IGoLibrary.Ex.Application.Configuration;
+
 public interface ILanCookieRelayService
 {
     event EventHandler<LanCookieRelayStoppedEventArgs>? Stopped;
+
+    event EventHandler<LanCookieRelayEndpointChangedEventArgs>? EndpointChanged;
 
     Task<LanCookieRelaySession> StartAsync(
         Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler,
@@ -21,10 +25,17 @@ public interface ILanCookieRelayService
 public sealed record LanCookieRelaySession(
     Guid SessionId,
     Uri Url,
+    Uri LanUrl,
     string Host,
     int Port,
     DateTimeOffset StartedAt,
-    TimeSpan Timeout);
+    TimeSpan Timeout,
+    MobileControlNetworkMode EffectiveMode);
+
+public sealed class LanCookieRelayEndpointChangedEventArgs(LanCookieRelaySession session) : EventArgs
+{
+    public LanCookieRelaySession Session { get; } = session;
+}
 
 public sealed record LanCookieRelaySubmitResult(bool Success, string Message)
 {

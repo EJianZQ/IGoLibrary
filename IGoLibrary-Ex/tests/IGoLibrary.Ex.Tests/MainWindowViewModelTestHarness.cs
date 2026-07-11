@@ -33,11 +33,13 @@ internal static class MainWindowViewModelTestHarness
         IQrCodeImageFactory qrCodeImageFactory,
         IMobileControlService? mobileControlService = null,
         IRemoteCheckInWorkflowService? remoteCheckInWorkflowService = null,
-        IRemoteCheckInProfileService? remoteCheckInProfileService = null)
+        IRemoteCheckInProfileService? remoteCheckInProfileService = null,
+        INetworkExposureManager? networkExposureManager = null)
     {
         mobileControlService ??= new FakeMobileControlService();
         remoteCheckInWorkflowService ??= new FakeRemoteCheckInWorkflowService();
         remoteCheckInProfileService ??= new FakeRemoteCheckInProfileService();
+        networkExposureManager ??= new FakeNetworkExposureManager();
         var workflowState = new ShellWorkflowState();
         var oauthCodeRegistry = new OAuthCodeConsumptionRegistry();
         var lanCookieRelayViewModel = new LanCookieRelayViewModel(
@@ -129,7 +131,8 @@ internal static class MainWindowViewModelTestHarness
                     new FakeStorageChangeWorkflowService(),
                     new FakeLoggingSettingsWorkflowService(),
                     activityLogService,
-                    notificationService)),
+                    notificationService),
+                networkExposureManager),
             new ProtocolTemplatesViewModel(
                 protocolTemplateEditorService,
                 activityLogService,

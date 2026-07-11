@@ -37,6 +37,7 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
 
         MobileControlConnectedDeviceCount = mobileControlService.ConnectedDeviceCount;
         mobileControlService.DeviceCountChanged += OnMobileControlDeviceCountChanged;
+        mobileControlService.EndpointChanged += OnMobileControlEndpointChanged;
     }
 
     [ObservableProperty]
@@ -97,6 +98,10 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
             IsMobileControlAutoStartEnabled = settings.AutoStart;
             _lastPersistedAutoStart = settings.AutoStart;
             MobileControlAccessTokenText = MaskAccessToken(_accessToken);
+            if (!IsMobileControlRunning)
+            {
+                MobileControlStatusText = $"已停止 · {GetNetworkModeText(settings.NetworkMode)}";
+            }
             OnPropertyChanged(nameof(MobileControlAccessTokenFullText));
         }
         finally
@@ -238,7 +243,11 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
             activityLogService.Write(LogEntryKind.Success, "MobileControl", $"手机控制已启动：{session.Host}:{session.Port}");
             if (showNotification)
             {
-                await notificationService.ShowSuccessAsync("手机控制已启动", "请用手机扫码访问局域网页面");
+                await notificationService.ShowSuccessAsync(
+                    "手机控制已启动",
+                    session.EffectiveMode == MobileControlNetworkMode.CloudflareTunnel
+                        ? "请用手机扫码访问公网控制页面"
+                        : "请用手机扫码访问局域网页面");
             }
         }
         catch (Exception ex)
@@ -265,7 +274,7 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
             activityLogService.Write(LogEntryKind.Info, "MobileControl", "手机控制已停止");
             if (showNotification)
             {
-                await notificationService.ShowInfoAsync("手机控制已停止", "局域网页面已关闭");
+                await notificationService.ShowInfoAsync("手机控制已停止", "手机控制页面已关闭");
             }
         }
         catch (Exception ex)
@@ -281,9 +290,11 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
     private void ApplyStartedSession(MobileControlSession session)
     {
         IsMobileControlRunning = true;
-        MobileControlStatusText = "运行中";
+        MobileControlStatusText = $"运行中 · {GetNetworkModeText(session.EffectiveMode)}";
         MobileControlConnectedDeviceCount = mobileControlService.ConnectedDeviceCount;
-        MobileControlHostText = $"{session.Host}:{session.Port}";
+        MobileControlHostText = session.EffectiveMode == MobileControlNetworkMode.CloudflareTunnel
+            ? session.Url.Authority
+            : $"{session.Host}:{session.Port}";
         MobileControlUrlText = session.Url.ToString();
         MobileControlQrCode = qrCodeImageFactory.Create(MobileControlUrlText);
         OnPropertyChanged(nameof(HasMobileControlQrCode));
@@ -332,6 +343,22 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
         }
 
         Dispatcher.UIThread.Post(() => MobileControlConnectedDeviceCount = e.ConnectedDeviceCount);
+    }
+
+    private void OnMobileControlEndpointChanged(object? sender, MobileControlEndpointChangedEventArgs e)
+    {
+        if (!IsMobileControlRunning)
+        {
+            return;
+        }
+
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            ApplyStartedSession(e.Session);
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() => ApplyStartedSession(e.Session));
     }
 
     private async Task PersistMobileControlAutoStartAsync(bool enabled)
@@ -390,5 +417,12 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
 
         var token = accessToken.Trim();
         return token.Length <= 8 ? token : $"{token[..8]}...";
+    }
+
+    private static string GetNetworkModeText(MobileControlNetworkMode mode)
+    {
+        return mode == MobileControlNetworkMode.CloudflareTunnel
+            ? "Cloudflare Tunnel"
+            : "本机局域网";
     }
 }

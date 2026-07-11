@@ -13,9 +13,166 @@ using MimeKit;
 
 namespace IGoLibrary.Ex.Tests;
 
+internal sealed class FakeNetworkExposureManager : INetworkExposureManager
+{
+    private readonly List<FakeNetworkExposureLease> _leases = [];
+
+    public event EventHandler<NetworkModeChangedEventArgs>? ModeChanged;
+
+    public MobileControlNetworkMode CurrentMode { get; private set; } = MobileControlNetworkMode.LocalNetwork;
+
+    public CloudflareTunnelProxyMode TunnelProxyMode { get; private set; } = CloudflareTunnelProxyMode.Auto;
+
+    public string TunnelManualProxyUrl { get; private set; } = string.Empty;
+
+    public bool ClashMihomoCompatibilityEnabled { get; private set; }
+
+    public string ClashMihomoConfigPath { get; private set; } = string.Empty;
+
+    public string ClashMihomoRoutePolicy { get; private set; } = "DIRECT";
+
+    public bool FallbackToLocalNetworkOnTunnelFailure { get; private set; } = true;
+
+    public Uri TunnelBaseUri { get; set; } = new("https://unit-test.trycloudflare.com/");
+
+    public void Initialize(
+        MobileControlNetworkMode networkMode,
+        CloudflareTunnelProxyMode tunnelProxyMode,
+        string tunnelManualProxyUrl,
+        bool clashMihomoCompatibilityEnabled = false,
+        string clashMihomoConfigPath = "",
+        string clashMihomoRoutePolicy = "DIRECT",
+        bool fallbackToLocalNetworkOnTunnelFailure = true)
+    {
+        CurrentMode = MobileControlSettings.NormalizeNetworkMode(networkMode);
+        TunnelProxyMode = MobileControlSettings.NormalizeTunnelProxyMode(tunnelProxyMode);
+        TunnelManualProxyUrl = tunnelManualProxyUrl;
+        ClashMihomoCompatibilityEnabled = clashMihomoCompatibilityEnabled;
+        ClashMihomoConfigPath = clashMihomoConfigPath;
+        ClashMihomoRoutePolicy = clashMihomoRoutePolicy;
+        FallbackToLocalNetworkOnTunnelFailure = fallbackToLocalNetworkOnTunnelFailure;
+    }
+
+    public Task<MobileControlSettings> SetClashMihomoCompatibilityAsync(
+        bool enabled,
+        string configPath,
+        string routePolicy,
+        CancellationToken cancellationToken = default)
+    {
+        ClashMihomoCompatibilityEnabled = enabled;
+        ClashMihomoConfigPath = configPath;
+        ClashMihomoRoutePolicy = routePolicy;
+        return Task.FromResult(new MobileControlSettings(
+            NetworkMode: CurrentMode,
+            TunnelProxyMode: TunnelProxyMode,
+            TunnelManualProxyUrl: TunnelManualProxyUrl,
+            ClashMihomoCompatibilityEnabled: enabled,
+            ClashMihomoConfigPath: configPath,
+            ClashMihomoRoutePolicy: routePolicy));
+    }
+
+    public Task<MobileControlSettings> SetCloudflareTunnelProxyAsync(
+        CloudflareTunnelProxyMode proxyMode,
+        string manualProxyUrl,
+        CancellationToken cancellationToken = default)
+    {
+        TunnelProxyMode = MobileControlSettings.NormalizeTunnelProxyMode(proxyMode);
+        TunnelManualProxyUrl = manualProxyUrl;
+        return Task.FromResult(new MobileControlSettings(
+            NetworkMode: CurrentMode,
+            TunnelProxyMode: TunnelProxyMode,
+            TunnelManualProxyUrl: TunnelManualProxyUrl));
+    }
+
+    public Task<MobileControlSettings> SetCloudflareTunnelFallbackAsync(
+        bool fallbackToLocalNetworkOnTunnelFailure,
+        CancellationToken cancellationToken = default)
+    {
+        FallbackToLocalNetworkOnTunnelFailure = fallbackToLocalNetworkOnTunnelFailure;
+        return Task.FromResult(new MobileControlSettings(
+            NetworkMode: CurrentMode,
+            TunnelProxyMode: TunnelProxyMode,
+            TunnelManualProxyUrl: TunnelManualProxyUrl,
+            FallbackToLocalNetworkOnTunnelFailure: fallbackToLocalNetworkOnTunnelFailure));
+    }
+
+    public Task<MobileControlNetworkMode> SetModeAsync(
+        MobileControlNetworkMode networkMode,
+        CancellationToken cancellationToken = default)
+    {
+        CurrentMode = MobileControlSettings.NormalizeNetworkMode(networkMode);
+        foreach (var lease in _leases)
+        {
+            lease.ApplyMode(CurrentMode, TunnelBaseUri);
+        }
+
+        ModeChanged?.Invoke(this, new NetworkModeChangedEventArgs(CurrentMode));
+        return Task.FromResult(CurrentMode);
+    }
+
+    public Task<INetworkExposureLease> PublishAsync(
+        Uri lanUrl,
+        string healthCheckPath,
+        CancellationToken cancellationToken = default)
+    {
+        var lease = new FakeNetworkExposureLease(lanUrl, Remove);
+        _leases.Add(lease);
+        lease.ApplyMode(CurrentMode, TunnelBaseUri);
+        return Task.FromResult<INetworkExposureLease>(lease);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _leases.Clear();
+        return ValueTask.CompletedTask;
+    }
+
+    private void Remove(FakeNetworkExposureLease lease)
+    {
+        _leases.Remove(lease);
+    }
+
+    private sealed class FakeNetworkExposureLease(
+        Uri lanUrl,
+        Action<FakeNetworkExposureLease> remove) : INetworkExposureLease
+    {
+        public event EventHandler<NetworkExposureChangedEventArgs>? EndpointChanged;
+
+        public Guid Id { get; } = Guid.NewGuid();
+
+        public Uri LanUrl { get; } = lanUrl;
+
+        public Uri Url { get; private set; } = lanUrl;
+
+        public MobileControlNetworkMode EffectiveMode { get; private set; } = MobileControlNetworkMode.LocalNetwork;
+
+        public ValueTask DisposeAsync()
+        {
+            remove(this);
+            return ValueTask.CompletedTask;
+        }
+
+        public void ApplyMode(MobileControlNetworkMode mode, Uri tunnelBaseUri)
+        {
+            EffectiveMode = mode;
+            Url = mode == MobileControlNetworkMode.CloudflareTunnel
+                ? new UriBuilder(LanUrl)
+                {
+                    Scheme = tunnelBaseUri.Scheme,
+                    Host = tunnelBaseUri.Host,
+                    Port = -1
+                }.Uri
+                : LanUrl;
+            EndpointChanged?.Invoke(this, new NetworkExposureChangedEventArgs(Url, EffectiveMode));
+        }
+    }
+}
+
 internal sealed class FakeLanCookieRelayService : ILanCookieRelayService
 {
     public event EventHandler<LanCookieRelayStoppedEventArgs>? Stopped;
+
+    public event EventHandler<LanCookieRelayEndpointChangedEventArgs>? EndpointChanged;
 
     public int StartCalls { get; private set; }
 
@@ -28,10 +185,12 @@ internal sealed class FakeLanCookieRelayService : ILanCookieRelayService
     public LanCookieRelaySession NextSession { get; set; } = new(
         Guid.NewGuid(),
         new Uri("http://127.0.0.1:49152/?token=test-token"),
+        new Uri("http://127.0.0.1:49152/?token=test-token"),
         "127.0.0.1",
         49152,
         DateTimeOffset.Now,
-        TimeSpan.FromMinutes(10));
+        TimeSpan.FromMinutes(10),
+        MobileControlNetworkMode.LocalNetwork);
 
     public Exception? StartException { get; set; }
 
@@ -87,6 +246,12 @@ internal sealed class FakeLanCookieRelayService : ILanCookieRelayService
     {
         Stopped?.Invoke(this, new LanCookieRelayStoppedEventArgs(NextSession.SessionId, reason, message));
     }
+
+    public void RaiseEndpointChanged(LanCookieRelaySession session)
+    {
+        NextSession = session;
+        EndpointChanged?.Invoke(this, new LanCookieRelayEndpointChangedEventArgs(session));
+    }
 }
 
 internal sealed class FakeMobileControlService : IMobileControlService
@@ -94,6 +259,8 @@ internal sealed class FakeMobileControlService : IMobileControlService
     public event EventHandler<MobileControlStoppedEventArgs>? Stopped;
 
     public event EventHandler<MobileControlDeviceCountChangedEventArgs>? DeviceCountChanged;
+
+    public event EventHandler<MobileControlEndpointChangedEventArgs>? EndpointChanged;
 
     public int StartCalls { get; private set; }
 
@@ -108,9 +275,11 @@ internal sealed class FakeMobileControlService : IMobileControlService
     public MobileControlSession NextSession { get; set; } = new(
         Guid.NewGuid(),
         new Uri("http://127.0.0.1:49153/?token=test-token"),
+        new Uri("http://127.0.0.1:49153/?token=test-token"),
         "127.0.0.1",
         49153,
-        DateTimeOffset.Now);
+        DateTimeOffset.Now,
+        MobileControlNetworkMode.LocalNetwork);
 
     public Task<MobileControlSession> StartAsync(
         MobileControlSettings settings,
@@ -125,6 +294,7 @@ internal sealed class FakeMobileControlService : IMobileControlService
         CurrentSession = NextSession with
         {
             Url = new Uri($"http://127.0.0.1:{settings.Port}/?token={settings.AccessToken}"),
+            LanUrl = new Uri($"http://127.0.0.1:{settings.Port}/?token={settings.AccessToken}"),
             Port = settings.Port
         };
         return Task.FromResult(CurrentSession);
@@ -149,6 +319,12 @@ internal sealed class FakeMobileControlService : IMobileControlService
     {
         ConnectedDeviceCount = connectedDeviceCount;
         DeviceCountChanged?.Invoke(this, new MobileControlDeviceCountChangedEventArgs(connectedDeviceCount));
+    }
+
+    public void RaiseEndpointChanged(MobileControlSession session)
+    {
+        CurrentSession = session;
+        EndpointChanged?.Invoke(this, new MobileControlEndpointChangedEventArgs(session));
     }
 }
 
@@ -409,7 +585,13 @@ internal sealed class FakeSettingsService : ISettingsService
 
         return settings with
         {
-            MobileControl = new MobileControlSettings(49153, "test-mobile-token", settings.MobileControl.AutoStart)
+            MobileControl = new MobileControlSettings(
+                49153,
+                "test-mobile-token",
+                settings.MobileControl.AutoStart,
+                settings.MobileControl.NetworkMode,
+                settings.MobileControl.TunnelProxyMode,
+                settings.MobileControl.TunnelManualProxyUrl)
         };
     }
 }

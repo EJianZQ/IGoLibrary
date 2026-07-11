@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
+using IGoLibrary.Ex.Application.Configuration;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
 
@@ -16,6 +17,7 @@ public sealed partial class LanCookieRelayViewModel(
     INotificationService notificationService) : ViewModelBase
 {
     private Guid? _activeLanCookieRelaySessionId;
+    private MobileControlNetworkMode _activeNetworkMode = MobileControlNetworkMode.LocalNetwork;
     private Func<string, Task<LanCookieRelayLinkSubmitResult>>? _submitLinkAsync;
 
     [ObservableProperty]
@@ -32,7 +34,7 @@ public sealed partial class LanCookieRelayViewModel(
     private string lanCookieRelayUrlText = string.Empty;
 
     [ObservableProperty]
-    private string lanCookieRelayStatusText = "局域网快传尚未启动";
+    private string lanCookieRelayStatusText = "快传尚未启动";
 
     [ObservableProperty]
     private bool showLanCookieRelayStartedStatusIcon;
@@ -66,20 +68,35 @@ public sealed partial class LanCookieRelayViewModel(
 
         if (e.Reason == LanCookieRelayStopReason.Timeout)
         {
-            LanCookieRelayStatusText = e.Message ?? "局域网快传已超时关闭";
+            LanCookieRelayStatusText = e.Message ?? $"{GetQuickTransferName()}已超时关闭";
             return;
         }
 
         if (e.Reason == LanCookieRelayStopReason.Failed)
         {
-            LanCookieRelayStatusText = e.Message ?? "局域网快传已异常关闭";
+            LanCookieRelayStatusText = e.Message ?? $"{GetQuickTransferName()}已异常关闭";
             return;
         }
 
         if (e.Reason == LanCookieRelayStopReason.Manual && IsLanCookieRelayDialogOpen)
         {
-            LanCookieRelayStatusText = "局域网快传已停止";
+            LanCookieRelayStatusText = $"{GetQuickTransferName()}已停止";
         }
+    }
+
+    public void ApplyEndpointChanged(LanCookieRelayEndpointChangedEventArgs e)
+    {
+        if (_activeLanCookieRelaySessionId != e.Session.SessionId)
+        {
+            return;
+        }
+
+        _activeNetworkMode = e.Session.EffectiveMode;
+        LanCookieRelayUrlText = e.Session.Url.ToString();
+        LanCookieRelayQrImage = qrCodeImageFactory.Create(LanCookieRelayUrlText);
+        LanCookieRelayStatusText = e.Session.EffectiveMode == MobileControlNetworkMode.CloudflareTunnel
+            ? "公网快传已启动"
+            : "已切换到局域网快传";
     }
 
     public async Task StopSessionAsync(bool closeDialog)
@@ -90,7 +107,7 @@ public sealed partial class LanCookieRelayViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Auth", $"停止局域网快传失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Auth", $"停止快传失败：{ex.Message}");
         }
         finally
         {
@@ -122,7 +139,7 @@ public sealed partial class LanCookieRelayViewModel(
     private async Task StartLanCookieRelayAsync()
     {
         var handler = _submitLinkAsync
-            ?? throw new InvalidOperationException("局域网快传尚未完成初始化");
+            ?? throw new InvalidOperationException("快传尚未完成初始化");
         await StartSessionAsync(LanAuthLinkRelayPurpose.GraphQlSession, handler);
     }
 
@@ -141,7 +158,7 @@ public sealed partial class LanCookieRelayViewModel(
             LanCookieRelayDialogTitle = purpose == LanAuthLinkRelayPurpose.RemoteCheckIn
                 ? "远程签到授权快传"
                 : "登录授权快传";
-            LanCookieRelayStatusText = "正在启动局域网快传...";
+            LanCookieRelayStatusText = "正在启动快传服务...";
             ShowLanCookieRelayStartedStatusIcon = false;
             LanCookieRelayUrlText = string.Empty;
             LanCookieRelayQrImage = null;
@@ -150,21 +167,27 @@ public sealed partial class LanCookieRelayViewModel(
                 (link, cancellationToken) => SubmitLanCookieRelayLinkAsync(link, submitLinkAsync, cancellationToken),
                 purpose);
             _activeLanCookieRelaySessionId = session.SessionId;
+            _activeNetworkMode = session.EffectiveMode;
             LanCookieRelayUrlText = session.Url.ToString();
             LanCookieRelayQrImage = qrCodeImageFactory.Create(LanCookieRelayUrlText);
             IsLanCookieRelayRunning = true;
-            LanCookieRelayStatusText = $"服务已启动，监听端口 {session.Port}";
+            LanCookieRelayStatusText = session.EffectiveMode == MobileControlNetworkMode.CloudflareTunnel
+                ? "公网快传已启动"
+                : $"局域网快传已启动，监听端口 {session.Port}";
             ShowLanCookieRelayStartedStatusIcon = true;
-            activityLogService.Write(LogEntryKind.Info, "Auth", $"局域网 Cookie 快传已启动：{LanCookieRelayUrlText}");
+            activityLogService.Write(
+                LogEntryKind.Info,
+                "Auth",
+                $"{GetQuickTransferName()}已启动，监听端口 {session.Port}");
         }
         catch (Exception ex)
         {
             IsLanCookieRelayRunning = false;
             ShowLanCookieRelayStartedStatusIcon = false;
             _activeLanCookieRelaySessionId = null;
-            LanCookieRelayStatusText = $"局域网快传启动失败：{ex.Message}";
-            activityLogService.Write(LogEntryKind.Error, "Auth", $"局域网快传启动失败：{ex.Message}");
-            await notificationService.ShowWarningAsync("局域网快传启动失败", ex.Message);
+            LanCookieRelayStatusText = $"快传启动失败：{ex.Message}";
+            activityLogService.Write(LogEntryKind.Error, "Auth", $"快传启动失败：{ex.Message}");
+            await notificationService.ShowWarningAsync("快传启动失败", ex.Message);
         }
     }
 
@@ -210,7 +233,7 @@ public sealed partial class LanCookieRelayViewModel(
         var parseResult = await submitLinkAsync(linkText.Trim());
         if (parseResult.Authenticated)
         {
-            LanCookieRelayStatusText = "授权成功，局域网快传已完成";
+            LanCookieRelayStatusText = $"授权成功，{GetQuickTransferName()}已完成";
             IsLanCookieRelayDialogOpen = false;
             return LanCookieRelaySubmitResult.Succeeded(parseResult.Message);
         }
@@ -218,14 +241,19 @@ public sealed partial class LanCookieRelayViewModel(
         LanCookieRelayStatusText = parseResult.Message;
         try
         {
-            await notificationService.ShowWarningAsync("局域网快传失败", parseResult.Message);
+            await notificationService.ShowWarningAsync("快传失败", parseResult.Message);
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Auth", $"显示局域网快传失败通知失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Auth", $"显示快传失败通知失败：{ex.Message}");
         }
 
         return LanCookieRelaySubmitResult.Failed(parseResult.Message);
+    }
+
+    private string GetQuickTransferName()
+    {
+        return _activeNetworkMode == MobileControlNetworkMode.CloudflareTunnel ? "公网快传" : "局域网快传";
     }
 }
 

@@ -928,7 +928,7 @@
         const connEl = $('connection');
         connEl.querySelector('span').textContent = '连接失败';
         connEl.className = 'pill bad';
-        text('updated', '请确认手机和电脑在同一局域网');
+        text('updated', '请确认手机网络和电脑端服务可用');
       }
     }
 
@@ -998,7 +998,7 @@
         }
         await refresh();
       } catch {
-        iosAlert('操作失败，请确认手机和电脑在同一局域网');
+        iosAlert('操作失败，请确认手机网络和电脑端服务可用');
       } finally {
         button.disabled = false;
       }
@@ -1030,7 +1030,7 @@
         }
         await refresh();
       } catch {
-        iosAlert('刷新失败，请确认手机和电脑在同一局域网');
+        iosAlert('刷新失败，请确认手机网络和电脑端服务可用');
       } finally {
         button.disabled = false;
       }

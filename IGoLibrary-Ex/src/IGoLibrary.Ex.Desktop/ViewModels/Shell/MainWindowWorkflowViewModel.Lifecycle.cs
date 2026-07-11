@@ -59,6 +59,7 @@ public partial class MainWindowWorkflowViewModel
         {
             _lanCookieRelayServiceSubscribed = true;
             _lanCookieRelayService.Stopped += OnLanCookieRelayStopped;
+            _lanCookieRelayService.EndpointChanged += OnLanCookieRelayEndpointChanged;
         }
 
         _ = LoadProjectAuthorAvatarAsync();

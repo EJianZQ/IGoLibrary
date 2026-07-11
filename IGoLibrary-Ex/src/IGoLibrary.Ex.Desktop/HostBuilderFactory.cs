@@ -66,6 +66,14 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IStorageChangeWorkflowService, StorageChangeWorkflowService>();
                 services.AddSingleton<ILanAddressProvider, LanAddressProvider>();
                 services.AddSingleton<IQrCodeImageFactory, QrCodeImageFactory>();
+                services.AddSingleton<ICloudflareSystemProxyProvider, CloudflareSystemProxyProvider>();
+                services.AddSingleton<ICloudflareTunnelProxyResolver, CloudflareTunnelProxyResolver>();
+                services.AddSingleton<ICloudflareTunnelHealthProbeFactory, CloudflareTunnelHealthProbeFactory>();
+                services.AddSingleton<IClashMihomoConfigurationLocator, ClashMihomoConfigurationLocator>();
+                services.AddSingleton<IMihomoControllerClient, MihomoControllerClient>();
+                services.AddSingleton<IClashMihomoCompatibilityService, ClashMihomoCompatibilityService>();
+                services.AddSingleton<ICloudflareQuickTunnelRunner, CloudflareQuickTunnelRunner>();
+                services.AddSingleton<INetworkExposureManager, NetworkExposureManager>();
                 services.AddSingleton<ILanCookieRelayService, LanCookieRelayService>();
                 services.AddSingleton<IMobileControlTaskUiStateAccessor, MobileControlTaskUiStateAccessor>();
                 services.AddSingleton<IMobileControlStatusSnapshotProvider, MobileControlStatusSnapshotProvider>();

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using IGoLibrary.Ex.Application.Configuration;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
@@ -6,12 +7,14 @@ internal static class LanCookieRelayMobilePage
 {
   public static string Build(
     string token,
-    LanAuthLinkRelayPurpose purpose = LanAuthLinkRelayPurpose.GraphQlSession)
+    LanAuthLinkRelayPurpose purpose = LanAuthLinkRelayPurpose.GraphQlSession,
+    MobileControlNetworkMode networkMode = MobileControlNetworkMode.LocalNetwork)
   {
     var tokenJson = JsonSerializer.Serialize(token);
+    var transferName = networkMode == MobileControlNetworkMode.CloudflareTunnel ? "公网快传" : "局域网快传";
     var purposeTitle = purpose == LanAuthLinkRelayPurpose.RemoteCheckIn
-      ? "远程签到授权局域网快传"
-      : "登录授权局域网快传";
+      ? $"远程签到授权{transferName}"
+      : $"登录授权{transferName}";
     var purposeHint = purpose == LanAuthLinkRelayPurpose.RemoteCheckIn
       ? "请重新扫码获取一个未被普通登录使用的新授权链接，提交后仅用于远程签到"
       : "提交后用于获取普通登录 Cookie";
@@ -101,7 +104,7 @@ internal static class LanCookieRelayMobilePage
         const result = await response.json();
         setMessage(result.message || (result.success ? '已发送成功' : '发送失败'), result.success ? 'ok' : 'bad');
       } catch {
-        setMessage('发送失败，请确认手机和电脑在同一局域网', 'bad');
+        setMessage('发送失败，请确认手机网络和电脑端服务可用', 'bad');
       } finally {
         send.disabled = false;
       }
