@@ -76,7 +76,8 @@ internal sealed class NetworkExposureManager(
                 return _currentMode;
             }
 
-            Dictionary<Guid, ICloudflareQuickTunnelSession> prepared;
+            Dictionary<Guid, ICloudflareQuickTunnelSession> prepared = [];
+            var preparedTunnelsCommitted = false;
             try
             {
                 prepared = await PrepareAllTunnelsUnderGateAsync(
@@ -92,6 +93,7 @@ internal sealed class NetworkExposureManager(
                     AttachTunnelUnderGate(_leases[pair.Key], pair.Value);
                 }
 
+                preparedTunnelsCommitted = true;
                 PublishModeChanged(_currentMode);
                 activityLogService.Write(LogEntryKind.Info, "Network", "手机控制网络方式已切换到 Cloudflare Tunnel");
                 return _currentMode;
@@ -114,6 +116,16 @@ internal sealed class NetworkExposureManager(
                 }
 
                 throw CreateTunnelStartupException(ex);
+            }
+            finally
+            {
+                if (!preparedTunnelsCommitted)
+                {
+                    foreach (var tunnel in prepared.Values)
+                    {
+                        await DisposeTunnelSafelyAsync(tunnel);
+                    }
+                }
             }
         }
         finally

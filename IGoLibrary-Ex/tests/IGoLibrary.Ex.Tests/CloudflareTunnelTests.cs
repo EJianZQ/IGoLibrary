@@ -273,6 +273,64 @@ public sealed class CloudflareTunnelTests
     }
 
     [Fact]
+    public async Task ExposureManager_ModePersistenceFailureDisposesAllPreparedTunnelsBeforeFallback()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.LocalNetwork);
+        var persistenceFailure = new IOException("database unavailable");
+        settingsService.UpdateExceptions.Enqueue(persistenceFailure);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        await using var manager = CreateManager(runner, settingsService);
+        manager.Initialize(MobileControlNetworkMode.LocalNetwork, CloudflareTunnelProxyMode.Auto, string.Empty);
+        await using var first = await manager.PublishAsync(
+            new Uri("http://192.168.1.8:49153/?token=one"),
+            "/_igolibrary/health/one");
+        await using var second = await manager.PublishAsync(
+            new Uri("http://192.168.1.8:49154/?token=two"),
+            "/_igolibrary/health/two");
+
+        var effective = await manager.SetModeAsync(MobileControlNetworkMode.CloudflareTunnel);
+
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, effective);
+        Assert.Equal(first.LanUrl, first.Url);
+        Assert.Equal(second.LanUrl, second.Url);
+        Assert.Equal(2, runner.Sessions.Count);
+        Assert.All(runner.Sessions, session => Assert.True(session.Disposed));
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, settingsService.CurrentSettings.MobileControl.NetworkMode);
+    }
+
+    [Fact]
+    public async Task ExposureManager_ModePersistenceFailureDisposesAllPreparedTunnelsWithoutFallback()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.LocalNetwork);
+        var persistenceFailure = new IOException("database unavailable");
+        settingsService.UpdateExceptions.Enqueue(persistenceFailure);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        await using var manager = CreateManager(runner, settingsService);
+        manager.Initialize(
+            MobileControlNetworkMode.LocalNetwork,
+            CloudflareTunnelProxyMode.Auto,
+            string.Empty,
+            fallbackToLocalNetworkOnTunnelFailure: false);
+        await using var first = await manager.PublishAsync(
+            new Uri("http://192.168.1.8:49153/?token=one"),
+            "/_igolibrary/health/one");
+        await using var second = await manager.PublishAsync(
+            new Uri("http://192.168.1.8:49154/?token=two"),
+            "/_igolibrary/health/two");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            manager.SetModeAsync(MobileControlNetworkMode.CloudflareTunnel));
+
+        Assert.Same(persistenceFailure, exception.InnerException);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, manager.CurrentMode);
+        Assert.Equal(first.LanUrl, first.Url);
+        Assert.Equal(second.LanUrl, second.Url);
+        Assert.Equal(2, runner.Sessions.Count);
+        Assert.All(runner.Sessions, session => Assert.True(session.Disposed));
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, settingsService.CurrentSettings.MobileControl.NetworkMode);
+    }
+
+    [Fact]
     public async Task ExposureManager_RuntimeFaultFallsBackAllLeasesAndPersistsLocalMode()
     {
         var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
@@ -287,7 +345,9 @@ public sealed class CloudflareTunnelTests
             "/_igolibrary/health/two");
 
         runner.Sessions[0].Fail("process exited");
-        await WaitForAsync(() => manager.CurrentMode == MobileControlNetworkMode.LocalNetwork);
+        await WaitForAsync(() =>
+            manager.CurrentMode == MobileControlNetworkMode.LocalNetwork &&
+            settingsService.CurrentSettings.MobileControl.NetworkMode == MobileControlNetworkMode.LocalNetwork);
 
         Assert.Equal(first.LanUrl, first.Url);
         Assert.Equal(second.LanUrl, second.Url);
@@ -323,7 +383,7 @@ public sealed class CloudflareTunnelTests
         var warning = Assert.Single(notifications.Warnings);
         Assert.Equal("Cloudflare Tunnel 已回退", warning.Title);
         Assert.Equal(
-            "Cloudflare Tunnel 不可用，已自动回退到本机局域网。详情请查看日志。",
+            "Cloudflare Tunnel 不可用，已自动回退到本机局域网。详情请查看日志",
             warning.Message);
         Assert.DoesNotContain("not ready", warning.Message, StringComparison.Ordinal);
     }
