@@ -35,13 +35,15 @@ internal static class MainWindowViewModelTestHarness
         IRemoteCheckInWorkflowService? remoteCheckInWorkflowService = null,
         IRemoteCheckInProfileService? remoteCheckInProfileService = null,
         INetworkExposureManager? networkExposureManager = null,
-        ISeatLabelDialogService? seatLabelDialogService = null)
+        ISeatLabelDialogService? seatLabelDialogService = null,
+        IGrabStrategyReminderDialogService? grabStrategyReminderDialogService = null)
     {
         mobileControlService ??= new FakeMobileControlService();
         remoteCheckInWorkflowService ??= new FakeRemoteCheckInWorkflowService();
         remoteCheckInProfileService ??= new FakeRemoteCheckInProfileService();
         networkExposureManager ??= new FakeNetworkExposureManager();
         seatLabelDialogService ??= new FakeSeatLabelDialogService();
+        grabStrategyReminderDialogService ??= new FakeGrabStrategyReminderDialogService();
         var workflowState = new ShellWorkflowState();
         var oauthCodeRegistry = new OAuthCodeConsumptionRegistry();
         var lanCookieRelayViewModel = new LanCookieRelayViewModel(
@@ -78,6 +80,7 @@ internal static class MainWindowViewModelTestHarness
                 activityLogService,
                 notificationService,
                 appThemeService,
+                grabStrategyReminderDialogService,
                 timeProvider),
             new GlobalLeakPageViewModel(
                 globalLeakCoordinator,

@@ -44,6 +44,8 @@ public sealed record GrabTaskSettings
 {
     public GrabReservationStrategy ReservationStrategy { get; init; } = GrabReservationStrategy.QueryThenReserve;
 
+    public bool OptimalStrategyReminderEnabled { get; init; } = true;
+
     public TimeSpan DefaultScheduledStartTime { get; init; } = TimeSpan.Zero;
 
     public GrabTaskSettings()
@@ -58,6 +60,16 @@ public sealed record GrabTaskSettings
     public GrabTaskSettings(GrabReservationStrategy reservationStrategy, TimeSpan defaultScheduledStartTime)
     {
         ReservationStrategy = reservationStrategy;
+        DefaultScheduledStartTime = defaultScheduledStartTime;
+    }
+
+    public GrabTaskSettings(
+        GrabReservationStrategy reservationStrategy,
+        bool optimalStrategyReminderEnabled,
+        TimeSpan defaultScheduledStartTime)
+    {
+        ReservationStrategy = reservationStrategy;
+        OptimalStrategyReminderEnabled = optimalStrategyReminderEnabled;
         DefaultScheduledStartTime = defaultScheduledStartTime;
     }
 

@@ -208,6 +208,7 @@ public sealed class WorkflowServiceTests
                 HomeCookieProgressTimingMode.SoftwareRuntimeDuration,
                 240),
             GrabReservationStrategy: GrabReservationStrategy.ReserveDirectly,
+            OptimalGrabStrategyReminderEnabled: false,
             AutoReleaseEnabled: true,
             AutoReleaseLeadSeconds: 90,
             TaskEventAlerts: TaskEventAlertSettings.Default));
@@ -226,6 +227,7 @@ public sealed class WorkflowServiceTests
             settingsService.CurrentSettings.Ui.HomeCookieProgress?.Mode);
         Assert.Equal(240, settingsService.CurrentSettings.Ui.HomeCookieProgress?.FixedDurationMinutes);
         Assert.Equal(GrabReservationStrategy.ReserveDirectly, settingsService.CurrentSettings.Tasks.Grab.ReservationStrategy);
+        Assert.False(settingsService.CurrentSettings.Tasks.Grab.OptimalStrategyReminderEnabled);
         Assert.True(settingsService.CurrentSettings.Tasks.AutoRelease.Enabled);
         Assert.Equal(90, settingsService.CurrentSettings.Tasks.AutoRelease.LeadSeconds);
     }
@@ -251,12 +253,71 @@ public sealed class WorkflowServiceTests
             HomeReservationProgress: HomeReservationProgressSettings.Default,
             HomeCookieProgress: HomeCookieProgressSettings.Default,
             GrabReservationStrategy: GrabReservationStrategy.QueryThenReserve,
+            OptimalGrabStrategyReminderEnabled: true,
             AutoReleaseEnabled: true,
             AutoReleaseLeadSeconds: requestedLeadSeconds,
             TaskEventAlerts: TaskEventAlertSettings.Default));
 
         Assert.True(settingsService.CurrentSettings.Tasks.AutoRelease.Enabled);
         Assert.Equal(expectedLeadSeconds, settingsService.CurrentSettings.Tasks.AutoRelease.LeadSeconds);
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_SaveGrabStartPreferencesAsync_UpdatesBothPreferencesAtomically()
+    {
+        var initial = AppSettings.Default with
+        {
+            Venue = new VenueSelectionSettings(3, "三楼"),
+            Tasks = AppSettings.Default.Tasks with
+            {
+                Grab = AppSettings.Default.Tasks.Grab with
+                {
+                    ReservationStrategy = GrabReservationStrategy.ReserveDirectly,
+                    OptimalStrategyReminderEnabled = true
+                }
+            }
+        };
+        var settingsService = new FakeSettingsService(initial);
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveGrabStartPreferencesAsync(
+            GrabReservationStrategy.QueryThenReserve,
+            disableOptimalStrategyReminder: true);
+
+        Assert.False(settingsService.CurrentSettings.Tasks.Grab.OptimalStrategyReminderEnabled);
+        Assert.Equal(
+            GrabReservationStrategy.QueryThenReserve,
+            settingsService.CurrentSettings.Tasks.Grab.ReservationStrategy);
+        Assert.Equal(initial.Venue, settingsService.CurrentSettings.Venue);
+        Assert.Equal(1, settingsService.SaveCalls);
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_SaveGrabStartPreferencesAsync_DoesNotReEnableDisabledReminder()
+    {
+        var initial = AppSettings.Default with
+        {
+            Tasks = AppSettings.Default.Tasks with
+            {
+                Grab = AppSettings.Default.Tasks.Grab with
+                {
+                    ReservationStrategy = GrabReservationStrategy.ReserveDirectly,
+                    OptimalStrategyReminderEnabled = false
+                }
+            }
+        };
+        var settingsService = new FakeSettingsService(initial);
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveGrabStartPreferencesAsync(
+            GrabReservationStrategy.QueryThenReserve,
+            disableOptimalStrategyReminder: false);
+
+        Assert.False(settingsService.CurrentSettings.Tasks.Grab.OptimalStrategyReminderEnabled);
+        Assert.Equal(
+            GrabReservationStrategy.QueryThenReserve,
+            settingsService.CurrentSettings.Tasks.Grab.ReservationStrategy);
+        Assert.Equal(1, settingsService.SaveCalls);
     }
 
     [Fact]

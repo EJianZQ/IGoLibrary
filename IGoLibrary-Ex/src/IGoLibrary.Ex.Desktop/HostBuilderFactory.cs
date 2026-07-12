@@ -64,6 +64,7 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IFolderPickerService, FolderPickerService>();
                 services.AddSingleton<IStorageChangeDialogService, StorageChangeDialogService>();
                 services.AddSingleton<ISeatLabelDialogService, SeatLabelDialogService>();
+                services.AddSingleton<IGrabStrategyReminderDialogService, GrabStrategyReminderDialogService>();
                 services.AddSingleton<IStorageChangeWorkflowService, StorageChangeWorkflowService>();
                 services.AddSingleton<ILanAddressProvider, LanAddressProvider>();
                 services.AddSingleton<IQrCodeImageFactory, QrCodeImageFactory>();

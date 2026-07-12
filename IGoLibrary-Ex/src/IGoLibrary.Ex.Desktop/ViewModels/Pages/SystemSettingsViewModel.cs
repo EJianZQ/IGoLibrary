@@ -31,6 +31,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
     private Func<TaskEventAlertSettings> _taskEventAlertSettings = static () => TaskEventAlertSettings.Default;
     private Action _cancelPendingNotificationSettingsAutoSave = static () => { };
     private bool _isRollingBackStartupEntry;
+    private bool _isApplyingOptimalGrabStrategyReminder;
     private bool _isApplyingNetworkMode;
     private bool _isApplyingTunnelFallbackSetting;
     private bool _isApplyingTunnelProxySettings;
@@ -140,6 +141,9 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
     private bool checkUpdatesOnStartup = true;
 
     [ObservableProperty]
+    private bool optimalGrabStrategyReminderEnabled = GrabTaskSettings.Default.OptimalStrategyReminderEnabled;
+
+    [ObservableProperty]
     private int requestTimeoutSeconds = 5;
 
     [ObservableProperty]
@@ -209,6 +213,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         MinimizeToTrayEnabled = ui.MinimizeToTray;
         LaunchOnStartupEnabled = ui.LaunchOnStartup;
         CheckUpdatesOnStartup = settings.Updates.CheckOnStartup;
+        OptimalGrabStrategyReminderEnabled = settings.Tasks.Grab.OptimalStrategyReminderEnabled;
         RequestTimeoutSeconds = settings.Network.TimeoutSeconds;
         NetworkMaxRetries = settings.Network.MaxRetries;
         _networkExposureManager.Initialize(
@@ -246,6 +251,24 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
     public Task FlushPendingAutoSaveAsync(CancellationToken cancellationToken = default)
     {
         return _systemSettingsAutoSave.FlushAsync(cancellationToken);
+    }
+
+    public void ApplyPersistedOptimalGrabStrategyReminder(bool enabled)
+    {
+        if (OptimalGrabStrategyReminderEnabled == enabled)
+        {
+            return;
+        }
+
+        _isApplyingOptimalGrabStrategyReminder = true;
+        try
+        {
+            OptimalGrabStrategyReminderEnabled = enabled;
+        }
+        finally
+        {
+            _isApplyingOptimalGrabStrategyReminder = false;
+        }
     }
 
     public Task<AppSettings> LoadSettingsAsync(CancellationToken cancellationToken = default)
@@ -320,6 +343,14 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
     }
 
     partial void OnMinimizeToTrayEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnOptimalGrabStrategyReminderEnabledChanged(bool value)
+    {
+        if (!_isApplyingOptimalGrabStrategyReminder)
+        {
+            ScheduleAutoSave();
+        }
+    }
 
     partial void OnLaunchOnStartupEnabledChanged(bool value)
     {
@@ -629,6 +660,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
             homeReservationProgress,
             homeCookieProgress,
             _grabReservationStrategy(),
+            OptimalGrabStrategyReminderEnabled,
             _autoReleaseEnabled(),
             AutoReleaseTaskSettings.NormalizeLeadSeconds(_autoReleaseLeadSeconds()),
             _taskEventAlertSettings()),

@@ -3257,6 +3257,25 @@
                   </Border>
 
                   <Border Classes="card">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="16">
+                      <StackPanel Spacing="6">
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Text="最优抢座策略提醒" />
+                        <TextBlock Classes="helper-text"
+                                   Text="直接发送预约请求且选中 6 个及以上座位时，启动前提示切换至更高效的策略" />
+                      </StackPanel>
+                      <ToggleSwitch x:Name="OptimalGrabStrategyReminderToggle"
+                                    Grid.Column="1"
+                                    IsChecked="{Binding SystemSettings.OptimalGrabStrategyReminderEnabled}"
+                                    OnContent="开"
+                                    OffContent="关"
+                                    VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+
+                  <Border Classes="card">
                     <Grid RowDefinitions="Auto,Auto"
                           RowSpacing="14">
                       <Grid ColumnDefinitions="*,Auto"

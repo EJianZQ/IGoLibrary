@@ -45,7 +45,8 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
             {
                 Grab = current.Tasks.Grab with
                 {
-                    ReservationStrategy = snapshot.GrabReservationStrategy
+                    ReservationStrategy = snapshot.GrabReservationStrategy,
+                    OptimalStrategyReminderEnabled = snapshot.OptimalGrabStrategyReminderEnabled
                 },
                 AutoRelease = current.Tasks.AutoRelease with
                 {
@@ -69,13 +70,18 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
         }, cancellationToken);
     }
 
-    public async Task SaveGrabReservationStrategyAsync(
+    public async Task SaveGrabStartPreferencesAsync(
         GrabReservationStrategy strategy,
+        bool disableOptimalStrategyReminder,
         CancellationToken cancellationToken = default)
     {
         await settingsService.UpdateAsync(current =>
         {
-            if (current.Tasks.Grab.ReservationStrategy == strategy)
+            var reminderEnabled = disableOptimalStrategyReminder
+                ? false
+                : current.Tasks.Grab.OptimalStrategyReminderEnabled;
+            if (current.Tasks.Grab.ReservationStrategy == strategy &&
+                current.Tasks.Grab.OptimalStrategyReminderEnabled == reminderEnabled)
             {
                 return current;
             }
@@ -86,7 +92,8 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
                 {
                     Grab = current.Tasks.Grab with
                     {
-                        ReservationStrategy = strategy
+                        ReservationStrategy = strategy,
+                        OptimalStrategyReminderEnabled = reminderEnabled
                     }
                 }
             };

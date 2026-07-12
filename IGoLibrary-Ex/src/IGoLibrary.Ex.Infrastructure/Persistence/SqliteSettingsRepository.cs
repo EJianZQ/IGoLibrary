@@ -195,6 +195,10 @@ public sealed class SqliteSettingsRepository(
             ?? ReadInt(tasks, "grabReservationStrategy")
             ?? ReadInt(root, "grabReservationStrategy")
             ?? (int)defaults.Tasks.Grab.ReservationStrategy);
+        writer.WriteBoolean(
+            "optimalStrategyReminderEnabled",
+            ReadBool(grab, "optimalStrategyReminderEnabled")
+            ?? defaults.Tasks.Grab.OptimalStrategyReminderEnabled);
         writer.WriteString(
             "defaultScheduledStartTime",
             NormalizeTimeOfDay(
@@ -538,6 +542,7 @@ public sealed class SqliteSettingsRepository(
                HasAnyProperty(ReadObject(root, "requestPolicy"), "timeoutSeconds", "retryCount") ||
                HasAnyProperty(ReadObject(root, "tasks"), "grabReservationStrategy") ||
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "grab"), "defaultScheduledStartTime") ||
+               !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "grab"), "optimalStrategyReminderEnabled") ||
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "autoRelease"), "enabled") ||
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "autoRelease"), "leadSeconds") ||
                !HasAnyProperty(ReadObject(ReadObject(root, "tasks"), "tomorrowReservation"), "defaultScheduledStartTime") ||

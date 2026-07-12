@@ -365,6 +365,31 @@ internal sealed class FakeSeatLabelDialogService : ISeatLabelDialogService
     }
 }
 
+internal sealed class FakeGrabStrategyReminderDialogService : IGrabStrategyReminderDialogService
+{
+    public Queue<GrabStrategyReminderResult> Results { get; } = [];
+
+    public int ShowCount { get; private set; }
+
+    public Exception? ShowException { get; set; }
+
+    public Task<GrabStrategyReminderResult> ShowAsync(
+        CancellationToken cancellationToken = default)
+    {
+        ShowCount++;
+        if (ShowException is not null)
+        {
+            throw ShowException;
+        }
+
+        return Task.FromResult(Results.Count > 0
+            ? Results.Dequeue()
+            : new GrabStrategyReminderResult(
+                GrabStrategyReminderDecision.KeepCurrent,
+                DisableReminder: false));
+    }
+}
+
 internal sealed class FakeUpdateCheckService : IUpdateCheckService
 {
     public Queue<UpdateCheckResult> Results { get; } = [];

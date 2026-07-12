@@ -15,8 +15,9 @@ public interface ISettingsWorkflowService
         TaskEventAlertSettings alerts,
         CancellationToken cancellationToken = default);
 
-    Task SaveGrabReservationStrategyAsync(
+    Task SaveGrabStartPreferencesAsync(
         GrabReservationStrategy strategy,
+        bool disableOptimalStrategyReminder,
         CancellationToken cancellationToken = default);
 
     Task SaveGrabScheduledStartDefaultAsync(

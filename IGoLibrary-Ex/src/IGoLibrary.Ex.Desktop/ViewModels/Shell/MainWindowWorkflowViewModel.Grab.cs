@@ -144,6 +144,9 @@ public partial class MainWindowWorkflowViewModel
         GrabPage.ConfigureOrchestration(
             () => IsInitializationComplete,
             () => IsLoadingSettings,
+            () => SystemSettings.OptimalGrabStrategyReminderEnabled,
+            () => FlushPendingSystemSettingsAsync(),
+            SystemSettings.ApplyPersistedOptimalGrabStrategyReminder,
             () => AccountVenue.LockedLibrary,
             () => MultiSeatSelection.SeatCount,
             MultiSeatSelection.GetSelectedSeatSnapshot,

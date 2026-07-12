@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 using IGoLibrary.Ex.Infrastructure.Persistence;
@@ -284,6 +285,7 @@ public sealed class SettingsSerializationTests
         Assert.Equal(5, settings.Network.TimeoutSeconds);
         Assert.Equal(3, settings.Network.MaxRetries);
         Assert.Equal(GrabReservationStrategy.QueryThenReserve, settings.Tasks.Grab.ReservationStrategy);
+        Assert.True(settings.Tasks.Grab.OptimalStrategyReminderEnabled);
         Assert.Equal(TimeSpan.Zero, settings.Tasks.Grab.DefaultScheduledStartTime);
         Assert.Equal(4, settings.Tasks.Occupy.ReReservationMaxAttempts);
         Assert.False(settings.Tasks.AutoRelease.Enabled);
@@ -318,6 +320,7 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"network\":", json);
         Assert.Contains("\"tasks\":", json);
         Assert.Contains("\"grab\":", json);
+        Assert.Contains("\"optimalStrategyReminderEnabled\": true", json);
         Assert.Contains("\"occupy\":", json);
         Assert.Contains("\"autoRelease\":", json);
         Assert.Contains("\"leadSeconds\": 60", json);
@@ -349,6 +352,35 @@ public sealed class SettingsSerializationTests
         Assert.DoesNotContain("appBannerNotificationsEnabled", json);
         Assert.Contains("\"graphQlOverridesEnabled\": true", json);
         Assert.Contains("\"autoStart\": false", json);
+    }
+
+    [Fact]
+    public void GrabOptimalStrategyReminderMigration_DefaultsToEnabledAndPreservesExplicitDisabledValue()
+    {
+        var canonical = Assert.IsType<JsonObject>(JsonNode.Parse(
+            JsonSerializer.Serialize(AppSettings.Default, AppJson.Default)));
+        var grab = Assert.IsType<JsonObject>(canonical["tasks"]?["grab"]);
+        Assert.True(grab.Remove("optimalStrategyReminderEnabled"));
+
+        var migratedJson = MigrateLegacyAppSettingsJson(canonical.ToJsonString());
+        var missingSetting = Assert.IsType<AppSettings>(
+            JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default));
+        var explicitlyDisabled = MigrateAndDeserialize(JsonSerializer.Serialize(
+            AppSettings.Default with
+            {
+                Tasks = AppSettings.Default.Tasks with
+                {
+                    Grab = AppSettings.Default.Tasks.Grab with
+                    {
+                        OptimalStrategyReminderEnabled = false
+                    }
+                }
+            },
+            AppJson.Default));
+
+        Assert.Contains("\"optimalStrategyReminderEnabled\": true", migratedJson);
+        Assert.True(missingSetting.Tasks.Grab.OptimalStrategyReminderEnabled);
+        Assert.False(explicitlyDisabled.Tasks.Grab.OptimalStrategyReminderEnabled);
     }
 
     [Fact]

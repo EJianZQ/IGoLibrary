@@ -32,6 +32,16 @@ public sealed class MainWindowLayoutTests
     }
 
     [AvaloniaFact]
+    public void GeneralSettings_ExposeOptimalGrabStrategyReminderToggle()
+    {
+        var window = new MainWindow();
+
+        var toggle = window.FindControl<ToggleSwitch>("OptimalGrabStrategyReminderToggle");
+
+        Assert.NotNull(toggle);
+    }
+
+    [AvaloniaFact]
     public void LanCookieRelayDialog_StatusWrapsBelowHeaderAndCannotOverlapCloseButton()
     {
         var window = new MainWindow

@@ -13,6 +13,7 @@ namespace IGoLibrary.Ex.Desktop.ViewModels;
 
 public sealed partial class GrabPageViewModel : ViewModelBase
 {
+    private const int OptimalStrategyReminderSeatThreshold = 5;
     private static readonly TimeSpan DefaultScheduledStartTime = GrabTaskSettings.Default.DefaultScheduledStartTime;
 
     private readonly IGrabSeatCoordinator _grabSeatCoordinator;
@@ -20,10 +21,15 @@ public sealed partial class GrabPageViewModel : ViewModelBase
     private readonly IActivityLogService _activityLogService;
     private readonly INotificationService _notificationService;
     private readonly IAppThemeService _appThemeService;
+    private readonly IGrabStrategyReminderDialogService _strategyReminderDialogService;
     private readonly TimeProvider _timeProvider;
 
     private Func<bool>? _isInitialized;
     private Func<bool>? _isLoadingSettings;
+    private Func<bool> _isOptimalStrategyReminderEnabled =
+        static () => GrabTaskSettings.Default.OptimalStrategyReminderEnabled;
+    private Func<Task> _flushPendingSystemSettingsAsync = static () => Task.CompletedTask;
+    private Action<bool> _applyPersistedOptimalStrategyReminder = static _ => { };
     private Func<LibrarySummary?>? _selectedLibrary;
     private Func<int>? _seatCount;
     private Func<IReadOnlyList<SeatReference>>? _selectedSeats;
@@ -55,6 +61,7 @@ public sealed partial class GrabPageViewModel : ViewModelBase
         IActivityLogService activityLogService,
         INotificationService notificationService,
         IAppThemeService appThemeService,
+        IGrabStrategyReminderDialogService strategyReminderDialogService,
         TimeProvider timeProvider)
     {
         _grabSeatCoordinator = grabSeatCoordinator;
@@ -62,6 +69,7 @@ public sealed partial class GrabPageViewModel : ViewModelBase
         _activityLogService = activityLogService;
         _notificationService = notificationService;
         _appThemeService = appThemeService;
+        _strategyReminderDialogService = strategyReminderDialogService;
         _timeProvider = timeProvider;
 
         var palette = _appThemeService.CurrentPalette;
@@ -140,6 +148,9 @@ public sealed partial class GrabPageViewModel : ViewModelBase
     public void ConfigureOrchestration(
         Func<bool> isInitialized,
         Func<bool> isLoadingSettings,
+        Func<bool> isOptimalStrategyReminderEnabled,
+        Func<Task> flushPendingSystemSettingsAsync,
+        Action<bool> applyPersistedOptimalStrategyReminder,
         Func<LibrarySummary?> selectedLibrary,
         Func<int> seatCount,
         Func<IReadOnlyList<SeatReference>> selectedSeats,
@@ -153,6 +164,9 @@ public sealed partial class GrabPageViewModel : ViewModelBase
     {
         _isInitialized = isInitialized;
         _isLoadingSettings = isLoadingSettings;
+        _isOptimalStrategyReminderEnabled = isOptimalStrategyReminderEnabled;
+        _flushPendingSystemSettingsAsync = flushPendingSystemSettingsAsync;
+        _applyPersistedOptimalStrategyReminder = applyPersistedOptimalStrategyReminder;
         _selectedLibrary = selectedLibrary;
         _seatCount = seatCount;
         _selectedSeats = selectedSeats;
@@ -340,7 +354,34 @@ public sealed partial class GrabPageViewModel : ViewModelBase
         {
             var mode = (GrabPollingMode)SelectedGrabPollingModeIndex;
             var scheduledStart = ParseScheduledTime();
-            await PersistGrabReservationStrategyAsync();
+            var reservationStrategy = CurrentReservationStrategy;
+            var disableOptimalStrategyReminder = false;
+            if (ShouldShowOptimalStrategyReminder(selectedSeats.Count, reservationStrategy))
+            {
+                var reminderResult = await _strategyReminderDialogService.ShowAsync();
+                if (reminderResult.Decision == GrabStrategyReminderDecision.Cancel)
+                {
+                    return;
+                }
+
+                disableOptimalStrategyReminder = reminderResult.DisableReminder;
+
+                if (reminderResult.Decision == GrabStrategyReminderDecision.SwitchToOptimal)
+                {
+                    reservationStrategy = GrabReservationStrategy.QueryThenReserve;
+                }
+            }
+
+            await _flushPendingSystemSettingsAsync();
+            await PersistGrabStartPreferencesAsync(
+                reservationStrategy,
+                disableOptimalStrategyReminder);
+            SelectedGrabReservationStrategyIndex = (int)reservationStrategy;
+            if (disableOptimalStrategyReminder)
+            {
+                _applyPersistedOptimalStrategyReminder(false);
+            }
+
             var plan = new GrabSeatPlan(
                 selectedLibrary.LibraryId,
                 selectedLibrary.Name,
@@ -371,9 +412,22 @@ public sealed partial class GrabPageViewModel : ViewModelBase
         }
     }
 
-    private async Task PersistGrabReservationStrategyAsync()
+    private bool ShouldShowOptimalStrategyReminder(
+        int selectedSeatCount,
+        GrabReservationStrategy reservationStrategy)
     {
-        await _settingsWorkflowService.SaveGrabReservationStrategyAsync(CurrentReservationStrategy);
+        return _isOptimalStrategyReminderEnabled() &&
+               selectedSeatCount > OptimalStrategyReminderSeatThreshold &&
+               reservationStrategy == GrabReservationStrategy.ReserveDirectly;
+    }
+
+    private async Task PersistGrabStartPreferencesAsync(
+        GrabReservationStrategy strategy,
+        bool disableOptimalStrategyReminder)
+    {
+        await _settingsWorkflowService.SaveGrabStartPreferencesAsync(
+            strategy,
+            disableOptimalStrategyReminder);
     }
 
     private TimeOnly? ParseScheduledTime()

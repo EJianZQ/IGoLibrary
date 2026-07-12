@@ -13,6 +13,7 @@ public sealed record SystemSettingsSnapshot(
     HomeReservationProgressSettings HomeReservationProgress,
     HomeCookieProgressSettings HomeCookieProgress,
     GrabReservationStrategy GrabReservationStrategy,
+    bool OptimalGrabStrategyReminderEnabled,
     bool AutoReleaseEnabled,
     int AutoReleaseLeadSeconds,
     TaskEventAlertSettings TaskEventAlerts);

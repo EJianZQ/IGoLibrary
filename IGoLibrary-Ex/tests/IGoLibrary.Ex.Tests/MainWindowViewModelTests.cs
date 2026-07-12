@@ -1909,6 +1909,47 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task OptimalGrabStrategyReminder_LoadsAndAutoSavesFromGeneralSettings()
+    {
+        var initial = AppSettings.Default with
+        {
+            Tasks = AppSettings.Default.Tasks with
+            {
+                Grab = AppSettings.Default.Tasks.Grab with
+                {
+                    OptimalStrategyReminderEnabled = false
+                }
+            }
+        };
+        var settingsService = new FakeSettingsService(initial);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.False(viewModel.SystemSettings.OptimalGrabStrategyReminderEnabled);
+        viewModel.SystemSettings.OptimalGrabStrategyReminderEnabled = true;
+        await WaitForAsync(() => settingsService.CurrentSettings.Tasks.Grab.OptimalStrategyReminderEnabled);
+
+        Assert.True(settingsService.CurrentSettings.Tasks.Grab.OptimalStrategyReminderEnabled);
+    }
+
+    [Fact]
+    public async Task ApplyPersistedOptimalGrabStrategyReminder_UpdatesToggleWithoutSchedulingAnotherSave()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+        var saveCallsBeforeApply = settingsService.SaveCalls;
+
+        viewModel.SystemSettings.ApplyPersistedOptimalGrabStrategyReminder(false);
+
+        Assert.False(viewModel.SystemSettings.OptimalGrabStrategyReminderEnabled);
+        Assert.False(viewModel.SystemSettings.HasPendingAutoSave);
+        Assert.True(settingsService.CurrentSettings.Tasks.Grab.OptimalStrategyReminderEnabled);
+        Assert.Equal(saveCallsBeforeApply, settingsService.SaveCalls);
+    }
+
+    [Fact]
     public async Task SaveSettingsAsync_PersistsTelegramNotificationSettings()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);
