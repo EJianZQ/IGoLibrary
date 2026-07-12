@@ -17,6 +17,13 @@ internal sealed partial class CloudflareQuickTunnelRunner(
     internal static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(5);
     internal const int ConsecutiveFailureThreshold = 3;
 
+    public void ValidateConfiguration(
+        CloudflareTunnelProxyOptions proxyOptions,
+        ClashMihomoCompatibilityOptions compatibilityOptions)
+    {
+        _ = ResolveAndValidateConfiguration(proxyOptions, compatibilityOptions);
+    }
+
     public async Task<ICloudflareQuickTunnelSession> StartAsync(
         Uri originBaseUri,
         string healthCheckPath,
@@ -35,13 +42,13 @@ internal sealed partial class CloudflareQuickTunnelRunner(
             throw new ArgumentException("Tunnel 健康检查路径无效。", nameof(healthCheckPath));
         }
 
+        var proxyResolution = ResolveAndValidateConfiguration(proxyOptions, compatibilityOptions);
         var executablePath = ResolveExecutablePath();
         if (!File.Exists(executablePath))
         {
             throw new FileNotFoundException("未找到内置 cloudflared，无法启动 Cloudflare Tunnel。", executablePath);
         }
 
-        var proxyResolution = proxyResolver.Resolve(proxyOptions);
         logger.LogInformation(
             "Starting Cloudflare Quick Tunnel with proxy mode {ProxyMode} and HTTP/2 transport.",
             proxyResolution.EffectiveMode);
@@ -103,19 +110,21 @@ internal sealed partial class CloudflareQuickTunnelRunner(
                     exitTask,
                     diagnostics,
                     startupSource.Token);
-                var publicHealthUri = BuildHealthCheckUri(publicBaseUri, healthCheckPath);
-                await WaitForHealthyAsync(
-                    publicHealthUri,
-                    process,
-                    exitTask,
-                    diagnostics,
-                    healthProbe,
-                    startupSource.Token);
             }
             catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
                 throw new TimeoutException($"Cloudflare Tunnel 未能在 {StartupTimeout.TotalSeconds:0} 秒内就绪。", ex);
             }
+
+            var publicHealthUri = BuildHealthCheckUri(publicBaseUri, healthCheckPath);
+            await WaitForHealthyAsync(
+                publicHealthUri,
+                process,
+                exitTask,
+                diagnostics,
+                healthProbe,
+                startupSource.Token,
+                cancellationToken);
 
             var session = new CloudflareQuickTunnelSession(
                 process,
@@ -240,24 +249,53 @@ internal sealed partial class CloudflareQuickTunnelRunner(
         Task processExitTask,
         CloudflaredDiagnosticBuffer diagnostics,
         ICloudflareTunnelHealthProbeSession healthProbe,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CancellationToken callerCancellationToken)
     {
-        while (true)
+        CloudflareTunnelHealthProbeResult? lastFailure = null;
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (processExitTask.IsCompleted)
+            while (true)
             {
-                await processExitTask;
-                throw CreateUnexpectedExitException(process, "在 Tunnel 就绪前", diagnostics);
-            }
+                cancellationToken.ThrowIfCancellationRequested();
+                if (processExitTask.IsCompleted)
+                {
+                    await processExitTask;
+                    throw CreateUnexpectedExitException(process, "在 Tunnel 就绪前", diagnostics);
+                }
 
-            if (await healthProbe.IsHealthyAsync(publicHealthUri, ProbeTimeout, cancellationToken))
-            {
-                return;
-            }
+                var result = await healthProbe.ProbeAsync(publicHealthUri, ProbeTimeout, cancellationToken);
+                if (result.IsHealthy)
+                {
+                    return;
+                }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+                lastFailure = result;
+                await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+            }
         }
+        catch (OperationCanceledException ex) when (!callerCancellationToken.IsCancellationRequested)
+        {
+            var failure = lastFailure?.Failure;
+            var failureMessage = DescribeHealthCheckFailure(failure);
+            logger.LogWarning(
+                failure,
+                "Cloudflare Tunnel 公网健康检查未能在启动超时前通过：{HealthCheckUri}。" +
+                "最后连接错误：{HealthCheckError}",
+                publicHealthUri,
+                failureMessage);
+            throw new TimeoutException(
+                $"Cloudflare Tunnel 未能在 {StartupTimeout.TotalSeconds:0} 秒内就绪。" +
+                $"公网健康检查最后错误：{failureMessage}",
+                failure ?? ex);
+        }
+    }
+
+    internal static string DescribeHealthCheckFailure(Exception? failure)
+    {
+        return failure is null
+            ? "未返回具体连接错误"
+            : SanitizeDiagnosticLine(failure.Message);
     }
 
     private static async Task<Uri> WaitForPublicUriAsync(
@@ -305,6 +343,34 @@ internal sealed partial class CloudflareQuickTunnelRunner(
         return diagnosticSummary.Contains("api.trycloudflare.com/tunnel", StringComparison.OrdinalIgnoreCase) &&
                (diagnosticSummary.Contains("EOF", StringComparison.OrdinalIgnoreCase) ||
                 diagnosticSummary.Contains("TLS", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private CloudflareTunnelProxyResolution ResolveAndValidateConfiguration(
+        CloudflareTunnelProxyOptions proxyOptions,
+        ClashMihomoCompatibilityOptions compatibilityOptions)
+    {
+        var resolution = proxyResolver.Resolve(proxyOptions);
+        ValidateResolvedProxyCompatibility(resolution, compatibilityOptions, logger);
+        return resolution;
+    }
+
+    internal static void ValidateResolvedProxyCompatibility(
+        CloudflareTunnelProxyResolution proxyResolution,
+        ClashMihomoCompatibilityOptions compatibilityOptions,
+        ILogger logger)
+    {
+        if (proxyResolution.ProxyUri is null ||
+            !compatibilityOptions.Enabled ||
+            !compatibilityOptions.RoutePolicy.Trim().Equals("DIRECT", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        logger.LogWarning(
+            "Cloudflare Tunnel 启动已被配置校验阻止。代理模式：{ProxyMode}。{ConflictMessage}",
+            proxyResolution.EffectiveMode,
+            CloudflareTunnelProxyConflictException.UserMessage);
+        throw new CloudflareTunnelProxyConflictException();
     }
 
     internal static string SanitizeDiagnosticLine(string line)
@@ -515,12 +581,18 @@ internal sealed partial class CloudflareQuickTunnelRunner(
                     }
 
                     await delayTask;
-                    var healthy = await _healthProbe.IsHealthyAsync(
+                    var result = await _healthProbe.ProbeAsync(
                         publicHealthUri,
                         ProbeTimeout,
                         cancellationToken);
-                    if (healthState.RecordProbe(healthy))
+                    if (healthState.RecordProbe(result.IsHealthy))
                     {
+                        _logger.LogWarning(
+                            result.Failure,
+                            "Cloudflare Tunnel 公网健康检查连续失败 {FailureThreshold} 次。" +
+                            "最后连接错误：{HealthCheckError}",
+                            ConsecutiveFailureThreshold,
+                            DescribeHealthCheckFailure(result.Failure));
                         return new CloudflareTunnelFault("Cloudflare Tunnel 公网健康检查连续失败 3 次");
                     }
                 }

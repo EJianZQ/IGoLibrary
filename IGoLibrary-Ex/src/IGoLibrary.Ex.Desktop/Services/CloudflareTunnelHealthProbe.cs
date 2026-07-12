@@ -9,10 +9,19 @@ internal interface ICloudflareTunnelHealthProbeFactory
 
 internal interface ICloudflareTunnelHealthProbeSession : IDisposable
 {
-    Task<bool> IsHealthyAsync(
+    Task<CloudflareTunnelHealthProbeResult> ProbeAsync(
         Uri healthCheckUri,
         TimeSpan timeout,
         CancellationToken cancellationToken = default);
+}
+
+internal sealed record CloudflareTunnelHealthProbeResult(
+    bool IsHealthy,
+    Exception? Failure)
+{
+    public static CloudflareTunnelHealthProbeResult Healthy { get; } = new(true, null);
+
+    public static CloudflareTunnelHealthProbeResult Failed(Exception failure) => new(false, failure);
 }
 
 internal sealed class CloudflareTunnelHealthProbeFactory : ICloudflareTunnelHealthProbeFactory
@@ -28,12 +37,12 @@ internal sealed class CloudflareTunnelHealthProbeFactory : ICloudflareTunnelHeal
     }
 }
 
-internal sealed class CloudflareTunnelHealthProbeSession(SocketsHttpHandler handler)
+internal sealed class CloudflareTunnelHealthProbeSession(HttpMessageHandler handler)
     : ICloudflareTunnelHealthProbeSession
 {
     private readonly HttpClient _httpClient = new(handler, disposeHandler: true);
 
-    public async Task<bool> IsHealthyAsync(
+    public async Task<CloudflareTunnelHealthProbeResult> ProbeAsync(
         Uri healthCheckUri,
         TimeSpan timeout,
         CancellationToken cancellationToken = default)
@@ -53,15 +62,22 @@ internal sealed class CloudflareTunnelHealthProbeSession(SocketsHttpHandler hand
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
                 timeoutSource.Token);
-            return response.StatusCode == HttpStatusCode.NoContent;
+            return response.StatusCode == HttpStatusCode.NoContent
+                ? CloudflareTunnelHealthProbeResult.Healthy
+                : CloudflareTunnelHealthProbeResult.Failed(new HttpRequestException(
+                    $"Cloudflare Tunnel 健康检查返回 HTTP {(int)response.StatusCode} ({response.StatusCode})。",
+                    inner: null,
+                    response.StatusCode));
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            return false;
+            return CloudflareTunnelHealthProbeResult.Failed(new TimeoutException(
+                $"Cloudflare Tunnel 健康检查在 {timeout.TotalSeconds:0.###} 秒内超时。",
+                ex));
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
-            return false;
+            return CloudflareTunnelHealthProbeResult.Failed(ex);
         }
     }
 

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.Sockets;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Desktop.Services;
@@ -82,6 +83,97 @@ public sealed class CloudflareTunnelTests
             new CloudflareTunnelProxyOptions(CloudflareTunnelProxyMode.SystemProxy, string.Empty)));
 
         Assert.Contains("未检测到", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExplicitProxyWithDirectCompatibility_IsRejectedWithUserMessage()
+    {
+        var logger = new CapturingQuickTunnelLogger();
+
+        var exception = Assert.Throws<CloudflareTunnelProxyConflictException>(() =>
+            CloudflareQuickTunnelRunner.ValidateResolvedProxyCompatibility(
+                new CloudflareTunnelProxyResolution(
+                    new Uri("http://127.0.0.1:7897"),
+                    CloudflareTunnelProxyMode.SystemProxy),
+                new ClashMihomoCompatibilityOptions(true, string.Empty, "DIRECT"),
+                logger));
+
+        Assert.Equal(
+            "检测到系统已开启代理，但Clash/Mihomo 路由策略为 DIRECT，明显冲突" +
+            "请填写正确的路由策略或把代理方式切换为不使用显式代理",
+            exception.Message);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Contains(CloudflareTunnelProxyConflictException.UserMessage, entry.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false, "DIRECT")]
+    [InlineData(true, "Cloudflare Proxy")]
+    public void CompatibleProxySettings_AreNotRejected(bool enabled, string routePolicy)
+    {
+        var logger = new CapturingQuickTunnelLogger();
+
+        CloudflareQuickTunnelRunner.ValidateResolvedProxyCompatibility(
+            new CloudflareTunnelProxyResolution(
+                new Uri("http://127.0.0.1:7897"),
+                CloudflareTunnelProxyMode.SystemProxy),
+            new ClashMihomoCompatibilityOptions(enabled, string.Empty, routePolicy),
+            logger);
+
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public void DirectConnectionWithDirectCompatibility_IsNotRejected()
+    {
+        var logger = new CapturingQuickTunnelLogger();
+
+        CloudflareQuickTunnelRunner.ValidateResolvedProxyCompatibility(
+            new CloudflareTunnelProxyResolution(
+                ProxyUri: null,
+                EffectiveMode: CloudflareTunnelProxyMode.Direct),
+            new ClashMihomoCompatibilityOptions(true, string.Empty, "DIRECT"),
+            logger);
+
+        Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public async Task HealthProbe_PreservesConcreteConnectionError()
+    {
+        var socketError = new SocketException((int)SocketError.TimedOut);
+        var connectionError = new HttpRequestException("proxy CONNECT timed out", socketError);
+        using var probe = new CloudflareTunnelHealthProbeSession(
+            new StubHttpMessageHandler((_, _) => throw connectionError));
+
+        var result = await probe.ProbeAsync(
+            new Uri("https://unit-test.trycloudflare.com/_health"),
+            TimeSpan.FromSeconds(1));
+
+        Assert.False(result.IsHealthy);
+        Assert.Same(connectionError, result.Failure);
+        Assert.Equal("proxy CONNECT timed out", CloudflareQuickTunnelRunner.DescribeHealthCheckFailure(result.Failure));
+    }
+
+    [Fact]
+    public async Task HealthProbe_RecordsPerRequestTimeout()
+    {
+        using var probe = new CloudflareTunnelHealthProbeSession(
+            new StubHttpMessageHandler(async (_, cancellationToken) =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return new HttpResponseMessage(HttpStatusCode.NoContent);
+            }));
+
+        var result = await probe.ProbeAsync(
+            new Uri("https://unit-test.trycloudflare.com/_health"),
+            TimeSpan.FromMilliseconds(10));
+
+        Assert.False(result.IsHealthy);
+        var timeout = Assert.IsType<TimeoutException>(result.Failure);
+        Assert.Contains("0.01", timeout.Message, StringComparison.Ordinal);
+        Assert.IsAssignableFrom<OperationCanceledException>(timeout.InnerException);
     }
 
     [Theory]
@@ -265,6 +357,67 @@ public sealed class CloudflareTunnelTests
     }
 
     [Fact]
+    public async Task ExposureManager_ProxyConflictBlocksPublishWithoutStartingOrFallingBack()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var conflict = new CloudflareTunnelProxyConflictException();
+        var runner = new FakeCloudflareQuickTunnelRunner
+        {
+            ValidationException = conflict
+        };
+        var notifications = new FakeNotificationService();
+        await using var manager = CreateManager(runner, settingsService, notificationService: notifications);
+        manager.Initialize(
+            MobileControlNetworkMode.CloudflareTunnel,
+            CloudflareTunnelProxyMode.Auto,
+            string.Empty,
+            clashMihomoCompatibilityEnabled: true,
+            clashMihomoRoutePolicy: "DIRECT");
+
+        var exception = await Assert.ThrowsAsync<CloudflareTunnelProxyConflictException>(() => manager.PublishAsync(
+            new Uri("http://192.168.1.8:49153/?token=one"),
+            "/_igolibrary/health/one"));
+
+        Assert.Same(conflict, exception);
+        Assert.Equal(CloudflareTunnelProxyConflictException.UserMessage, exception.Message);
+        Assert.Equal(1, runner.ValidationCallCount);
+        Assert.Equal(0, runner.StartCallCount);
+        Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, manager.CurrentMode);
+        Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, settingsService.CurrentSettings.MobileControl.NetworkMode);
+        Assert.Empty(notifications.Warnings);
+    }
+
+    [Fact]
+    public async Task ExposureManager_ProxyConflictBlocksModeSwitchWithoutFallback()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.LocalNetwork);
+        var conflict = new CloudflareTunnelProxyConflictException();
+        var runner = new FakeCloudflareQuickTunnelRunner
+        {
+            ValidationException = conflict
+        };
+        var notifications = new FakeNotificationService();
+        await using var manager = CreateManager(runner, settingsService, notificationService: notifications);
+        manager.Initialize(
+            MobileControlNetworkMode.LocalNetwork,
+            CloudflareTunnelProxyMode.Auto,
+            string.Empty,
+            clashMihomoCompatibilityEnabled: true,
+            clashMihomoRoutePolicy: "DIRECT");
+
+        var exception = await Assert.ThrowsAsync<CloudflareTunnelProxyConflictException>(() =>
+            manager.SetModeAsync(MobileControlNetworkMode.CloudflareTunnel));
+
+        Assert.Same(conflict, exception);
+        Assert.Equal(CloudflareTunnelProxyConflictException.UserMessage, exception.Message);
+        Assert.Equal(1, runner.ValidationCallCount);
+        Assert.Equal(0, runner.StartCallCount);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, manager.CurrentMode);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, settingsService.CurrentSettings.MobileControl.NetworkMode);
+        Assert.Empty(notifications.Warnings);
+    }
+
+    [Fact]
     public async Task ExposureManager_RuntimeFaultKeepsTunnelModeWhenFallbackIsDisabled()
     {
         var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
@@ -397,11 +550,15 @@ public sealed class CloudflareTunnelTests
 
     private sealed class FakeCloudflareQuickTunnelRunner : ICloudflareQuickTunnelRunner
     {
+        public Exception? ValidationException { get; set; }
+
         public Exception? StartException { get; set; }
 
         public int? FailOnStartCall { get; set; }
 
         public int StartCallCount { get; private set; }
+
+        public int ValidationCallCount { get; private set; }
 
         public List<Uri> Origins { get; } = [];
 
@@ -410,6 +567,17 @@ public sealed class CloudflareTunnelTests
         public List<ClashMihomoCompatibilityOptions> CompatibilityOptions { get; } = [];
 
         public List<FakeCloudflareQuickTunnelSession> Sessions { get; } = [];
+
+        public void ValidateConfiguration(
+            CloudflareTunnelProxyOptions proxyOptions,
+            ClashMihomoCompatibilityOptions compatibilityOptions)
+        {
+            ValidationCallCount++;
+            if (ValidationException is not null)
+            {
+                throw ValidationException;
+            }
+        }
 
         public Task<ICloudflareQuickTunnelSession> StartAsync(
             Uri originBaseUri,
@@ -491,5 +659,35 @@ public sealed class CloudflareTunnelTests
         public Uri? GetProxy(Uri destination) => proxyUri ?? destination;
 
         public bool IsBypassed(Uri host) => proxyUri is null;
+    }
+
+    private sealed class CapturingQuickTunnelLogger : ILogger<CloudflareQuickTunnelRunner>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), exception));
+        }
+    }
+
+    private sealed class StubHttpMessageHandler(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> sendAsync) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            return sendAsync(request, cancellationToken);
+        }
     }
 }

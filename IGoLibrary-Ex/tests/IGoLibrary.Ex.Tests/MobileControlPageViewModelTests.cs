@@ -56,6 +56,34 @@ public sealed class MobileControlPageViewModelTests
     }
 
     [Fact]
+    public async Task StartMobileControlAsync_ProxyConflictShowsExactWarningAndStaysStopped()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(9527, "token")
+        });
+        var mobileControlService = new FakeMobileControlService
+        {
+            StartException = new CloudflareTunnelProxyConflictException()
+        };
+        var notifications = new FakeNotificationService();
+        var viewModel = new MobileControlPageViewModel(
+            mobileControlService,
+            new SettingsWorkflowService(settingsService),
+            new FakeQrCodeImageFactory(),
+            new ActivityLogService(),
+            notifications);
+
+        await viewModel.StartMobileControlCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsMobileControlRunning);
+        Assert.Equal("启动失败", viewModel.MobileControlStatusText);
+        var warning = Assert.Single(notifications.Warnings);
+        Assert.Equal("启动手机控制失败", warning.Title);
+        Assert.Equal(CloudflareTunnelProxyConflictException.UserMessage, warning.Message);
+    }
+
+    [Fact]
     public async Task RandomizeMobileControlPortAsync_WhenRunning_RestartsServiceWithNewPort()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default with

@@ -100,6 +100,10 @@ internal sealed class NetworkExposureManager(
             {
                 throw;
             }
+            catch (CloudflareTunnelProxyConflictException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Cloudflare Tunnel startup failed while switching network mode.");
@@ -315,6 +319,7 @@ internal sealed class NetworkExposureManager(
             {
                 try
                 {
+                    tunnelRunner.ValidateConfiguration(_proxyOptions, _compatibilityOptions);
                     var tunnel = await tunnelRunner.StartAsync(
                         lanUrl,
                         healthCheckPath,
@@ -322,6 +327,10 @@ internal sealed class NetworkExposureManager(
                         _compatibilityOptions,
                         cancellationToken);
                     AttachTunnelUnderGate(lease, tunnel);
+                }
+                catch (CloudflareTunnelProxyConflictException)
+                {
+                    throw;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
@@ -390,6 +399,7 @@ internal sealed class NetworkExposureManager(
         ClashMihomoCompatibilityOptions compatibilityOptions,
         CancellationToken cancellationToken)
     {
+        tunnelRunner.ValidateConfiguration(options, compatibilityOptions);
         var tasks = _leases.Values
             .Select(async lease => (
                 lease.Id,

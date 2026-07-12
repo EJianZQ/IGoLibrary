@@ -2,12 +2,28 @@ namespace IGoLibrary.Ex.Desktop.Services;
 
 internal interface ICloudflareQuickTunnelRunner
 {
+    void ValidateConfiguration(
+        CloudflareTunnelProxyOptions proxyOptions,
+        ClashMihomoCompatibilityOptions compatibilityOptions);
+
     Task<ICloudflareQuickTunnelSession> StartAsync(
         Uri originBaseUri,
         string healthCheckPath,
         CloudflareTunnelProxyOptions proxyOptions,
         ClashMihomoCompatibilityOptions compatibilityOptions,
         CancellationToken cancellationToken = default);
+}
+
+internal sealed class CloudflareTunnelProxyConflictException : InvalidOperationException
+{
+    internal const string UserMessage =
+        "检测到系统已开启代理，但Clash/Mihomo 路由策略为 DIRECT，明显冲突" +
+        "请填写正确的路由策略或把代理方式切换为不使用显式代理";
+
+    public CloudflareTunnelProxyConflictException()
+        : base(UserMessage)
+    {
+    }
 }
 
 internal interface ICloudflareQuickTunnelSession : IAsyncDisposable

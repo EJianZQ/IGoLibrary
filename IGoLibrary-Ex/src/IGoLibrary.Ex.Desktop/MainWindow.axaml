@@ -3903,7 +3903,8 @@
         </Grid>
       </Carousel>
 
-      <Border Grid.Row="1"
+      <Border x:Name="LanCookieRelayDialogOverlay"
+              Grid.Row="1"
               ZIndex="31"
               IsVisible="{Binding IsLanCookieRelayDialogOpen}"
               Background="{DynamicResource AppModalOverlayBrush}">
@@ -3916,31 +3917,42 @@
                   VerticalAlignment="Center">
             <Grid RowDefinitions="Auto,Auto,Auto,Auto"
                   RowSpacing="18">
-              <Grid ColumnDefinitions="*,Auto"
+              <Grid x:Name="LanCookieRelayDialogHeader"
+                    ColumnDefinitions="*,Auto"
+                    RowDefinitions="Auto,Auto"
+                    RowSpacing="6"
                     ColumnSpacing="12">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="{Binding LanCookieRelayDialogTitle}"
-                             FontSize="22"
-                             FontWeight="Bold" />
-                  <StackPanel Orientation="Horizontal"
-                              Spacing="6">
-                    <PathIcon Width="16"
-                              Height="16"
-                              VerticalAlignment="Center"
-                              Foreground="{DynamicResource SemiSuccessTextBrush}"
-                              IsVisible="{Binding ShowLanCookieRelayStartedStatusIcon}"
-                              Data="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 14.2-4-4 1.4-1.4 2.6 2.6 5.8-5.8L18 9l-7.2 7.2z" />
-                    <TextBlock Text="{Binding LanCookieRelayStatusText}"
-                               Classes="helper-text"
-                               VerticalAlignment="Center" />
-                  </StackPanel>
-                </StackPanel>
+                <TextBlock Text="{Binding LanCookieRelayDialogTitle}"
+                           FontSize="22"
+                           FontWeight="Bold" />
 
-                <Button Grid.Column="1"
+                <Button x:Name="LanCookieRelayCloseButton"
+                        Grid.Column="1"
                         Content="{Binding LanCookieRelayCloseButtonText}"
                         Command="{Binding CloseLanCookieRelayCommand}"
                         Classes="Secondary"
+                        VerticalAlignment="Top"
                         HorizontalContentAlignment="Center" />
+
+                <Grid x:Name="LanCookieRelayStatusPanel"
+                      Grid.Row="1"
+                      Grid.ColumnSpan="2"
+                      ColumnDefinitions="Auto,*"
+                      ColumnSpacing="6">
+                  <PathIcon Width="16"
+                            Height="16"
+                            VerticalAlignment="Top"
+                            Margin="0,2,0,0"
+                            Foreground="{DynamicResource SemiSuccessTextBrush}"
+                            IsVisible="{Binding ShowLanCookieRelayStartedStatusIcon}"
+                            Data="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 14.2-4-4 1.4-1.4 2.6 2.6 5.8-5.8L18 9l-7.2 7.2z" />
+                  <TextBlock x:Name="LanCookieRelayStatusTextBlock"
+                             Grid.Column="1"
+                             Text="{Binding LanCookieRelayStatusText}"
+                             Classes="helper-text"
+                             HorizontalAlignment="Stretch"
+                             TextWrapping="Wrap" />
+                </Grid>
               </Grid>
 
               <StackPanel Grid.Row="1"

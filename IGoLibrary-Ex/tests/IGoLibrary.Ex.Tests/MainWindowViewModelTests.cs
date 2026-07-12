@@ -1461,6 +1461,29 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task StartLanCookieRelayAsync_ProxyConflictShowsExactWarningAndStaysStopped()
+    {
+        var relayService = new FakeLanCookieRelayService
+        {
+            StartException = new CloudflareTunnelProxyConflictException()
+        };
+        var notifications = new FakeNotificationService();
+        var viewModel = CreateViewModel(
+            notificationService: notifications,
+            lanCookieRelayService: relayService);
+
+        await viewModel.StartLanCookieRelayCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsLanCookieRelayRunning);
+        Assert.Equal(
+            $"快传启动失败：{CloudflareTunnelProxyConflictException.UserMessage}",
+            viewModel.LanCookieRelayStatusText);
+        var warning = Assert.Single(notifications.Warnings);
+        Assert.Equal("快传启动失败", warning.Title);
+        Assert.Equal(CloudflareTunnelProxyConflictException.UserMessage, warning.Message);
+    }
+
+    [Fact]
     public async Task SignOutAsync_StopsLanCookieRelaySession()
     {
         var relayService = new FakeLanCookieRelayService();
