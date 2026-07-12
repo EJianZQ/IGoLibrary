@@ -1229,6 +1229,9 @@
         </ScrollViewer>
 
           <!-- Tab 2: Grab -->
+          <ScrollViewer x:Name="GrabPageScrollViewer"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
           <Grid RowDefinitions="Auto,Auto,*"
                 RowSpacing="16"
                 Margin="0,0,16,0"
@@ -1493,6 +1496,7 @@
               </Border>
             </Grid>
           </Grid>
+          </ScrollViewer>
 
         <!-- Tab 3: Global Leak -->
         <ScrollViewer>

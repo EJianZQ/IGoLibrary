@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -9,6 +10,17 @@ namespace IGoLibrary.Ex.Tests;
 
 public sealed class MainWindowLayoutTests
 {
+    [AvaloniaFact]
+    public void GrabPage_ProvidesOuterVerticalScrollingForExpandedSeatSelection()
+    {
+        var window = new MainWindow();
+        var scrollViewer = Assert.IsType<ScrollViewer>(
+            window.FindControl<ScrollViewer>("GrabPageScrollViewer"));
+
+        Assert.Equal(ScrollBarVisibility.Disabled, scrollViewer.HorizontalScrollBarVisibility);
+        Assert.Equal(ScrollBarVisibility.Auto, scrollViewer.VerticalScrollBarVisibility);
+    }
+
     [AvaloniaFact]
     public void GrabSeatSelectionModal_StretchesToAvailableWidth()
     {
