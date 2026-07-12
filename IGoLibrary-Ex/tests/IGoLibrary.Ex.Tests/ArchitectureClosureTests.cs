@@ -247,6 +247,7 @@ public sealed class ArchitectureClosureTests
             Path.Combine("Pages", "GrabPageViewModel.cs"),
             Path.Combine("Pages", "TomorrowReservationPageViewModel.cs"),
             Path.Combine("Components", "MultiSeatSelectionViewModel.cs"),
+            Path.Combine("Components", "MultiSeatSelectionViewModel.Labels.cs"),
             Path.Combine("Pages", "AccountVenueViewModel.cs"),
             Path.Combine("Pages", "LanCookieRelayViewModel.cs"),
             Path.Combine("Pages", "RemoteCheckInPageViewModel.cs"),

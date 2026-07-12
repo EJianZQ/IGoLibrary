@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddSingleton<IAppVersionProvider, AssemblyAppVersionProvider>();
         services.AddSingleton<ISessionService, SessionService>();
         services.AddSingleton<ILibraryService, LibraryService>();
+        services.AddSingleton<ISeatLabelService, SeatLabelService>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<ISessionWorkflowService, SessionWorkflowService>();
         services.AddSingleton<IVenueWorkflowService, VenueWorkflowService>();

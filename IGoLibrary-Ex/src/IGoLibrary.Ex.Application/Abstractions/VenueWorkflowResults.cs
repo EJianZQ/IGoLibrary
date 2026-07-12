@@ -10,6 +10,7 @@ public sealed record VenueBindingResult(
     LibraryLayout Layout,
     LibraryRule? Rule,
     IReadOnlyList<SeatReference> Favorites,
+    IReadOnlyList<SeatLabel> SeatLabels,
     string? RuleFailureMessage = null);
 
 public sealed record VenuePreviewResult(

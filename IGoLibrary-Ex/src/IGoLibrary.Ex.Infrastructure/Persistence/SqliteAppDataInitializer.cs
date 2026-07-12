@@ -28,6 +28,14 @@ public sealed class SqliteAppDataInitializer(SqliteConnectionFactory connectionF
                 PRIMARY KEY (LibraryId, SeatKey)
             );
 
+            CREATE TABLE IF NOT EXISTS SeatLabels (
+                LibraryId INTEGER NOT NULL,
+                SeatKey TEXT NOT NULL,
+                SeatName TEXT NOT NULL,
+                LabelText TEXT NOT NULL,
+                PRIMARY KEY (LibraryId, SeatKey)
+            );
+
             CREATE TABLE IF NOT EXISTS ProtocolOverrides (
                 Key TEXT PRIMARY KEY,
                 Value TEXT NOT NULL

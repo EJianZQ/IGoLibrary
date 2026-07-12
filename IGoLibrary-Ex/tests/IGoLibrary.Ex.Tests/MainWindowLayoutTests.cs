@@ -10,6 +10,16 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class MainWindowLayoutTests
 {
     [AvaloniaFact]
+    public void GrabSeatSelectionModal_StretchesToAvailableWidth()
+    {
+        var window = new MainWindow();
+        var modal = Assert.IsType<Border>(window.FindControl<Border>("GrabSeatSelectionModal"));
+
+        Assert.Equal(HorizontalAlignment.Stretch, modal.HorizontalAlignment);
+        Assert.Equal(1180, modal.MaxWidth);
+    }
+
+    [AvaloniaFact]
     public void LanCookieRelayDialog_StatusWrapsBelowHeaderAndCannotOverlapCloseButton()
     {
         var window = new MainWindow

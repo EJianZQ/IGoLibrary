@@ -14,7 +14,8 @@ namespace IGoLibrary.Ex.Desktop.ViewModels;
 public sealed partial class MultiSeatSelectionViewModel(
     IVenueWorkflowService venueWorkflowService,
     IActivityLogService activityLogService,
-    INotificationService notificationService) : ViewModelBase
+    INotificationService notificationService,
+    ISeatLabelDialogService seatLabelDialogService) : ViewModelBase
 {
     private readonly ObservableCollection<SeatItemViewModel> _allSeats = [];
     private readonly object _filterGate = new();
@@ -51,6 +52,10 @@ public sealed partial class MultiSeatSelectionViewModel(
     public bool HasNoSelectedSeats => !HasSelectedSeats;
 
     public int DraftSelectedSeatCount => _draftSelectedSeatKeys.Count;
+
+    public bool HasDraftSelectedSeats => DraftSelectedSeatCount > 0;
+
+    public bool CanSetSelectedSeatLabel => HasDraftSelectedSeats && !IsSeatLabelOperationInProgress;
 
     public bool HasVisibleSeatResults => VisibleSeatResultCount > 0;
 
@@ -140,7 +145,12 @@ public sealed partial class MultiSeatSelectionViewModel(
         _isSynchronizingSeatSelection = true;
         foreach (var seat in layout.Seats)
         {
-            var item = new SeatItemViewModel(seat.SeatKey, seat.SeatName, seat.IsOccupied);
+            var item = new SeatItemViewModel(
+                seat.SeatKey,
+                seat.SeatName,
+                seat.IsOccupied,
+                EditSeatLabelAsync,
+                DeleteSeatLabelAsync);
             item.PropertyChanged += OnSeatItemPropertyChanged;
             item.IsSelected = selectedKeysToRestore.Contains(item.SeatKey, StringComparer.Ordinal);
             _allSeats.Add(item);
@@ -331,6 +341,16 @@ public sealed partial class MultiSeatSelectionViewModel(
 
     private void OnSeatItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(SeatItemViewModel.LabelText))
+        {
+            if (!_isSynchronizingSeatLabels)
+            {
+                _ = ApplySeatFilterAsync();
+            }
+
+            return;
+        }
+
         if (_isSynchronizingSeatSelection || e.PropertyName != nameof(SeatItemViewModel.IsSelected))
         {
             return;
@@ -370,6 +390,8 @@ public sealed partial class MultiSeatSelectionViewModel(
     private void UpdateDraftSelectionPresentation()
     {
         OnPropertyChanged(nameof(DraftSelectedSeatCount));
+        OnPropertyChanged(nameof(HasDraftSelectedSeats));
+        OnPropertyChanged(nameof(CanSetSelectedSeatLabel));
         OnPropertyChanged(nameof(DraftSelectedSeatSummaryText));
     }
 
@@ -407,7 +429,7 @@ public sealed partial class MultiSeatSelectionViewModel(
         var filterText = SeatFilterText;
         var showAvailableOnly = ShowAvailableOnly;
         var snapshot = _allSeats
-            .Select(seat => new SeatFilterSnapshot(seat, seat.SeatName, seat.IsOccupied))
+            .Select(seat => new SeatFilterSnapshot(seat, seat.SeatName, seat.LabelText, seat.IsOccupied))
             .ToArray();
 
         try
@@ -422,7 +444,12 @@ public sealed partial class MultiSeatSelectionViewModel(
                 return snapshot
                     .Select(seat => new SeatFilterResult(
                         seat.ViewModel,
-                        ShouldSeatBeVisible(seat.SeatName, seat.IsOccupied, filterText, showAvailableOnly)))
+                        ShouldSeatBeVisible(
+                            seat.SeatName,
+                            seat.LabelText,
+                            seat.IsOccupied,
+                            filterText,
+                            showAvailableOnly)))
                     .ToArray();
             }, cts.Token);
 
@@ -515,6 +542,7 @@ public sealed partial class MultiSeatSelectionViewModel(
 
     private static bool ShouldSeatBeVisible(
         string seatName,
+        string? labelText,
         bool isOccupied,
         string filterText,
         bool showAvailableOnly)
@@ -529,12 +557,15 @@ public sealed partial class MultiSeatSelectionViewModel(
             return true;
         }
 
-        return seatName.Contains(filterText, StringComparison.OrdinalIgnoreCase);
+        var normalizedFilterText = filterText.Trim();
+        return seatName.Contains(normalizedFilterText, StringComparison.OrdinalIgnoreCase) ||
+               labelText?.Contains(normalizedFilterText, StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private sealed record SeatFilterSnapshot(
         SeatItemViewModel ViewModel,
         string SeatName,
+        string? LabelText,
         bool IsOccupied);
 
     private sealed record SeatFilterResult(

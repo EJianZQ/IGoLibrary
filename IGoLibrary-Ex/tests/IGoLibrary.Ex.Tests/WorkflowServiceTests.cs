@@ -61,6 +61,7 @@ public sealed class WorkflowServiceTests
         });
         var service = new VenueWorkflowService(
             libraryService,
+            new FakeSeatLabelService(),
             new FakeSessionService(),
             new FakeTraceIntApiClient(),
             settingsService);
@@ -78,6 +79,7 @@ public sealed class WorkflowServiceTests
         var layout = new LibraryLayout(7, "自科", "4F", true, 10, 1, 2, []);
         var rule = new LibraryRule(7, "", "", "", "", "", null, null, 0, "08:00", 0, "22:00", 0);
         var favorites = new SeatReference[] { new("seat-1", "1") };
+        var labels = new SeatLabel[] { new("seat-1", "1", "靠窗") };
         var libraryService = new FakeLibraryService
         {
             LibrariesToLoad = [library]
@@ -88,8 +90,11 @@ public sealed class WorkflowServiceTests
         {
             OnGetLibraryRuleAsync = (_, _, _) => Task.FromResult(rule)
         };
+        var seatLabelService = new FakeSeatLabelService();
+        seatLabelService.LabelsByLibraryId[7] = labels;
         var service = new VenueWorkflowService(
             libraryService,
+            seatLabelService,
             new FakeSessionService
             {
                 CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
@@ -102,6 +107,7 @@ public sealed class WorkflowServiceTests
         Assert.Equal(layout, result.Layout);
         Assert.Equal(rule, result.Rule);
         Assert.Equal(favorites, result.Favorites);
+        Assert.Equal(labels, result.SeatLabels);
     }
 
     [Fact]
@@ -120,6 +126,7 @@ public sealed class WorkflowServiceTests
         };
         var service = new VenueWorkflowService(
             libraryService,
+            new FakeSeatLabelService(),
             new FakeSessionService
             {
                 CurrentSession = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)

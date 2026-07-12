@@ -350,6 +350,21 @@ internal sealed class FakeErrorDialogService : IErrorDialogService
     }
 }
 
+internal sealed class FakeSeatLabelDialogService : ISeatLabelDialogService
+{
+    public Queue<string?> Results { get; } = [];
+
+    public List<SeatLabelDialogRequest> Requests { get; } = [];
+
+    public Task<string?> ShowAsync(
+        SeatLabelDialogRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        Requests.Add(request);
+        return Task.FromResult(Results.Count > 0 ? Results.Dequeue() : null);
+    }
+}
+
 internal sealed class FakeUpdateCheckService : IUpdateCheckService
 {
     public Queue<UpdateCheckResult> Results { get; } = [];
@@ -797,6 +812,68 @@ internal sealed class FakeLibraryService : ILibraryService
     {
         SaveFavoritesCalls++;
         FavoritesByLibraryId[libraryId] = seats.ToArray();
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class FakeSeatLabelService : ISeatLabelService
+{
+    public Dictionary<int, IReadOnlyList<SeatLabel>> LabelsByLibraryId { get; } = [];
+
+    public int SetCalls { get; private set; }
+
+    public int DeleteCalls { get; private set; }
+
+    public Exception? SetException { get; set; }
+
+    public Exception? DeleteException { get; set; }
+
+    public Task<IReadOnlyList<SeatLabel>> GetLabelsAsync(
+        int libraryId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(
+            LabelsByLibraryId.TryGetValue(libraryId, out var labels)
+                ? labels
+                : Array.Empty<SeatLabel>() as IReadOnlyList<SeatLabel>);
+    }
+
+    public Task<IReadOnlyList<SeatLabel>> SetLabelsAsync(
+        int libraryId,
+        IReadOnlyList<SeatReference> seats,
+        string text,
+        CancellationToken cancellationToken = default)
+    {
+        SetCalls++;
+        if (SetException is not null)
+        {
+            throw SetException;
+        }
+
+        var saved = seats
+            .DistinctBy(static seat => seat.SeatKey, StringComparer.Ordinal)
+            .Select(seat => new SeatLabel(seat.SeatKey, seat.SeatName, text.Trim()))
+            .ToArray();
+        LabelsByLibraryId[libraryId] = saved;
+        return Task.FromResult<IReadOnlyList<SeatLabel>>(saved);
+    }
+
+    public Task DeleteLabelsAsync(
+        int libraryId,
+        IReadOnlyList<string> seatKeys,
+        CancellationToken cancellationToken = default)
+    {
+        DeleteCalls++;
+        if (DeleteException is not null)
+        {
+            throw DeleteException;
+        }
+
+        var keys = seatKeys.ToHashSet(StringComparer.Ordinal);
+        LabelsByLibraryId[libraryId] = LabelsByLibraryId
+            .GetValueOrDefault(libraryId, Array.Empty<SeatLabel>())
+            .Where(label => !keys.Contains(label.SeatKey))
+            .ToArray();
         return Task.CompletedTask;
     }
 }

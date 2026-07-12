@@ -44,6 +44,10 @@ public partial class MainWindowWorkflowViewModel
 
     public int DraftSelectedSeatCount => MultiSeatSelection.DraftSelectedSeatCount;
 
+    public bool HasDraftSelectedSeats => MultiSeatSelection.HasDraftSelectedSeats;
+
+    public bool CanSetSelectedSeatLabel => MultiSeatSelection.CanSetSelectedSeatLabel;
+
     public bool HasVisibleSeatResults => MultiSeatSelection.HasVisibleSeatResults;
 
     public bool HasNoVisibleSeatResults => MultiSeatSelection.HasNoVisibleSeatResults;
@@ -87,6 +91,15 @@ public partial class MainWindowWorkflowViewModel
         }
     }
 
+    public IAsyncRelayCommand SetSelectedSeatLabelCommand
+    {
+        get
+        {
+            EnsureMultiSeatSelectionConfigured();
+            return MultiSeatSelection.SetSelectedSeatLabelCommand;
+        }
+    }
+
     public IRelayCommand ClearSelectedSeatsCommand
     {
         get
@@ -122,6 +135,8 @@ public partial class MainWindowWorkflowViewModel
             nameof(MultiSeatSelection.HasSelectedSeats),
             nameof(MultiSeatSelection.HasNoSelectedSeats),
             nameof(MultiSeatSelection.DraftSelectedSeatCount),
+            nameof(MultiSeatSelection.HasDraftSelectedSeats),
+            nameof(MultiSeatSelection.CanSetSelectedSeatLabel),
             nameof(MultiSeatSelection.HasVisibleSeatResults),
             nameof(MultiSeatSelection.HasNoVisibleSeatResults),
             nameof(MultiSeatSelection.HasSeatLayout),

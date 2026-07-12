@@ -31,4 +31,15 @@ public interface IVenueWorkflowService
         int libraryId,
         IReadOnlyList<SeatReference> seats,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SeatLabel>> SetSeatLabelsAsync(
+        int libraryId,
+        IReadOnlyList<SeatReference> seats,
+        string text,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteSeatLabelsAsync(
+        int libraryId,
+        IReadOnlyList<string> seatKeys,
+        CancellationToken cancellationToken = default);
 }

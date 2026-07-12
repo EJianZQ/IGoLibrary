@@ -5,6 +5,7 @@ namespace IGoLibrary.Ex.Application.Services;
 
 public sealed class VenueWorkflowService(
     ILibraryService libraryService,
+    ISeatLabelService seatLabelService,
     ISessionService sessionService,
     ITraceIntApiClient apiClient,
     ISettingsService settingsService) : IVenueWorkflowService
@@ -38,14 +39,16 @@ public sealed class VenueWorkflowService(
         var layout = await libraryService.BindLibraryAsync(libraryId, cancellationToken);
         var ruleResult = await TryLoadLibraryRuleAsync(libraryId, cancellationToken);
         var favorites = await libraryService.GetFavoritesAsync(libraryId, cancellationToken);
-        return new VenueBindingResult(layout, ruleResult.Rule, favorites, ruleResult.FailureMessage);
+        var seatLabels = await seatLabelService.GetLabelsAsync(libraryId, cancellationToken);
+        return new VenueBindingResult(layout, ruleResult.Rule, favorites, seatLabels, ruleResult.FailureMessage);
     }
 
     public async Task<VenueBindingResult> RefreshBoundLibraryAsync(CancellationToken cancellationToken = default)
     {
         var layout = await libraryService.RefreshBoundLibraryAsync(cancellationToken);
         var favorites = await libraryService.GetFavoritesAsync(layout.LibraryId, cancellationToken);
-        return new VenueBindingResult(layout, null, favorites);
+        var seatLabels = await seatLabelService.GetLabelsAsync(layout.LibraryId, cancellationToken);
+        return new VenueBindingResult(layout, null, favorites, seatLabels);
     }
 
     public async Task<VenuePreviewResult> PreviewLibraryAsync(
@@ -104,6 +107,23 @@ public sealed class VenueWorkflowService(
         CancellationToken cancellationToken = default)
     {
         return libraryService.SaveFavoritesAsync(libraryId, seats, cancellationToken);
+    }
+
+    public Task<IReadOnlyList<SeatLabel>> SetSeatLabelsAsync(
+        int libraryId,
+        IReadOnlyList<SeatReference> seats,
+        string text,
+        CancellationToken cancellationToken = default)
+    {
+        return seatLabelService.SetLabelsAsync(libraryId, seats, text, cancellationToken);
+    }
+
+    public Task DeleteSeatLabelsAsync(
+        int libraryId,
+        IReadOnlyList<string> seatKeys,
+        CancellationToken cancellationToken = default)
+    {
+        return seatLabelService.DeleteLabelsAsync(libraryId, seatKeys, cancellationToken);
     }
 
     private sealed record LibraryRuleLoadResult(

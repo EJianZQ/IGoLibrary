@@ -34,12 +34,14 @@ internal static class MainWindowViewModelTestHarness
         IMobileControlService? mobileControlService = null,
         IRemoteCheckInWorkflowService? remoteCheckInWorkflowService = null,
         IRemoteCheckInProfileService? remoteCheckInProfileService = null,
-        INetworkExposureManager? networkExposureManager = null)
+        INetworkExposureManager? networkExposureManager = null,
+        ISeatLabelDialogService? seatLabelDialogService = null)
     {
         mobileControlService ??= new FakeMobileControlService();
         remoteCheckInWorkflowService ??= new FakeRemoteCheckInWorkflowService();
         remoteCheckInProfileService ??= new FakeRemoteCheckInProfileService();
         networkExposureManager ??= new FakeNetworkExposureManager();
+        seatLabelDialogService ??= new FakeSeatLabelDialogService();
         var workflowState = new ShellWorkflowState();
         var oauthCodeRegistry = new OAuthCodeConsumptionRegistry();
         var lanCookieRelayViewModel = new LanCookieRelayViewModel(
@@ -68,7 +70,8 @@ internal static class MainWindowViewModelTestHarness
             new MultiSeatSelectionViewModel(
                 venueWorkflowService,
                 activityLogService,
-                notificationService),
+                notificationService,
+                seatLabelDialogService),
             new GrabPageViewModel(
                 grabSeatCoordinator,
                 settingsWorkflowService,

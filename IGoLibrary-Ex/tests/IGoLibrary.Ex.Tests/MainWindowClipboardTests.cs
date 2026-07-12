@@ -141,7 +141,7 @@ public sealed class MainWindowClipboardTests
 
         return MainWindowViewModelTestHarness.Create(
             new SessionWorkflowService(apiClient, sessionService),
-            new VenueWorkflowService(libraryService, sessionService, apiClient, settingsService),
+            new VenueWorkflowService(libraryService, new FakeSeatLabelService(), sessionService, apiClient, settingsService),
             new ReservationWorkflowService(sessionService, apiClient, occupySeatCoordinator, activityLogService),
             new SettingsWorkflowService(settingsService),
             new ProtocolTemplateEditorService(new FakeProtocolTemplateStore(TestProtocolTemplates.Create())),

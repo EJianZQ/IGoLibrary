@@ -1,0 +1,57 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:IGoLibrary.Ex.Desktop.ViewModels"
+        x:Class="IGoLibrary.Ex.Desktop.SeatLabelEditorWindow"
+        x:DataType="vm:SeatLabelEditorViewModel"
+        Width="520"
+        MinWidth="420"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        KeyDown="OnWindowKeyDown">
+  <Border Padding="24">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+          RowSpacing="16">
+      <StackPanel Spacing="6">
+        <TextBlock Text="{Binding Title}"
+                   FontSize="22"
+                   FontWeight="Bold" />
+        <TextBlock Text="{Binding Description}"
+                   Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+
+      <TextBox x:Name="LabelTextBox"
+               Grid.Row="1"
+               Text="{Binding LabelText}"
+               MaxLength="32"
+               Watermark="例如：靠窗、常用、安静区域"
+               HorizontalAlignment="Stretch" />
+
+      <TextBlock x:Name="ValidationText"
+                 Grid.Row="2"
+                 Text="{Binding ValidationMessage}"
+                 Foreground="{DynamicResource SemiDangerTextBrush}"
+                 FontSize="12"
+                 MinHeight="18"
+                 TextWrapping="Wrap" />
+
+      <StackPanel Grid.Row="3"
+                  Orientation="Horizontal"
+                  HorizontalAlignment="Right"
+                  Spacing="10">
+        <Button Content="取消"
+                MinWidth="92"
+                Click="OnCancelClick" />
+        <Button x:Name="ConfirmButton"
+                Content="保存标签"
+                MinWidth="112"
+                IsEnabled="{Binding CanConfirm}"
+                Background="{DynamicResource SemiAccentBrush}"
+                Foreground="White"
+                Click="OnConfirmClick" />
+      </StackPanel>
+    </Grid>
+  </Border>
+</Window>

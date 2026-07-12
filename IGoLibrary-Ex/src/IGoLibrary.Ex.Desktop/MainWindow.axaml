@@ -292,12 +292,65 @@
             ClipToBounds="False"
             IsVisible="{Binding IsFilterVisible}">
         <ToolTip.Tip>
-          <StackPanel Spacing="4">
-            <TextBlock Text="{Binding SeatName, StringFormat=座位 {0}}" FontWeight="Bold" />
-            <TextBlock Text="{Binding SeatKey}" Classes="helper-text" />
-            <TextBlock Text="{Binding StatusText, StringFormat=状态：{0}}" Classes="helper-text" />
-          </StackPanel>
+          <Border MinWidth="152"
+                  MaxWidth="248"
+                  Padding="3">
+            <StackPanel Spacing="7">
+              <TextBlock Text="{Binding SeatName, StringFormat=座位 {0}}"
+                         FontSize="14"
+                         FontWeight="SemiBold"
+                         Foreground="White" />
+              <Border Height="1"
+                      Background="#26FFFFFF" />
+              <Grid ColumnDefinitions="Auto,*"
+                    RowDefinitions="Auto,Auto,Auto"
+                    ColumnSpacing="12"
+                    RowSpacing="6">
+                <TextBlock Text="标识"
+                           FontSize="12"
+                           Foreground="#FFA9B4C4" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding SeatKey}"
+                           FontSize="12"
+                           Foreground="#FFE7EDF5"
+                           TextWrapping="Wrap" />
+                <TextBlock Grid.Row="1"
+                           Text="状态"
+                           FontSize="12"
+                           Foreground="#FFA9B4C4" />
+                <TextBlock Grid.Row="1"
+                           Grid.Column="1"
+                           Text="{Binding StatusText}"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="#FFF4F7FB" />
+                <TextBlock Grid.Row="2"
+                           Text="标签"
+                           FontSize="12"
+                           Foreground="#FFA9B4C4"
+                           IsVisible="{Binding HasLabel}" />
+                <TextBlock Grid.Row="2"
+                           Grid.Column="1"
+                           Text="{Binding LabelText}"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="#FFBFD7FF"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding HasLabel}" />
+              </Grid>
+            </StackPanel>
+          </Border>
         </ToolTip.Tip>
+
+        <Grid.ContextMenu>
+          <ContextMenu IsVisible="{Binding SupportsLabelEditing}">
+            <MenuItem Header="{Binding LabelMenuHeader}"
+                      Command="{Binding EditLabelCommand}" />
+            <MenuItem Header="删除标签"
+                      Command="{Binding DeleteLabelCommand}"
+                      IsVisible="{Binding HasLabel}" />
+          </ContextMenu>
+        </Grid.ContextMenu>
 
         <Border CornerRadius="12"
                 Background="{DynamicResource SemiColorFill0}"
@@ -323,6 +376,25 @@
                    FontSize="15"
                    FontWeight="Bold"
                    Foreground="{Binding IsUnavailable, Converter={x:Static BoolConverters.Not}, FallbackValue={DynamicResource SemiColorText0}}" />
+
+        <Grid Width="16"
+              Height="16"
+              Margin="-3,-3,0,0"
+              HorizontalAlignment="Left"
+              VerticalAlignment="Top"
+              IsVisible="{Binding HasLabel}">
+          <Path Data="M2,2 L8,2 L15,9 L9,15 L2,8 Z"
+                Fill="{DynamicResource SemiAccentBrush}"
+                Stroke="{DynamicResource SemiAccentBrush}"
+                StrokeThickness="1.8"
+                Stretch="Fill" />
+          <Ellipse Width="3"
+                   Height="3"
+                   Margin="4,4,0,0"
+                   HorizontalAlignment="Left"
+                   VerticalAlignment="Top"
+                   Fill="{DynamicResource AppAccentForegroundBrush}" />
+        </Grid>
 
         <Path Width="18"
               Height="18"
@@ -4004,11 +4076,12 @@
               Background="{DynamicResource AppModalOverlayBrush}"
               PointerPressed="OnGrabSeatOverlayPointerPressed">
         <Grid Margin="28,16,28,28">
-          <Border Classes="semi-card Shadow"
+          <Border x:Name="GrabSeatSelectionModal"
+                  Classes="semi-card Shadow"
                   MaxWidth="1180"
                   MaxHeight="760"
                   Padding="24"
-                  HorizontalAlignment="Center"
+                  HorizontalAlignment="Stretch"
                   VerticalAlignment="Center"
                   PointerPressed="OnGrabSeatModalPointerPressed">
             <Grid RowDefinitions="Auto,Auto,*,Auto"
@@ -4031,25 +4104,60 @@
               </Grid>
 
               <Grid Grid.Row="1"
-                    ColumnDefinitions="2.1*,Auto,Auto,Auto"
+                    ColumnDefinitions="2.1*,Auto,Auto,Auto,Auto"
                     ColumnSpacing="12">
                 <TextBox Text="{Binding SeatFilterText}"
-                         Watermark="仅按座位号过滤"
+                         Watermark="按座位号或标签过滤"
                          VerticalAlignment="Center" />
                 <CheckBox Grid.Column="1"
                           Content="隐藏被占座位"
                           IsChecked="{Binding ShowAvailableOnly}"
                           VerticalAlignment="Center" />
                 <Button Grid.Column="2"
-                        Content="刷新"
                         Command="{Binding RefreshSeatsCommand}"
                         Classes="Secondary"
-                        HorizontalContentAlignment="Center" />
+                        HorizontalContentAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="7">
+                    <PathIcon Width="16"
+                              Height="16"
+                              Data="M17.65,6.35 C16.2,4.9 14.21,4 12,4 C7.58,4 4,7.58 4,12 C4,16.42 7.58,20 12,20 C15.73,20 18.84,17.45 19.73,14 L17.65,14 C16.83,16.33 14.61,18 12,18 C8.69,18 6,15.31 6,12 C6,8.69 8.69,6 12,6 C13.66,6 15.14,6.69 16.22,7.78 L13,11 L20,11 L20,4 Z" />
+                    <TextBlock Text="刷新" />
+                  </StackPanel>
+                </Button>
                 <Button Grid.Column="3"
-                        Content="收藏选中座位"
                         Command="{Binding SaveFavoritesCommand}"
+                        IsEnabled="{Binding HasDraftSelectedSeats}"
                         Classes="Secondary"
-                        HorizontalContentAlignment="Center" />
+                        HorizontalContentAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="7">
+                    <PathIcon Width="16"
+                              Height="16"
+                              Data="M12,2.2 L14.9,8.07 L21.38,9.01 L16.69,13.58 L17.8,20.03 L12,16.98 L6.2,20.03 L7.31,13.58 L2.62,9.01 L9.1,8.07 Z" />
+                    <TextBlock Text="收藏" />
+                  </StackPanel>
+                </Button>
+                <Button Grid.Column="4"
+                        Command="{Binding SetSelectedSeatLabelCommand}"
+                        IsEnabled="{Binding CanSetSelectedSeatLabel}"
+                        Classes="Secondary"
+                        HorizontalContentAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="7">
+                    <Grid Width="15" Height="15">
+                      <Path Data="M2,2 L8,2 L15,9 L9,15 L2,8 Z"
+                            Fill="Transparent"
+                            Stroke="{Binding $parent[Button].Foreground}"
+                            StrokeThickness="1.8"
+                            Stretch="Fill" />
+                      <Ellipse Width="3"
+                               Height="3"
+                               Margin="4,4,0,0"
+                               HorizontalAlignment="Left"
+                               VerticalAlignment="Top"
+                               Fill="{Binding $parent[Button].Foreground}" />
+                    </Grid>
+                    <TextBlock Text="加标签" />
+                  </StackPanel>
+                </Button>
               </Grid>
 
               <Border Grid.Row="2"
@@ -4117,7 +4225,7 @@
               <Grid Grid.Row="3"
                     ColumnDefinitions="*,Auto"
                     ColumnSpacing="12">
-                <TextBlock Text="只有点击“确认完成”才会同步本次勾选结果；直接关闭或点击遮罩空白处会放弃本次修改"
+                <TextBlock Text="关闭只会放弃本次目标座位勾选；已经保存的座位标签不会撤销"
                            Classes="helper-text"
                            VerticalAlignment="Center" />
                 <Button Grid.Column="1"

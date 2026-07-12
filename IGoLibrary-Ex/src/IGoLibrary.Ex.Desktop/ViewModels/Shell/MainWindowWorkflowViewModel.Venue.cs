@@ -253,6 +253,7 @@ public partial class MainWindowWorkflowViewModel
                 await MultiSeatSelection.PopulateSeatsAsync(result.Layout, preserveSelection);
                 TomorrowReservationPage.PopulateSeats(result.Layout);
                 MultiSeatSelection.ApplyFavoriteStates(result.Favorites.Select(x => x.SeatKey), syncSelection: false);
+                MultiSeatSelection.ApplySeatLabels(result.SeatLabels);
             },
             () => RefreshReservationAsync(showNotificationOnError: false),
             () =>
