@@ -499,6 +499,7 @@ public sealed class CloudflareTunnelTests
 
         Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, manager.CurrentMode);
         Assert.Equal(tunnelUrl, lease.Url);
+        Assert.True(runner.Sessions[0].Disposed);
         Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, settingsService.CurrentSettings.MobileControl.NetworkMode);
         var warning = Assert.Single(notifications.Warnings);
         Assert.Equal("Cloudflare Tunnel 不可用", warning.Title);

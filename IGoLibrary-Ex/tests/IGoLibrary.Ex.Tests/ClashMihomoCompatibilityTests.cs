@@ -177,6 +177,63 @@ public sealed class ClashMihomoCompatibilityTests
     }
 
     [Fact]
+    public async Task CompatibilityService_RetriesFailedRestoreBeforeApplyingDifferentPolicy()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "IGoLibrary-Ex-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var sourcePath = Path.Combine(root, "config.yaml");
+        await File.WriteAllTextAsync(
+            sourcePath,
+            "external-controller: 127.0.0.1:9090\nrules:\n- MATCH,DIRECT\n");
+        try
+        {
+            var configuration = new MihomoConfiguration(
+                "Test Mihomo",
+                root,
+                sourcePath,
+                new MihomoControllerEndpoint.Http(new Uri("http://127.0.0.1:9090/")),
+                string.Empty);
+            var controller = new FakeControllerClient
+            {
+                FailOnCall = 2
+            };
+            var service = new ClashMihomoCompatibilityService(
+                new FakeLocator(configuration),
+                controller,
+                new ActivityLogService(),
+                NullLogger<ClashMihomoCompatibilityService>.Instance);
+            var first = Assert.IsAssignableFrom<IAsyncDisposable>(await service.AcquireAsync(
+                new ClashMihomoCompatibilityOptions(true, sourcePath, "DIRECT")));
+            var firstTemporaryPath = Assert.Single(controller.LoadedPaths);
+
+            await first.DisposeAsync();
+
+            Assert.True(File.Exists(firstTemporaryPath));
+            Assert.Equal([firstTemporaryPath, sourcePath], controller.LoadedPaths);
+            controller.FailOnCall = null;
+
+            var second = Assert.IsAssignableFrom<IAsyncDisposable>(await service.AcquireAsync(
+                new ClashMihomoCompatibilityOptions(true, sourcePath, "Proxy Group")));
+            var secondTemporaryPath = controller.LoadedPaths[^1];
+
+            Assert.False(File.Exists(firstTemporaryPath));
+            Assert.NotEqual(firstTemporaryPath, secondTemporaryPath);
+            Assert.Equal(
+                [firstTemporaryPath, sourcePath, sourcePath, secondTemporaryPath],
+                controller.LoadedPaths);
+
+            await second.DisposeAsync();
+
+            Assert.Equal(sourcePath, controller.LoadedPaths[^1]);
+            Assert.False(File.Exists(secondTemporaryPath));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ControllerClient_ReloadsConfigurationThroughWindowsNamedPipe()
     {
         if (!OperatingSystem.IsWindows())
@@ -272,12 +329,19 @@ public sealed class ClashMihomoCompatibilityTests
     {
         public List<string> LoadedPaths { get; } = [];
 
+        public int? FailOnCall { get; set; }
+
         public Task ReloadAsync(
             MihomoConfiguration configuration,
             string configurationPath,
             CancellationToken cancellationToken = default)
         {
             LoadedPaths.Add(configurationPath);
+            if (LoadedPaths.Count == FailOnCall)
+            {
+                throw new IOException("controller unavailable");
+            }
+
             return Task.CompletedTask;
         }
     }

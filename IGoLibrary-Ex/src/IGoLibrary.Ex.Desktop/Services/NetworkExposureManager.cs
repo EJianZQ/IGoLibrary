@@ -514,6 +514,12 @@ internal sealed class NetworkExposureManager(
             }
             else
             {
+                var faultedTunnel = lease.DetachFaultedTunnelWithoutChangingEndpoint(tunnel);
+                if (faultedTunnel is not null)
+                {
+                    await DisposeTunnelSafelyAsync(faultedTunnel);
+                }
+
                 ReportTunnelFailureWithoutFallbackUnderGate(fault.Message, showNotification: true);
             }
         }
@@ -696,6 +702,18 @@ internal sealed class NetworkExposureManager(
             Url = LanUrl;
             EndpointChanged?.Invoke(this, new NetworkExposureChangedEventArgs(Url, EffectiveMode));
             return tunnel;
+        }
+
+        public ICloudflareQuickTunnelSession? DetachFaultedTunnelWithoutChangingEndpoint(
+            ICloudflareQuickTunnelSession expectedTunnel)
+        {
+            if (!ReferenceEquals(Tunnel, expectedTunnel))
+            {
+                return null;
+            }
+
+            Tunnel = null;
+            return expectedTunnel;
         }
 
         public async Task StopTunnelUnderManagerLockAsync()

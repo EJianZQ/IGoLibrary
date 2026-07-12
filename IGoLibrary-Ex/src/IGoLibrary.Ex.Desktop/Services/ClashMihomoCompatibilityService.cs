@@ -43,6 +43,28 @@ internal sealed partial class ClashMihomoCompatibilityService(
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            if (_active is not null && _referenceCount == 0)
+            {
+                var pendingRestore = _active;
+                try
+                {
+                    await RestoreOriginalConfigurationUnderGateAsync(
+                        pendingRestore,
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    LogRestoreFailure(pendingRestore, ex);
+                    throw new InvalidOperationException(
+                        "上一次 Clash/Mihomo 临时兼容规则尚未恢复，无法应用新的兼容设置。请确认 Mihomo 正在运行后重试。",
+                        ex);
+                }
+            }
+
             if (_active is not null)
             {
                 if (_active.Options != normalizedOptions)
@@ -158,27 +180,43 @@ internal sealed partial class ClashMihomoCompatibilityService(
             var active = _active;
             try
             {
-                await controllerClient.ReloadAsync(active.Configuration, active.Configuration.SourcePath);
-                TryDeleteTemporaryFile(active.TemporaryPath);
-                activityLogService.Write(
-                    LogEntryKind.Info,
-                    "Network",
-                    $"已恢复 {active.Configuration.ClientName} 原始运行配置");
-                _active = null;
+                await RestoreOriginalConfigurationUnderGateAsync(active);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Failed to restore original Mihomo configuration.");
-                activityLogService.Write(
-                    LogEntryKind.Warning,
-                    "Network",
-                    $"恢复 {active.Configuration.ClientName} 原始配置失败：{ex.Message}；临时配置文件已保留");
+                LogRestoreFailure(active, ex);
             }
         }
         finally
         {
             _gate.Release();
         }
+    }
+
+    private async Task RestoreOriginalConfigurationUnderGateAsync(
+        ActiveConfiguration active,
+        CancellationToken cancellationToken = default)
+    {
+        await controllerClient.ReloadAsync(
+            active.Configuration,
+            active.Configuration.SourcePath,
+            cancellationToken);
+        TryDeleteTemporaryFile(active.TemporaryPath);
+        activityLogService.Write(
+            LogEntryKind.Info,
+            "Network",
+            $"已恢复 {active.Configuration.ClientName} 原始运行配置");
+        _active = null;
+        _referenceCount = 0;
+    }
+
+    private void LogRestoreFailure(ActiveConfiguration active, Exception exception)
+    {
+        logger.LogWarning(exception, "Failed to restore original Mihomo configuration.");
+        activityLogService.Write(
+            LogEntryKind.Warning,
+            "Network",
+            $"恢复 {active.Configuration.ClientName} 原始配置失败：{exception.Message}；临时配置文件已保留");
     }
 
     private static async Task WritePrivateFileAsync(

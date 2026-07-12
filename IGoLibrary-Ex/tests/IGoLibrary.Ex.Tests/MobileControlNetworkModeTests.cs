@@ -247,4 +247,17 @@ public sealed class MobileControlNetworkModeTests
         await Assert.ThrowsAsync<ArgumentException>(() =>
             service.SaveClashMihomoCompatibilityAsync(true, configPath, routePolicy));
     }
+
+    [Fact]
+    public void ClashMihomoConfigPath_WithInvalidPathCharactersReturnsFalse()
+    {
+        var invalidPath = Path.GetFullPath(".") + Path.DirectorySeparatorChar + "invalid\0config.yaml";
+
+        var valid = MobileControlSettings.TryNormalizeClashMihomoConfigPath(
+            invalidPath,
+            out var normalized);
+
+        Assert.False(valid);
+        Assert.Equal(string.Empty, normalized);
+    }
 }

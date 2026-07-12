@@ -84,16 +84,23 @@ public sealed record MobileControlSettings(
             return true;
         }
 
-        var extension = Path.GetExtension(trimmed);
-        if (!Path.IsPathFullyQualified(trimmed) ||
-            !extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase) &&
-            !extension.Equals(".yml", StringComparison.OrdinalIgnoreCase))
+        try
+        {
+            var extension = Path.GetExtension(trimmed);
+            if (!Path.IsPathFullyQualified(trimmed) ||
+                !extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase) &&
+                !extension.Equals(".yml", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            normalized = Path.GetFullPath(trimmed);
+            return true;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
         {
             return false;
         }
-
-        normalized = Path.GetFullPath(trimmed);
-        return true;
     }
 
     public static bool TryNormalizeClashMihomoRoutePolicy(string? value, out string normalized)
