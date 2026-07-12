@@ -15,6 +15,7 @@ namespace IGoLibrary.Ex.Desktop.ViewModels;
 public sealed partial class GlobalLeakPageViewModel : ViewModelBase
 {
     private readonly IGlobalLeakCoordinator _globalLeakCoordinator;
+    private readonly IVenueWorkflowService _venueWorkflowService;
     private readonly ISettingsWorkflowService _settingsWorkflowService;
     private readonly IActivityLogService _activityLogService;
     private readonly INotificationService _notificationService;
@@ -23,7 +24,6 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
     private readonly HashSet<int> _committedGlobalLeakLibraryIds = [];
     private readonly HashSet<int> _draftGlobalLeakLibraryIds = [];
 
-    private Func<bool, Task>? _loadLibrariesAsync;
     private Func<bool>? _isAuthorized;
     private Func<Task>? _refreshSuccessReservationAsync;
     private Func<Task>? _recordSuccessfulReservationAsync;
@@ -44,6 +44,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
 
     public GlobalLeakPageViewModel(
         IGlobalLeakCoordinator globalLeakCoordinator,
+        IVenueWorkflowService venueWorkflowService,
         ISettingsWorkflowService settingsWorkflowService,
         IActivityLogService activityLogService,
         INotificationService notificationService,
@@ -51,6 +52,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
         TimeProvider timeProvider)
     {
         _globalLeakCoordinator = globalLeakCoordinator;
+        _venueWorkflowService = venueWorkflowService;
         _settingsWorkflowService = settingsWorkflowService;
         _activityLogService = activityLogService;
         _notificationService = notificationService;
@@ -138,13 +140,11 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
     };
 
     public void ConfigureOrchestration(
-        Func<bool, Task> loadLibrariesAsync,
         Func<bool> isAuthorized,
         Func<Task> refreshSuccessReservationAsync,
         Func<Task> recordSuccessfulReservationAsync,
         Action<CoordinatorStatus> statusApplied)
     {
-        _loadLibrariesAsync = loadLibrariesAsync;
         _isAuthorized = isAuthorized;
         _refreshSuccessReservationAsync = refreshSuccessReservationAsync;
         _recordSuccessfulReservationAsync = recordSuccessfulReservationAsync;
@@ -555,9 +555,16 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
 
     private async Task LoadLibrariesForSelectionAsync()
     {
-        if (_loadLibrariesAsync is not null)
+        try
         {
-            await _loadLibrariesAsync(false);
+            var result = await _venueWorkflowService.LoadLibrariesAsync(
+                restorePreferredSelection: false);
+            PopulateLibraries(result.Libraries);
+        }
+        catch (Exception ex)
+        {
+            _activityLogService.Write(LogEntryKind.Error, "GlobalLeak", $"加载全域捡漏场馆列表失败：{ex.Message}");
+            await _notificationService.ShowWarningAsync("加载扫描场馆失败", ex.Message);
         }
     }
 

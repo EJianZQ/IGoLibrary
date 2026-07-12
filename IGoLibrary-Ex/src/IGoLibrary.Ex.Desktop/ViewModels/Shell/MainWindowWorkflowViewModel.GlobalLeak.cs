@@ -184,7 +184,6 @@ public partial class MainWindowWorkflowViewModel
 
         _globalLeakPageConfigured = true;
         GlobalLeakPage.ConfigureOrchestration(
-            restorePreferredSelection => LoadLibrariesAsync(restorePreferredSelection),
             () => IsAuthorized,
             () => RefreshReservationAsync(showNotificationOnError: false),
             RecordSuccessfulReservationAsync,

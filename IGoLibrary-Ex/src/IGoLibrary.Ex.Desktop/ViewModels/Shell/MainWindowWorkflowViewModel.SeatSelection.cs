@@ -105,7 +105,7 @@ public partial class MainWindowWorkflowViewModel
 
         _multiSeatSelectionConfigured = true;
         MultiSeatSelection.Configure(
-            () => SelectedLibrary,
+            () => AccountVenue.LockedLibrary,
             () => CanEditGrabConfiguration,
             () => IsGrabSeatSelectionOverlayOpen);
     }

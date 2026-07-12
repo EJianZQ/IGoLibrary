@@ -3168,6 +3168,37 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task GlobalLeakLibraryPicker_DoesNotClearBoundLibraryUsedByGrab()
+    {
+        var notifications = new FakeNotificationService();
+        var (viewModel, _) = await CreateBoundGrabViewModelAsync(notificationService: notifications);
+        var boundLibrary = viewModel.AccountVenue.LockedLibrary;
+
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        await viewModel.OpenGrabSeatSelectionOverlayCommand.ExecuteAsync(null);
+
+        Assert.NotNull(boundLibrary);
+        Assert.Equal(boundLibrary, viewModel.AccountVenue.LockedLibrary);
+        Assert.Equal(boundLibrary, viewModel.SelectedLibrary);
+        Assert.True(viewModel.IsGrabSeatSelectionOverlayOpen);
+        Assert.DoesNotContain(notifications.Warnings, warning => warning.Title == "未绑定场馆");
+    }
+
+    [Fact]
+    public async Task StartGrabAsync_UsesLockedLibrary_WhenSelectedLibraryDrifts()
+    {
+        var (viewModel, coordinator) = await CreateBoundGrabViewModelAsync();
+        viewModel.VisibleSeats[0].IsSelected = true;
+        viewModel.SelectedLibrary = new LibrarySummary(999001, "临时预览场馆", "1层", true, 10, 1, 0);
+
+        await viewModel.StartGrabCommand.ExecuteAsync(null);
+
+        var plan = Assert.IsType<GrabSeatPlan>(coordinator.LastPlan);
+        Assert.Equal(117580, plan.LibraryId);
+        Assert.Equal("自科阅览区一", plan.LibraryName);
+    }
+
+    [Fact]
     public async Task RunTomorrowReservationNowAsync_UsesLockedLibrary_WhenSelectedLibraryDrifts()
     {
         var (viewModel, coordinator) = await CreateBoundTomorrowViewModelAsync();

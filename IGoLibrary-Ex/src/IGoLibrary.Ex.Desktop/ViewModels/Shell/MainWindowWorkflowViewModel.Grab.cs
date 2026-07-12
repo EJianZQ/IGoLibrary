@@ -144,7 +144,7 @@ public partial class MainWindowWorkflowViewModel
         GrabPage.ConfigureOrchestration(
             () => IsInitializationComplete,
             () => IsLoadingSettings,
-            () => SelectedLibrary,
+            () => AccountVenue.LockedLibrary,
             () => MultiSeatSelection.SeatCount,
             MultiSeatSelection.GetSelectedSeatSnapshot,
             RefreshSeatsAsync,

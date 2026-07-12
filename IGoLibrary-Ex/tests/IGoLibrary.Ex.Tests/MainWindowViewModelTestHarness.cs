@@ -78,6 +78,7 @@ internal static class MainWindowViewModelTestHarness
                 timeProvider),
             new GlobalLeakPageViewModel(
                 globalLeakCoordinator,
+                venueWorkflowService,
                 settingsWorkflowService,
                 activityLogService,
                 notificationService,
