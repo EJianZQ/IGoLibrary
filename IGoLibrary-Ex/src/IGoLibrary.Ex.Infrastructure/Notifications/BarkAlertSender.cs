@@ -199,7 +199,7 @@ internal sealed class BarkAlertSender(
             }
             catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
             {
-                lastException = new TimeoutException($"Bark 请求超时（>{settings.Timeout.TotalSeconds:0} 秒）。", ex);
+                lastException = new TimeoutException($"Bark 请求超时（>{settings.Timeout.TotalSeconds:0} 秒）", ex);
             }
             catch (HttpRequestException ex) when (IsTransient(ex.StatusCode))
             {
@@ -214,7 +214,7 @@ internal sealed class BarkAlertSender(
             await Task.Delay(TimeSpan.FromMilliseconds(250 * (attempt + 1)), cancellationToken);
         }
 
-        throw lastException ?? new InvalidOperationException("Bark 请求失败。");
+        throw lastException ?? new InvalidOperationException("Bark 请求失败");
     }
 
     private async Task<(TimeSpan Timeout, int MaxRetries)> LoadNetworkSettingsAsync(CancellationToken cancellationToken)

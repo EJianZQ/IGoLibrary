@@ -416,12 +416,12 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
     {
         if (!MobileControlSettings.TryNormalizeClashMihomoConfigPath(configPath, out var normalizedConfigPath))
         {
-            throw new ArgumentException("Mihomo 活动配置必须是绝对路径的 .yaml 或 .yml 文件。", nameof(configPath));
+            throw new ArgumentException("Mihomo 活动配置必须是绝对路径的 .yaml 或 .yml 文件", nameof(configPath));
         }
 
         if (!MobileControlSettings.TryNormalizeClashMihomoRoutePolicy(routePolicy, out var normalizedRoutePolicy))
         {
-            throw new ArgumentException("Mihomo 路由策略不能为空、不能包含逗号或 #，且最多 128 个字符。", nameof(routePolicy));
+            throw new ArgumentException("Mihomo 路由策略不能为空、不能包含逗号或 #，且最多 128 个字符", nameof(routePolicy));
         }
 
         var settings = await settingsService.UpdateAsync(current =>

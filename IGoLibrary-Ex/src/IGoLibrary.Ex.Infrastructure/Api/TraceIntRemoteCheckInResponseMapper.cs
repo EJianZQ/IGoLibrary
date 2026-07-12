@@ -31,7 +31,7 @@ internal static class TraceIntRemoteCheckInResponseMapper
 
             if (devices.Length == 0)
             {
-                throw new RemoteCheckInApiException("当前预约区域未返回可用的 Beacon UUID。");
+                throw new RemoteCheckInApiException("当前预约区域未返回可用的 Beacon UUID");
             }
 
             return new RemoteCheckInDeviceInfo(
@@ -48,7 +48,7 @@ internal static class TraceIntRemoteCheckInResponseMapper
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException)
         {
-            throw new RemoteCheckInApiException("设备信息响应格式无效。", innerException: ex);
+            throw new RemoteCheckInApiException("设备信息响应格式无效", innerException: ex);
         }
     }
 
@@ -58,7 +58,7 @@ internal static class TraceIntRemoteCheckInResponseMapper
         if (!long.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var unixSeconds) ||
             unixSeconds <= 0)
         {
-            throw new RemoteCheckInApiException("服务器返回了无效的时间戳。");
+            throw new RemoteCheckInApiException("服务器返回了无效的时间戳");
         }
 
         return new RemoteCheckInServerTime(unixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture), unixSeconds);
@@ -93,7 +93,7 @@ internal static class TraceIntRemoteCheckInResponseMapper
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {
-            throw new RemoteCheckInApiException("签到响应格式无效。", innerException: ex);
+            throw new RemoteCheckInApiException("签到响应格式无效", innerException: ex);
         }
     }
 
@@ -120,7 +120,7 @@ internal static class TraceIntRemoteCheckInResponseMapper
     private static void ThrowIfApiError(JsonElement root)
     {
         var code = ReadNullableInt(root, "code")
-                   ?? throw new RemoteCheckInApiException("响应缺少 code 字段。");
+                   ?? throw new RemoteCheckInApiException("响应缺少 code 字段");
         if (code == 0)
         {
             return;
@@ -129,7 +129,7 @@ internal static class TraceIntRemoteCheckInResponseMapper
         var message = ReadString(root, "msg");
         if (string.IsNullOrWhiteSpace(message))
         {
-            message = "接口未返回成功结果。";
+            message = "接口未返回成功结果";
         }
 
         throw new RemoteCheckInApiException(

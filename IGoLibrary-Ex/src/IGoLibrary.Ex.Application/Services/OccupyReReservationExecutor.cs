@@ -19,7 +19,7 @@ internal sealed class OccupyReReservationExecutor(
         var cancelled = await apiClient.CancelReservationAsync(cookie, reservation.ReservationToken, cancellationToken);
         if (!cancelled)
         {
-            throw new InvalidOperationException("取消预约失败。");
+            throw new InvalidOperationException("取消预约失败");
         }
 
         await runtime.DelayAsync(plan.ReReserveDelay, cancellationToken);

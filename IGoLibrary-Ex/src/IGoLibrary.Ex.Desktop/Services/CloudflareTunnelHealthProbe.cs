@@ -65,14 +65,14 @@ internal sealed class CloudflareTunnelHealthProbeSession(HttpMessageHandler hand
             return response.StatusCode == HttpStatusCode.NoContent
                 ? CloudflareTunnelHealthProbeResult.Healthy
                 : CloudflareTunnelHealthProbeResult.Failed(new HttpRequestException(
-                    $"Cloudflare Tunnel 健康检查返回 HTTP {(int)response.StatusCode} ({response.StatusCode})。",
+                    $"Cloudflare Tunnel 健康检查返回 HTTP {(int)response.StatusCode} ({response.StatusCode})",
                     inner: null,
                     response.StatusCode));
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             return CloudflareTunnelHealthProbeResult.Failed(new TimeoutException(
-                $"Cloudflare Tunnel 健康检查在 {timeout.TotalSeconds:0.###} 秒内超时。",
+                $"Cloudflare Tunnel 健康检查在 {timeout.TotalSeconds:0.###} 秒内超时",
                 ex));
         }
         catch (HttpRequestException ex)

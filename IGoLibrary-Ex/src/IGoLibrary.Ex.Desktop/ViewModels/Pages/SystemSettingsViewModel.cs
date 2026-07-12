@@ -767,7 +767,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         {
             await _notificationService.ShowWarningAsync(
                 "开机启动项不可用",
-                "当前系统暂不支持开机自启动，已恢复开关到关闭状态。");
+                "当前系统暂不支持开机自启动，已恢复开关到关闭状态");
         }
         catch (Exception ex)
         {

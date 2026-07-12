@@ -8,13 +8,13 @@ public sealed class ApplicationRestartService(AppWindowService appWindowService)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var processPath = Environment.ProcessPath
-                          ?? throw new InvalidOperationException("无法确定当前可执行文件路径。");
+                          ?? throw new InvalidOperationException("无法确定当前可执行文件路径");
         var startInfo = BuildStartInfo(
             processPath,
             Environment.GetCommandLineArgs(),
             Environment.ProcessId);
         var process = Process.Start(startInfo)
-                      ?? throw new InvalidOperationException("无法启动新的应用进程。");
+                      ?? throw new InvalidOperationException("无法启动新的应用进程");
         process.Dispose();
         appWindowService.QuitApplication();
         return Task.CompletedTask;

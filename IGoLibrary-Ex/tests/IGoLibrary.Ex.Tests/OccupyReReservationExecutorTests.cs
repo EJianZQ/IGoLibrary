@@ -27,7 +27,7 @@ public sealed class OccupyReReservationExecutorTests
                 1,
                 CancellationToken.None));
 
-        Assert.Equal("取消预约失败。", ex.Message);
+        Assert.Equal("取消预约失败", ex.Message);
     }
 
     [Fact]

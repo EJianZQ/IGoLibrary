@@ -517,7 +517,7 @@ public sealed partial class SessionViewModel : ViewModelBase
             }
 
             var result = await AuthenticateFromCookieAsync(ManualCookieText, RememberSession);
-            var session = result.Session ?? throw new InvalidOperationException("Cookie 验证成功但未返回会话。");
+            var session = result.Session ?? throw new InvalidOperationException("Cookie 验证成功但未返回会话");
             IsAuthorized = true;
             SessionSummary = result.StatusMessage;
             UpdateSidebarSessionExpiration(result.CookieExpirationTime, session.Cookie);

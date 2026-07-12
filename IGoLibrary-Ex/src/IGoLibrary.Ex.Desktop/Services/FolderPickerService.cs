@@ -8,7 +8,7 @@ public sealed class FolderPickerService(AppWindowService appWindowService) : IFo
     {
         cancellationToken.ThrowIfCancellationRequested();
         var owner = appWindowService.MainWindow
-                    ?? throw new InvalidOperationException("主窗口尚未就绪，无法选择文件夹。");
+                    ?? throw new InvalidOperationException("主窗口尚未就绪，无法选择文件夹");
         var folders = await owner.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = title,

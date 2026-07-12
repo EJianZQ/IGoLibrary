@@ -61,7 +61,7 @@ public sealed partial class MultiSeatSelectionViewModel
 
         var text = await seatLabelDialogService.ShowAsync(new SeatLabelDialogRequest(
             "批量设置座位标签",
-            $"将为已选的 {targets.Length} 个座位设置同一标签；已有标签会被覆盖。"));
+            $"将为已选的 {targets.Length} 个座位设置同一标签；已有标签会被覆盖"));
         if (text is null)
         {
             return;
@@ -79,7 +79,7 @@ public sealed partial class MultiSeatSelectionViewModel
 
         var text = await seatLabelDialogService.ShowAsync(new SeatLabelDialogRequest(
             seat.HasLabel ? "编辑座位标签" : "添加座位标签",
-            $"为座位 {seat.SeatName} 设置自定义标签。",
+            $"为座位 {seat.SeatName} 设置自定义标签",
             seat.LabelText));
         if (text is null || string.Equals(text.Trim(), seat.LabelText, StringComparison.Ordinal))
         {

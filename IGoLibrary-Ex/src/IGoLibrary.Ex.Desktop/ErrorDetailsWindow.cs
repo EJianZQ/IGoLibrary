@@ -62,7 +62,7 @@ public sealed class ErrorDetailsWindow : Window
                     },
                     new TextBlock
                     {
-                        Text = "请根据下列信息检查 SMTP 配置、网络连通性和授权码。",
+                        Text = "请根据下列信息检查 SMTP 配置、网络连通性和授权码",
                         TextWrapping = TextWrapping.Wrap,
                         Foreground = ResolveBrush("AppErrorSecondaryTextBrush", "#FF4B5563"),
                         [Grid.RowProperty] = 1

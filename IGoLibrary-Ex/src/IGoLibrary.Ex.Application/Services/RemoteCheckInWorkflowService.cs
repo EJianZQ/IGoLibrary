@@ -68,7 +68,7 @@ public sealed class RemoteCheckInWorkflowService(
         if (!RemoteCheckInSessionTokenValidator.TryNormalize(exchange.Token, out var token))
         {
             throw new RemoteCheckInAuthorizationException(
-                "签到接口返回了无效的 wechatSESS_ID。",
+                "签到接口返回了无效的 wechatSESS_ID",
                 isSessionInvalid: true);
         }
 

@@ -89,7 +89,7 @@ internal sealed class StorageMigrationTransaction(PendingStorageLocationChange c
         var targetDatabase = Path.Combine(change.Target.DataDirectory, StorageLocationDefaults.DatabaseFileName);
         if (File.Exists(targetDatabase) && !change.OverwriteTargetDatabase)
         {
-            throw new IOException("目标目录已经存在数据库，未获得覆盖确认。");
+            throw new IOException("目标目录已经存在数据库，未获得覆盖确认");
         }
 
         _dataStageDirectory = Path.Combine(change.Target.DataDirectory, $".igolibrary-ex-data-migration-{_id}");
@@ -197,7 +197,7 @@ internal sealed class StorageMigrationTransaction(PendingStorageLocationChange c
         foreach (var target in _targetsToBackup)
         {
             var backupDirectory = _dataStageDirectory
-                                  ?? throw new InvalidOperationException("数据库迁移暂存目录尚未创建。");
+                                  ?? throw new InvalidOperationException("数据库迁移暂存目录尚未创建");
             var backup = Path.Combine(backupDirectory, Path.GetFileName(target) + ".target-backup");
             File.Move(target, backup, overwrite: false);
             _targetBackups.Add((backup, target));

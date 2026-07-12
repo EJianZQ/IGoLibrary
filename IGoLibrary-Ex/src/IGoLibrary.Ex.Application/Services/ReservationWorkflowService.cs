@@ -39,7 +39,7 @@ public sealed class ReservationWorkflowService(
                 Succeeded: false,
                 Reservation: reservation,
                 HasSession: false,
-                FailureMessage: "当前会话已失效，请重新授权后再操作。");
+                FailureMessage: "当前会话已失效，请重新授权后再操作");
         }
 
         if (stopOccupyFirst)
@@ -63,6 +63,6 @@ public sealed class ReservationWorkflowService(
                 Succeeded: false,
                 Reservation: reservation,
                 RemoteSucceeded: false,
-                FailureMessage: "接口未返回成功结果，请稍后重试。");
+                FailureMessage: "接口未返回成功结果，请稍后重试");
     }
 }

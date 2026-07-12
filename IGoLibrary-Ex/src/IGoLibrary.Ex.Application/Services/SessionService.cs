@@ -113,7 +113,7 @@ public sealed class SessionService(
 
         if (clearFailure is not null)
         {
-            throw new InvalidOperationException("清理本地安全凭据失败，请手动检查系统凭据管理器。", clearFailure);
+            throw new InvalidOperationException("清理本地安全凭据失败，请手动检查系统凭据管理器", clearFailure);
         }
 
         activityLogService.Write(LogEntryKind.Info, "Auth", "已清除当前会话。");

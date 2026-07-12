@@ -34,19 +34,19 @@ internal sealed partial class CloudflareQuickTunnelRunner(
         ArgumentNullException.ThrowIfNull(originBaseUri);
         if (!originBaseUri.IsAbsoluteUri || originBaseUri.Scheme != Uri.UriSchemeHttp)
         {
-            throw new ArgumentException("Cloudflare Tunnel 本机服务地址必须是绝对 HTTP 地址。", nameof(originBaseUri));
+            throw new ArgumentException("Cloudflare Tunnel 本机服务地址必须是绝对 HTTP 地址", nameof(originBaseUri));
         }
 
         if (string.IsNullOrWhiteSpace(healthCheckPath) || !healthCheckPath.StartsWith("/", StringComparison.Ordinal))
         {
-            throw new ArgumentException("Tunnel 健康检查路径无效。", nameof(healthCheckPath));
+            throw new ArgumentException("Tunnel 健康检查路径无效", nameof(healthCheckPath));
         }
 
         var proxyResolution = ResolveAndValidateConfiguration(proxyOptions, compatibilityOptions);
         var executablePath = ResolveExecutablePath();
         if (!File.Exists(executablePath))
         {
-            throw new FileNotFoundException("未找到内置 cloudflared，无法启动 Cloudflare Tunnel。", executablePath);
+            throw new FileNotFoundException("未找到内置 cloudflared，无法启动 Cloudflare Tunnel", executablePath);
         }
 
         logger.LogInformation(
@@ -93,7 +93,7 @@ internal sealed partial class CloudflareQuickTunnelRunner(
                 cancellationToken);
             if (!process.Start())
             {
-                throw new InvalidOperationException("cloudflared 进程未能启动。");
+                throw new InvalidOperationException("cloudflared 进程未能启动");
             }
 
             process.BeginOutputReadLine();
@@ -113,7 +113,7 @@ internal sealed partial class CloudflareQuickTunnelRunner(
             }
             catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
-                throw new TimeoutException($"Cloudflare Tunnel 未能在 {StartupTimeout.TotalSeconds:0} 秒内就绪。", ex);
+                throw new TimeoutException($"Cloudflare Tunnel 未能在 {StartupTimeout.TotalSeconds:0} 秒内就绪", ex);
             }
 
             var publicHealthUri = BuildHealthCheckUri(publicBaseUri, healthCheckPath);

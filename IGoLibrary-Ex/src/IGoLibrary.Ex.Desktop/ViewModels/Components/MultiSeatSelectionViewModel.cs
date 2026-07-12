@@ -72,8 +72,8 @@ public sealed partial class MultiSeatSelectionViewModel(
         : "尚未选择目标座位";
 
     public string SelectedSeatHintText => HasSelectedSeats
-        ? "这些座位会被持续监控，任意一个释放后都会立即尝试预约。"
-        : "点击上方按钮打开选座工作区，确认后才会同步到主界面。";
+        ? "这些座位会被持续监控，任意一个释放后都会立即尝试预约"
+        : "点击上方按钮打开选座工作区，确认后才会同步到主界面";
 
     public string DraftSelectedSeatSummaryText => DraftSelectedSeatCount > 0
         ? $"本次已勾选 {DraftSelectedSeatCount} 个目标座位"

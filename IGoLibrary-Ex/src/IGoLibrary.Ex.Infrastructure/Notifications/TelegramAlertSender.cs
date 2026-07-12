@@ -176,7 +176,7 @@ internal sealed class TelegramAlertSender(
             }
             catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
             {
-                lastException = new TimeoutException($"Telegram 请求超时（>{settings.Timeout.TotalSeconds:0} 秒）。", ex);
+                lastException = new TimeoutException($"Telegram 请求超时（>{settings.Timeout.TotalSeconds:0} 秒）", ex);
             }
             catch (HttpRequestException ex) when (IsTransient(ex.StatusCode))
             {
@@ -191,7 +191,7 @@ internal sealed class TelegramAlertSender(
             await Task.Delay(TimeSpan.FromMilliseconds(250 * (attempt + 1)), cancellationToken);
         }
 
-        throw lastException ?? new InvalidOperationException("Telegram 请求失败。");
+        throw lastException ?? new InvalidOperationException("Telegram 请求失败");
     }
 
     private async Task<(TimeSpan Timeout, int MaxRetries)> LoadNetworkSettingsAsync(CancellationToken cancellationToken)

@@ -103,8 +103,8 @@ public sealed class StorageLocationManager : IStorageLocationService
                 document.LastResult = new StorageLocationStartupResult(
                     true,
                     pending.MigrateData || pending.MigrateLogs
-                        ? "存储位置已更新，文件迁移完成。"
-                        : "存储位置已更新，旧目录文件保持不变。");
+                        ? "存储位置已更新，文件迁移完成"
+                        : "存储位置已更新，旧目录文件保持不变");
                 _locatorStore.Save(document);
                 locatorCommitted = true;
 
@@ -116,7 +116,7 @@ public sealed class StorageLocationManager : IStorageLocationService
                     MergePendingCleanup(document, cleanupFailures);
                     document.LastResult = new StorageLocationStartupResult(
                         true,
-                        $"存储位置已更新，但有 {cleanupFailures.Count} 个旧文件暂未删除，将在下次启动重试。");
+                        $"存储位置已更新，但有 {cleanupFailures.Count} 个旧文件暂未删除，将在下次启动重试");
                     _locatorStore.Save(document);
                 }
 
@@ -190,7 +190,7 @@ public sealed class StorageLocationManager : IStorageLocationService
             target.LogDirectory);
         if (!dataChanged && !logsChanged)
         {
-            throw new InvalidOperationException("存储位置没有变化。");
+            throw new InvalidOperationException("存储位置没有变化");
         }
 
         await _gate.WaitAsync(cancellationToken);
@@ -241,7 +241,7 @@ public sealed class StorageLocationManager : IStorageLocationService
         if (!TryPrepareLocations(_recoveryLocations, out var recoveryFailure))
         {
             throw new AggregateException(
-                "已配置的存储目录和平台恢复目录均不可用。",
+                "已配置的存储目录和平台恢复目录均不可用",
                 activeFailure,
                 recoveryFailure!);
         }

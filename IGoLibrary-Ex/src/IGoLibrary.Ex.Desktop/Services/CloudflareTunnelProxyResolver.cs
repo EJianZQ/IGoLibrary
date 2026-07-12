@@ -53,7 +53,7 @@ internal sealed class CloudflareTunnelProxyResolver(
             CloudflareTunnelProxyMode.Direct => new CloudflareTunnelProxyResolution(
                 null,
                 CloudflareTunnelProxyMode.Direct),
-            _ => throw new InvalidOperationException("Cloudflare Tunnel 代理方式无效。")
+            _ => throw new InvalidOperationException("Cloudflare Tunnel 代理方式无效")
         };
     }
 
@@ -65,7 +65,7 @@ internal sealed class CloudflareTunnelProxyResolver(
             if (proxy.IsBypassed(ProbeTarget))
             {
                 return required
-                    ? throw new InvalidOperationException("未检测到可用于 Cloudflare Tunnel 的系统代理。")
+                    ? throw new InvalidOperationException("未检测到可用于 Cloudflare Tunnel 的系统代理")
                     : null;
             }
 
@@ -78,7 +78,7 @@ internal sealed class CloudflareTunnelProxyResolver(
                     StringComparison.OrdinalIgnoreCase) == 0)
             {
                 return required
-                    ? throw new InvalidOperationException("未检测到可用于 Cloudflare Tunnel 的系统代理。")
+                    ? throw new InvalidOperationException("未检测到可用于 Cloudflare Tunnel 的系统代理")
                     : null;
             }
 
@@ -101,7 +101,7 @@ internal sealed class CloudflareTunnelProxyResolver(
         if (!MobileControlSettings.TryNormalizeManualProxyUrl(value, out var normalized))
         {
             throw new InvalidOperationException(
-                "手动代理地址无效，应类似 http://127.0.0.1:7897，且不能包含账号、密码、路径或查询参数。");
+                "手动代理地址无效，应类似 http://127.0.0.1:7897，且不能包含账号、密码、路径或查询参数");
         }
 
         return new Uri(normalized, UriKind.Absolute);
@@ -114,7 +114,7 @@ internal sealed class CloudflareTunnelProxyResolver(
             string.IsNullOrWhiteSpace(uri.Host) ||
             !string.IsNullOrEmpty(uri.UserInfo))
         {
-            throw new InvalidOperationException($"{source}不是受支持的 HTTP 代理地址。");
+            throw new InvalidOperationException($"{source}不是受支持的 HTTP 代理地址");
         }
 
         return new Uri(uri.GetLeftPart(UriPartial.Authority), UriKind.Absolute);

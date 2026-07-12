@@ -11,6 +11,6 @@ internal sealed class GrabReservationStrategySelector(IEnumerable<IGrabReservati
     {
         return _strategies.TryGetValue(strategy, out var selected)
             ? selected
-            : throw new InvalidOperationException($"不支持的抢座预约策略：{strategy}。");
+            : throw new InvalidOperationException($"不支持的抢座预约策略：{strategy}");
     }
 }

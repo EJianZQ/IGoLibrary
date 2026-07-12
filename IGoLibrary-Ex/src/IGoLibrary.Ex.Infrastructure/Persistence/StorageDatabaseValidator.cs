@@ -36,7 +36,7 @@ internal static class StorageDatabaseValidator
         quickCheck.CommandText = "PRAGMA quick_check;";
         if (!string.Equals(quickCheck.ExecuteScalar()?.ToString(), "ok", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidDataException("数据库完整性检查失败。");
+            throw new InvalidDataException("数据库完整性检查失败");
         }
 
         using var schemaCheck = connection.CreateCommand();
@@ -44,7 +44,7 @@ internal static class StorageDatabaseValidator
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('Settings', 'Favorites', 'ProtocolOverrides');";
         if (Convert.ToInt32(schemaCheck.ExecuteScalar()) != 3)
         {
-            throw new InvalidDataException("数据库缺少必要的数据表。");
+            throw new InvalidDataException("数据库缺少必要的数据表");
         }
     }
 }

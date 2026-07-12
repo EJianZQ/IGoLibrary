@@ -102,7 +102,7 @@ public sealed class MacKeychainCredentialStore : ICredentialStore
         CancellationToken cancellationToken,
         bool tolerateItemNotFound = false)
     {
-        using var process = Process.Start(psi) ?? throw new InvalidOperationException("无法启动 security 命令。");
+        using var process = Process.Start(psi) ?? throw new InvalidOperationException("无法启动 security 命令");
         var output = await process.StandardOutput.ReadToEndAsync(cancellationToken);
         var error = await process.StandardError.ReadToEndAsync(cancellationToken);
         await process.WaitForExitAsync(cancellationToken);
@@ -123,6 +123,6 @@ public sealed class MacKeychainCredentialStore : ICredentialStore
         }
 
         throw new InvalidOperationException(
-            string.IsNullOrWhiteSpace(error) ? "Keychain 操作失败。" : error.Trim());
+            string.IsNullOrWhiteSpace(error) ? "Keychain 操作失败" : error.Trim());
     }
 }

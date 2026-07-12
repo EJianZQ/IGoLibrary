@@ -17,7 +17,7 @@ public sealed class TraceIntProtocolValidationException(TraceIntProtocolValidati
     private static string BuildMessage(TraceIntProtocolValidationResult result)
     {
         return result.Errors.Count == 0
-            ? "TraceInt 协议地址无效。"
+            ? "TraceInt 协议地址无效"
             : string.Join("；", result.Errors.Select(static issue => issue.Message));
     }
 }
@@ -194,7 +194,7 @@ public static class TraceIntProtocolValidator
     {
         if (string.IsNullOrWhiteSpace(template))
         {
-            errors.Add(new TraceIntProtocolValidationIssue(propertyName, $"{displayName}不能为空。"));
+            errors.Add(new TraceIntProtocolValidationIssue(propertyName, $"{displayName}不能为空"));
             return;
         }
 
@@ -202,17 +202,17 @@ public static class TraceIntProtocolValidator
         {
             errors.Add(new TraceIntProtocolValidationIssue(
                 propertyName,
-                $"{displayName}必须包含 {CodePlaceholder}。"));
+                $"{displayName}必须包含 {CodePlaceholder}"));
         }
 
         if (!template.Contains(ReturnUrlPlaceholder, StringComparison.Ordinal))
         {
             var issue = new TraceIntProtocolValidationIssue(
                 propertyName,
-                $"{displayName}未包含 {ReturnUrlPlaceholder}，将按兼容模式使用模板中已有的回调地址。");
+                $"{displayName}未包含 {ReturnUrlPlaceholder}，将按兼容模式使用模板中已有的回调地址");
             if (requireReturnUrlPlaceholder)
             {
-                errors.Add(issue with { Message = $"{displayName}必须包含 {ReturnUrlPlaceholder}。" });
+                errors.Add(issue with { Message = $"{displayName}必须包含 {ReturnUrlPlaceholder}" });
             }
             else
             {
@@ -236,7 +236,7 @@ public static class TraceIntProtocolValidator
         {
             errors.Add(new TraceIntProtocolValidationIssue(
                 propertyName,
-                $"{displayName}必须是绝对 http/https 地址。"));
+                $"{displayName}必须是绝对 http/https 地址"));
             return;
         }
 
@@ -253,7 +253,7 @@ public static class TraceIntProtocolValidator
         {
             errors.Add(new TraceIntProtocolValidationIssue(
                 propertyName,
-                $"{displayName}必须是绝对 ws/wss 地址。"));
+                $"{displayName}必须是绝对 ws/wss 地址"));
             return;
         }
 
@@ -277,7 +277,7 @@ public static class TraceIntProtocolValidator
         {
             errors.Add(new TraceIntProtocolValidationIssue(
                 propertyName,
-                $"{displayName}只能包含协议、主机和可选端口。"));
+                $"{displayName}只能包含协议、主机和可选端口"));
         }
     }
 
@@ -289,17 +289,17 @@ public static class TraceIntProtocolValidator
     {
         if (string.IsNullOrWhiteSpace(uri.Host))
         {
-            errors.Add(new TraceIntProtocolValidationIssue(propertyName, $"{displayName}缺少主机名。"));
+            errors.Add(new TraceIntProtocolValidationIssue(propertyName, $"{displayName}缺少主机名"));
         }
 
         if (!string.IsNullOrEmpty(uri.UserInfo))
         {
-            errors.Add(new TraceIntProtocolValidationIssue(propertyName, $"{displayName}不能包含用户信息。"));
+            errors.Add(new TraceIntProtocolValidationIssue(propertyName, $"{displayName}不能包含用户信息"));
         }
 
         if (!string.IsNullOrEmpty(uri.Fragment))
         {
-            errors.Add(new TraceIntProtocolValidationIssue(propertyName, $"{displayName}不能包含片段标识。"));
+            errors.Add(new TraceIntProtocolValidationIssue(propertyName, $"{displayName}不能包含片段标识"));
         }
     }
 

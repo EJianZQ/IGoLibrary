@@ -22,10 +22,10 @@ public sealed class DesktopNotificationTestService(
             subject: "IGoLibrary-Ex 测试邮件",
             body:
             """
-            这是一封来自 IGoLibrary-Ex 的测试邮件。
+            这是一封来自 IGoLibrary-Ex 的测试邮件
 
             如果你收到了这封邮件，说明当前 SMTP 参数已经可以正常工作，
-            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒。
+            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒
             """,
             cancellationToken);
     }
@@ -37,10 +37,10 @@ public sealed class DesktopNotificationTestService(
         return telegramAlertSender.SendAsync(
             settings,
             """
-            这是一条来自 IGoLibrary-Ex 的 Telegram 测试消息。
+            这是一条来自 IGoLibrary-Ex 的 Telegram 测试消息
 
             如果你收到了这条消息，说明当前 Bot Token、Chat ID 和 API 地址已经可以正常工作，
-            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒。
+            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒
             """,
             cancellationToken);
     }
@@ -53,10 +53,10 @@ public sealed class DesktopNotificationTestService(
             settings,
             "IGoLibrary-Ex Bark 测试推送",
             """
-            这是一条来自 IGoLibrary-Ex 的 Bark 测试推送。
+            这是一条来自 IGoLibrary-Ex 的 Bark 测试推送
 
             如果你收到了这条推送，说明当前服务端地址和 Device Key 已经可以正常工作，
-            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒。
+            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒
             """,
             cancellationToken);
     }
@@ -69,10 +69,10 @@ public sealed class DesktopNotificationTestService(
             settings,
             "IGoLibrary-Ex WxPusher 测试推送",
             """
-            这是一条来自 IGoLibrary-Ex 的 WxPusher 测试推送。
+            这是一条来自 IGoLibrary-Ex 的 WxPusher 测试推送
 
             如果你收到了这条推送，说明当前 AppToken、UID 或 Topic ID 已经可以正常工作，
-            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒。
+            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒
             """,
             cancellationToken);
     }
@@ -85,10 +85,10 @@ public sealed class DesktopNotificationTestService(
             settings,
             "IGoLibrary-Ex Server酱 测试推送",
             """
-            这是一条来自 IGoLibrary-Ex 的 Server酱 测试推送。
+            这是一条来自 IGoLibrary-Ex 的 Server酱 测试推送
 
             如果你收到了这条推送，说明当前 SendKey、通道和收件人配置已经可以正常工作，
-            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒。
+            可用于 Cookie 失效、抢座成功、占座成功和任务失败提醒
             """,
             cancellationToken);
     }

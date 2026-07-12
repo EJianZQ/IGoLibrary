@@ -22,7 +22,7 @@ public sealed class StorageChangeDialogService(AppWindowService appWindowService
 
         var choice = await ShowAsync(
             "应用存储位置更改",
-            string.Join("\n\n", changes) + "\n\n是否将现有文件迁移到新位置？应用将在确认后立即重启。",
+            string.Join("\n\n", changes) + "\n\n是否将现有文件迁移到新位置？应用将在确认后立即重启",
             "迁移并重启",
             "不迁移并重启",
             cancellationToken);
@@ -40,7 +40,7 @@ public sealed class StorageChangeDialogService(AppWindowService appWindowService
     {
         var choice = await ShowAsync(
             "目标位置已有数据",
-            $"目标目录已经存在数据库：\n{databasePath}\n\n继续后将使用当前数据库覆盖目标数据库。迁移失败时会自动恢复目标原文件。",
+            $"目标目录已经存在数据库：\n{databasePath}\n\n继续后将使用当前数据库覆盖目标数据库。迁移失败时会自动恢复目标原文件",
             "覆盖并继续",
             secondaryText: null,
             cancellationToken);
@@ -53,7 +53,7 @@ public sealed class StorageChangeDialogService(AppWindowService appWindowService
     {
         var choice = await ShowAsync(
             "目标位置已有数据",
-            $"目标目录已经存在有效数据库：\n{databasePath}\n\n选择继续后，应用将直接使用其中的设置、收藏和接口配置；当前目录中的数据不会迁移过去。",
+            $"目标目录已经存在有效数据库：\n{databasePath}\n\n选择继续后，应用将直接使用其中的设置、收藏和接口配置；当前目录中的数据不会迁移过去",
             "使用现有数据并重启",
             secondaryText: null,
             cancellationToken);

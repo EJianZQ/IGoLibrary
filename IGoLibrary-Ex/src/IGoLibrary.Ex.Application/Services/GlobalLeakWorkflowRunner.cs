@@ -32,17 +32,17 @@ internal sealed class GlobalLeakWorkflowRunner(
         {
             if (plan.Libraries.Count == 0)
             {
-                throw new InvalidOperationException("请至少选择一个扫描场馆。");
+                throw new InvalidOperationException("请至少选择一个扫描场馆");
             }
 
             var scanInterval = GlobalLeakStateMachine.NormalizeScanInterval(plan.ScanInterval);
-            context.SetRunning("全域捡漏任务已启动。");
+            context.SetRunning("全域捡漏任务已启动");
             activityLogService.Write(LogEntryKind.Info, "GlobalLeak", $"开始扫描 {plan.Libraries.Count} 个场馆，扫描间隔 {scanInterval.TotalSeconds:0} 秒。");
 
             while (!cancellationToken.IsCancellationRequested)
             {
                 cycle++;
-                context.UpdateRunningMetrics($"全域捡漏第 {cycle} 轮扫描中。", cycle, requestCount, lastRequestAt);
+                context.UpdateRunningMetrics($"全域捡漏第 {cycle} 轮扫描中", cycle, requestCount, lastRequestAt);
                 var cookie = GetCurrentCookieOrThrow();
 
                 foreach (var target in plan.Libraries)
@@ -76,7 +76,7 @@ internal sealed class GlobalLeakWorkflowRunner(
                         }
 
                         activityLogService.Write(LogEntryKind.Success, "GlobalLeak", $"{target.LibraryName} · {seat.SeatName} 捡漏成功。");
-                        context.Complete("已成功捡漏预约到空座。", CoordinatorStatusReason.GlobalLeakSucceeded);
+                        context.Complete("已成功捡漏预约到空座", CoordinatorStatusReason.GlobalLeakSucceeded);
                         _ = PublishCoordinatorEventSafelyAsync(
                             new GlobalLeakSucceededCoordinatorEvent(target.LibraryName, seat.SeatName),
                             "发送全域捡漏成功提醒失败");
@@ -165,7 +165,7 @@ internal sealed class GlobalLeakWorkflowRunner(
 
     private string GetCurrentCookieOrThrow()
     {
-        var cookie = sessionState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
+        var cookie = sessionState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录");
         if (SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime) &&
             expirationTime <= runtime.Now)
         {

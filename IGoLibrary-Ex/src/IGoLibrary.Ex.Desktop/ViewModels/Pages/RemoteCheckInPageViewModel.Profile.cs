@@ -18,11 +18,11 @@ public sealed partial class RemoteCheckInPageViewModel
         try
         {
             var library = _workflowState.LockedLibrary
-                ?? throw new InvalidOperationException("请先锁定场馆。");
+                ?? throw new InvalidOperationException("请先锁定场馆");
             if (SelectedBeaconUuid is null ||
                 !AllowedBeaconUuids.Contains(SelectedBeaconUuid, StringComparer.OrdinalIgnoreCase))
             {
-                throw new InvalidOperationException("请选择本次服务端返回的 Beacon UUID。");
+                throw new InvalidOperationException("请选择本次服务端返回的 Beacon UUID");
             }
 
             var saved = await _profileService.SaveAsync(new RemoteCheckInVenueProfileSettings

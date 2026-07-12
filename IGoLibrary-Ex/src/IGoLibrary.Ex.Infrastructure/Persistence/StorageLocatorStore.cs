@@ -22,18 +22,18 @@ internal sealed class StorageLocatorStore(string locatorFilePath, StorageLocatio
             if (!parsed.RootElement.TryGetProperty("schemaVersion", out var schemaVersionElement) ||
                 !schemaVersionElement.TryGetInt32(out var schemaVersion))
             {
-                throw new JsonException("定位配置缺少有效的版本号。");
+                throw new JsonException("定位配置缺少有效的版本号");
             }
 
             return schemaVersion switch
             {
                 SchemaVersion => NormalizeDocument(
                     JsonSerializer.Deserialize<StorageLocatorDocument>(json, AppJson.Default)
-                    ?? throw new JsonException("定位配置内容为空。")),
+                    ?? throw new JsonException("定位配置内容为空")),
                 1 => UpgradeVersionOne(
                     JsonSerializer.Deserialize<LegacyStorageLocatorDocument>(json, AppJson.Default)
-                    ?? throw new JsonException("定位配置内容为空。")),
-                _ => throw new JsonException($"不支持的存储位置配置版本：{schemaVersion}。")
+                    ?? throw new JsonException("定位配置内容为空")),
+                _ => throw new JsonException($"不支持的存储位置配置版本：{schemaVersion}")
             };
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException)
@@ -62,7 +62,7 @@ internal sealed class StorageLocatorStore(string locatorFilePath, StorageLocatio
     {
         document.SchemaVersion = SchemaVersion;
         var directory = Path.GetDirectoryName(_locatorFilePath)
-                        ?? throw new InvalidOperationException("无法确定存储位置配置目录。");
+                        ?? throw new InvalidOperationException("无法确定存储位置配置目录");
         Directory.CreateDirectory(directory);
         var temporaryPath = Path.Combine(directory, $".{StorageLocationDefaults.LocatorFileName}.{Guid.NewGuid():N}.tmp");
         try

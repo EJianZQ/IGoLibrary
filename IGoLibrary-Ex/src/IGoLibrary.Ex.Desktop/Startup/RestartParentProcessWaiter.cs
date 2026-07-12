@@ -37,7 +37,7 @@ internal static class RestartParentProcessWaiter
             catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
                 throw new TimeoutException(
-                    $"等待旧进程 {processId.Value} 退出超时。",
+                    $"等待旧进程 {processId.Value} 退出超时",
                     ex);
             }
         }

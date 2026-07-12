@@ -54,7 +54,7 @@ public sealed class UpdateCheckService(
         catch (TimeoutException ex)
         {
             logger.LogWarning(ex, "GitHub release check timed out.");
-            return UpdateCheckResult.Failed("检查更新超时，请稍后重试。");
+            return UpdateCheckResult.Failed("检查更新超时，请稍后重试");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

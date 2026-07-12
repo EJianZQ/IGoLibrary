@@ -18,27 +18,27 @@ public sealed partial class RemoteCheckInPageViewModel
         try
         {
             var library = _workflowState.LockedLibrary
-                ?? throw new InvalidOperationException("请先锁定场馆。");
+                ?? throw new InvalidOperationException("请先锁定场馆");
             if (!IsProfileSaved || _savedProfile is null || _savedProfile.LibraryId != library.LibraryId)
             {
-                throw new InvalidOperationException("请先保存当前场馆的 Beacon 与 GCJ-02 坐标配置。");
+                throw new InvalidOperationException("请先保存当前场馆的 Beacon 与 GCJ-02 坐标配置");
             }
 
             var reservationResult = await _reservationWorkflowService.RefreshReservationAsync();
             if (!reservationResult.HasSession)
             {
-                throw new InvalidOperationException("普通登录会话已失效，请重新登录。");
+                throw new InvalidOperationException("普通登录会话已失效，请重新登录");
             }
 
             _workflowState.CurrentReservation = reservationResult.Reservation;
             if (reservationResult.Reservation is null)
             {
-                throw new InvalidOperationException("当前没有可签到的预约。");
+                throw new InvalidOperationException("当前没有可签到的预约");
             }
 
             if (reservationResult.Reservation.LibraryId != library.LibraryId)
             {
-                throw new InvalidOperationException("当前预约与锁定场馆不一致，请切换到预约所在场馆后再签到。");
+                throw new InvalidOperationException("当前预约与锁定场馆不一致，请切换到预约所在场馆后再签到");
             }
 
             var result = await _workflowService.SignAsync(new RemoteCheckInSignPlan(
@@ -64,7 +64,7 @@ public sealed partial class RemoteCheckInPageViewModel
             {
                 await _notificationService.ShowWarningAsync(
                     "签到已成功，但场馆不一致",
-                    $"服务端返回的实际场馆为 {actualLibrary}，请立即核对预约状态。");
+                    $"服务端返回的实际场馆为 {actualLibrary}，请立即核对预约状态");
             }
             else
             {

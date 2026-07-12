@@ -57,6 +57,6 @@ public sealed class UpdateReleaseWindowTests
     {
         var markdownViewer = UpdateReleaseWindow.CreateReleaseBodyViewer(body);
 
-        Assert.Equal("此版本没有填写更新说明。", markdownViewer.Markdown);
+        Assert.Equal("此版本没有填写更新说明", markdownViewer.Markdown);
     }
 }

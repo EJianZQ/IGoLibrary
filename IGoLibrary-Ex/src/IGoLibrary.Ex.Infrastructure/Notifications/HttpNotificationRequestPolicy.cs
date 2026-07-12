@@ -35,7 +35,7 @@ internal static class HttpNotificationRequestPolicy
             }
             catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
             {
-                lastException = new TimeoutException($"{requestLabel}请求超时（>{settings.Timeout.TotalSeconds:0} 秒）。", ex);
+                lastException = new TimeoutException($"{requestLabel}请求超时（>{settings.Timeout.TotalSeconds:0} 秒）", ex);
             }
             catch (HttpRequestException ex) when (IsTransient(ex.StatusCode))
             {
@@ -50,7 +50,7 @@ internal static class HttpNotificationRequestPolicy
             await Task.Delay(TimeSpan.FromMilliseconds(250 * (attempt + 1)), cancellationToken);
         }
 
-        throw lastException ?? new InvalidOperationException($"{requestLabel}请求失败。");
+        throw lastException ?? new InvalidOperationException($"{requestLabel}请求失败");
     }
 
     private static async Task<(TimeSpan Timeout, int MaxRetries)> LoadNetworkSettingsAsync(

@@ -26,7 +26,7 @@ internal sealed class GrabSeatWorkflowRunner(
                 await WaitUntilScheduledStartAsync(plan.ScheduledStart.Value, cancellationToken);
             }
 
-            context.SetRunning("抢座任务已启动。");
+            context.SetRunning("抢座任务已启动");
             activityLogService.Write(LogEntryKind.Info, "Grab", $"开始监控 {plan.Seats.Count} 个目标座位。");
 
             var cycle = 0;
@@ -41,13 +41,13 @@ internal sealed class GrabSeatWorkflowRunner(
             while (!cancellationToken.IsCancellationRequested)
             {
                 cycle++;
-                context.UpdateRunningMetrics("抢座任务运行中。", cycle, requestCount, lastRequestAt);
+                context.UpdateRunningMetrics("抢座任务运行中", cycle, requestCount, lastRequestAt);
                 var cookie = GetCurrentCookieOrThrow();
                 void MarkRequestSent()
                 {
                     requestCount++;
                     lastRequestAt = runtime.Now;
-                    context.UpdateRunningMetrics("抢座任务运行中。", cycle, requestCount, lastRequestAt);
+                    context.UpdateRunningMetrics("抢座任务运行中", cycle, requestCount, lastRequestAt);
                 }
 
                 var reservationResult = await reservationAttemptStrategy.TryReserveAsync(
@@ -63,7 +63,7 @@ internal sealed class GrabSeatWorkflowRunner(
                 {
                     var reservedSeatName = reservationResult.ReservedSeat.SeatName;
                     activityLogService.Write(LogEntryKind.Success, "Grab", $"{reservedSeatName} 预约成功。");
-                    context.Complete("已成功预约到目标座位。", CoordinatorStatusReason.GrabSucceeded);
+                    context.Complete("已成功预约到目标座位", CoordinatorStatusReason.GrabSucceeded);
                     _ = PublishCoordinatorEventSafelyAsync(
                         new GrabSucceededCoordinatorEvent(plan.LibraryName, reservedSeatName),
                         "发送抢座成功提醒失败");
@@ -166,7 +166,7 @@ internal sealed class GrabSeatWorkflowRunner(
 
     private string GetCurrentCookieOrThrow()
     {
-        var cookie = sessionState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
+        var cookie = sessionState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录");
         if (SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime) &&
             expirationTime <= runtime.Now)
         {

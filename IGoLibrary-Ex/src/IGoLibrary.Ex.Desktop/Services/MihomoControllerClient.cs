@@ -22,7 +22,7 @@ internal sealed class MihomoControllerClient : IMihomoControllerClient
         {
             MihomoControllerEndpoint.Http http => new Uri(http.BaseUri, "configs?force=true"),
             MihomoControllerEndpoint.WindowsNamedPipe => new Uri("http://localhost/configs?force=true"),
-            _ => throw new InvalidOperationException("不支持的 Mihomo 控制接口类型。")
+            _ => throw new InvalidOperationException("不支持的 Mihomo 控制接口类型")
         };
         var payload = JsonSerializer.Serialize(new { path = configurationPath, payload = string.Empty });
         using var request = new HttpRequestMessage(HttpMethod.Put, endpoint)
@@ -45,7 +45,7 @@ internal sealed class MihomoControllerClient : IMihomoControllerClient
         if (!response.IsSuccessStatusCode)
         {
             throw new InvalidOperationException(
-                $"Mihomo 控制接口拒绝加载临时配置（HTTP {(int)response.StatusCode}）。");
+                $"Mihomo 控制接口拒绝加载临时配置（HTTP {(int)response.StatusCode}）");
         }
     }
 
@@ -71,7 +71,7 @@ internal sealed class MihomoControllerClient : IMihomoControllerClient
     {
         if (!OperatingSystem.IsWindows())
         {
-            throw new PlatformNotSupportedException("Mihomo Windows 命名管道只能在 Windows 上使用。");
+            throw new PlatformNotSupportedException("Mihomo Windows 命名管道只能在 Windows 上使用");
         }
 
         var stream = new NamedPipeClientStream(

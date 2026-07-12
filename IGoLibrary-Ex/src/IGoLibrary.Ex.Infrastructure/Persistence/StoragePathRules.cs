@@ -14,14 +14,14 @@ internal static class StoragePathRules
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new ArgumentException("存储目录不能为空。", parameterName);
+            throw new ArgumentException("存储目录不能为空", parameterName);
         }
 
         var fullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(value.Trim()));
         var root = Path.TrimEndingDirectorySeparator(Path.GetPathRoot(fullPath) ?? string.Empty);
         if (string.IsNullOrWhiteSpace(root) || PathsEqualWithoutNormalization(fullPath, root))
         {
-            throw new ArgumentException("不能把文件系统根目录作为存储目录。", parameterName);
+            throw new ArgumentException("不能把文件系统根目录作为存储目录", parameterName);
         }
 
         return fullPath;

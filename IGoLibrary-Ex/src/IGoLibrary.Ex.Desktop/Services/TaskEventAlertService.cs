@@ -544,7 +544,7 @@ public sealed class TaskEventAlertService(
             builder.AppendLine($"详细信息：{reason}");
         }
 
-        builder.AppendLine("请尽快重新授权，以恢复抢座/占座轮询。");
+        builder.AppendLine("请尽快重新授权，以恢复抢座/占座轮询");
         return builder.ToString();
     }
 
@@ -555,7 +555,7 @@ public sealed class TaskEventAlertService(
         builder.AppendLine($"目标场馆：{libraryName}");
         builder.AppendLine($"目标座位：{seatName}");
         builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
-        builder.AppendLine("你可以返回应用查看最新预约状态。");
+        builder.AppendLine("你可以返回应用查看最新预约状态");
         return builder.ToString();
     }
 
@@ -565,7 +565,7 @@ public sealed class TaskEventAlertService(
         builder.AppendLine("IGoLibrary-Ex 占座成功");
         builder.AppendLine($"目标座位：{seatName}");
         builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
-        builder.AppendLine("你可以返回应用查看最新预约状态。");
+        builder.AppendLine("你可以返回应用查看最新预约状态");
         return builder.ToString();
     }
 
@@ -588,7 +588,7 @@ public sealed class TaskEventAlertService(
         builder.AppendLine($"目标场馆：{libraryName}");
         builder.AppendLine($"目标座位：{seatName}");
         builder.AppendLine($"完成时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
-        builder.AppendLine("你可以返回应用查看最新预约状态。");
+        builder.AppendLine("你可以返回应用查看最新预约状态");
         return builder.ToString();
     }
 
@@ -603,7 +603,7 @@ public sealed class TaskEventAlertService(
             builder.AppendLine($"详细信息：{reason}");
         }
 
-        builder.AppendLine("请返回应用检查任务状态、授权信息与场馆配置。");
+        builder.AppendLine("请返回应用检查任务状态、授权信息与场馆配置");
         return builder.ToString();
     }
 

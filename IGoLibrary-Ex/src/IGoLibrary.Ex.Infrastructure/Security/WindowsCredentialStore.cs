@@ -40,7 +40,7 @@ public sealed class WindowsCredentialStore : ICredentialStore
         var bytes = System.Text.Encoding.Unicode.GetBytes(payload);
         if (bytes.Length > 5120)
         {
-            throw new InvalidOperationException("会话数据超出 Windows 凭据管理器限制。");
+            throw new InvalidOperationException("会话数据超出 Windows 凭据管理器限制");
         }
 
         var credential = new NativeCredential
@@ -60,7 +60,7 @@ public sealed class WindowsCredentialStore : ICredentialStore
         {
             if (!CredWrite(ref credential, 0))
             {
-                throw new InvalidOperationException("写入 Windows 凭据管理器失败。");
+                throw new InvalidOperationException("写入 Windows 凭据管理器失败");
             }
         }
         finally
@@ -114,7 +114,7 @@ public sealed class WindowsCredentialStore : ICredentialStore
         }
 
         throw new InvalidOperationException(
-            $"删除 Windows 安全凭据失败（Win32 错误 {errorCode}）。",
+            $"删除 Windows 安全凭据失败（Win32 错误 {errorCode}）",
             new Win32Exception(errorCode));
     }
 

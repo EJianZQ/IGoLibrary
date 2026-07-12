@@ -72,18 +72,18 @@ public sealed class SeatLabelService(
         ArgumentNullException.ThrowIfNull(text);
         if (text.Any(char.IsControl))
         {
-            throw new ArgumentException("标签不能包含换行或控制字符。", nameof(text));
+            throw new ArgumentException("标签不能包含换行或控制字符", nameof(text));
         }
 
         var normalized = text.Trim();
         if (normalized.Length == 0)
         {
-            throw new ArgumentException("标签不能为空或仅包含空白字符。", nameof(text));
+            throw new ArgumentException("标签不能为空或仅包含空白字符", nameof(text));
         }
 
         if (normalized.Length > MaxLabelLength)
         {
-            throw new ArgumentException($"标签不能超过 {MaxLabelLength} 个字符。", nameof(text));
+            throw new ArgumentException($"标签不能超过 {MaxLabelLength} 个字符", nameof(text));
         }
 
         return normalized;

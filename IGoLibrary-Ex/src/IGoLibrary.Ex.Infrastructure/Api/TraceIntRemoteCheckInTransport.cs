@@ -76,13 +76,13 @@ internal sealed class TraceIntRemoteCheckInTransport(
         catch (TimeoutException ex)
         {
             throw new RemoteCheckInOutcomeUnknownException(
-                "签到请求的结果未知，请先核对预约状态，不要立即重复提交。",
+                "签到请求的结果未知，请先核对预约状态，不要立即重复提交",
                 ex);
         }
         catch (HttpRequestException ex) when (ex.StatusCode is null)
         {
             throw new RemoteCheckInOutcomeUnknownException(
-                "签到请求的结果未知，请先核对预约状态，不要立即重复提交。",
+                "签到请求的结果未知，请先核对预约状态，不要立即重复提交",
                 ex);
         }
     }
@@ -102,7 +102,7 @@ internal sealed class TraceIntRemoteCheckInTransport(
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
             response.Dispose();
-            throw new RemoteCheckInApiException("签到授权已失效，请重新扫码授权。", isSessionInvalid: true);
+            throw new RemoteCheckInApiException("签到授权已失效，请重新扫码授权", isSessionInvalid: true);
         }
 
         try

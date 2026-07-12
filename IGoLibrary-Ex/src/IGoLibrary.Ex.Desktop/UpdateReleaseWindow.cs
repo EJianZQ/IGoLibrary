@@ -140,7 +140,7 @@ public sealed class UpdateReleaseWindow : Window
     internal static MarkdownScrollViewer CreateReleaseBodyViewer(string? body)
     {
         var releaseBody = string.IsNullOrWhiteSpace(body)
-            ? "此版本没有填写更新说明。"
+            ? "此版本没有填写更新说明"
             : body.Trim();
 
         var viewer = new MarkdownScrollViewer

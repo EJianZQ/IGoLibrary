@@ -28,7 +28,7 @@ internal sealed class TraceIntCookieTransport(
             }
             catch (Exception ex) when (ex is not OperationCanceledException and not HttpRequestException)
             {
-                throw new HttpRequestException("获取 Cookie 请求失败，请检查网络连接或授权链接是否可访问。", ex);
+                throw new HttpRequestException("获取 Cookie 请求失败，请检查网络连接或授权链接是否可访问", ex);
             }
 
             if (result.Cookies?.Count >= 2)

@@ -90,7 +90,7 @@ public sealed partial class HomeDashboardViewModel : ViewModelBase
     private string homeHeroStatusText = "等待授权";
 
     [ObservableProperty]
-    private string homeHeroStatusDetailText = "完成登录与场馆绑定后即可启用全部引擎。";
+    private string homeHeroStatusDetailText = "完成登录与场馆绑定后即可启用全部引擎";
 
     [ObservableProperty]
     private IBrush homeHeroStatusBrush;
@@ -362,7 +362,7 @@ public sealed partial class HomeDashboardViewModel : ViewModelBase
     {
         if (_isAuthorized?.Invoke() != true)
         {
-            return ("等待授权", "完成登录与场馆绑定后即可启用全部引擎。", _stateWarningBrush, _warningSoftBrush);
+            return ("等待授权", "完成登录与场馆绑定后即可启用全部引擎", _stateWarningBrush, _warningSoftBrush);
         }
 
         var activeTaskCount = new[]
@@ -374,17 +374,17 @@ public sealed partial class HomeDashboardViewModel : ViewModelBase
         }.Count(static active => active);
         if (activeTaskCount >= 2)
         {
-            return ("多任务协同中", "后台任务正在稳定运行，请保持程序常驻。", _stateRunningBrush, _runningSoftBrush);
+            return ("多任务协同中", "后台任务正在稳定运行，请保持程序常驻", _stateRunningBrush, _runningSoftBrush);
         }
 
         if (_isGrabTaskActive?.Invoke() == true)
         {
-            return ("抢座任务运行中", "已进入实时监控阶段，请保持程序常驻。", _stateRunningBrush, _runningSoftBrush);
+            return ("抢座任务运行中", "已进入实时监控阶段，请保持程序常驻", _stateRunningBrush, _runningSoftBrush);
         }
 
         if (_isGlobalLeakTaskActive?.Invoke() == true)
         {
-            return ("全域捡漏运行中", "正在按轮扫描多个场馆，请保持程序常驻。", _stateRunningBrush, _runningSoftBrush);
+            return ("全域捡漏运行中", "正在按轮扫描多个场馆，请保持程序常驻", _stateRunningBrush, _runningSoftBrush);
         }
 
         if (_isTomorrowTaskActive?.Invoke() == true)
@@ -394,15 +394,15 @@ public sealed partial class HomeDashboardViewModel : ViewModelBase
 
         if (_isOccupyRunning?.Invoke() == true)
         {
-            return ("占座守护运行中", "预约过期前会自动续占，请安心保持后台运行。", _stateSuccessBrush, _successSoftBrush);
+            return ("占座守护运行中", "预约过期前会自动续占，请安心保持后台运行", _stateSuccessBrush, _successSoftBrush);
         }
 
         if (_hasLockedVenue?.Invoke() == true)
         {
-            return ("核心引擎就绪", "授权、场馆与本地配置均已准备完成。", _stateSuccessBrush, _successSoftBrush);
+            return ("核心引擎就绪", "授权、场馆与本地配置均已准备完成", _stateSuccessBrush, _successSoftBrush);
         }
 
-        return ("等待绑定场馆", "当前已授权，下一步锁定一个常用场馆即可开始执行。", _stateWarningBrush, _warningSoftBrush);
+        return ("等待绑定场馆", "当前已授权，下一步锁定一个常用场馆即可开始执行", _stateWarningBrush, _warningSoftBrush);
     }
 
     private string BuildHomeEngineSummaryText()
@@ -557,12 +557,12 @@ public sealed partial class HomeDashboardViewModel : ViewModelBase
     {
         return hour switch
         {
-            < 5 => "也别忘了给自己留一点休息时间。",
+            < 5 => "也别忘了给自己留一点休息时间",
             < 11 => "准备好开始今天的学习了吗？",
-            < 14 => "给今天的计划加把劲吧。",
-            < 18 => "专注状态已经准备就绪。",
-            < 23 => "把今天最后一段时间好好度过吧。",
-            _ => "也别忘了给自己留一点休息时间。"
+            < 14 => "给今天的计划加把劲吧",
+            < 18 => "专注状态已经准备就绪",
+            < 23 => "把今天最后一段时间好好度过吧",
+            _ => "也别忘了给自己留一点休息时间"
         };
     }
 

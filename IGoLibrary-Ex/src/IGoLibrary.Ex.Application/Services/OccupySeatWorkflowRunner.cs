@@ -22,7 +22,7 @@ internal sealed class OccupySeatWorkflowRunner(
     {
         try
         {
-            context.SetRunning("占座任务已启动。");
+            context.SetRunning("占座任务已启动");
             activityLogService.Write(LogEntryKind.Success, "Occupy", "占座任务已启动。");
 
             while (!cancellationToken.IsCancellationRequested)
@@ -31,7 +31,7 @@ internal sealed class OccupySeatWorkflowRunner(
                 var info = await apiClient.GetReservationInfoAsync(cookie, cancellationToken);
                 if (info is null)
                 {
-                    throw new InvalidOperationException("当前没有可续占的预约。");
+                    throw new InvalidOperationException("当前没有可续占的预约");
                 }
 
                 reservationState.CurrentReservation = info;
@@ -56,17 +56,17 @@ internal sealed class OccupySeatWorkflowRunner(
                     cancellationToken);
                 if (!reservationResult.Succeeded)
                 {
-                    throw new InvalidOperationException("重新预约失败，已达到重试上限。");
+                    throw new InvalidOperationException("重新预约失败，已达到重试上限");
                 }
 
                 activityLogService.Write(LogEntryKind.Success, "Occupy", $"{info.SeatName} 已重新预约成功。");
-                context.SetRunning("占座任务已启动。", CoordinatorStatusReason.OccupyReReserveSucceeded);
+                context.SetRunning("占座任务已启动", CoordinatorStatusReason.OccupyReReserveSucceeded);
                 await PublishCoordinatorEventSafelyAsync(
                     new OccupyReReserveSucceededCoordinatorEvent(info.SeatName),
                     "发送占座成功提醒失败");
                 await runtime.DelayAsync(TimeSpan.FromSeconds(5), cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
-                context.SetRunning("占座任务已启动。");
+                context.SetRunning("占座任务已启动");
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -109,7 +109,7 @@ internal sealed class OccupySeatWorkflowRunner(
 
     private string GetCurrentCookieOrThrow()
     {
-        var cookie = sessionState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录。");
+        var cookie = sessionState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录");
         if (SessionAuthFailureDetector.TryGetCookieExpirationTime(cookie, out var expirationTime) &&
             expirationTime <= runtime.Now)
         {

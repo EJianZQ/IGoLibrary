@@ -55,7 +55,7 @@ public sealed class VenueWorkflowService(
         LibrarySummary library,
         CancellationToken cancellationToken = default)
     {
-        var session = sessionService.CurrentSession ?? throw new InvalidOperationException("当前未登录。");
+        var session = sessionService.CurrentSession ?? throw new InvalidOperationException("当前未登录");
         var layout = await apiClient.GetLibraryLayoutAsync(session.Cookie, library.LibraryId, cancellationToken);
         var ruleResult = await TryLoadLibraryRuleAsync(library.LibraryId, cancellationToken);
         return new VenuePreviewResult(layout, ruleResult.Rule, ruleResult.FailureMessage);

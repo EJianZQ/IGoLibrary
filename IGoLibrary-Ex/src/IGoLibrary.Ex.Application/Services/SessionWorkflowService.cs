@@ -51,7 +51,7 @@ public sealed class SessionWorkflowService(
                 Cookie: null,
                 CookieExpirationTime: null,
                 ShouldLoadLibraries: false,
-                StatusMessage: "本地没有可恢复的会话。");
+                StatusMessage: "本地没有可恢复的会话");
         }
 
         return new SessionWorkflowResult(

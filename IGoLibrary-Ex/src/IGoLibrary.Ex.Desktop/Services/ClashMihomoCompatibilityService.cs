@@ -36,7 +36,7 @@ internal sealed partial class ClashMihomoCompatibilityService(
         if (!MobileControlSettings.TryNormalizeClashMihomoConfigPath(options.ConfigPath, out var configPath) ||
             !MobileControlSettings.TryNormalizeClashMihomoRoutePolicy(options.RoutePolicy, out var routePolicy))
         {
-            throw new InvalidOperationException("Clash/Mihomo 兼容设置无效。");
+            throw new InvalidOperationException("Clash/Mihomo 兼容设置无效");
         }
         var normalizedOptions = new ClashMihomoCompatibilityOptions(true, configPath, routePolicy);
 
@@ -60,7 +60,7 @@ internal sealed partial class ClashMihomoCompatibilityService(
                 {
                     LogRestoreFailure(pendingRestore, ex);
                     throw new InvalidOperationException(
-                        "上一次 Clash/Mihomo 临时兼容规则尚未恢复，无法应用新的兼容设置。请确认 Mihomo 正在运行后重试。",
+                        "上一次 Clash/Mihomo 临时兼容规则尚未恢复，无法应用新的兼容设置。请确认 Mihomo 正在运行后重试",
                         ex);
                 }
             }
@@ -70,7 +70,7 @@ internal sealed partial class ClashMihomoCompatibilityService(
                 if (_active.Options != normalizedOptions)
                 {
                     throw new InvalidOperationException(
-                        "已有 Tunnel 正在使用另一组 Clash/Mihomo 兼容规则；请先切换到本机局域网，再应用兼容设置。");
+                        "已有 Tunnel 正在使用另一组 Clash/Mihomo 兼容规则；请先切换到本机局域网，再应用兼容设置");
                 }
 
                 _referenceCount++;
@@ -81,7 +81,7 @@ internal sealed partial class ClashMihomoCompatibilityService(
             if (configurations.Count == 0)
             {
                 throw new InvalidOperationException(
-                    "未检测到已启用本机控制接口的 Clash/Mihomo。可在设置中手动指定包含 rules、external-controller 或 external-controller-pipe 的活动配置文件。");
+                    "未检测到已启用本机控制接口的 Clash/Mihomo。可在设置中手动指定包含 rules、external-controller 或 external-controller-pipe 的活动配置文件");
             }
 
             var failures = new List<string>();
@@ -136,13 +136,13 @@ internal sealed partial class ClashMihomoCompatibilityService(
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
         if (!MobileControlSettings.TryNormalizeClashMihomoRoutePolicy(routePolicy, out var normalizedPolicy))
         {
-            throw new ArgumentException("Mihomo 路由策略无效。", nameof(routePolicy));
+            throw new ArgumentException("Mihomo 路由策略无效", nameof(routePolicy));
         }
 
         var match = RulesHeaderRegex().Match(source);
         if (!match.Success)
         {
-            throw new InvalidOperationException("活动 Mihomo 配置中没有可注入的 rules 列表。");
+            throw new InvalidOperationException("活动 Mihomo 配置中没有可注入的 rules 列表");
         }
 
         var newline = source.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";

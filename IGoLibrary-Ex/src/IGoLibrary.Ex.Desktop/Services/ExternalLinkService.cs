@@ -14,7 +14,7 @@ public sealed class ExternalLinkService : IExternalLinkService
         });
         if (process is null)
         {
-            throw new InvalidOperationException("无法启动默认浏览器。");
+            throw new InvalidOperationException("无法启动默认浏览器");
         }
 
         return Task.CompletedTask;

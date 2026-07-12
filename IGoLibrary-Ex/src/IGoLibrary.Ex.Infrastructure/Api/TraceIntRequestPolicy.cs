@@ -21,7 +21,7 @@ internal sealed class TraceIntRequestPolicy(ISettingsService settingsService)
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
         {
             throw new TimeoutException(
-                $"{timeoutMessagePrefix}超时（>{settings.Timeout.TotalSeconds:0} 秒）。",
+                $"{timeoutMessagePrefix}超时（>{settings.Timeout.TotalSeconds:0} 秒）",
                 ex);
         }
     }
@@ -46,7 +46,7 @@ internal sealed class TraceIntRequestPolicy(ISettingsService settingsService)
             catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
             {
                 lastException = new TimeoutException(
-                    $"{timeoutMessagePrefix}超时（>{settings.Timeout.TotalSeconds:0} 秒）。",
+                    $"{timeoutMessagePrefix}超时（>{settings.Timeout.TotalSeconds:0} 秒）",
                     ex);
             }
             catch (HttpRequestException ex) when (IsTransient(ex.StatusCode))
@@ -62,7 +62,7 @@ internal sealed class TraceIntRequestPolicy(ISettingsService settingsService)
             await Task.Delay(TimeSpan.FromMilliseconds(250 * (attempt + 1)), cancellationToken);
         }
 
-        throw lastException ?? new InvalidOperationException($"{timeoutMessagePrefix}失败。");
+        throw lastException ?? new InvalidOperationException($"{timeoutMessagePrefix}失败");
     }
 
     private async Task<(TimeSpan Timeout, int MaxRetries)> LoadNetworkSettingsAsync(CancellationToken cancellationToken)

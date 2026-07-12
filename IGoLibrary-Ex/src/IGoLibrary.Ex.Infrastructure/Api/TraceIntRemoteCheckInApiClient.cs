@@ -45,7 +45,7 @@ internal sealed class TraceIntRemoteCheckInApiClient(
         if ((int)response.StatusCode >= 400)
         {
             throw new HttpRequestException(
-                $"获取签到授权失败，HTTP {(int)response.StatusCode} {response.StatusCode}。",
+                $"获取签到授权失败，HTTP {(int)response.StatusCode} {response.StatusCode}",
                 null,
                 response.StatusCode);
         }
