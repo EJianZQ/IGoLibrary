@@ -1,4 +1,4 @@
-namespace IGoLibrary.Ex.Desktop.ViewModels;
+namespace IGoLibrary.Ex.Desktop.Services;
 
 internal sealed class DeferredAutoSaveController(TimeSpan delay, Func<CancellationToken, Task> saveAsync)
 {

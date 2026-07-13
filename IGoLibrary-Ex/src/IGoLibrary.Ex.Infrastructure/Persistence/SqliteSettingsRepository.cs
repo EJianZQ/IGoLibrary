@@ -75,6 +75,7 @@ public sealed class SqliteSettingsRepository(
         var notifications = ReadObject(root, "notifications");
         var ui = ReadObject(root, "ui");
         var theme = ReadObject(ui, "theme");
+        var windowSize = ReadObject(ui, "windowSize");
         var homeReservationProgress = ReadObject(ui, "homeReservationProgress");
         var homeCookieProgress = ReadObject(ui, "homeCookieProgress");
         var legacyProtocol = ReadObject(root, "protocol");
@@ -114,6 +115,36 @@ public sealed class SqliteSettingsRepository(
             "launchOnStartup",
             ReadBool(ui, "launchOnStartup")
             ?? defaults.Ui.LaunchOnStartup);
+        var normalizedWindowSize = MainViewSizePreferences.Normalize(new MainViewSizePreferences(
+            ReadBool(windowSize, "rememberSize")
+            ?? defaults.Ui.MainViewSize?.RememberSize
+            ?? MainViewSizePreferences.Default.RememberSize,
+            ReadDouble(windowSize, "clientWidth")
+            ?? defaults.Ui.MainViewSize?.ClientWidth,
+            ReadDouble(windowSize, "clientHeight")
+            ?? defaults.Ui.MainViewSize?.ClientHeight));
+        writer.WritePropertyName("windowSize");
+        writer.WriteStartObject();
+        writer.WriteBoolean("rememberSize", normalizedWindowSize.RememberSize);
+        if (normalizedWindowSize.ClientWidth is { } clientWidth)
+        {
+            writer.WriteNumber("clientWidth", clientWidth);
+        }
+        else
+        {
+            writer.WriteNull("clientWidth");
+        }
+
+        if (normalizedWindowSize.ClientHeight is { } clientHeight)
+        {
+            writer.WriteNumber("clientHeight", clientHeight);
+        }
+        else
+        {
+            writer.WriteNull("clientHeight");
+        }
+
+        writer.WriteEndObject();
         writer.WritePropertyName("theme");
         writer.WriteStartObject();
         writer.WriteNumber(
@@ -373,6 +404,7 @@ public sealed class SqliteSettingsRepository(
     {
         var notifications = settings.Notifications ?? NotificationSettings.Default;
         var ui = settings.Ui ?? UiPreferences.Default;
+        var windowSize = MainViewSizePreferences.Normalize(ui.MainViewSize);
         var alertSettings = notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
         var tasks = settings.Tasks ?? TaskExecutionSettings.Default;
         var grab = tasks.Grab ?? GrabTaskSettings.Default;
@@ -413,6 +445,7 @@ public sealed class SqliteSettingsRepository(
             },
             Ui = ui with
             {
+                MainViewSize = windowSize,
                 Theme = ui.Theme ?? ThemePreferences.Default,
                 HomeReservationProgress = HomeReservationProgressSettings.Normalize(ui.HomeReservationProgress),
                 HomeCookieProgress = HomeCookieProgressSettings.Normalize(ui.HomeCookieProgress)
@@ -475,8 +508,13 @@ public sealed class SqliteSettingsRepository(
 
     private static bool IsCanonicalShape(JsonElement root)
     {
+        var ui = ReadObject(root, "ui");
+        var windowSize = ReadObject(ui, "windowSize");
         var logging = ReadObject(root, "logging");
-        return root.TryGetProperty("traceIntProtocol", out _) &&
+        return windowSize.ValueKind == JsonValueKind.Object &&
+               ReadBool(windowSize, "rememberSize").HasValue &&
+               HasCanonicalWindowSizeDimensions(windowSize) &&
+               root.TryGetProperty("traceIntProtocol", out _) &&
                root.TryGetProperty("network", out _) &&
                root.TryGetProperty("tasks", out var tasks) &&
                tasks.ValueKind == JsonValueKind.Object &&
@@ -491,6 +529,24 @@ public sealed class SqliteSettingsRepository(
                logging.ValueKind == JsonValueKind.Object &&
                ReadBool(logging, "enabled").HasValue &&
                ReadInt(logging, "retainedFileCount").HasValue;
+    }
+
+    private static bool HasCanonicalWindowSizeDimensions(JsonElement windowSize)
+    {
+        var hasWidth = windowSize.TryGetProperty("clientWidth", out var clientWidth);
+        var hasHeight = windowSize.TryGetProperty("clientHeight", out var clientHeight);
+        if (!hasWidth || !hasHeight)
+        {
+            return !hasWidth && !hasHeight;
+        }
+
+        return IsNullOrDouble(clientWidth) && IsNullOrDouble(clientHeight);
+    }
+
+    private static bool IsNullOrDouble(JsonElement value)
+    {
+        return value.ValueKind == JsonValueKind.Null ||
+               value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out _);
     }
 
     private static IReadOnlyList<RemoteCheckInVenueProfileSettings> NormalizeRemoteCheckInVenueProfiles(
@@ -733,6 +789,30 @@ public sealed class SqliteSettingsRepository(
 
         return property.ValueKind == JsonValueKind.String && int.TryParse(property.GetString(), out intValue)
             ? intValue
+            : null;
+    }
+
+    private static double? ReadDouble(JsonElement parent, string propertyName)
+    {
+        if (parent.ValueKind != JsonValueKind.Object ||
+            !parent.TryGetProperty(propertyName, out var property) ||
+            property.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetDouble(out var doubleValue))
+        {
+            return doubleValue;
+        }
+
+        return property.ValueKind == JsonValueKind.String &&
+               double.TryParse(
+                   property.GetString(),
+                   System.Globalization.NumberStyles.Float,
+                   System.Globalization.CultureInfo.InvariantCulture,
+                   out doubleValue)
+            ? doubleValue
             : null;
     }
 

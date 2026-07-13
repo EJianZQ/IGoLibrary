@@ -312,6 +312,8 @@ public sealed class SettingsSerializationTests
 
         Assert.Contains("\"notifications\":", json);
         Assert.Contains("\"ui\":", json);
+        Assert.Contains("\"windowSize\":", json);
+        Assert.Contains("\"rememberSize\": false", json);
         Assert.Contains("\"homeReservationProgress\":", json);
         Assert.Contains("\"fixedDurationMinutes\": 30", json);
         Assert.Contains("\"homeCookieProgress\":", json);
@@ -352,6 +354,122 @@ public sealed class SettingsSerializationTests
         Assert.DoesNotContain("appBannerNotificationsEnabled", json);
         Assert.Contains("\"graphQlOverridesEnabled\": true", json);
         Assert.Contains("\"autoStart\": false", json);
+    }
+
+    [Fact]
+    public void WindowSizePreferences_DefaultToDisabledWithoutStoredDimensions()
+    {
+        var windowSize = Assert.IsType<MainViewSizePreferences>(AppSettings.Default.Ui.MainViewSize);
+
+        Assert.False(windowSize.RememberSize);
+        Assert.Null(windowSize.ClientWidth);
+        Assert.Null(windowSize.ClientHeight);
+    }
+
+    [Fact]
+    public void SerializedDefaultSettings_AreAlreadyCanonical()
+    {
+        var json = JsonSerializer.Serialize(AppSettings.Default, AppJson.Default);
+
+        var migratedJson = MigrateLegacyAppSettingsJson(json);
+
+        Assert.Equal(json, migratedJson);
+    }
+
+    [Fact]
+    public void AppSettingsSerialization_PreservesExplicitWindowSizePreferences()
+    {
+        var json = JsonSerializer.Serialize(AppSettings.Default with
+        {
+            Ui = AppSettings.Default.Ui with
+            {
+                MainViewSize = new MainViewSizePreferences(true, 1280.25, 760.5)
+            }
+        }, AppJson.Default);
+
+        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
+        var windowSize = Assert.IsType<MainViewSizePreferences>(settings.Ui.MainViewSize);
+
+        Assert.True(windowSize.RememberSize);
+        Assert.Equal(1280.25, windowSize.ClientWidth);
+        Assert.Equal(760.5, windowSize.ClientHeight);
+    }
+
+    [Fact]
+    public void CanonicalJsonWithoutWindowSize_RewritesWithDisabledDefaults()
+    {
+        var root = Assert.IsType<JsonObject>(JsonNode.Parse(
+            JsonSerializer.Serialize(AppSettings.Default, AppJson.Default)));
+        Assert.True(Assert.IsType<JsonObject>(root["ui"]).Remove("windowSize"));
+
+        var migratedJson = MigrateLegacyAppSettingsJson(root.ToJsonString(AppJson.Default));
+        var settings = Assert.IsType<AppSettings>(
+            JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default));
+        var windowSize = Assert.IsType<MainViewSizePreferences>(settings.Ui.MainViewSize);
+
+        Assert.False(windowSize.RememberSize);
+        Assert.Null(windowSize.ClientWidth);
+        Assert.Null(windowSize.ClientHeight);
+        Assert.Contains("\"windowSize\":", migratedJson);
+    }
+
+    [Fact]
+    public void AppSettingsMigration_DropsPartiallyStoredWindowSizePair()
+    {
+        var root = Assert.IsType<JsonObject>(JsonNode.Parse(
+            JsonSerializer.Serialize(AppSettings.Default, AppJson.Default)));
+        var windowSize = Assert.IsType<JsonObject>(root["ui"]?["windowSize"]);
+        windowSize["rememberSize"] = true;
+        windowSize["clientWidth"] = 1200d;
+
+        var migratedJson = MigrateLegacyAppSettingsJson(root.ToJsonString(AppJson.Default));
+        var settings = Assert.IsType<AppSettings>(
+            JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default));
+        var migratedWindowSize = Assert.IsType<MainViewSizePreferences>(settings.Ui.MainViewSize);
+
+        Assert.True(migratedWindowSize.RememberSize);
+        Assert.Null(migratedWindowSize.ClientWidth);
+        Assert.Null(migratedWindowSize.ClientHeight);
+        Assert.Contains("\"clientWidth\": null", migratedJson);
+        Assert.Contains("\"clientHeight\": null", migratedJson);
+    }
+
+    [Theory]
+    [InlineData(-1d, 800d)]
+    [InlineData(0d, 800d)]
+    [InlineData(1200d, 0d)]
+    [InlineData(double.NaN, 800d)]
+    [InlineData(1200d, double.PositiveInfinity)]
+    public void AppSettingsNormalization_DropsInvalidWindowSizePairs(double width, double height)
+    {
+        var settings = Normalize(AppSettings.Default with
+        {
+            Ui = AppSettings.Default.Ui with
+            {
+                MainViewSize = new MainViewSizePreferences(true, width, height)
+            }
+        });
+        var windowSize = Assert.IsType<MainViewSizePreferences>(settings.Ui.MainViewSize);
+
+        Assert.True(windowSize.RememberSize);
+        Assert.Null(windowSize.ClientWidth);
+        Assert.Null(windowSize.ClientHeight);
+    }
+
+    [Fact]
+    public void AppSettingsNormalization_RoundsValidWindowSizeToTwoDecimals()
+    {
+        var settings = Normalize(AppSettings.Default with
+        {
+            Ui = AppSettings.Default.Ui with
+            {
+                MainViewSize = new MainViewSizePreferences(true, 1200.126, 800.125)
+            }
+        });
+        var windowSize = Assert.IsType<MainViewSizePreferences>(settings.Ui.MainViewSize);
+
+        Assert.Equal(1200.13, windowSize.ClientWidth);
+        Assert.Equal(800.13, windowSize.ClientHeight);
     }
 
     [Fact]

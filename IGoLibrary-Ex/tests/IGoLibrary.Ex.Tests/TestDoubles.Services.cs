@@ -646,6 +646,26 @@ internal sealed class FakeSettingsService : ISettingsService
     }
 }
 
+internal sealed class RecordingMainWindowSizePersistenceService : IMainWindowSizePersistenceService
+{
+    public List<(bool Enabled, bool CaptureCurrentSize)> Changes { get; } = [];
+
+    public Task InitializeAsync(Window window, CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    public void SetRememberSizeEnabled(bool enabled, bool captureCurrentSize)
+    {
+        Changes.Add((enabled, captureCurrentSize));
+    }
+
+    public Task FlushAsync(CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
+}
+
 internal sealed class FakeCoordinatorRuntime : ICoordinatorRuntime
 {
     private readonly Queue<TimeSpan> _randomDelays = [];

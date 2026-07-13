@@ -11,6 +11,11 @@ public interface ISettingsWorkflowService
         SystemSettingsSnapshot snapshot,
         CancellationToken cancellationToken = default);
 
+    Task SaveMainViewSizeAsync(
+        double clientWidth,
+        double clientHeight,
+        CancellationToken cancellationToken = default);
+
     Task SaveNotificationSettingsAsync(
         TaskEventAlertSettings alerts,
         CancellationToken cancellationToken = default);

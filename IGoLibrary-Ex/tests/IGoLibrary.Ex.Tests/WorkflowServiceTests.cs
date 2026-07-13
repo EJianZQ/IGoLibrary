@@ -187,6 +187,10 @@ public sealed class WorkflowServiceTests
     {
         var initial = AppSettings.Default with
         {
+            Ui = AppSettings.Default.Ui with
+            {
+                MainViewSize = new MainViewSizePreferences(true, 1260, 780)
+            },
             Venue = new VenueSelectionSettings(3, "三楼"),
             Dashboard = new DashboardMetrics(8, 900)
         };
@@ -196,6 +200,7 @@ public sealed class WorkflowServiceTests
         await service.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
             MinimizeToTray: false,
             LaunchOnStartup: false,
+            RememberMainViewSize: false,
             TraceIntGraphQlOverridesEnabled: true,
             CheckUpdatesOnStartup: false,
             RequestTimeoutSeconds: 1,
@@ -230,6 +235,67 @@ public sealed class WorkflowServiceTests
         Assert.False(settingsService.CurrentSettings.Tasks.Grab.OptimalStrategyReminderEnabled);
         Assert.True(settingsService.CurrentSettings.Tasks.AutoRelease.Enabled);
         Assert.Equal(90, settingsService.CurrentSettings.Tasks.AutoRelease.LeadSeconds);
+        var windowSize = Assert.IsType<MainViewSizePreferences>(settingsService.CurrentSettings.Ui.MainViewSize);
+        Assert.False(windowSize.RememberSize);
+        Assert.Equal(1260, windowSize.ClientWidth);
+        Assert.Equal(780, windowSize.ClientHeight);
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_SaveWindowSizeAsync_OnlyChangesRoundedDimensions()
+    {
+        var initial = AppSettings.Default with
+        {
+            Ui = AppSettings.Default.Ui with
+            {
+                MainViewSize = new MainViewSizePreferences(false, 1188, 840)
+            },
+            Venue = new VenueSelectionSettings(3, "三楼"),
+            Dashboard = new DashboardMetrics(8, 900)
+        };
+        var settingsService = new FakeSettingsService(initial);
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveMainViewSizeAsync(1300.126, 760.124);
+
+        var windowSize = Assert.IsType<MainViewSizePreferences>(settingsService.CurrentSettings.Ui.MainViewSize);
+        Assert.False(windowSize.RememberSize);
+        Assert.Equal(1300.13, windowSize.ClientWidth);
+        Assert.Equal(760.12, windowSize.ClientHeight);
+        Assert.Equal(initial.Venue, settingsService.CurrentSettings.Venue);
+        Assert.Equal(initial.Dashboard, settingsService.CurrentSettings.Dashboard);
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_ConcurrentToggleAndSizeUpdates_PreserveBothChanges()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var service = new SettingsWorkflowService(settingsService);
+        var snapshot = new SystemSettingsSnapshot(
+            MinimizeToTray: true,
+            LaunchOnStartup: false,
+            RememberMainViewSize: true,
+            TraceIntGraphQlOverridesEnabled: false,
+            CheckUpdatesOnStartup: true,
+            RequestTimeoutSeconds: 5,
+            NetworkMaxRetries: 3,
+            Theme: ThemePreferences.Default,
+            HomeReservationProgress: HomeReservationProgressSettings.Default,
+            HomeCookieProgress: HomeCookieProgressSettings.Default,
+            GrabReservationStrategy: GrabReservationStrategy.QueryThenReserve,
+            OptimalGrabStrategyReminderEnabled: true,
+            AutoReleaseEnabled: false,
+            AutoReleaseLeadSeconds: 60,
+            TaskEventAlerts: TaskEventAlertSettings.Default);
+
+        await Task.WhenAll(
+            service.SaveSystemSettingsAsync(snapshot),
+            service.SaveMainViewSizeAsync(1366, 768));
+
+        var windowSize = Assert.IsType<MainViewSizePreferences>(settingsService.CurrentSettings.Ui.MainViewSize);
+        Assert.True(windowSize.RememberSize);
+        Assert.Equal(1366, windowSize.ClientWidth);
+        Assert.Equal(768, windowSize.ClientHeight);
     }
 
     [Theory]
@@ -245,6 +311,7 @@ public sealed class WorkflowServiceTests
         await service.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
             MinimizeToTray: true,
             LaunchOnStartup: false,
+            RememberMainViewSize: false,
             TraceIntGraphQlOverridesEnabled: false,
             CheckUpdatesOnStartup: true,
             RequestTimeoutSeconds: 5,

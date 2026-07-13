@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace IGoLibrary.Ex.Application.Configuration;
 
 public sealed record UiPreferences
@@ -5,6 +7,9 @@ public sealed record UiPreferences
     public bool MinimizeToTray { get; init; } = true;
 
     public bool LaunchOnStartup { get; init; }
+
+    [JsonPropertyName("windowSize")]
+    public MainViewSizePreferences? MainViewSize { get; init; } = MainViewSizePreferences.Default;
 
     public ThemePreferences? Theme { get; init; } = ThemePreferences.Default;
 
@@ -22,6 +27,7 @@ public sealed record UiPreferences
     {
         MinimizeToTray = minimizeToTray;
         LaunchOnStartup = launchOnStartup;
+        MainViewSize = MainViewSizePreferences.Default;
         Theme = theme;
         HomeReservationProgress = HomeReservationProgressSettings.Default;
         HomeCookieProgress = HomeCookieProgressSettings.Default;

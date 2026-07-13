@@ -2305,6 +2305,40 @@ public sealed class MainWindowViewModelTests
         Assert.False(themeService.LastAppliedTheme?.UseSystemAccent);
     }
 
+    [AvaloniaFact]
+    public async Task RememberWindowSizeSetting_LoadsBindsAndAutoSavesWithCaptureSemantics()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            Ui = AppSettings.Default.Ui with
+            {
+                MainViewSize = new MainViewSizePreferences(true, 1260, 780)
+            }
+        });
+        var sizePersistence = new RecordingMainWindowSizePersistenceService();
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            windowSizePersistenceService: sizePersistence);
+
+        await viewModel.InitializeAsync();
+        var saveCallsAfterLoad = settingsService.SaveCalls;
+        var window = new MainWindow { DataContext = viewModel };
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(viewModel.SystemSettings.RememberWindowSizeEnabled);
+        Assert.True(window.FindControl<ToggleSwitch>("RememberWindowSizeToggle")?.IsChecked);
+        Assert.Contains((Enabled: true, CaptureCurrentSize: false), sizePersistence.Changes);
+        Assert.Equal(saveCallsAfterLoad, settingsService.SaveCalls);
+
+        viewModel.SystemSettings.RememberWindowSizeEnabled = false;
+        await WaitForAsync(() => settingsService.CurrentSettings.Ui.MainViewSize?.RememberSize == false);
+        Assert.Equal((Enabled: false, CaptureCurrentSize: false), sizePersistence.Changes[^1]);
+
+        viewModel.SystemSettings.RememberWindowSizeEnabled = true;
+        await WaitForAsync(() => settingsService.CurrentSettings.Ui.MainViewSize?.RememberSize == true);
+        Assert.Equal((Enabled: true, CaptureCurrentSize: true), sizePersistence.Changes[^1]);
+    }
+
     [Fact]
     public async Task HomeReservationProgressSettings_AutoSavePreferences()
     {
@@ -3793,7 +3827,8 @@ public sealed class MainWindowViewModelTests
         FakeQrCodeImageFactory? qrCodeImageFactory = null,
         FakeMobileControlService? mobileControlService = null,
         FakeTimeProvider? timeProvider = null,
-        FakeNetworkExposureManager? networkExposureManager = null)
+        FakeNetworkExposureManager? networkExposureManager = null,
+        IMainWindowSizePersistenceService? windowSizePersistenceService = null)
     {
         sessionService ??= new FakeSessionService();
         libraryService ??= new FakeLibraryService();
@@ -3831,7 +3866,8 @@ public sealed class MainWindowViewModelTests
             lanCookieRelayService ?? new FakeLanCookieRelayService(),
             qrCodeImageFactory ?? new FakeQrCodeImageFactory(),
             mobileControlService,
-            networkExposureManager: networkExposureManager);
+            networkExposureManager: networkExposureManager,
+            windowSizePersistenceService: windowSizePersistenceService);
     }
 
     private static ReleaseUpdateInfo CreateReleaseUpdateInfo(string tagName)

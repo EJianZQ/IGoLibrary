@@ -5,6 +5,7 @@ namespace IGoLibrary.Ex.Application.Abstractions;
 public sealed record SystemSettingsSnapshot(
     bool MinimizeToTray,
     bool LaunchOnStartup,
+    bool RememberMainViewSize,
     bool TraceIntGraphQlOverridesEnabled,
     bool CheckUpdatesOnStartup,
     int RequestTimeoutSeconds,

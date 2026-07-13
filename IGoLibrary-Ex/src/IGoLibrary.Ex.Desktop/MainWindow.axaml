@@ -3356,6 +3356,25 @@
                   </Border>
 
                   <Border Classes="card">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="20">
+                      <StackPanel Spacing="6">
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Text="记忆窗口大小" />
+                        <TextBlock Classes="helper-text"
+                                   Text="启用后会记录手动调整后的窗口大小，并在下次启动时恢复" />
+                      </StackPanel>
+                      <ToggleSwitch x:Name="RememberWindowSizeToggle"
+                                    Grid.Column="1"
+                                    IsChecked="{Binding SystemSettings.RememberWindowSizeEnabled}"
+                                    OnContent="开"
+                                    OffContent="关"
+                                    VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+
+                  <Border Classes="card">
                     <Grid RowDefinitions="Auto,Auto"
                           RowSpacing="14">
                       <Grid ColumnDefinitions="*,260"

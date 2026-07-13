@@ -26,6 +26,10 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
             {
                 MinimizeToTray = snapshot.MinimizeToTray,
                 LaunchOnStartup = snapshot.LaunchOnStartup,
+                MainViewSize = MainViewSizePreferences.Normalize(current.Ui.MainViewSize) with
+                {
+                    RememberSize = snapshot.RememberMainViewSize
+                },
                 Theme = snapshot.Theme,
                 HomeReservationProgress = HomeReservationProgressSettings.Normalize(snapshot.HomeReservationProgress),
                 HomeCookieProgress = HomeCookieProgressSettings.Normalize(snapshot.HomeCookieProgress)
@@ -54,6 +58,44 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
                     LeadSeconds = AutoReleaseTaskSettings.NormalizeLeadSeconds(snapshot.AutoReleaseLeadSeconds)
                 }
             }
+        }, cancellationToken);
+    }
+
+    public async Task SaveMainViewSizeAsync(
+        double clientWidth,
+        double clientHeight,
+        CancellationToken cancellationToken = default)
+    {
+        if (!MainViewSizePreferences.TryNormalizeSize(
+                clientWidth,
+                clientHeight,
+                out var normalizedWidth,
+                out var normalizedHeight))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(clientWidth),
+                "窗口宽高必须是大于零的有限数值");
+        }
+
+        await settingsService.UpdateAsync(current =>
+        {
+            var mainViewSize = MainViewSizePreferences.Normalize(current.Ui.MainViewSize) with
+            {
+                ClientWidth = normalizedWidth,
+                ClientHeight = normalizedHeight
+            };
+            if (mainViewSize == current.Ui.MainViewSize)
+            {
+                return current;
+            }
+
+            return current with
+            {
+                Ui = current.Ui with
+                {
+                    MainViewSize = mainViewSize
+                }
+            };
         }, cancellationToken);
     }
 

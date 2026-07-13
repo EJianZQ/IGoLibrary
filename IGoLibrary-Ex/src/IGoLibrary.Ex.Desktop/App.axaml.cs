@@ -26,6 +26,10 @@ public partial class App : Avalonia.Application
 
             var mainWindow = services.GetRequiredService<MainWindow>();
             var viewModel = services.GetRequiredService<MainWindowViewModel>();
+            services.GetRequiredService<IMainWindowSizePersistenceService>()
+                .InitializeAsync(mainWindow)
+                .GetAwaiter()
+                .GetResult();
 
             DataContext = viewModel;
             mainWindow.DataContext = viewModel;

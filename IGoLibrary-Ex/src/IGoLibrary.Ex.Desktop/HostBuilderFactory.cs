@@ -56,6 +56,7 @@ internal static class HostBuilderFactory
                 services.AddInfrastructure();
                 services.AddSingleton<IAppThemeService, AppThemeService>();
                 services.AddSingleton<AppWindowService>();
+                services.AddSingleton<IMainWindowSizePersistenceService, MainWindowSizePersistenceService>();
                 services.AddSingleton<IErrorDialogService, ErrorDialogService>();
                 services.AddSingleton<IUpdateDialogService, UpdateDialogService>();
                 services.AddSingleton<IExternalLinkService, ExternalLinkService>();

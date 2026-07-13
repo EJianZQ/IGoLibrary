@@ -17,6 +17,18 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class MainWindowLayoutTests
 {
     [AvaloniaFact]
+    public void MainWindow_PreservesDefaultSizeAndExposesRememberSizeToggle()
+    {
+        var window = new MainWindow();
+
+        Assert.Equal(1188, window.Width);
+        Assert.Equal(840, window.Height);
+        Assert.Equal(1000, window.MinWidth);
+        Assert.Equal(680, window.MinHeight);
+        Assert.NotNull(window.FindControl<ToggleSwitch>("RememberWindowSizeToggle"));
+    }
+
+    [AvaloniaFact]
     public void GrabPage_ProvidesOuterVerticalScrollingForExpandedSeatSelection()
     {
         var window = new MainWindow();

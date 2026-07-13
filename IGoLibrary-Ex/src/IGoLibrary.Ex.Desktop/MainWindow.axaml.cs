@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     private readonly AppWindowService _appWindowService;
     private readonly INotificationService _notificationService;
     private readonly IAlertSoundService _alertSoundService;
+    private readonly IMainWindowSizePersistenceService _windowSizePersistenceService;
     private readonly DispatcherTimer _globalLeakPriorityAutoScrollTimer;
     private readonly DispatcherTimer _modalAttentionAnimationTimer;
     private MainWindowViewModel? _observedViewModel;
@@ -56,12 +57,20 @@ public partial class MainWindow : Window
     private long _lastModalAttentionSoundTimestamp;
 
     public MainWindow()
-        : this(new AppWindowService(), new NoOpNotificationService(), new AlertSoundService())
+        : this(
+            new AppWindowService(),
+            new NoOpNotificationService(),
+            new AlertSoundService(),
+            NoOpMainWindowSizePersistenceService.Instance)
     {
     }
 
     public MainWindow(AppWindowService appWindowService, INotificationService notificationService)
-        : this(appWindowService, notificationService, new AlertSoundService())
+        : this(
+            appWindowService,
+            notificationService,
+            new AlertSoundService(),
+            NoOpMainWindowSizePersistenceService.Instance)
     {
     }
 
@@ -69,10 +78,24 @@ public partial class MainWindow : Window
         AppWindowService appWindowService,
         INotificationService notificationService,
         IAlertSoundService alertSoundService)
+        : this(
+            appWindowService,
+            notificationService,
+            alertSoundService,
+            NoOpMainWindowSizePersistenceService.Instance)
+    {
+    }
+
+    public MainWindow(
+        AppWindowService appWindowService,
+        INotificationService notificationService,
+        IAlertSoundService alertSoundService,
+        IMainWindowSizePersistenceService windowSizePersistenceService)
     {
         _appWindowService = appWindowService;
         _notificationService = notificationService;
         _alertSoundService = alertSoundService;
+        _windowSizePersistenceService = windowSizePersistenceService;
         _globalLeakPriorityAutoScrollTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(40)
@@ -136,9 +159,16 @@ public partial class MainWindow : Window
         }
         finally
         {
-            _isClosingAfterFlush = true;
-            _isFlushingBeforeClose = false;
-            Close();
+            try
+            {
+                await _windowSizePersistenceService.FlushAsync();
+            }
+            finally
+            {
+                _isClosingAfterFlush = true;
+                _isFlushingBeforeClose = false;
+                Close();
+            }
         }
     }
 
