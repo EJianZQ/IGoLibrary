@@ -163,6 +163,7 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
         CancellationToken cancellationToken = default)
     {
         var selectedLibraries = libraries
+            .DistinctBy(static library => library.LibraryId)
             .Select(static library => new GlobalLeakLibrarySelectionSettings(
                 library.LibraryId,
                 library.LibraryName,

@@ -1,10 +1,15 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Threading;
 using IGoLibrary.Ex.Desktop;
+using IGoLibrary.Ex.Desktop.Controls;
 
 namespace IGoLibrary.Ex.Tests;
 
@@ -29,6 +34,202 @@ public sealed class MainWindowLayoutTests
 
         Assert.Equal(HorizontalAlignment.Stretch, modal.HorizontalAlignment);
         Assert.Equal(1180, modal.MaxWidth);
+    }
+
+    [AvaloniaFact]
+    public void GlobalLeakLibraryPicker_UsesTwoColumnPriorityLayout()
+    {
+        var window = new MainWindow();
+        var modal = Assert.IsType<Border>(window.FindControl<Border>("GlobalLeakLibraryPickerModal"));
+        var columns = Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerColumns"));
+        Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerContent"));
+        var priorityPanel = Assert.IsType<Border>(window.FindControl<Border>("GlobalLeakPriorityPanel"));
+        var priorityScrollViewer = Assert.IsType<ScrollViewer>(
+            window.FindControl<ScrollViewer>("GlobalLeakPriorityScrollViewer"));
+        var priorityItemsControl = Assert.IsType<AnimatedReorderItemsControl>(
+            window.FindControl<AnimatedReorderItemsControl>("GlobalLeakPriorityItemsControl"));
+        Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerActions"));
+        Assert.IsType<Button>(window.FindControl<Button>("GlobalLeakLibraryPickerCloseButton"));
+        Assert.IsType<Button>(window.FindControl<Button>("GlobalLeakLibraryPickerConfirmButton"));
+        var dragOverlay = Assert.IsType<Canvas>(
+            window.FindControl<Canvas>("GlobalLeakPriorityDragOverlay"));
+        var dragGhost = Assert.IsType<Border>(window.FindControl<Border>("GlobalLeakPriorityDragGhost"));
+        var emptyState = Assert.IsType<Border>(window.FindControl<Border>("GlobalLeakPriorityEmptyState"));
+
+        Assert.Equal(HorizontalAlignment.Stretch, modal.HorizontalAlignment);
+        Assert.Equal(1180, modal.MaxWidth);
+        Assert.Equal(2, columns.ColumnDefinitions.Count);
+        Assert.Equal(columns.ColumnDefinitions[0].Width, columns.ColumnDefinitions[1].Width);
+        Assert.Equal(1, Grid.GetColumn(priorityPanel));
+        Assert.True(priorityPanel.IsLogicalAncestorOf(priorityScrollViewer));
+        Assert.True(DragDrop.GetAllowDrop(priorityScrollViewer));
+        Assert.Equal(TimeSpan.FromMilliseconds(220), priorityItemsControl.ReorderAnimationDuration);
+        Assert.Equal(4, Grid.GetRowSpan(dragOverlay));
+        Assert.False(dragOverlay.IsHitTestVisible);
+        Assert.Equal(0, Canvas.GetLeft(dragGhost));
+        Assert.Equal(0, Canvas.GetTop(dragGhost));
+        Assert.False(dragGhost.IsHitTestVisible);
+        Assert.False(dragGhost.IsVisible);
+        Assert.Equal(0.72, dragGhost.Opacity);
+        Assert.Equal(Colors.Transparent, Assert.IsAssignableFrom<ISolidColorBrush>(emptyState.Background).Color);
+        Assert.DoesNotContain(
+            window.GetLogicalDescendants().OfType<TextBlock>(),
+            textBlock => textBlock.Text == "勾选范围与原有逻辑一致");
+    }
+
+    [Fact]
+    public void GlobalLeakPriorityDragHelpers_ApplyThresholdAndRowMidpoint()
+    {
+        Assert.False(MainWindow.HasExceededGlobalLeakDragThreshold(new Point(10, 10), new Point(15.9, 10)));
+        Assert.True(MainWindow.HasExceededGlobalLeakDragThreshold(new Point(10, 10), new Point(16, 10)));
+        Assert.False(MainWindow.ShouldInsertGlobalLeakPriorityAfter(19.9, 40));
+        Assert.True(MainWindow.ShouldInsertGlobalLeakPriorityAfter(20, 40));
+        Assert.False(MainWindow.ShouldInsertGlobalLeakPriorityAfter(20, 0));
+        Assert.Equal(-1, MainWindow.GetGlobalLeakPriorityAutoScrollDirection(20, 300));
+        Assert.Equal(0, MainWindow.GetGlobalLeakPriorityAutoScrollDirection(150, 300));
+        Assert.Equal(1, MainWindow.GetGlobalLeakPriorityAutoScrollDirection(280, 300));
+        Assert.Equal(0, MainWindow.GetGlobalLeakPriorityAutoScrollDirection(20, 0));
+        Assert.Equal(0, MainWindow.CalculateGlobalLeakPriorityAutoScrollOffset(5, 100, -1));
+        Assert.Equal(100, MainWindow.CalculateGlobalLeakPriorityAutoScrollOffset(95, 100, 1));
+        Assert.Equal(
+            new Point(36, 36),
+            MainWindow.CalculateGlobalLeakPriorityDragGhostPosition(
+                new Point(20, 20),
+                new Size(500, 300),
+                new Size(100, 60)));
+        Assert.Equal(
+            new Point(400, 240),
+            MainWindow.CalculateGlobalLeakPriorityDragGhostPosition(
+                new Point(490, 290),
+                new Size(500, 300),
+                new Size(100, 60)));
+    }
+
+    [Theory]
+    [InlineData(120, 40, 80)]
+    [InlineData(40, 120, -80)]
+    [InlineData(80, 80, 0)]
+    public void AnimatedReorderItemsControl_CalculatesFlipTranslation(
+        double previousPosition,
+        double currentPosition,
+        double expectedOffset)
+    {
+        Assert.Equal(
+            expectedOffset,
+            AnimatedReorderItemsControl.CalculateTranslationOffset(previousPosition, currentPosition));
+    }
+
+    [Theory]
+    [InlineData(80, 0, 80)]
+    [InlineData(80, 0.5, 10)]
+    [InlineData(-80, 0.5, -10)]
+    [InlineData(80, 1, 0)]
+    [InlineData(80, 2, 0)]
+    public void AnimatedReorderItemsControl_UsesCubicEaseOut(
+        double startingOffset,
+        double progress,
+        double expectedOffset)
+    {
+        Assert.Equal(
+            expectedOffset,
+            AnimatedReorderItemsControl.CalculateAnimatedOffset(startingOffset, progress),
+            precision: 6);
+    }
+
+    [AvaloniaFact]
+    public void AnimatedReorderItemsControl_AppliesTranslationAfterCollectionMove()
+    {
+        var items = new System.Collections.ObjectModel.ObservableCollection<string>
+        {
+            "first",
+            "second",
+            "third"
+        };
+        var itemsControl = new AnimatedReorderItemsControl
+        {
+            ItemsSource = items,
+            ItemTemplate = new FuncDataTemplate<string>((_, _) => new Border { Height = 40 }),
+            ReorderAnimationDuration = TimeSpan.FromSeconds(10)
+        };
+        var window = new Window
+        {
+            Width = 240,
+            Height = 240,
+            Content = itemsControl
+        };
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            window.Measure(new Size(240, 240));
+            window.Arrange(new Rect(0, 0, 240, 240));
+
+            items.Move(0, 2);
+            window.Measure(new Size(240, 240));
+            window.Arrange(new Rect(0, 0, 240, 240));
+            Dispatcher.UIThread.RunJobs();
+
+            var firstContainer = Assert.IsAssignableFrom<Control>(itemsControl.ContainerFromIndex(2));
+            var transform = Assert.IsType<TranslateTransform>(firstContainer.RenderTransform);
+            Assert.True(Math.Abs(transform.Y) > 0.5, "Moved card should still be sliding from its previous position.");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void AnimatedReorderItemsControl_CancelsExistingAnimation_WhenReverseMoveCancelsOffset()
+    {
+        var items = new System.Collections.ObjectModel.ObservableCollection<string>
+        {
+            "first",
+            "second",
+            "third"
+        };
+        var itemsControl = new AnimatedReorderItemsControl
+        {
+            ItemsSource = items,
+            ItemTemplate = new FuncDataTemplate<string>((_, _) => new Border { Height = 40 }),
+            ReorderAnimationDuration = TimeSpan.FromSeconds(30)
+        };
+        var window = new Window
+        {
+            Width = 240,
+            Height = 240,
+            Content = itemsControl
+        };
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            window.Measure(new Size(240, 240));
+            window.Arrange(new Rect(0, 0, 240, 240));
+
+            items.Move(0, 2);
+            window.Measure(new Size(240, 240));
+            window.Arrange(new Rect(0, 0, 240, 240));
+            Dispatcher.UIThread.RunJobs();
+            var movedContainer = Assert.IsAssignableFrom<Control>(itemsControl.ContainerFromIndex(2));
+            Assert.True(Math.Abs(Assert.IsType<TranslateTransform>(movedContainer.RenderTransform).Y) > 0.5);
+
+            items.Move(2, 0);
+            window.Measure(new Size(240, 240));
+            window.Arrange(new Rect(0, 0, 240, 240));
+            Dispatcher.UIThread.RunJobs();
+
+            var restoredContainer = Assert.IsAssignableFrom<Control>(itemsControl.ContainerFromIndex(0));
+            Assert.True(
+                restoredContainer.RenderTransform is null or TranslateTransform { Y: 0 },
+                "Reverse move should leave no residual translation on the restored card.");
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
     [AvaloniaFact]

@@ -239,6 +239,8 @@ public sealed class ArchitectureClosureTests
         var extractedFiles = new[]
         {
             Path.Combine("Components", "ActivityLogPanelViewModel.cs"),
+            Path.Combine("Components", "GlobalLeakLibraryPriorityItemViewModel.cs"),
+            Path.Combine("Components", "GlobalLeakLibrarySelectionViewModel.cs"),
             Path.Combine("Shell", "ShellNavigationViewModel.cs"),
             Path.Combine("Pages", "NotificationSettingsViewModel.Settings.cs"),
             Path.Combine("Pages", "ProtocolTemplatesViewModel.cs"),

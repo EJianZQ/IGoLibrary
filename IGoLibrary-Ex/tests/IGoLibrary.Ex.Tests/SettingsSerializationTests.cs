@@ -698,17 +698,18 @@ public sealed class SettingsSerializationTests
             {
                 GlobalLeak = new GlobalLeakTaskSettings(
                 [
+                    new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层"),
                     new GlobalLeakLibrarySelectionSettings(1, "场馆A", "3层"),
-                    new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层")
+                    new GlobalLeakLibrarySelectionSettings(3, "场馆C", "7层")
                 ])
             }
         }, AppJson.Default);
 
         var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
 
-        Assert.Equal([1, 2], settings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
-        Assert.Equal(["场馆A", "场馆B"], settings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryName).ToArray());
-        Assert.Equal(["3层", "5层"], settings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.Floor).ToArray());
+        Assert.Equal([2, 1, 3], settings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal(["场馆B", "场馆A", "场馆C"], settings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryName).ToArray());
+        Assert.Equal(["5层", "3层", "7层"], settings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.Floor).ToArray());
     }
 
     [Fact]

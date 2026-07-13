@@ -430,6 +430,49 @@ public sealed class WorkflowServiceTests
     }
 
     [Fact]
+    public async Task SettingsWorkflowService_SaveGlobalLeakSelectedLibrariesAsync_SavesPriorityOnlyChange()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            Tasks = AppSettings.Default.Tasks with
+            {
+                GlobalLeak = new GlobalLeakTaskSettings(
+                [
+                    new GlobalLeakLibrarySelectionSettings(1, "场馆A", "3层"),
+                    new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层")
+                ])
+            }
+        });
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveGlobalLeakSelectedLibrariesAsync(
+        [
+            new GlobalLeakLibraryTarget(2, "场馆B", "5层"),
+            new GlobalLeakLibraryTarget(1, "场馆A", "3层")
+        ]);
+
+        Assert.Equal(1, settingsService.SaveCalls);
+        Assert.Equal([2, 1], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
+    }
+
+    [Fact]
+    public async Task SettingsWorkflowService_SaveGlobalLeakSelectedLibrariesAsync_DeduplicatesByFirstPriority()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var service = new SettingsWorkflowService(settingsService);
+
+        await service.SaveGlobalLeakSelectedLibrariesAsync(
+        [
+            new GlobalLeakLibraryTarget(2, "场馆B", "5层"),
+            new GlobalLeakLibraryTarget(2, "重复场馆B", "旧楼层"),
+            new GlobalLeakLibraryTarget(1, "场馆A", "3层")
+        ]);
+
+        Assert.Equal([2, 1], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal("场馆B", settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries[0].LibraryName);
+    }
+
+    [Fact]
     public async Task SettingsWorkflowService_SaveGlobalLeakSelectedLibrariesAsync_ClearsSelection()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default with

@@ -15,6 +15,12 @@ public partial class MainWindowWorkflowViewModel
 
     public ObservableCollection<GlobalLeakLibraryTarget> SelectedGlobalLeakLibraries => GlobalLeakPage.SelectedGlobalLeakLibraries;
 
+    public ObservableCollection<GlobalLeakLibraryPriorityItemViewModel> SelectedGlobalLeakLibraryPriorities =>
+        GlobalLeakPage.SelectedGlobalLeakLibraryPriorities;
+
+    public ObservableCollection<GlobalLeakLibraryPriorityItemViewModel> DraftGlobalLeakLibraryPriorities =>
+        GlobalLeakPage.DraftGlobalLeakLibraryPriorities;
+
     public bool IsGlobalLeakLibraryPickerOpen
     {
         get => GlobalLeakPage.IsGlobalLeakLibraryPickerOpen;
@@ -73,7 +79,13 @@ public partial class MainWindowWorkflowViewModel
 
     public bool HasNoSelectedGlobalLeakLibraries => GlobalLeakPage.HasNoSelectedGlobalLeakLibraries;
 
+    public bool HasDraftGlobalLeakLibraries => GlobalLeakPage.HasDraftGlobalLeakLibraries;
+
+    public bool HasNoDraftGlobalLeakLibraries => GlobalLeakPage.HasNoDraftGlobalLeakLibraries;
+
     public bool CanEditGlobalLeakConfiguration => GlobalLeakPage.CanEditGlobalLeakConfiguration;
+
+    public bool CanCancelGlobalLeakLibraryPicker => GlobalLeakPage.CanCancelGlobalLeakLibraryPicker;
 
     public string SelectedGlobalLeakLibrarySummaryText => GlobalLeakPage.SelectedGlobalLeakLibrarySummaryText;
 
@@ -157,6 +169,24 @@ public partial class MainWindowWorkflowViewModel
         }
     }
 
+    public IRelayCommand<GlobalLeakLibraryPriorityItemViewModel?> MoveGlobalLeakLibraryUpCommand
+    {
+        get
+        {
+            EnsureGlobalLeakPageConfigured();
+            return GlobalLeakPage.MoveGlobalLeakLibraryUpCommand;
+        }
+    }
+
+    public IRelayCommand<GlobalLeakLibraryPriorityItemViewModel?> MoveGlobalLeakLibraryDownCommand
+    {
+        get
+        {
+            EnsureGlobalLeakPageConfigured();
+            return GlobalLeakPage.MoveGlobalLeakLibraryDownCommand;
+        }
+    }
+
     public IAsyncRelayCommand StartGlobalLeakCommand
     {
         get
@@ -173,6 +203,24 @@ public partial class MainWindowWorkflowViewModel
             EnsureGlobalLeakPageConfigured();
             return GlobalLeakPage.StopGlobalLeakCommand;
         }
+    }
+
+    public bool MoveDraftGlobalLeakLibrary(int sourceLibraryId, int targetLibraryId, bool insertAfter)
+    {
+        EnsureGlobalLeakPageConfigured();
+        return GlobalLeakPage.MoveDraftGlobalLeakLibrary(sourceLibraryId, targetLibraryId, insertAfter);
+    }
+
+    public bool SetGlobalLeakLibraryDropIndicator(int targetLibraryId, bool insertAfter)
+    {
+        EnsureGlobalLeakPageConfigured();
+        return GlobalLeakPage.SetGlobalLeakLibraryDropIndicator(targetLibraryId, insertAfter);
+    }
+
+    public void ClearGlobalLeakLibraryDropIndicators()
+    {
+        EnsureGlobalLeakPageConfigured();
+        GlobalLeakPage.ClearGlobalLeakLibraryDropIndicators();
     }
 
     private void EnsureGlobalLeakPageConfigured()
@@ -213,7 +261,10 @@ public partial class MainWindowWorkflowViewModel
             nameof(GlobalLeakPage.SelectedGlobalLeakLibraryCount),
             nameof(GlobalLeakPage.HasSelectedGlobalLeakLibraries),
             nameof(GlobalLeakPage.HasNoSelectedGlobalLeakLibraries),
+            nameof(GlobalLeakPage.HasDraftGlobalLeakLibraries),
+            nameof(GlobalLeakPage.HasNoDraftGlobalLeakLibraries),
             nameof(GlobalLeakPage.CanEditGlobalLeakConfiguration),
+            nameof(GlobalLeakPage.CanCancelGlobalLeakLibraryPicker),
             nameof(GlobalLeakPage.SelectedGlobalLeakLibrarySummaryText),
             nameof(GlobalLeakPage.DraftGlobalLeakLibraryCount),
             nameof(GlobalLeakPage.DraftGlobalLeakLibrarySummaryText),

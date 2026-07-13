@@ -95,6 +95,7 @@ internal static class HostBuilderFactory
                 services.AddSingleton<AccountVenueViewModel>();
                 services.AddSingleton<MultiSeatSelectionViewModel>();
                 services.AddSingleton<GrabPageViewModel>();
+                services.AddSingleton<GlobalLeakLibrarySelectionViewModel>();
                 services.AddSingleton<GlobalLeakPageViewModel>();
                 services.AddSingleton<OccupyPageViewModel>();
                 services.AddSingleton<TomorrowReservationPageViewModel>();

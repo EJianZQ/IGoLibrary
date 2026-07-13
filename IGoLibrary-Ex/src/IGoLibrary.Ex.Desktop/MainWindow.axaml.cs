@@ -1,6 +1,8 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -16,13 +18,25 @@ namespace IGoLibrary.Ex.Desktop;
 
 public partial class MainWindow : Window
 {
+    private const double GlobalLeakDragThreshold = 6;
+    private const double GlobalLeakPriorityAutoScrollEdge = 56;
+    private const double GlobalLeakPriorityAutoScrollStep = 24;
+    private const double GlobalLeakPriorityDragGhostOffset = 16;
+    private static readonly DataFormat<string> GlobalLeakLibraryDragDataFormat =
+        DataFormat.CreateStringApplicationFormat("igolibrary-global-leak-library-id");
+
     private readonly AppWindowService _appWindowService;
     private readonly INotificationService _notificationService;
+    private readonly DispatcherTimer _globalLeakPriorityAutoScrollTimer;
     private MainWindowViewModel? _observedViewModel;
     private string? _lastProcessedClipboardText;
     private bool _isAutoParsingClipboard;
     private bool _isClosingAfterFlush;
     private bool _isFlushingBeforeClose;
+    private GlobalLeakLibraryPriorityItemViewModel? _globalLeakDragCandidate;
+    private Point _globalLeakDragStartPoint;
+    private bool _globalLeakDragStarted;
+    private int _globalLeakPriorityAutoScrollDirection;
 
     public MainWindow()
         : this(new AppWindowService(), new NoOpNotificationService())
@@ -33,6 +47,11 @@ public partial class MainWindow : Window
     {
         _appWindowService = appWindowService;
         _notificationService = notificationService;
+        _globalLeakPriorityAutoScrollTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(40)
+        };
+        _globalLeakPriorityAutoScrollTimer.Tick += OnGlobalLeakPriorityAutoScrollTick;
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         Opened += OnOpened;
@@ -216,6 +235,348 @@ public partial class MainWindow : Window
     private static void OnGlobalLeakLibraryModalPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         e.Handled = true;
+    }
+
+    private void OnGlobalLeakPriorityDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control { DataContext: GlobalLeakLibraryPriorityItemViewModel item } control ||
+            !e.GetCurrentPoint(control).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        _globalLeakDragCandidate = item;
+        _globalLeakDragStartPoint = e.GetPosition(control);
+        _globalLeakDragStarted = false;
+        e.Pointer.Capture(control);
+        e.Handled = true;
+    }
+
+    private async void OnGlobalLeakPriorityDragHandlePointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (sender is not Control control ||
+            _globalLeakDragCandidate is null ||
+            _globalLeakDragStarted ||
+            !e.GetCurrentPoint(control).Properties.IsLeftButtonPressed ||
+            !HasExceededGlobalLeakDragThreshold(_globalLeakDragStartPoint, e.GetPosition(control)))
+        {
+            return;
+        }
+
+        _globalLeakDragStarted = true;
+        ShowGlobalLeakPriorityDragGhost(_globalLeakDragCandidate, e);
+        var dataTransfer = new DataTransfer();
+        dataTransfer.Add(DataTransferItem.Create(
+            GlobalLeakLibraryDragDataFormat,
+            _globalLeakDragCandidate.LibraryId.ToString(CultureInfo.InvariantCulture)));
+        e.Pointer.Capture(null);
+        e.Handled = true;
+
+        try
+        {
+            await DragDrop.DoDragDropAsync(e, dataTransfer, DragDropEffects.Move);
+        }
+        catch (Exception ex)
+        {
+            await _notificationService.ShowWarningAsync("调整扫描优先级失败", ex.Message);
+        }
+        finally
+        {
+            ResetGlobalLeakPriorityDrag();
+            if (DataContext is MainWindowViewModel viewModel)
+            {
+                viewModel.ClearGlobalLeakLibraryDropIndicators();
+            }
+        }
+    }
+
+    private void OnGlobalLeakPriorityDragHandlePointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_globalLeakDragStarted)
+        {
+            ResetGlobalLeakPriorityDrag();
+        }
+    }
+
+    private void OnGlobalLeakPriorityDragHandlePointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (!_globalLeakDragStarted)
+        {
+            ResetGlobalLeakPriorityDrag();
+        }
+    }
+
+    private void OnGlobalLeakPriorityDragOver(object? sender, DragEventArgs e)
+    {
+        if (sender is not Control { DataContext: GlobalLeakLibraryPriorityItemViewModel target } control ||
+            DataContext is not MainWindowViewModel viewModel ||
+            !TryGetGlobalLeakDraggedLibraryId(e.DataTransfer, out var sourceLibraryId))
+        {
+            e.DragEffects = DragDropEffects.None;
+            StopGlobalLeakPriorityAutoScroll();
+            return;
+        }
+
+        UpdateGlobalLeakPriorityAutoScroll(e);
+        UpdateGlobalLeakPriorityDragGhost(e);
+        if (sourceLibraryId == target.LibraryId)
+        {
+            viewModel.ClearGlobalLeakLibraryDropIndicators();
+            e.DragEffects = DragDropEffects.Move;
+            e.Handled = true;
+            return;
+        }
+
+        var insertAfter = ShouldInsertGlobalLeakPriorityAfter(
+            e.GetPosition(control).Y,
+            control.Bounds.Height);
+        e.DragEffects = viewModel.SetGlobalLeakLibraryDropIndicator(target.LibraryId, insertAfter)
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnGlobalLeakPriorityDragLeave(object? sender, DragEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.ClearGlobalLeakLibraryDropIndicators();
+        }
+    }
+
+    private void OnGlobalLeakPriorityDrop(object? sender, DragEventArgs e)
+    {
+        StopGlobalLeakPriorityAutoScroll();
+        if (sender is not Control { DataContext: GlobalLeakLibraryPriorityItemViewModel target } control ||
+            DataContext is not MainWindowViewModel viewModel ||
+            !TryGetGlobalLeakDraggedLibraryId(e.DataTransfer, out var sourceLibraryId))
+        {
+            e.DragEffects = DragDropEffects.None;
+            return;
+        }
+
+        var insertAfter = ShouldInsertGlobalLeakPriorityAfter(
+            e.GetPosition(control).Y,
+            control.Bounds.Height);
+        var moved = viewModel.MoveDraftGlobalLeakLibrary(sourceLibraryId, target.LibraryId, insertAfter);
+        viewModel.ClearGlobalLeakLibraryDropIndicators();
+        e.DragEffects = moved ? DragDropEffects.Move : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnGlobalLeakPriorityScrollViewerDragOver(object? sender, DragEventArgs e)
+    {
+        if (!TryGetGlobalLeakDraggedLibraryId(e.DataTransfer, out _))
+        {
+            e.DragEffects = DragDropEffects.None;
+            StopGlobalLeakPriorityAutoScroll();
+            return;
+        }
+
+        UpdateGlobalLeakPriorityAutoScroll(e);
+        UpdateGlobalLeakPriorityDragGhost(e);
+        e.DragEffects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private void OnGlobalLeakPriorityScrollViewerDragLeave(object? sender, DragEventArgs e)
+    {
+        StopGlobalLeakPriorityAutoScroll();
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.ClearGlobalLeakLibraryDropIndicators();
+        }
+    }
+
+    private void OnGlobalLeakPriorityScrollViewerDrop(object? sender, DragEventArgs e)
+    {
+        StopGlobalLeakPriorityAutoScroll();
+        if (DataContext is MainWindowViewModel viewModel)
+        {
+            viewModel.ClearGlobalLeakLibraryDropIndicators();
+        }
+
+        e.DragEffects = DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    public static bool HasExceededGlobalLeakDragThreshold(Point origin, Point current)
+    {
+        return Math.Abs(current.X - origin.X) >= GlobalLeakDragThreshold ||
+               Math.Abs(current.Y - origin.Y) >= GlobalLeakDragThreshold;
+    }
+
+    public static bool ShouldInsertGlobalLeakPriorityAfter(double pointerY, double targetHeight)
+    {
+        return targetHeight > 0 && pointerY >= targetHeight / 2;
+    }
+
+    public static int GetGlobalLeakPriorityAutoScrollDirection(double pointerY, double viewportHeight)
+    {
+        if (viewportHeight <= 0)
+        {
+            return 0;
+        }
+
+        var edge = Math.Min(GlobalLeakPriorityAutoScrollEdge, viewportHeight / 3);
+        if (pointerY <= edge)
+        {
+            return -1;
+        }
+
+        return pointerY >= viewportHeight - edge ? 1 : 0;
+    }
+
+    public static double CalculateGlobalLeakPriorityAutoScrollOffset(
+        double currentOffset,
+        double maximumOffset,
+        int direction)
+    {
+        return Math.Clamp(
+            currentOffset + Math.Sign(direction) * GlobalLeakPriorityAutoScrollStep,
+            0,
+            Math.Max(0, maximumOffset));
+    }
+
+    public static Point CalculateGlobalLeakPriorityDragGhostPosition(
+        Point pointerPosition,
+        Size containerSize,
+        Size ghostSize)
+    {
+        return new Point(
+            Math.Clamp(
+                pointerPosition.X + GlobalLeakPriorityDragGhostOffset,
+                0,
+                Math.Max(0, containerSize.Width - ghostSize.Width)),
+            Math.Clamp(
+                pointerPosition.Y + GlobalLeakPriorityDragGhostOffset,
+                0,
+                Math.Max(0, containerSize.Height - ghostSize.Height)));
+    }
+
+    private static bool TryGetGlobalLeakDraggedLibraryId(IDataTransfer dataTransfer, out int libraryId)
+    {
+        var text = dataTransfer.TryGetValue(GlobalLeakLibraryDragDataFormat);
+        return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out libraryId);
+    }
+
+    private void ResetGlobalLeakPriorityDrag()
+    {
+        StopGlobalLeakPriorityAutoScroll();
+        HideGlobalLeakPriorityDragGhost();
+        _globalLeakDragCandidate = null;
+        _globalLeakDragStarted = false;
+    }
+
+    private void UpdateGlobalLeakPriorityAutoScroll(DragEventArgs e)
+    {
+        var scrollViewer = this.FindControl<ScrollViewer>("GlobalLeakPriorityScrollViewer");
+        if (scrollViewer is null)
+        {
+            StopGlobalLeakPriorityAutoScroll();
+            return;
+        }
+
+        _globalLeakPriorityAutoScrollDirection = GetGlobalLeakPriorityAutoScrollDirection(
+            e.GetPosition(scrollViewer).Y,
+            scrollViewer.Bounds.Height);
+        if (_globalLeakPriorityAutoScrollDirection == 0)
+        {
+            StopGlobalLeakPriorityAutoScroll();
+            return;
+        }
+
+        _globalLeakPriorityAutoScrollTimer.Start();
+    }
+
+    private void OnGlobalLeakPriorityAutoScrollTick(object? sender, EventArgs e)
+    {
+        var scrollViewer = this.FindControl<ScrollViewer>("GlobalLeakPriorityScrollViewer");
+        if (scrollViewer is null || _globalLeakPriorityAutoScrollDirection == 0)
+        {
+            StopGlobalLeakPriorityAutoScroll();
+            return;
+        }
+
+        var maximumOffset = Math.Max(0, scrollViewer.Extent.Height - scrollViewer.Viewport.Height);
+        var nextOffset = CalculateGlobalLeakPriorityAutoScrollOffset(
+            scrollViewer.Offset.Y,
+            maximumOffset,
+            _globalLeakPriorityAutoScrollDirection);
+        if (Math.Abs(nextOffset - scrollViewer.Offset.Y) < 0.01)
+        {
+            StopGlobalLeakPriorityAutoScroll();
+            return;
+        }
+
+        scrollViewer.Offset = new Vector(scrollViewer.Offset.X, nextOffset);
+    }
+
+    private void StopGlobalLeakPriorityAutoScroll()
+    {
+        _globalLeakPriorityAutoScrollTimer.Stop();
+        _globalLeakPriorityAutoScrollDirection = 0;
+    }
+
+    private void ShowGlobalLeakPriorityDragGhost(
+        GlobalLeakLibraryPriorityItemViewModel item,
+        PointerEventArgs e)
+    {
+        var ghost = this.FindControl<Border>("GlobalLeakPriorityDragGhost");
+        var overlay = this.FindControl<Canvas>("GlobalLeakPriorityDragOverlay");
+        var priorityPanel = this.FindControl<Border>("GlobalLeakPriorityPanel");
+        if (ghost is null || overlay is null || priorityPanel is null)
+        {
+            return;
+        }
+
+        ghost.Width = Math.Clamp(priorityPanel.Bounds.Width - 32, 280, 460);
+        ghost.DataContext = item;
+        ghost.IsVisible = true;
+        UpdateGlobalLeakPriorityDragGhostPosition(e.GetPosition(overlay));
+    }
+
+    private void UpdateGlobalLeakPriorityDragGhost(DragEventArgs e)
+    {
+        var ghost = this.FindControl<Border>("GlobalLeakPriorityDragGhost");
+        var overlay = this.FindControl<Canvas>("GlobalLeakPriorityDragOverlay");
+        if (ghost is not { IsVisible: true } || overlay is null)
+        {
+            return;
+        }
+
+        UpdateGlobalLeakPriorityDragGhostPosition(e.GetPosition(overlay));
+    }
+
+    private void UpdateGlobalLeakPriorityDragGhostPosition(Point pointerPosition)
+    {
+        var ghost = this.FindControl<Border>("GlobalLeakPriorityDragGhost");
+        var overlay = this.FindControl<Canvas>("GlobalLeakPriorityDragOverlay");
+        if (ghost is null || overlay is null)
+        {
+            return;
+        }
+
+        var ghostSize = new Size(
+            double.IsNaN(ghost.Width) ? 340 : ghost.Width,
+            ghost.Bounds.Height > 0 ? ghost.Bounds.Height : 64);
+        var position = CalculateGlobalLeakPriorityDragGhostPosition(
+            pointerPosition,
+            overlay.Bounds.Size,
+            ghostSize);
+        Canvas.SetLeft(ghost, position.X);
+        Canvas.SetTop(ghost, position.Y);
+    }
+
+    private void HideGlobalLeakPriorityDragGhost()
+    {
+        if (this.FindControl<Border>("GlobalLeakPriorityDragGhost") is { } ghost)
+        {
+            ghost.IsVisible = false;
+            ghost.DataContext = null;
+            Canvas.SetLeft(ghost, 0);
+            Canvas.SetTop(ghost, 0);
+        }
     }
 
     private void OnTomorrowSeatOverlayPointerPressed(object? sender, PointerPressedEventArgs e)

@@ -44,6 +44,46 @@ public sealed class GlobalLeakCoordinatorTests
     }
 
     [Fact]
+    public async Task StartAsync_RestartsFromHighestPriorityOnEveryScanRound()
+    {
+        var layoutCalls = new List<int>();
+        var secondRoundScanned = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var runtime = new FakeCoordinatorRuntime
+        {
+            BlockDelaysStartingAtCall = 2
+        };
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetLibraryLayoutAsync = (_, libraryId, _) =>
+            {
+                layoutCalls.Add(libraryId);
+                if (layoutCalls.Count == 6)
+                {
+                    secondRoundScanned.TrySetResult(null);
+                }
+
+                return Task.FromResult(CreateLayout(libraryId, $"场馆{libraryId}", []));
+            }
+        };
+        var coordinator = CreateCoordinator(apiClient, runtime: runtime);
+        var plan = new GlobalLeakPlan(
+        [
+            new GlobalLeakLibraryTarget(3, "场馆3", "7层"),
+            new GlobalLeakLibraryTarget(1, "场馆1", "3层"),
+            new GlobalLeakLibraryTarget(2, "场馆2", "5层")
+        ], TimeSpan.FromSeconds(2));
+
+        await coordinator.StartAsync(plan);
+        await secondRoundScanned.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal([3, 1, 2, 3, 1, 2], layoutCalls);
+        Assert.Equal(2, coordinator.GetStatus().PollCount);
+
+        await coordinator.StopAsync();
+        await WaitForStatusAsync(coordinator, CoordinatorTaskState.Completed);
+    }
+
+    [Fact]
     public async Task StartAsync_ReservesFirstAvailableSeat_AndPublishesSuccess()
     {
         var layoutCalls = 0;

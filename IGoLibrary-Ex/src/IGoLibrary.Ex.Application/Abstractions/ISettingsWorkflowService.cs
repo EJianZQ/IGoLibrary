@@ -28,6 +28,9 @@ public interface ISettingsWorkflowService
         TimeSpan value,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Saves selected venues in persisted high-to-low scan-priority order.
+    /// </summary>
     Task SaveGlobalLeakSelectedLibrariesAsync(
         IReadOnlyList<GlobalLeakLibraryTarget> libraries,
         CancellationToken cancellationToken = default);

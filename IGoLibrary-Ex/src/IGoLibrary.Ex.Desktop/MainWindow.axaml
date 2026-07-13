@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:IGoLibrary.Ex.Desktop.ViewModels"
+        xmlns:controls="using:IGoLibrary.Ex.Desktop.Controls"
         xmlns:primitives="using:Avalonia.Controls.Primitives"
         mc:Ignorable="d"
         x:Class="IGoLibrary.Ex.Desktop.MainWindow"
@@ -1559,7 +1560,7 @@
                             CornerRadius="16"
                             Padding="12">
                       <Grid>
-                        <ItemsControl ItemsSource="{Binding SelectedGlobalLeakLibraries}"
+                        <ItemsControl ItemsSource="{Binding SelectedGlobalLeakLibraryPriorities}"
                                       IsVisible="{Binding HasSelectedGlobalLeakLibraries}">
                           <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -1579,13 +1580,16 @@
                                   <TextBlock FontSize="12"
                                              FontWeight="SemiBold"
                                              Foreground="{DynamicResource SemiAccentBrush}">
+                                    <Run Text="#" />
+                                    <Run Text="{Binding Priority}" />
+                                    <Run Text=" · " />
                                     <Run Text="{Binding LibraryName}" />
                                     <Run Text=" · " />
                                     <Run Text="{Binding Floor}" />
                                   </TextBlock>
                                   <Button Content="✕"
                                           Command="{Binding DataContext.RemoveSelectedGlobalLeakLibraryCommand, ElementName=MainWindowRoot}"
-                                          CommandParameter="{Binding .}"
+                                          CommandParameter="{Binding Target}"
                                           Classes="chip-close"
                                           IsEnabled="{Binding DataContext.CanEditGlobalLeakConfiguration, ElementName=MainWindowRoot}"
                                           Background="Transparent"
@@ -4345,14 +4349,16 @@
               Background="{DynamicResource AppModalOverlayBrush}"
               PointerPressed="OnGlobalLeakLibraryOverlayPointerPressed">
         <Grid Margin="28,16,28,28">
-          <Border Classes="semi-card Shadow"
-                  MaxWidth="920"
+          <Border x:Name="GlobalLeakLibraryPickerModal"
+                  Classes="semi-card Shadow"
+                  MaxWidth="1180"
                   MaxHeight="760"
                   Padding="24"
-                  HorizontalAlignment="Center"
+                  HorizontalAlignment="Stretch"
                   VerticalAlignment="Center"
                   PointerPressed="OnGlobalLeakLibraryModalPointerPressed">
-            <Grid RowDefinitions="Auto,Auto,*,Auto"
+            <Grid x:Name="GlobalLeakLibraryPickerContent"
+                  RowDefinitions="Auto,Auto,*,Auto"
                   RowSpacing="18">
               <Grid ColumnDefinitions="*,Auto"
                     ColumnSpacing="12">
@@ -4365,15 +4371,19 @@
                 </StackPanel>
 
                 <Button Grid.Column="1"
+                        x:Name="GlobalLeakLibraryPickerCloseButton"
                         Content="关闭 (X)"
                         Command="{Binding CancelGlobalLeakLibrariesCommand}"
+                        IsEnabled="{Binding CanCancelGlobalLeakLibraryPicker}"
                         Classes="Secondary"
                         HorizontalContentAlignment="Center" />
               </Grid>
 
               <Grid Grid.Row="1"
+                    x:Name="GlobalLeakLibraryPickerActions"
                     ColumnDefinitions="*,Auto,Auto,Auto"
-                    ColumnSpacing="12">
+                    ColumnSpacing="12"
+                    IsEnabled="{Binding CanEditGlobalLeakConfiguration}">
                 <TextBlock Text="多选场馆后按确认同步到全域捡漏任务"
                            Classes="helper-text"
                            VerticalAlignment="Center" />
@@ -4394,89 +4404,293 @@
                         HorizontalContentAlignment="Center" />
               </Grid>
 
-              <Border Grid.Row="2"
-                      Background="{DynamicResource SemiColorFill0}"
-                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
-                      BorderThickness="1"
-                      CornerRadius="18"
-                      Padding="16">
-                <Grid>
-                  <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                                VerticalScrollBarVisibility="Auto">
-                    <ItemsControl ItemsSource="{Binding GlobalLeakLibraries}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                          <Border Margin="0,0,0,10"
-                                  Padding="14"
-                                  CornerRadius="14"
-                                  Background="{DynamicResource SemiCardBackgroundBrush}"
-                                  BorderBrush="{DynamicResource SemiCardBorderBrush}"
-                                  BorderThickness="1">
-                            <CheckBox IsChecked="{Binding IsSelected}"
-                                      HorizontalAlignment="Stretch"
-                                      VerticalAlignment="Center">
-                              <Grid ColumnDefinitions="*,Auto"
-                                    ColumnSpacing="16">
-                                <StackPanel Spacing="4">
-                                  <TextBlock Text="{Binding LibraryName}"
-                                             FontSize="15"
-                                             FontWeight="SemiBold"
-                                             Foreground="{DynamicResource SemiTextPrimaryBrush}" />
-                                  <TextBlock Text="{Binding Floor}"
-                                             FontSize="12"
-                                             Foreground="{DynamicResource SemiColorText2}" />
-                                  <TextBlock Text="{Binding SeatSummary}"
-                                             FontSize="12"
-                                             Foreground="{DynamicResource SemiColorText2}" />
-                                </StackPanel>
-                                <Border Grid.Column="1"
-                                        Padding="10,5"
-                                        CornerRadius="999"
-                                        Background="{DynamicResource SemiAccentSoftBrush}"
+              <Grid Grid.Row="2"
+                    x:Name="GlobalLeakLibraryPickerColumns"
+                    ColumnDefinitions="*,*"
+                    ColumnSpacing="16"
+                    IsEnabled="{Binding CanEditGlobalLeakConfiguration}">
+                <Border Background="{DynamicResource SemiColorFill0}"
+                        BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="16">
+                  <Grid RowDefinitions="Auto,*"
+                        RowSpacing="12">
+                    <TextBlock Text="可选场馆"
+                               FontSize="16"
+                               FontWeight="Bold" />
+
+                    <Grid Grid.Row="1">
+                      <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                    VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding GlobalLeakLibraries}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:GlobalLeakLibraryItemViewModel">
+                              <Border Margin="0,0,0,10"
+                                      Padding="14"
+                                      CornerRadius="14"
+                                      Background="{DynamicResource SemiCardBackgroundBrush}"
+                                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                                      BorderThickness="1">
+                                <CheckBox IsChecked="{Binding IsSelected}"
+                                          HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Center">
+                                  <Grid ColumnDefinitions="*,Auto"
+                                        ColumnSpacing="16">
+                                    <StackPanel Spacing="4">
+                                      <TextBlock Text="{Binding LibraryName}"
+                                                 FontSize="15"
+                                                 FontWeight="SemiBold"
+                                                 Foreground="{DynamicResource SemiTextPrimaryBrush}" />
+                                      <TextBlock Text="{Binding Floor}"
+                                                 FontSize="12"
+                                                 Foreground="{DynamicResource SemiColorText2}" />
+                                      <TextBlock Text="{Binding SeatSummary}"
+                                                 FontSize="12"
+                                                 Foreground="{DynamicResource SemiColorText2}" />
+                                    </StackPanel>
+                                    <Border Grid.Column="1"
+                                            Padding="10,5"
+                                            CornerRadius="999"
+                                            Background="{DynamicResource SemiAccentSoftBrush}"
+                                            BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                                            BorderThickness="1"
+                                            VerticalAlignment="Center">
+                                      <TextBlock Text="{Binding OpenStatusText}"
+                                                 FontSize="12"
+                                                 FontWeight="SemiBold"
+                                                 Foreground="{DynamicResource SemiAccentBrush}" />
+                                    </Border>
+                                  </Grid>
+                                </CheckBox>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
+
+                      <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
+                              CornerRadius="14"
+                              Padding="24"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              IsVisible="{Binding HasNoGlobalLeakLibraries}">
+                        <TextBlock Text="当前账号暂无可选择的场馆，请刷新后重试"
+                                   Classes="helper-text"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center" />
+                      </Border>
+                    </Grid>
+                  </Grid>
+                </Border>
+
+                <Border Grid.Column="1"
+                        x:Name="GlobalLeakPriorityPanel"
+                        Background="{DynamicResource SemiColorFill0}"
+                        BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="18"
+                        Padding="16">
+                  <Grid RowDefinitions="Auto,*"
+                        RowSpacing="12">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="扫描优先级"
+                                 FontSize="16"
+                                 FontWeight="Bold" />
+                      <TextBlock Text="从上到下扫描，可拖动或使用箭头调整"
+                                 Classes="helper-text" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="1">
+                      <ScrollViewer x:Name="GlobalLeakPriorityScrollViewer"
+                                    HorizontalScrollBarVisibility="Disabled"
+                                    VerticalScrollBarVisibility="Auto"
+                                    DragDrop.AllowDrop="True"
+                                    DragDrop.DragOver="OnGlobalLeakPriorityScrollViewerDragOver"
+                                    DragDrop.DragLeave="OnGlobalLeakPriorityScrollViewerDragLeave"
+                                    DragDrop.Drop="OnGlobalLeakPriorityScrollViewerDrop">
+                        <controls:AnimatedReorderItemsControl
+                            x:Name="GlobalLeakPriorityItemsControl"
+                            ItemsSource="{Binding DraftGlobalLeakLibraryPriorities}"
+                            IsVisible="{Binding HasDraftGlobalLeakLibraries}"
+                            ReorderAnimationDuration="0:0:0.22">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:GlobalLeakLibraryPriorityItemViewModel">
+                              <Grid Margin="0,0,0,8"
+                                    RowDefinitions="2,Auto,2">
+                                <Border Height="2"
+                                        Background="{DynamicResource SemiAccentBrush}"
+                                        IsVisible="{Binding IsDropBefore}" />
+                                <Border Grid.Row="1"
+                                        Padding="10"
+                                        CornerRadius="12"
+                                        Background="{DynamicResource SemiCardBackgroundBrush}"
                                         BorderBrush="{DynamicResource SemiCardBorderBrush}"
                                         BorderThickness="1"
-                                        VerticalAlignment="Center">
-                                  <TextBlock Text="{Binding OpenStatusText}"
-                                             FontSize="12"
-                                             FontWeight="SemiBold"
-                                             Foreground="{DynamicResource SemiAccentBrush}" />
-                                </Border>
-                              </Grid>
-                            </CheckBox>
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </ScrollViewer>
+                                        DragDrop.AllowDrop="True"
+                                        DragDrop.DragOver="OnGlobalLeakPriorityDragOver"
+                                        DragDrop.DragLeave="OnGlobalLeakPriorityDragLeave"
+                                        DragDrop.Drop="OnGlobalLeakPriorityDrop">
+                                  <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto"
+                                        ColumnSpacing="8">
+                                    <Border Width="30"
+                                            Height="30"
+                                            CornerRadius="15"
+                                            Background="{DynamicResource SemiAccentSoftBrush}"
+                                            VerticalAlignment="Center">
+                                      <TextBlock Text="{Binding Priority}"
+                                                 Foreground="{DynamicResource SemiAccentBrush}"
+                                                 FontWeight="Bold"
+                                                 HorizontalAlignment="Center"
+                                                 VerticalAlignment="Center" />
+                                    </Border>
 
-                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
-                          CornerRadius="14"
-                          Padding="24"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          IsVisible="{Binding HasNoGlobalLeakLibraries}">
-                    <TextBlock Text="当前账号暂无可选择的场馆，请刷新后重试"
-                               Classes="helper-text"
-                               HorizontalAlignment="Center"
-                               TextAlignment="Center" />
-                  </Border>
-                </Grid>
-              </Border>
+                                    <StackPanel Grid.Column="1"
+                                                Spacing="2"
+                                                VerticalAlignment="Center">
+                                      <TextBlock Text="{Binding LibraryName}"
+                                                 FontWeight="SemiBold"
+                                                 TextTrimming="CharacterEllipsis" />
+                                      <TextBlock Text="{Binding Floor}"
+                                                 FontSize="12"
+                                                 Foreground="{DynamicResource SemiColorText2}" />
+                                    </StackPanel>
+
+                                    <Border Grid.Column="2"
+                                            Width="32"
+                                            Height="32"
+                                            CornerRadius="8"
+                                            Background="{DynamicResource SemiColorFill1}"
+                                            Cursor="SizeAll"
+                                            ToolTip.Tip="拖动调整扫描优先级"
+                                            AutomationProperties.Name="拖动调整扫描优先级"
+                                            PointerPressed="OnGlobalLeakPriorityDragHandlePointerPressed"
+                                            PointerMoved="OnGlobalLeakPriorityDragHandlePointerMoved"
+                                            PointerReleased="OnGlobalLeakPriorityDragHandlePointerReleased"
+                                            PointerCaptureLost="OnGlobalLeakPriorityDragHandlePointerCaptureLost">
+                                      <TextBlock Text="☰"
+                                                 FontSize="16"
+                                                 HorizontalAlignment="Center"
+                                                 VerticalAlignment="Center" />
+                                    </Border>
+
+                                    <Button Grid.Column="3"
+                                            Content="↑"
+                                            Width="32"
+                                            Height="32"
+                                            Padding="0"
+                                            Command="{Binding DataContext.MoveGlobalLeakLibraryUpCommand, ElementName=MainWindowRoot}"
+                                            CommandParameter="{Binding .}"
+                                            IsEnabled="{Binding CanMoveUp}"
+                                            Classes="Secondary"
+                                            ToolTip.Tip="提高扫描优先级"
+                                            AutomationProperties.Name="提高扫描优先级" />
+                                    <Button Grid.Column="4"
+                                            Content="↓"
+                                            Width="32"
+                                            Height="32"
+                                            Padding="0"
+                                            Command="{Binding DataContext.MoveGlobalLeakLibraryDownCommand, ElementName=MainWindowRoot}"
+                                            CommandParameter="{Binding .}"
+                                            IsEnabled="{Binding CanMoveDown}"
+                                            Classes="Secondary"
+                                            ToolTip.Tip="降低扫描优先级"
+                                            AutomationProperties.Name="降低扫描优先级" />
+                                  </Grid>
+                                </Border>
+                                <Border Grid.Row="2"
+                                        Height="2"
+                                        Background="{DynamicResource SemiAccentBrush}"
+                                        IsVisible="{Binding IsDropAfter}" />
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </controls:AnimatedReorderItemsControl>
+                      </ScrollViewer>
+
+                      <Border x:Name="GlobalLeakPriorityEmptyState"
+                              Background="Transparent"
+                              CornerRadius="14"
+                              Padding="20"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Center"
+                              IsVisible="{Binding HasNoDraftGlobalLeakLibraries}">
+                        <TextBlock Text="请在左侧勾选场馆；新选择的场馆会追加为最低优先级"
+                                   Classes="helper-text"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center" />
+                      </Border>
+                    </Grid>
+                  </Grid>
+                </Border>
+              </Grid>
 
               <Grid Grid.Row="3"
                     ColumnDefinitions="*,Auto"
                     ColumnSpacing="12">
-                <TextBlock Text="选择顺序以当前列表顺序为准；任务运行时不能修改扫描范围"
+                <TextBlock Text="确认后保存当前优先级；关闭或点击弹窗外部会放弃本次全部修改"
                            Classes="helper-text"
                            VerticalAlignment="Center" />
                 <Button Grid.Column="1"
+                        x:Name="GlobalLeakLibraryPickerConfirmButton"
                         Content="确认完成"
                         Command="{Binding ConfirmGlobalLeakLibrariesCommand}"
+                        IsEnabled="{Binding CanEditGlobalLeakConfiguration}"
                         Background="{DynamicResource AppAccentBrush}"
                         Foreground="{DynamicResource AppAccentForegroundBrush}"
                         FontWeight="Bold"
                         HorizontalContentAlignment="Center" />
               </Grid>
+
+              <Canvas x:Name="GlobalLeakPriorityDragOverlay"
+                      Grid.RowSpan="4"
+                      ZIndex="50"
+                      ClipToBounds="True"
+                      IsHitTestVisible="False">
+                <Border x:Name="GlobalLeakPriorityDragGhost"
+                        x:DataType="vm:GlobalLeakLibraryPriorityItemViewModel"
+                        Canvas.Left="0"
+                        Canvas.Top="0"
+                        Width="340"
+                        Padding="12"
+                        CornerRadius="12"
+                        Background="{DynamicResource SemiCardBackgroundBrush}"
+                        BorderBrush="{DynamicResource SemiAccentBrush}"
+                        BorderThickness="1"
+                        Opacity="0.72"
+                        IsVisible="False"
+                        IsHitTestVisible="False">
+                  <Grid ColumnDefinitions="Auto,*,Auto"
+                        ColumnSpacing="10">
+                    <Border Width="32"
+                            Height="32"
+                            CornerRadius="16"
+                            Background="{DynamicResource SemiAccentSoftBrush}"
+                            VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Priority}"
+                                 Foreground="{DynamicResource SemiAccentBrush}"
+                                 FontWeight="Bold"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="1"
+                                Spacing="2"
+                                VerticalAlignment="Center">
+                      <TextBlock Text="{Binding LibraryName}"
+                                 FontWeight="SemiBold"
+                                 TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding Floor}"
+                                 FontSize="12"
+                                 Foreground="{DynamicResource SemiColorText2}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="2"
+                               Text="拖动中"
+                               FontSize="12"
+                               Foreground="{DynamicResource SemiAccentBrush}"
+                               VerticalAlignment="Center" />
+                  </Grid>
+                </Border>
+              </Canvas>
             </Grid>
           </Border>
         </Grid>

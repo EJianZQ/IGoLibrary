@@ -1,7 +1,10 @@
 using System.Net;
 using System.Globalization;
 using System.Text;
+using Avalonia.Controls;
+using Avalonia.Headless.XUnit;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Desktop;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Application.Services;
@@ -372,14 +375,15 @@ public sealed class MainWindowViewModelTests
         await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
         viewModel.GlobalLeakLibraries[0].IsSelected = true;
         viewModel.GlobalLeakLibraries[2].IsSelected = true;
-        viewModel.ConfirmGlobalLeakLibrariesCommand.Execute(null);
+        Assert.True(viewModel.MoveDraftGlobalLeakLibrary(3, 1, insertAfter: false));
+        await viewModel.ConfirmGlobalLeakLibrariesCommand.ExecuteAsync(null);
 
         await viewModel.StartGlobalLeakCommand.ExecuteAsync(null);
 
         var plan = Assert.IsType<GlobalLeakPlan>(coordinator.LastPlan);
         Assert.Equal(TimeSpan.FromSeconds(10), plan.ScanInterval);
-        Assert.Equal([1, 3], plan.Libraries.Select(library => library.LibraryId).ToArray());
-        Assert.Equal(["场馆A", "场馆C"], plan.Libraries.Select(library => library.LibraryName).ToArray());
+        Assert.Equal([3, 1], plan.Libraries.Select(library => library.LibraryId).ToArray());
+        Assert.Equal(["场馆C", "场馆A"], plan.Libraries.Select(library => library.LibraryName).ToArray());
     }
 
     [Fact]
@@ -392,7 +396,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.IsGlobalLeakLibraryPickerOpen);
         Assert.Empty(viewModel.SelectedGlobalLeakLibraries);
-        Assert.Equal("本次已勾选 1 个场馆", viewModel.DraftGlobalLeakLibrarySummaryText);
+        Assert.Equal("本次已勾选 1 个场馆，右侧从上到下依次扫描", viewModel.DraftGlobalLeakLibrarySummaryText);
 
         viewModel.CancelGlobalLeakLibrariesCommand.Execute(null);
 
@@ -519,13 +523,14 @@ public sealed class MainWindowViewModelTests
     {
         var settingsService = new FakeSettingsService(WithGlobalLeakSelectedLibraries(
             new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层"),
+            new GlobalLeakLibrarySelectionSettings(1, "场馆A", "3层"),
             new GlobalLeakLibrarySelectionSettings(99, "旧场馆", "旧楼层")));
         var viewModel = CreateGlobalLeakViewModel(settingsService: settingsService);
 
         await viewModel.InitializeAsync();
 
-        Assert.Equal([2], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
-        Assert.Equal(["场馆B"], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryName).ToArray());
+        Assert.Equal([2, 1], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal(["场馆B", "场馆A"], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryName).ToArray());
         Assert.Equal(0, settingsService.SaveCalls);
     }
 
@@ -630,11 +635,138 @@ public sealed class MainWindowViewModelTests
         await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
         viewModel.GlobalLeakLibraries[0].IsSelected = true;
         viewModel.GlobalLeakLibraries[2].IsSelected = true;
+        Assert.True(viewModel.MoveDraftGlobalLeakLibrary(3, 1, insertAfter: false));
         await viewModel.ConfirmGlobalLeakLibrariesCommand.ExecuteAsync(null);
 
-        Assert.Equal([1, 3], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
-        Assert.Equal([1, 3], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal([3, 1], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal([1, 2], viewModel.SelectedGlobalLeakLibraryPriorities.Select(x => x.Priority).ToArray());
+        Assert.Equal([3, 1], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
         Assert.Equal(1, settingsService.SaveCalls);
+    }
+
+    [Fact]
+    public async Task ConfirmGlobalLeakLibrariesAsync_CommitsPersistedSnapshot_AndLocksDraftWhileSaving()
+    {
+        var updateStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseUpdate = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var viewModel = CreateGlobalLeakViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        viewModel.GlobalLeakLibraries[0].IsSelected = true;
+        settingsService.UpdateStarted = updateStarted;
+        settingsService.UpdateBlocker = releaseUpdate.Task;
+
+        var confirmTask = viewModel.ConfirmGlobalLeakLibrariesCommand.ExecuteAsync(null);
+        await updateStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(viewModel.CanEditGlobalLeakConfiguration);
+        Assert.False(viewModel.CanCancelGlobalLeakLibraryPicker);
+        viewModel.GlobalLeakLibraries[2].IsSelected = true;
+        Assert.False(viewModel.MoveDraftGlobalLeakLibrary(3, 1, insertAfter: false));
+        viewModel.CancelGlobalLeakLibrariesCommand.Execute(null);
+        Assert.True(viewModel.IsGlobalLeakLibraryPickerOpen);
+
+        releaseUpdate.TrySetResult(null);
+        await confirmTask;
+
+        Assert.False(viewModel.IsGlobalLeakLibraryPickerOpen);
+        Assert.True(viewModel.CanEditGlobalLeakConfiguration);
+        Assert.True(viewModel.CanCancelGlobalLeakLibraryPicker);
+        Assert.Equal([1], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal([1], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
+    }
+
+    [AvaloniaFact]
+    public async Task GlobalLeakLibraryPicker_DisablesMutation_WhenTaskBecomesActive()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var coordinator = new FakeGlobalLeakCoordinator();
+        var viewModel = CreateGlobalLeakViewModel(
+            settingsService: settingsService,
+            globalLeakCoordinator: coordinator);
+        await viewModel.InitializeAsync();
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        viewModel.GlobalLeakLibraries[0].IsSelected = true;
+
+        var timestamp = DateTimeOffset.Now;
+        coordinator.EmitStatus(new CoordinatorStatus(
+            CoordinatorTaskState.Running,
+            "全域捡漏",
+            "运行中",
+            timestamp,
+            timestamp,
+            Reason: CoordinatorStatusReason.Running));
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(viewModel.CanEditGlobalLeakConfiguration);
+        Assert.True(viewModel.CanCancelGlobalLeakLibraryPicker);
+        Assert.False(viewModel.SetGlobalLeakLibraryDropIndicator(1, insertAfter: true));
+        Assert.False(viewModel.MoveDraftGlobalLeakLibrary(1, 2, insertAfter: true));
+        await viewModel.SelectAllGlobalLeakLibrariesCommand.ExecuteAsync(null);
+        await viewModel.ConfirmGlobalLeakLibrariesCommand.ExecuteAsync(null);
+
+        Assert.Equal([1], viewModel.DraftGlobalLeakLibraryPriorities.Select(x => x.LibraryId).ToArray());
+        Assert.Empty(viewModel.SelectedGlobalLeakLibraries);
+        Assert.Equal(0, settingsService.SaveCalls);
+
+        var window = new MainWindow { DataContext = viewModel };
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerActions")).IsEnabled);
+            Assert.False(Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerColumns")).IsEnabled);
+            Assert.False(Assert.IsType<Button>(window.FindControl<Button>("GlobalLeakLibraryPickerConfirmButton")).IsEnabled);
+            Assert.True(Assert.IsType<Button>(window.FindControl<Button>("GlobalLeakLibraryPickerCloseButton")).IsEnabled);
+        }
+        finally
+        {
+            window.DataContext = null;
+            window.Close();
+        }
+
+        viewModel.CancelGlobalLeakLibrariesCommand.Execute(null);
+        Assert.False(viewModel.IsGlobalLeakLibraryPickerOpen);
+    }
+
+    [Fact]
+    public async Task GlobalLeakLibraryPriority_CancelRestoresCommittedOrderWithoutSaving()
+    {
+        var settingsService = new FakeSettingsService(WithGlobalLeakSelectedLibraries(
+            new GlobalLeakLibrarySelectionSettings(1, "场馆A", "3层"),
+            new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层")));
+        var viewModel = CreateGlobalLeakViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        Assert.True(viewModel.MoveDraftGlobalLeakLibrary(2, 1, insertAfter: false));
+        viewModel.CancelGlobalLeakLibrariesCommand.Execute(null);
+
+        Assert.Equal([1, 2], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal(0, settingsService.SaveCalls);
+    }
+
+    [Fact]
+    public async Task ConfirmGlobalLeakLibraryPriority_KeepsCommittedOrder_WhenPersistFails()
+    {
+        var settingsService = new FakeSettingsService(WithGlobalLeakSelectedLibraries(
+            new GlobalLeakLibrarySelectionSettings(1, "场馆A", "3层"),
+            new GlobalLeakLibrarySelectionSettings(2, "场馆B", "5层")));
+        var viewModel = CreateGlobalLeakViewModel(settingsService: settingsService);
+        await viewModel.InitializeAsync();
+
+        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
+        Assert.True(viewModel.MoveDraftGlobalLeakLibrary(2, 1, insertAfter: false));
+        settingsService.UpdateExceptions.Enqueue(new InvalidOperationException("database locked"));
+
+        await viewModel.ConfirmGlobalLeakLibrariesCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsGlobalLeakLibraryPickerOpen);
+        Assert.Equal([2, 1], viewModel.DraftGlobalLeakLibraryPriorities.Select(x => x.LibraryId).ToArray());
+        Assert.Equal([1, 2], viewModel.SelectedGlobalLeakLibraries.Select(x => x.LibraryId).ToArray());
+        Assert.Equal([1, 2], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
     }
 
     [Fact]

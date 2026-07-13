@@ -556,6 +556,10 @@ internal sealed class FakeSettingsService : ISettingsService
 
     public Queue<Exception> UpdateExceptions { get; } = [];
 
+    public TaskCompletionSource<object?>? UpdateStarted { get; set; }
+
+    public Task? UpdateBlocker { get; set; }
+
     public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
         await _settingsGate.WaitAsync(cancellationToken);
@@ -595,6 +599,12 @@ internal sealed class FakeSettingsService : ISettingsService
         await _settingsGate.WaitAsync(cancellationToken);
         try
         {
+            UpdateStarted?.TrySetResult(null);
+            if (UpdateBlocker is not null)
+            {
+                await UpdateBlocker.WaitAsync(cancellationToken);
+            }
+
             if (UpdateExceptions.Count > 0)
             {
                 throw UpdateExceptions.Dequeue();

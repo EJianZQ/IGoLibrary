@@ -89,7 +89,8 @@ internal static class MainWindowViewModelTestHarness
                 activityLogService,
                 notificationService,
                 appThemeService,
-                timeProvider),
+                timeProvider,
+                new GlobalLeakLibrarySelectionViewModel()),
             new OccupyPageViewModel(
                 occupySeatCoordinator,
                 reservationWorkflowService,
