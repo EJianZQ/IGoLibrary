@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using Avalonia;
@@ -7,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Input.Platform;
+using Avalonia.Media;
 using Avalonia.Threading;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Desktop.Services;
@@ -22,12 +24,19 @@ public partial class MainWindow : Window
     private const double GlobalLeakPriorityAutoScrollEdge = 56;
     private const double GlobalLeakPriorityAutoScrollStep = 24;
     private const double GlobalLeakPriorityDragGhostOffset = 16;
+    private const double ModalAttentionMaximumScale = 0.014;
+    private const double ModalAttentionMaximumOffset = 4;
+    private static readonly TimeSpan ModalAttentionAnimationDuration = TimeSpan.FromMilliseconds(260);
+    private static readonly TimeSpan ModalAttentionAnimationFrameInterval = TimeSpan.FromMilliseconds(16);
+    private static readonly TimeSpan ModalAttentionSoundMinimumInterval = TimeSpan.FromMilliseconds(400);
     private static readonly DataFormat<string> GlobalLeakLibraryDragDataFormat =
         DataFormat.CreateStringApplicationFormat("igolibrary-global-leak-library-id");
 
     private readonly AppWindowService _appWindowService;
     private readonly INotificationService _notificationService;
+    private readonly IAlertSoundService _alertSoundService;
     private readonly DispatcherTimer _globalLeakPriorityAutoScrollTimer;
+    private readonly DispatcherTimer _modalAttentionAnimationTimer;
     private MainWindowViewModel? _observedViewModel;
     private string? _lastProcessedClipboardText;
     private bool _isAutoParsingClipboard;
@@ -37,21 +46,43 @@ public partial class MainWindow : Window
     private Point _globalLeakDragStartPoint;
     private bool _globalLeakDragStarted;
     private int _globalLeakPriorityAutoScrollDirection;
+    private Border? _modalAttentionTarget;
+    private TransformGroup? _modalAttentionTransform;
+    private ScaleTransform? _modalAttentionScaleTransform;
+    private TranslateTransform? _modalAttentionTranslateTransform;
+    private ITransform? _modalAttentionOriginalTransform;
+    private RelativePoint _modalAttentionOriginalTransformOrigin;
+    private long _modalAttentionAnimationStartTimestamp;
+    private long _lastModalAttentionSoundTimestamp;
 
     public MainWindow()
-        : this(new AppWindowService(), new NoOpNotificationService())
+        : this(new AppWindowService(), new NoOpNotificationService(), new AlertSoundService())
     {
     }
 
     public MainWindow(AppWindowService appWindowService, INotificationService notificationService)
+        : this(appWindowService, notificationService, new AlertSoundService())
+    {
+    }
+
+    public MainWindow(
+        AppWindowService appWindowService,
+        INotificationService notificationService,
+        IAlertSoundService alertSoundService)
     {
         _appWindowService = appWindowService;
         _notificationService = notificationService;
+        _alertSoundService = alertSoundService;
         _globalLeakPriorityAutoScrollTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(40)
         };
         _globalLeakPriorityAutoScrollTimer.Tick += OnGlobalLeakPriorityAutoScrollTick;
+        _modalAttentionAnimationTimer = new DispatcherTimer
+        {
+            Interval = ModalAttentionAnimationFrameInterval
+        };
+        _modalAttentionAnimationTimer.Tick += OnModalAttentionAnimationTick;
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         Opened += OnOpened;
@@ -66,6 +97,8 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, WindowClosingEventArgs e)
     {
+        StopModalAttentionAnimation();
+
         if (!_isClosingAfterFlush &&
             !_appWindowService.AllowClose &&
             DataContext is MainWindowViewModel viewModel &&
@@ -119,6 +152,8 @@ public partial class MainWindow : Window
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        StopModalAttentionAnimation();
+
         if (_observedViewModel is not null)
         {
             _observedViewModel.OccupyLogLines.CollectionChanged -= OnOccupyLogLinesChanged;
@@ -166,6 +201,12 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.Post(() => TomorrowLogScrollViewer?.ScrollToEnd(), DispatcherPriority.Background);
         }
 
+        if (e.PropertyName == nameof(MainWindowViewModel.HasOpenModalOverlay) &&
+            !viewModel.HasOpenModalOverlay)
+        {
+            StopModalAttentionAnimation();
+        }
+
         if (!IsActive)
         {
             return;
@@ -203,6 +244,157 @@ public partial class MainWindow : Window
             () => viewModel.HandleVenuePickerLibraryClickAsync(library),
             _notificationService,
             "处理场馆选择失败");
+    }
+
+    private void OnSidebarPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel { HasOpenModalOverlay: true })
+        {
+            return;
+        }
+
+        e.Handled = true;
+        NotifyBlockedNavigationAttempt();
+    }
+
+    internal bool NotifyBlockedNavigationAttempt()
+    {
+        if (!TryEmphasizeOpenModal())
+        {
+            return false;
+        }
+
+        PlayModalAttentionSound();
+        return true;
+    }
+
+    internal bool TryEmphasizeOpenModal()
+    {
+        var target = FindOpenModal();
+        if (target is null)
+        {
+            return false;
+        }
+
+        StopModalAttentionAnimation();
+
+        _modalAttentionTarget = target;
+        _modalAttentionOriginalTransform = target.RenderTransform;
+        _modalAttentionOriginalTransformOrigin = target.RenderTransformOrigin;
+        _modalAttentionScaleTransform = new ScaleTransform(1, 1);
+        _modalAttentionTranslateTransform = new TranslateTransform();
+        _modalAttentionTransform = new TransformGroup();
+        _modalAttentionTransform.Children.Add(_modalAttentionScaleTransform);
+        _modalAttentionTransform.Children.Add(_modalAttentionTranslateTransform);
+        target.RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative);
+        target.RenderTransform = _modalAttentionTransform;
+        _modalAttentionAnimationStartTimestamp = Stopwatch.GetTimestamp();
+        _modalAttentionAnimationTimer.Start();
+        return true;
+    }
+
+    private Border? FindOpenModal()
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+        {
+            return null;
+        }
+
+        if (viewModel.IsLanCookieRelayDialogOpen)
+        {
+            return this.FindControl<Border>("LanCookieRelayDialogModal");
+        }
+
+        if (viewModel.IsGrabSeatSelectionOverlayOpen)
+        {
+            return this.FindControl<Border>("GrabSeatSelectionModal");
+        }
+
+        if (viewModel.IsMobileControlDetailsOpen)
+        {
+            return this.FindControl<Border>("MobileControlDetailsModal");
+        }
+
+        if (viewModel.IsGlobalLeakLibraryPickerOpen)
+        {
+            return this.FindControl<Border>("GlobalLeakLibraryPickerModal");
+        }
+
+        if (viewModel.IsTomorrowSeatSelectionOverlayOpen)
+        {
+            return this.FindControl<Border>("TomorrowSeatSelectionModal");
+        }
+
+        return viewModel.IsVenuePickerOpen
+            ? this.FindControl<Border>("VenuePickerModal")
+            : null;
+    }
+
+    private void OnModalAttentionAnimationTick(object? sender, EventArgs e)
+    {
+        if (_modalAttentionTarget is null ||
+            _modalAttentionScaleTransform is null ||
+            _modalAttentionTranslateTransform is null)
+        {
+            StopModalAttentionAnimation();
+            return;
+        }
+
+        var elapsed = Stopwatch.GetElapsedTime(_modalAttentionAnimationStartTimestamp);
+        var progress = elapsed.TotalMilliseconds / ModalAttentionAnimationDuration.TotalMilliseconds;
+        var scale = CalculateModalAttentionScale(progress);
+        _modalAttentionScaleTransform.ScaleX = scale;
+        _modalAttentionScaleTransform.ScaleY = scale;
+        _modalAttentionTranslateTransform.X = CalculateModalAttentionOffset(progress);
+
+        if (progress >= 1)
+        {
+            StopModalAttentionAnimation();
+        }
+    }
+
+    private void StopModalAttentionAnimation()
+    {
+        _modalAttentionAnimationTimer.Stop();
+        if (_modalAttentionTarget is not null &&
+            ReferenceEquals(_modalAttentionTarget.RenderTransform, _modalAttentionTransform))
+        {
+            _modalAttentionTarget.RenderTransform = _modalAttentionOriginalTransform;
+            _modalAttentionTarget.RenderTransformOrigin = _modalAttentionOriginalTransformOrigin;
+        }
+
+        _modalAttentionTarget = null;
+        _modalAttentionTransform = null;
+        _modalAttentionScaleTransform = null;
+        _modalAttentionTranslateTransform = null;
+        _modalAttentionOriginalTransform = null;
+    }
+
+    internal static double CalculateModalAttentionScale(double progress)
+    {
+        var normalized = Math.Clamp(progress, 0, 1);
+        return 1 + (ModalAttentionMaximumScale * Math.Sin(Math.PI * normalized));
+    }
+
+    internal static double CalculateModalAttentionOffset(double progress)
+    {
+        var normalized = Math.Clamp(progress, 0, 1);
+        return ModalAttentionMaximumOffset *
+               Math.Sin(normalized * Math.PI * 4) *
+               (1 - normalized);
+    }
+
+    private void PlayModalAttentionSound()
+    {
+        var now = Stopwatch.GetTimestamp();
+        if (_lastModalAttentionSoundTimestamp != 0 &&
+            Stopwatch.GetElapsedTime(_lastModalAttentionSoundTimestamp, now) < ModalAttentionSoundMinimumInterval)
+        {
+            return;
+        }
+
+        _lastModalAttentionSoundTimestamp = now;
+        _ = _alertSoundService.PlaySystemPromptAsync();
     }
 
     private void OnGrabSeatOverlayPointerPressed(object? sender, PointerPressedEventArgs e)

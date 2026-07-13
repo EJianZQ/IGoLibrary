@@ -10,6 +10,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using IGoLibrary.Ex.Desktop;
 using IGoLibrary.Ex.Desktop.Controls;
+using IGoLibrary.Ex.Desktop.ViewModels;
 
 namespace IGoLibrary.Ex.Tests;
 
@@ -34,6 +35,75 @@ public sealed class MainWindowLayoutTests
 
         Assert.Equal(HorizontalAlignment.Stretch, modal.HorizontalAlignment);
         Assert.Equal(1180, modal.MaxWidth);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SeatTemplate_MapsAvailabilityToATypeSafeForegroundStyle(bool isOccupied)
+    {
+        var window = new MainWindow();
+        var seat = new SeatItemViewModel("seat-1", "1", isOccupied);
+        var template = Assert.Single(window.DataTemplates, candidate => candidate.Match(seat));
+        var seatControl = Assert.IsAssignableFrom<Control>(template.Build(seat));
+        seatControl.DataContext = seat;
+        window.Content = seatControl;
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var seatName = Assert.Single(
+                seatControl.GetLogicalDescendants().OfType<TextBlock>(),
+                candidate => candidate.Name == "SeatNameTextBlock");
+            Assert.Equal(isOccupied, seatName.Classes.Contains("unavailable"));
+            Assert.IsAssignableFrom<IBrush>(seatName.Foreground);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void InWindowDialogs_ExposeAttentionAnimationTargets()
+    {
+        var window = new MainWindow();
+        string[] targetNames =
+        [
+            "LanCookieRelayDialogModal",
+            "GrabSeatSelectionModal",
+            "MobileControlDetailsModal",
+            "GlobalLeakLibraryPickerModal",
+            "TomorrowSeatSelectionModal",
+            "VenuePickerModal"
+        ];
+
+        foreach (var targetName in targetNames)
+        {
+            Assert.IsType<Border>(window.FindControl<Border>(targetName));
+        }
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(0.5, 1.014)]
+    [InlineData(1, 1)]
+    [InlineData(2, 1)]
+    public void ModalAttentionScale_UsesOneSubtlePulse(double progress, double expected)
+    {
+        Assert.Equal(expected, MainWindow.CalculateModalAttentionScale(progress), precision: 6);
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(0.125, 3.5)]
+    [InlineData(0.375, -2.5)]
+    [InlineData(1, 0)]
+    public void ModalAttentionOffset_UsesDampedHorizontalFeedback(double progress, double expected)
+    {
+        Assert.Equal(expected, MainWindow.CalculateModalAttentionOffset(progress), precision: 6);
     }
 
     [AvaloniaFact]

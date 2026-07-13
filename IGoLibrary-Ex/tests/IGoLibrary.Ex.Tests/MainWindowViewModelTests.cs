@@ -213,6 +213,93 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void ModalOverlayState_DisablesSidebarNavigation_ForEveryInWindowDialog()
+    {
+        var viewModel = CreateViewModel();
+        Action<bool>[] setModalStates =
+        [
+            value => viewModel.IsLanCookieRelayDialogOpen = value,
+            value => viewModel.IsGrabSeatSelectionOverlayOpen = value,
+            value => viewModel.IsMobileControlDetailsOpen = value,
+            value => viewModel.IsGlobalLeakLibraryPickerOpen = value,
+            value => viewModel.IsTomorrowSeatSelectionOverlayOpen = value,
+            value => viewModel.IsVenuePickerOpen = value
+        ];
+
+        Assert.False(viewModel.HasOpenModalOverlay);
+        Assert.True(viewModel.IsSidebarNavigationInteractive);
+
+        foreach (var setModalState in setModalStates)
+        {
+            setModalState(true);
+
+            Assert.True(viewModel.HasOpenModalOverlay);
+            Assert.False(viewModel.IsSidebarNavigationInteractive);
+
+            setModalState(false);
+
+            Assert.False(viewModel.HasOpenModalOverlay);
+            Assert.True(viewModel.IsSidebarNavigationInteractive);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task OpenModalOverlay_BlocksSidebarPointerInputWithoutDimmingIt()
+    {
+        var viewModel = CreateViewModel();
+        await viewModel.InitializeAsync();
+        viewModel.IsAuthorized = true;
+        viewModel.SelectedTabIndex = 2;
+        var alertSoundService = new RecordingAlertSoundService();
+        var window = new MainWindow(
+            new AppWindowService(),
+            new NoOpNotificationService(),
+            alertSoundService)
+        {
+            DataContext = viewModel
+        };
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var sidebar = Assert.IsType<ListBox>(
+                window.FindControl<ListBox>("SidebarNavigationList"));
+
+            Assert.True(sidebar.IsEnabled);
+            Assert.True(sidebar.IsHitTestVisible);
+
+            viewModel.IsGrabSeatSelectionOverlayOpen = true;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(sidebar.IsEnabled);
+            Assert.False(sidebar.IsHitTestVisible);
+            Assert.Equal(2, viewModel.SelectedTabIndex);
+
+            var modal = Assert.IsType<Border>(
+                window.FindControl<Border>("GrabSeatSelectionModal"));
+            Assert.True(window.NotifyBlockedNavigationAttempt());
+            Assert.IsType<TransformGroup>(modal.RenderTransform);
+            Assert.Equal(1, alertSoundService.SystemPromptPlayCount);
+
+            Assert.True(window.NotifyBlockedNavigationAttempt());
+            Assert.Equal(1, alertSoundService.SystemPromptPlayCount);
+
+            viewModel.IsGrabSeatSelectionOverlayOpen = false;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(sidebar.IsEnabled);
+            Assert.True(sidebar.IsHitTestVisible);
+            Assert.Null(modal.RenderTransform);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [Fact]
     public void SidebarItems_ExposeRestrictedEntries_WhenAuthorized()
     {
         var viewModel = CreateViewModel();

@@ -35,6 +35,16 @@ public partial class MainWindowWorkflowViewModel
 
     public bool IsRemoteCheckInPageActive => Navigation.IsRemoteCheckInPageActive;
 
+    public bool HasOpenModalOverlay =>
+        IsLanCookieRelayDialogOpen ||
+        IsGrabSeatSelectionOverlayOpen ||
+        IsMobileControlDetailsOpen ||
+        IsGlobalLeakLibraryPickerOpen ||
+        IsTomorrowSeatSelectionOverlayOpen ||
+        IsVenuePickerOpen;
+
+    public bool IsSidebarNavigationInteractive => !HasOpenModalOverlay;
+
     public int SelectedNotificationSettingsTabIndex
     {
         get => Navigation.SelectedNotificationSettingsTabIndex;

@@ -42,6 +42,27 @@ internal sealed class FakeNotificationService : INotificationService
     }
 }
 
+internal sealed class RecordingAlertSoundService : IAlertSoundService
+{
+    public int DefaultPlayCount { get; private set; }
+
+    public int SystemPromptPlayCount { get; private set; }
+
+    public Task PlayAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        DefaultPlayCount++;
+        return Task.CompletedTask;
+    }
+
+    public Task PlaySystemPromptAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        SystemPromptPlayCount++;
+        return Task.CompletedTask;
+    }
+}
+
 internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, INotificationTestService
 {
     public List<(string Source, string Reason)> SessionInvalidNotifications { get; } = [];

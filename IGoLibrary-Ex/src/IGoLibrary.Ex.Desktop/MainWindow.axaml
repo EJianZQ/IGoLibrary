@@ -371,12 +371,20 @@
                 BorderBrush="{DynamicResource SemiAccentBrush}"
                 IsVisible="{Binding IsSelected}" />
 
-        <TextBlock Text="{Binding SeatName}"
+        <TextBlock x:Name="SeatNameTextBlock"
+                   Text="{Binding SeatName}"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
                    FontSize="15"
                    FontWeight="Bold"
-                   Foreground="{Binding IsUnavailable, Converter={x:Static BoolConverters.Not}, FallbackValue={DynamicResource SemiColorText0}}" />
+                   Foreground="{DynamicResource SemiColorText0}"
+                   Classes.unavailable="{Binding IsUnavailable}">
+          <TextBlock.Styles>
+            <Style Selector="TextBlock.unavailable">
+              <Setter Property="Foreground" Value="{DynamicResource SemiColorText2}" />
+            </Style>
+          </TextBlock.Styles>
+        </TextBlock>
 
         <Grid Width="16"
               Height="16"
@@ -433,19 +441,23 @@
   <Grid ColumnDefinitions="232,*">
     
     <!-- Sidebar -->
-    <Border Grid.Column="0"
+    <Border x:Name="SidebarPanel"
+            Grid.Column="0"
             Background="{DynamicResource AppSidebarBrush}"
             BorderBrush="{DynamicResource AppSidebarBorderBrush}"
-            BorderThickness="0,0,1,0">
+            BorderThickness="0,0,1,0"
+            PointerPressed="OnSidebarPointerPressed">
       <Grid RowDefinitions="40, *, Auto">
         <!-- Window Title / Drag Area -->
         <TextBlock Grid.Row="0" Text="IGoLibrary-Ex 端" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Margin="24,0,0,0" Opacity="0.7" IsHitTestVisible="False"/>
         
         <!-- Navigation Menu -->
         <ListBox Grid.Row="1"
+                 x:Name="SidebarNavigationList"
                  Classes="sidebar"
                  ItemsSource="{Binding SidebarItems}"
                  SelectedItem="{Binding SelectedSidebarItem}"
+                 IsHitTestVisible="{Binding IsSidebarNavigationInteractive}"
                  Margin="0,16,0,0"
                  Background="Transparent"
                  BorderThickness="0" />
@@ -4008,7 +4020,8 @@
               IsVisible="{Binding IsLanCookieRelayDialogOpen}"
               Background="{DynamicResource AppModalOverlayBrush}">
         <Grid Margin="28,16,28,28">
-          <Border Classes="semi-card Shadow"
+          <Border x:Name="LanCookieRelayDialogModal"
+                  Classes="semi-card Shadow"
                   Width="520"
                   MaxWidth="520"
                   Padding="24"
@@ -4273,7 +4286,8 @@
               IsVisible="{Binding IsMobileControlDetailsOpen}"
               Background="{DynamicResource AppModalOverlayBrush}">
         <Grid Margin="28,16,28,28">
-          <Border Classes="semi-card Shadow"
+          <Border x:Name="MobileControlDetailsModal"
+                  Classes="semi-card Shadow"
                   MaxWidth="560"
                   Padding="24"
                   HorizontalAlignment="Center"
@@ -4702,7 +4716,8 @@
               Background="{DynamicResource AppModalOverlayBrush}"
               PointerPressed="OnTomorrowSeatOverlayPointerPressed">
         <Grid Margin="28,16,28,28">
-          <Border Classes="semi-card Shadow"
+          <Border x:Name="TomorrowSeatSelectionModal"
+                  Classes="semi-card Shadow"
                   MaxWidth="1180"
                   MaxHeight="760"
                   Padding="24"
@@ -4817,7 +4832,8 @@
         <Grid HorizontalAlignment="Stretch"
               VerticalAlignment="Stretch"
               Margin="24,8,24,24">
-          <Border Classes="semi-card Shadow"
+          <Border x:Name="VenuePickerModal"
+                  Classes="semi-card Shadow"
                   Width="400"
                   MaxWidth="400"
                   MaxHeight="600"
