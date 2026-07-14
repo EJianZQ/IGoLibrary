@@ -1,15 +1,32 @@
 namespace IGoLibrary.Ex.Desktop;
 
-internal sealed record RestartArguments(int? ParentProcessId, string[] ApplicationArguments)
+internal sealed record RestartArguments(
+    int? ParentProcessId,
+    string[] ApplicationArguments,
+    string? UpdateTransactionId = null)
 {
     public const string ParentProcessIdOption = "--storage-restart-parent-pid";
+    public const string UpdateTransactionOption = "--update-transaction";
 
     public static RestartArguments Parse(IReadOnlyList<string> arguments)
     {
         int? parentProcessId = null;
+        string? updateTransactionId = null;
         var forwarded = new List<string>(arguments.Count);
         for (var index = 0; index < arguments.Count; index++)
         {
+            if (string.Equals(arguments[index], UpdateTransactionOption, StringComparison.Ordinal))
+            {
+                if (index + 1 >= arguments.Count ||
+                    !Guid.TryParseExact(arguments[++index], "N", out var transactionId))
+                {
+                    throw new ArgumentException("更新事务参数无效", nameof(arguments));
+                }
+
+                updateTransactionId = transactionId.ToString("N");
+                continue;
+            }
+
             if (!string.Equals(arguments[index], ParentProcessIdOption, StringComparison.Ordinal))
             {
                 forwarded.Add(arguments[index]);
@@ -24,12 +41,12 @@ internal sealed record RestartArguments(int? ParentProcessId, string[] Applicati
                     out var parsed) ||
                 parsed <= 0)
             {
-                throw new ArgumentException("重启父进程参数无效。", nameof(arguments));
+                throw new ArgumentException("重启父进程参数无效", nameof(arguments));
             }
 
             parentProcessId = parsed;
         }
 
-        return new RestartArguments(parentProcessId, forwarded.ToArray());
+        return new RestartArguments(parentProcessId, forwarded.ToArray(), updateTransactionId);
     }
 }

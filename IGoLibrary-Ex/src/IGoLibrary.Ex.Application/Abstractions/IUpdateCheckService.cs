@@ -65,4 +65,11 @@ public sealed record ReleaseUpdateInfo(
     string Body,
     Uri HtmlUrl,
     DateTimeOffset? PublishedAt,
-    bool IsPrerelease);
+    ReleaseAssetInfo? WindowsX64Package = null);
+
+public sealed record ReleaseAssetInfo(
+    string Name,
+    Uri BrowserDownloadUrl,
+    long Size,
+    string Digest,
+    string ContentType);

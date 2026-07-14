@@ -65,6 +65,12 @@ public sealed class ArchitectureClosureTests
             var text = File.ReadAllText(file);
             foreach (var term in bannedTerms)
             {
+                if (term == "Window")
+                {
+                    Assert.DoesNotMatch(@"\bWindow\b", text);
+                    continue;
+                }
+
                 Assert.DoesNotContain(term, text, StringComparison.Ordinal);
             }
         }
@@ -121,9 +127,60 @@ public sealed class ArchitectureClosureTests
             var text = File.ReadAllText(file);
             foreach (var term in bannedTerms)
             {
+                if (term == "Window")
+                {
+                    Assert.DoesNotMatch(@"\bWindow\b", text);
+                    continue;
+                }
+
                 Assert.DoesNotContain(term, text, StringComparison.Ordinal);
             }
         }
+    }
+
+    [Fact]
+    public void UpdaterCoreProject_UsesOnlyBclAndDoesNotReferenceProductionOrUiLayers()
+    {
+        var coreRoot = Path.Combine(GetRepositoryRoot().FullName, "src", "IGoLibrary.Ex.Updater.Core");
+        var projectText = File.ReadAllText(Path.Combine(coreRoot, "IGoLibrary.Ex.Updater.Core.csproj"));
+        Assert.DoesNotContain("ProjectReference", projectText, StringComparison.Ordinal);
+        Assert.DoesNotContain("PackageReference", projectText, StringComparison.Ordinal);
+
+        var bannedTerms = new[]
+        {
+            "using IGoLibrary.Ex.Domain",
+            "using IGoLibrary.Ex.Application",
+            "using IGoLibrary.Ex.Infrastructure",
+            "using IGoLibrary.Ex.Desktop",
+            "Avalonia",
+            "System.Windows.Forms"
+        };
+        foreach (var file in Directory.EnumerateFiles(coreRoot, "*.cs", SearchOption.AllDirectories))
+        {
+            var text = File.ReadAllText(file);
+            foreach (var term in bannedTerms)
+            {
+                Assert.DoesNotContain(term, text, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Fact]
+    public void WindowsUpdaterProject_ReferencesOnlyUpdaterCore()
+    {
+        var updaterProject = Path.Combine(
+            GetRepositoryRoot().FullName,
+            "src",
+            "IGoLibrary.Ex.Updater",
+            "IGoLibrary.Ex.Updater.csproj");
+        var text = File.ReadAllText(updaterProject);
+
+        Assert.Contains("IGoLibrary.Ex.Updater.Core", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("IGoLibrary.Ex.Domain", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("IGoLibrary.Ex.Application", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("IGoLibrary.Ex.Infrastructure", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("IGoLibrary.Ex.Desktop", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("PackageReference", text, StringComparison.Ordinal);
     }
 
     [Fact]

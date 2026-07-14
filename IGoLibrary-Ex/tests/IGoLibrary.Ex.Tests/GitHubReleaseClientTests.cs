@@ -21,7 +21,14 @@ public sealed class GitHubReleaseClientTests
                     "draft": false,
                     "prerelease": false,
                     "assets": [
-                      { "name": "IGoLibrary-Ex-v1.0.0-windows-x64.zip" }
+                      {
+                        "name": "IGoLibrary-Ex-v1.0.0-windows-x64.zip",
+                        "browser_download_url": "https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.0/IGoLibrary-Ex-v1.0.0-windows-x64.zip",
+                        "size": 123456,
+                        "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                        "state": "uploaded",
+                        "content_type": "application/zip"
+                      }
                     ]
                   }
                 ]
@@ -36,7 +43,15 @@ public sealed class GitHubReleaseClientTests
         Assert.Equal("IGoLibrary-Ex v1.0.0", release.Name);
         Assert.Equal("更新内容", release.Body);
         Assert.Equal(new DateTimeOffset(2026, 6, 9, 8, 0, 0, TimeSpan.Zero), release.PublishedAt);
-        Assert.Contains("IGoLibrary-Ex-v1.0.0-windows-x64.zip", release.AssetNames);
+        var asset = Assert.Single(release.Assets);
+        Assert.Equal("IGoLibrary-Ex-v1.0.0-windows-x64.zip", asset.Name);
+        Assert.Equal(123456, asset.Size);
+        Assert.Equal("sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", asset.Digest);
+        Assert.Equal("uploaded", asset.State);
+        Assert.Equal("application/zip", asset.ContentType);
+        Assert.Equal(
+            new Uri("https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.0/IGoLibrary-Ex-v1.0.0-windows-x64.zip"),
+            asset.BrowserDownloadUrl);
     }
 
     [Fact]

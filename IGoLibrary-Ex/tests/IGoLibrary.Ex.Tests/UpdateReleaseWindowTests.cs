@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Layout;
 using Avalonia.Styling;
+using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Updates;
 using IGoLibrary.Ex.Desktop;
 using Markdown.Avalonia.Full;
 
@@ -58,5 +60,29 @@ public sealed class UpdateReleaseWindowTests
         var markdownViewer = UpdateReleaseWindow.CreateReleaseBodyViewer(body);
 
         Assert.Equal("此版本没有填写更新说明", markdownViewer.Markdown);
+    }
+
+    [Fact]
+    public void ShouldShowAutomaticInstall_RequiresWindowsAndQualifiedAsset()
+    {
+        var release = new ReleaseUpdateInfo(
+            new ReleaseVersion(1, 0, 1),
+            "v1.0.1",
+            "IGoLibrary-Ex v1.0.1",
+            "notes",
+            new Uri("https://github.com/EJianZQ/IGoLibrary/releases/tag/v1.0.1"),
+            DateTimeOffset.UtcNow,
+            new ReleaseAssetInfo(
+                "IGoLibrary-Ex-v1.0.1-windows-x64.zip",
+                new Uri("https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/file.zip"),
+                1,
+                "sha256:" + new string('0', 64),
+                "application/zip"));
+
+        Assert.True(UpdateReleaseWindow.ShouldShowAutomaticInstall(release, isWindows: true));
+        Assert.False(UpdateReleaseWindow.ShouldShowAutomaticInstall(release, isWindows: false));
+        Assert.False(UpdateReleaseWindow.ShouldShowAutomaticInstall(
+            release with { WindowsX64Package = null },
+            isWindows: true));
     }
 }

@@ -7,15 +7,15 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$versionPattern = '^\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z-]*(\.[0-9A-Za-z][0-9A-Za-z-]*)*)?$'
+$versionPattern = '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
 if ([string]::IsNullOrWhiteSpace($AppVersion)) {
-    throw "必须通过 -AppVersion 提供版本号，例如：-AppVersion `"0.4.0-beta.1`"。"
+    throw "必须通过 -AppVersion 提供版本号，例如：-AppVersion `"1.0.1`"。"
 }
 if ($AppVersion.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "AppVersion 不要带 v 前缀；请传 `"0.4.0-beta.1`"，Git tag / Release 再使用 `"v0.4.0-beta.1`"。"
+    throw "AppVersion 不要带 v 前缀；Git tag / Release 再使用 vN.N.N。"
 }
 if ($AppVersion -notmatch $versionPattern) {
-    throw "AppVersion 格式无效：$AppVersion。请使用 0.4.0、0.4.0-beta.1 或 0.4.0-rc.1。"
+    throw "AppVersion 格式无效：$AppVersion。请使用不带前导零的 N.N.N 稳定版本号。"
 }
 
 $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))

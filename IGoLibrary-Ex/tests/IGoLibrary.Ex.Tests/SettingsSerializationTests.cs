@@ -130,6 +130,33 @@ public sealed class SettingsSerializationTests
     }
 
     [Fact]
+    public void UpdateEtagVersionMigration_PreservesBinding_AndLeavesLegacyEtagUnbound()
+    {
+        var bound = MigrateAndDeserialize(
+            """
+            {
+              "updates": {
+                "lastReleaseETag": "\"etag\"",
+                "lastReleaseETagVersion": "1.0.0"
+              }
+            }
+            """);
+        var legacy = MigrateAndDeserialize(
+            """
+            {
+              "updates": {
+                "lastReleaseETag": "\"legacy\""
+              }
+            }
+            """);
+
+        Assert.Equal("\"etag\"", bound.Updates.LastReleaseETag);
+        Assert.Equal("1.0.0", bound.Updates.LastReleaseETagVersion);
+        Assert.Equal("\"legacy\"", legacy.Updates.LastReleaseETag);
+        Assert.Null(legacy.Updates.LastReleaseETagVersion);
+    }
+
+    [Fact]
     public void LegacyAdvancedModeMigration_MigratesToTraceIntProtocolSettings()
     {
         const string json = """{"advancedMode":true}""";

@@ -41,7 +41,21 @@ public partial class App : Avalonia.Application
             {
                 try
                 {
+                    if (Program.UpdateTransactionId is { } transactionId)
+                    {
+                        UpdateStartupHealthReporter.ReportReady(
+                            transactionId,
+                            services.GetRequiredService<IAppVersionProvider>());
+                    }
+
                     await viewModel.InitializeAsync();
+                    if (Program.UpdateTransactionId is { } completedTransactionId)
+                    {
+                        await UpdateStartupHealthReporter.ObserveCompletionAsync(
+                            completedTransactionId,
+                            services.GetRequiredService<IAppVersionProvider>(),
+                            services.GetRequiredService<INotificationService>());
+                    }
                 }
                 catch (Exception ex)
                 {

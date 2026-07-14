@@ -13,5 +13,6 @@ public enum UpdateDialogResult
 {
     Later,
     OpenReleasePage,
-    SkipVersion
+    SkipVersion,
+    DownloadAndInstall
 }

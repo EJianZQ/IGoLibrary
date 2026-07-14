@@ -8,6 +8,7 @@
     <ProjectReference Include="..\..\src\IGoLibrary.Ex.Desktop\IGoLibrary.Ex.Desktop.csproj" />
     <ProjectReference Include="..\..\src\IGoLibrary.Ex.Domain\IGoLibrary.Ex.Domain.csproj" />
     <ProjectReference Include="..\..\src\IGoLibrary.Ex.Infrastructure\IGoLibrary.Ex.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\IGoLibrary.Ex.Updater.Core\IGoLibrary.Ex.Updater.Core.csproj" />
     <ProjectReference Include="..\IGoLibrary.Ex.TestProcess\IGoLibrary.Ex.TestProcess.csproj" />
   </ItemGroup>
 

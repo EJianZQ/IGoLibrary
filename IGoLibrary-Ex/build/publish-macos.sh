@@ -9,18 +9,18 @@ APP_VERSION="${APP_VERSION:-}"
 EXECUTABLE_NAME="IGoLibrary.Ex.Desktop"
 
 if [[ -z "${APP_VERSION//[[:space:]]/}" ]]; then
-  echo "APP_VERSION is required. Example: APP_VERSION=0.4.0-beta.1 ./build/publish-macos.sh Release osx-arm64" >&2
+  echo "APP_VERSION is required. Example: APP_VERSION=1.0.1 ./build/publish-macos.sh Release osx-arm64" >&2
   exit 1
 fi
 if [[ "$APP_VERSION" =~ ^[vV] ]]; then
-  echo "APP_VERSION must not include the v prefix. Use 0.4.0-beta.1; use v0.4.0-beta.1 only for the Git tag / GitHub Release." >&2
+  echo "APP_VERSION must not include the v prefix; use vN.N.N only for the Git tag / GitHub Release." >&2
   exit 1
 fi
-if [[ ! $APP_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z-]*(\.[0-9A-Za-z][0-9A-Za-z-]*)*)?$ ]]; then
-  echo "Invalid APP_VERSION: $APP_VERSION. Use 0.4.0, 0.4.0-beta.1, or 0.4.0-rc.1." >&2
+if [[ ! $APP_VERSION =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+  echo "Invalid APP_VERSION: $APP_VERSION. Use a canonical N.N.N stable version without leading zeroes." >&2
   exit 1
 fi
-BUNDLE_VERSION="${APP_VERSION%%-*}"
+BUNDLE_VERSION="$APP_VERSION"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT="$ROOT/src/IGoLibrary.Ex.Desktop/IGoLibrary.Ex.Desktop.csproj"

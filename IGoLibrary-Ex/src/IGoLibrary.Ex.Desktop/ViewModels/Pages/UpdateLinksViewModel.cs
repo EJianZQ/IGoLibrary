@@ -16,6 +16,7 @@ public sealed partial class UpdateLinksViewModel(
     INotificationService notificationService,
     IUpdateCheckService updateCheckService,
     IUpdateDialogService updateDialogService,
+    IWindowsUpdateProgressDialogService windowsUpdateProgressDialogService,
     IExternalLinkService externalLinkService,
     IAppVersionProvider appVersionProvider) : ViewModelBase
 {
@@ -154,17 +155,44 @@ public sealed partial class UpdateLinksViewModel(
         if (result.HasUpdate && result.Release is { } release)
         {
             activityLogService.Write(LogEntryKind.Info, "Update", $"发现新版本：{release.TagName}");
-            var dialogResult = await updateDialogService.ShowUpdateAsync(release);
-            if (dialogResult == UpdateDialogResult.OpenReleasePage)
+            while (true)
             {
-                await OpenUpdateReleasePageAsync(release.HtmlUrl);
-            }
-            else if (dialogResult == UpdateDialogResult.SkipVersion)
-            {
-                await updateCheckService.SkipVersionAsync(release.Version);
-                await notificationService.ShowSuccessAsync(
-                    "已跳过此版本",
-                    $"{release.TagName} 将不再提示");
+                var dialogResult = await updateDialogService.ShowUpdateAsync(release);
+                if (dialogResult == UpdateDialogResult.OpenReleasePage)
+                {
+                    await OpenUpdateReleasePageAsync(release.HtmlUrl);
+                    break;
+                }
+
+                if (dialogResult == UpdateDialogResult.SkipVersion)
+                {
+                    await updateCheckService.SkipVersionAsync(release.Version);
+                    await notificationService.ShowSuccessAsync(
+                        "已跳过此版本",
+                        $"{release.TagName} 将不再提示");
+                    break;
+                }
+
+                if (dialogResult != UpdateDialogResult.DownloadAndInstall)
+                {
+                    break;
+                }
+
+                var installResult = await windowsUpdateProgressDialogService.ShowAsync(release);
+                LogInstallResult(release, installResult);
+                if (installResult.ExitRequested)
+                {
+                    break;
+                }
+
+                if (installResult.Outcome == WindowsPortableUpdateOutcome.Canceled)
+                {
+                    await notificationService.ShowInfoAsync("已取消自动更新", installResult.Message);
+                }
+                else
+                {
+                    await notificationService.ShowWarningAsync("自动更新未开始", installResult.Message);
+                }
             }
 
             return;
@@ -185,6 +213,26 @@ public sealed partial class UpdateLinksViewModel(
         {
             await notificationService.ShowSuccessAsync("检查更新完成", result.Message);
         }
+    }
+
+    private void LogInstallResult(
+        ReleaseUpdateInfo release,
+        WindowsPortableUpdateResult result)
+    {
+        var (kind, outcome) = result.Outcome switch
+        {
+            WindowsPortableUpdateOutcome.ExitRequested =>
+                (LogEntryKind.Success, "自动更新已交接给独立更新组件"),
+            WindowsPortableUpdateOutcome.Blocked =>
+                (LogEntryKind.Warning, "自动更新被阻止"),
+            WindowsPortableUpdateOutcome.Canceled =>
+                (LogEntryKind.Info, "自动更新已取消"),
+            _ => (LogEntryKind.Error, "自动更新失败")
+        };
+        activityLogService.Write(
+            kind,
+            "Update",
+            $"{outcome}（目标版本 {release.TagName}）：{result.Message}");
     }
 
     private async Task OpenUpdateReleasePageAsync(Uri releaseUrl)

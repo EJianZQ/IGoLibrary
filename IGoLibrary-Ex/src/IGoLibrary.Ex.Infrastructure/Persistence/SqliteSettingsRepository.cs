@@ -310,6 +310,12 @@ public sealed class SqliteSettingsRepository(
         WriteNullableDateTimeOffset(writer, "lastCheckedAtUtc", updates);
         WriteNullableString(writer, "skippedVersion", updates, default, "skippedVersion");
         WriteNullableString(writer, "lastReleaseETag", updates, default, "lastReleaseETag");
+        WriteNullableString(
+            writer,
+            "lastReleaseETagVersion",
+            updates,
+            default,
+            "lastReleaseETagVersion");
         writer.WriteEndObject();
 
         writer.WritePropertyName("mobileControl");

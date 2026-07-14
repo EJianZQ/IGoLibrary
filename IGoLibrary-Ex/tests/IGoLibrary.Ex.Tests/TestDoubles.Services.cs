@@ -435,9 +435,28 @@ internal sealed class FakeUpdateDialogService : IUpdateDialogService
 {
     public List<ReleaseUpdateInfo> Releases { get; } = [];
 
+    public Queue<UpdateDialogResult> Results { get; } = new();
+
     public UpdateDialogResult Result { get; set; } = UpdateDialogResult.Later;
 
     public Task<UpdateDialogResult> ShowUpdateAsync(
+        ReleaseUpdateInfo release,
+        CancellationToken cancellationToken = default)
+    {
+        Releases.Add(release);
+        return Task.FromResult(Results.Count > 0 ? Results.Dequeue() : Result);
+    }
+}
+
+internal sealed class FakeWindowsUpdateProgressDialogService : IWindowsUpdateProgressDialogService
+{
+    public WindowsPortableUpdateResult Result { get; set; } = new(
+        WindowsPortableUpdateOutcome.Canceled,
+        "已取消");
+
+    public List<ReleaseUpdateInfo> Releases { get; } = [];
+
+    public Task<WindowsPortableUpdateResult> ShowAsync(
         ReleaseUpdateInfo release,
         CancellationToken cancellationToken = default)
     {

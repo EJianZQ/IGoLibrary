@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddSingleton<ISettingsWorkflowService, SettingsWorkflowService>();
         services.AddSingleton<ILoggingSettingsWorkflowService, LoggingSettingsWorkflowService>();
         services.AddSingleton<IUpdateCheckService, UpdateCheckService>();
+        services.AddSingleton<IUpdateInstallGuard, UpdateInstallGuard>();
         services.AddSingleton<IProtocolTemplateEditorService, ProtocolTemplateEditorService>();
         services.AddSingleton<IRemoteCheckInProfileService, RemoteCheckInProfileService>();
         services.AddSingleton<IRemoteCheckInWorkflowService, RemoteCheckInWorkflowService>();

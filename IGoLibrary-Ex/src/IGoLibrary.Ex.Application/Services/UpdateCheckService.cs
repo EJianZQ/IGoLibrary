@@ -40,14 +40,27 @@ public sealed class UpdateCheckService(
         }
 
         GitHubReleaseQueryResult queryResult;
+        var currentVersion = appVersionProvider.CurrentVersion;
+        var currentVersionText = currentVersion.ToString();
+        var requestEtag = mode == UpdateCheckMode.Automatic &&
+                          string.Equals(
+                              updateSettings.LastReleaseETagVersion,
+                              currentVersionText,
+                              StringComparison.Ordinal)
+            ? updateSettings.LastReleaseETag
+            : null;
         var requestTimeout = TimeSpan.FromSeconds(Math.Max(
             3,
             (settings.Network ?? NetworkRequestSettings.Default).TimeoutSeconds));
-        await SaveCheckStateAsync(now, etag: null, cancellationToken);
+        await SaveCheckStateAsync(
+            now,
+            etag: null,
+            etagVersion: null,
+            cancellationToken);
         try
         {
             queryResult = await releaseClient.GetReleasesAsync(
-                updateSettings.LastReleaseETag,
+                requestEtag,
                 requestTimeout,
                 cancellationToken);
         }
@@ -64,34 +77,47 @@ public sealed class UpdateCheckService(
 
         if (queryResult.NotModified)
         {
-            await SaveCheckStateAsync(now, queryResult.ETag, cancellationToken);
+            await SaveCheckStateAsync(
+                now,
+                queryResult.ETag,
+                currentVersionText,
+                cancellationToken);
             return UpdateCheckResult.Skipped(
                 UpdateCheckStatus.NotModified,
                 "GitHub Release 列表没有变化");
         }
 
-        var currentVersion = appVersionProvider.CurrentVersion;
-        var includePrerelease = currentVersion.IsPrerelease;
         var latestRelease = SelectLatestRelease(
             queryResult.Releases,
-            currentVersion,
-            includePrerelease);
+            currentVersion);
         if (latestRelease is null)
         {
-            await SaveCheckStateAsync(now, queryResult.ETag, cancellationToken);
+            await SaveCheckStateAsync(
+                now,
+                queryResult.ETag,
+                currentVersionText,
+                cancellationToken);
             return UpdateCheckResult.NoUpdate("当前已是最新版本");
         }
 
         if (ReleaseVersion.TryParse(updateSettings.SkippedVersion, out var skippedVersion) &&
             latestRelease.Version <= skippedVersion)
         {
-            await SaveCheckStateAsync(now, queryResult.ETag, cancellationToken);
+            await SaveCheckStateAsync(
+                now,
+                queryResult.ETag,
+                currentVersionText,
+                cancellationToken);
             return UpdateCheckResult.Skipped(
                 UpdateCheckStatus.SkippedVersion,
                 $"已跳过版本 {latestRelease.Version}");
         }
 
-        await SaveCheckStateAsync(now, etag: null, cancellationToken);
+        await SaveCheckStateAsync(
+            now,
+            etag: null,
+            etagVersion: null,
+            cancellationToken);
         return UpdateCheckResult.UpdateAvailable(latestRelease);
     }
 
@@ -110,14 +136,12 @@ public sealed class UpdateCheckService(
 
     private static ReleaseUpdateInfo? SelectLatestRelease(
         IReadOnlyList<GitHubReleaseItem> releases,
-        ReleaseVersion currentVersion,
-        bool includePrerelease)
+        ReleaseVersion currentVersion)
     {
         return releases
-            .Where(static release => !release.Draft)
+            .Where(static release => !release.Draft && !release.Prerelease)
             .Select(TryCreateReleaseInfo)
             .OfType<ReleaseUpdateInfo>()
-            .Where(release => includePrerelease || !release.IsPrerelease)
             .Where(release => release.Version > currentVersion)
             .OrderByDescending(static release => release.Version)
             .FirstOrDefault();
@@ -125,7 +149,8 @@ public sealed class UpdateCheckService(
 
     private static ReleaseUpdateInfo? TryCreateReleaseInfo(GitHubReleaseItem release)
     {
-        if (!ReleaseVersion.TryParse(release.TagName, out var version))
+        if (release.Draft || release.Prerelease ||
+            !ReleaseVersion.TryParse(release.TagName, out var version))
         {
             return null;
         }
@@ -142,18 +167,76 @@ public sealed class UpdateCheckService(
             release.Body ?? string.Empty,
             release.HtmlUrl,
             release.PublishedAt,
-            release.Prerelease || version.IsPrerelease);
+            SelectWindowsX64Package(release, version));
     }
 
     private static bool IsProductRelease(GitHubReleaseItem release)
     {
         if (ContainsProductMarker(release.Name) ||
-            release.AssetNames.Any(ContainsProductMarker))
+            release.Assets.Any(static asset => ContainsProductMarker(asset.Name)))
         {
             return true;
         }
 
         return false;
+    }
+
+    private static ReleaseAssetInfo? SelectWindowsX64Package(
+        GitHubReleaseItem release,
+        ReleaseVersion version)
+    {
+        var expectedName = $"IGoLibrary-Ex-v{version}-windows-x64.zip";
+        var matches = release.Assets
+            .Where(asset => string.Equals(
+                asset.Name,
+                expectedName,
+                StringComparison.Ordinal))
+            .ToArray();
+        if (matches.Length != 1)
+        {
+            return null;
+        }
+
+        var asset = matches[0];
+        if (!string.Equals(asset.State, "uploaded", StringComparison.OrdinalIgnoreCase) ||
+            asset.Size <= 0 ||
+            asset.BrowserDownloadUrl is not { Scheme: "https" } downloadUrl ||
+            !string.Equals(downloadUrl.Host, "github.com", StringComparison.OrdinalIgnoreCase) ||
+            !downloadUrl.AbsolutePath.StartsWith(
+                "/EJianZQ/IGoLibrary/releases/download/",
+                StringComparison.OrdinalIgnoreCase) ||
+            !TryNormalizeSha256Digest(asset.Digest, out var digest))
+        {
+            return null;
+        }
+
+        return new ReleaseAssetInfo(
+            asset.Name,
+            downloadUrl,
+            asset.Size,
+            digest,
+            string.IsNullOrWhiteSpace(asset.ContentType)
+                ? "application/zip"
+                : asset.ContentType.Trim());
+    }
+
+    private static bool TryNormalizeSha256Digest(string? value, out string digest)
+    {
+        digest = string.Empty;
+        if (string.IsNullOrWhiteSpace(value) ||
+            !value.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var hash = value[7..].Trim();
+        if (hash.Length != 64 || !hash.All(Uri.IsHexDigit))
+        {
+            return false;
+        }
+
+        digest = "sha256:" + hash.ToLowerInvariant();
+        return true;
     }
 
     private static bool ContainsProductMarker(string? value)
@@ -165,6 +248,7 @@ public sealed class UpdateCheckService(
     private async Task SaveCheckStateAsync(
         DateTimeOffset checkedAtUtc,
         string? etag,
+        string? etagVersion,
         CancellationToken cancellationToken)
     {
         await settingsService.UpdateAsync(current =>
@@ -177,7 +261,10 @@ public sealed class UpdateCheckService(
                     LastCheckedAtUtc = checkedAtUtc,
                     LastReleaseETag = string.IsNullOrWhiteSpace(etag)
                         ? updates.LastReleaseETag
-                        : etag
+                        : etag,
+                    LastReleaseETagVersion = string.IsNullOrWhiteSpace(etag)
+                        ? updates.LastReleaseETagVersion
+                        : etagVersion
                 }
             };
         }, cancellationToken);

@@ -31,8 +31,8 @@ public sealed class UpdateReleaseWindow : Window
 
         var openButton = new Button
         {
-            Content = "前往 GitHub Release 页面",
-            MinWidth = 180,
+            Content = "前往 GitHub",
+            MinWidth = 125,
             HorizontalContentAlignment = HorizontalAlignment.Center
         };
         openButton.Click += (_, _) =>
@@ -55,6 +55,37 @@ public sealed class UpdateReleaseWindow : Window
             HorizontalContentAlignment = HorizontalAlignment.Center
         };
         laterButton.Click += (_, _) => Close(UpdateDialogResult.Later);
+
+        var buttons = new List<Control>
+        {
+            laterButton,
+            skipButton,
+            openButton
+        };
+        if (ShouldShowAutomaticInstall(release, OperatingSystem.IsWindows()))
+        {
+            var installButton = new Button
+            {
+                Content = "下载并安装",
+                MinWidth = 125,
+                HorizontalContentAlignment = HorizontalAlignment.Center
+            };
+            installButton.Classes.Add("accent");
+            installButton.Click += (_, _) => Close(UpdateDialogResult.DownloadAndInstall);
+            buttons.Add(installButton);
+        }
+
+        var buttonPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Spacing = 10,
+            [Grid.RowProperty] = 3
+        };
+        foreach (var button in buttons)
+        {
+            buttonPanel.Children.Add(button);
+        }
 
         Content = new Border
         {
@@ -106,19 +137,7 @@ public sealed class UpdateReleaseWindow : Window
                         Child = CreateReleaseBodyViewer(release.Body),
                         [Grid.RowProperty] = 2
                     },
-                    new StackPanel
-                    {
-                        Orientation = Orientation.Horizontal,
-                        HorizontalAlignment = HorizontalAlignment.Right,
-                        Spacing = 10,
-                        Children =
-                        {
-                            laterButton,
-                            skipButton,
-                            openButton
-                        },
-                        [Grid.RowProperty] = 3
-                    }
+                    buttonPanel
                 }
             }
         };
@@ -165,9 +184,16 @@ public sealed class UpdateReleaseWindow : Window
         };
     }
 
+    internal static bool ShouldShowAutomaticInstall(
+        ReleaseUpdateInfo release,
+        bool isWindows)
+    {
+        return isWindows && release.WindowsX64Package is not null;
+    }
+
     private static string BuildReleaseSubtitle(ReleaseUpdateInfo release)
     {
-        var channel = release.IsPrerelease ? "预发布版本" : "正式版本";
+        const string channel = "正式版本";
         return release.PublishedAt is { } publishedAt
             ? $"{channel} · 发布于 {publishedAt.LocalDateTime:yyyy-MM-dd HH:mm}"
             : channel;

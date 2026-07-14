@@ -37,7 +37,8 @@ internal static class MainWindowViewModelTestHarness
         INetworkExposureManager? networkExposureManager = null,
         ISeatLabelDialogService? seatLabelDialogService = null,
         IGrabStrategyReminderDialogService? grabStrategyReminderDialogService = null,
-        IMainWindowSizePersistenceService? windowSizePersistenceService = null)
+        IMainWindowSizePersistenceService? windowSizePersistenceService = null,
+        IWindowsUpdateProgressDialogService? windowsUpdateProgressDialogService = null)
     {
         mobileControlService ??= new FakeMobileControlService();
         remoteCheckInWorkflowService ??= new FakeRemoteCheckInWorkflowService();
@@ -46,6 +47,7 @@ internal static class MainWindowViewModelTestHarness
         seatLabelDialogService ??= new FakeSeatLabelDialogService();
         grabStrategyReminderDialogService ??= new FakeGrabStrategyReminderDialogService();
         windowSizePersistenceService ??= NoOpMainWindowSizePersistenceService.Instance;
+        windowsUpdateProgressDialogService ??= new FakeWindowsUpdateProgressDialogService();
         var workflowState = new ShellWorkflowState();
         var oauthCodeRegistry = new OAuthCodeConsumptionRegistry();
         var lanCookieRelayViewModel = new LanCookieRelayViewModel(
@@ -162,6 +164,7 @@ internal static class MainWindowViewModelTestHarness
                 notificationService,
                 updateCheckService,
                 updateDialogService,
+                windowsUpdateProgressDialogService,
                 externalLinkService,
                 appVersionProvider));
 

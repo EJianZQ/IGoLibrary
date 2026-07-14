@@ -11,6 +11,7 @@ using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Application.Updates;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
+using IGoLibrary.Ex.Updater.Core;
 using Avalonia.Media;
 using Avalonia.Threading;
 
@@ -2403,8 +2404,7 @@ public sealed class MainWindowViewModelTests
             "IGoLibrary-Ex v1.0.2",
             "更新内容",
             new Uri("https://github.com/EJianZQ/IGoLibrary/releases/tag/v1.0.2"),
-            new DateTimeOffset(2026, 6, 9, 8, 0, 0, TimeSpan.Zero),
-            false);
+            new DateTimeOffset(2026, 6, 9, 8, 0, 0, TimeSpan.Zero));
         var updateCheckService = new FakeUpdateCheckService();
         updateCheckService.Results.Enqueue(UpdateCheckResult.UpdateAvailable(release));
         var updateDialogService = new FakeUpdateDialogService
@@ -2442,6 +2442,43 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(release.HtmlUrl, Assert.Single(externalLinkService.OpenedUris));
         Assert.Empty(updateCheckService.SkippedVersions);
+    }
+
+    [Fact]
+    public async Task CheckForUpdatesAsync_LogsInstallationFailure_WhenPackageManifestIsMissing()
+    {
+        var release = CreateReleaseUpdateInfo("v1.0.2");
+        var updateCheckService = new FakeUpdateCheckService();
+        updateCheckService.Results.Enqueue(UpdateCheckResult.UpdateAvailable(release));
+        var updateDialogService = new FakeUpdateDialogService();
+        updateDialogService.Results.Enqueue(UpdateDialogResult.DownloadAndInstall);
+        updateDialogService.Results.Enqueue(UpdateDialogResult.Later);
+        var installDialogService = new FakeWindowsUpdateProgressDialogService
+        {
+            Result = new WindowsPortableUpdateResult(
+                WindowsPortableUpdateOutcome.Failed,
+                $"更新包校验失败：缺少必需的更新清单文件：{UpdateProtocol.ManifestFileName}")
+        };
+        var activityLogService = new ActivityLogService();
+        var notificationService = new FakeNotificationService();
+        var viewModel = CreateViewModel(
+            notificationService: notificationService,
+            updateCheckService: updateCheckService,
+            updateDialogService: updateDialogService,
+            activityLogService: activityLogService,
+            windowsUpdateProgressDialogService: installDialogService);
+
+        await viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        var entry = Assert.Single(
+            activityLogService.Entries,
+            entry => entry.Kind == LogEntryKind.Error && entry.Category == "Update");
+        Assert.Contains("自动更新失败", entry.Message);
+        Assert.Contains(release.TagName, entry.Message);
+        Assert.Contains(UpdateProtocol.ManifestFileName, entry.Message);
+        var warning = Assert.Single(notificationService.Warnings);
+        Assert.Equal("自动更新未开始", warning.Title);
+        Assert.Contains(UpdateProtocol.ManifestFileName, warning.Message);
     }
 
     [Fact]
@@ -3828,7 +3865,8 @@ public sealed class MainWindowViewModelTests
         FakeMobileControlService? mobileControlService = null,
         FakeTimeProvider? timeProvider = null,
         FakeNetworkExposureManager? networkExposureManager = null,
-        IMainWindowSizePersistenceService? windowSizePersistenceService = null)
+        IMainWindowSizePersistenceService? windowSizePersistenceService = null,
+        FakeWindowsUpdateProgressDialogService? windowsUpdateProgressDialogService = null)
     {
         sessionService ??= new FakeSessionService();
         libraryService ??= new FakeLibraryService();
@@ -3867,7 +3905,8 @@ public sealed class MainWindowViewModelTests
             qrCodeImageFactory ?? new FakeQrCodeImageFactory(),
             mobileControlService,
             networkExposureManager: networkExposureManager,
-            windowSizePersistenceService: windowSizePersistenceService);
+            windowSizePersistenceService: windowSizePersistenceService,
+            windowsUpdateProgressDialogService: windowsUpdateProgressDialogService);
     }
 
     private static ReleaseUpdateInfo CreateReleaseUpdateInfo(string tagName)
@@ -3879,8 +3918,7 @@ public sealed class MainWindowViewModelTests
             $"IGoLibrary-Ex {tagName}",
             "更新内容",
             new Uri($"https://github.com/EJianZQ/IGoLibrary/releases/tag/{tagName}"),
-            new DateTimeOffset(2026, 6, 9, 8, 0, 0, TimeSpan.Zero),
-            version.IsPrerelease);
+            new DateTimeOffset(2026, 6, 9, 8, 0, 0, TimeSpan.Zero));
     }
 
     private static async Task<(MainWindowViewModel ViewModel, FakeTomorrowReservationCoordinator Coordinator)>

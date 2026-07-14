@@ -87,10 +87,31 @@ public sealed class GitHubReleaseClient(HttpClient httpClient) : IGitHubReleaseC
             dto.Draft,
             dto.Prerelease,
             dto.Assets?
-                .Select(static asset => asset.Name)
-                .Where(static name => !string.IsNullOrWhiteSpace(name))
-                .Select(static name => name!)
+                .Select(MapAsset)
+                .OfType<GitHubReleaseAssetItem>()
                 .ToArray() ?? []);
+    }
+
+    private static GitHubReleaseAssetItem? MapAsset(GitHubReleaseAssetDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Name))
+        {
+            return null;
+        }
+
+        Uri? browserDownloadUrl = null;
+        if (!string.IsNullOrWhiteSpace(dto.BrowserDownloadUrl))
+        {
+            Uri.TryCreate(dto.BrowserDownloadUrl, UriKind.Absolute, out browserDownloadUrl);
+        }
+
+        return new GitHubReleaseAssetItem(
+            dto.Name.Trim(),
+            browserDownloadUrl,
+            dto.Size,
+            dto.Digest,
+            dto.State,
+            dto.ContentType);
     }
 
     private sealed record GitHubReleaseDto(
@@ -104,5 +125,10 @@ public sealed class GitHubReleaseClient(HttpClient httpClient) : IGitHubReleaseC
         [property: JsonPropertyName("assets")] IReadOnlyList<GitHubReleaseAssetDto>? Assets);
 
     private sealed record GitHubReleaseAssetDto(
-        [property: JsonPropertyName("name")] string? Name);
+        [property: JsonPropertyName("name")] string? Name,
+        [property: JsonPropertyName("browser_download_url")] string? BrowserDownloadUrl,
+        [property: JsonPropertyName("size")] long Size,
+        [property: JsonPropertyName("digest")] string? Digest,
+        [property: JsonPropertyName("state")] string? State,
+        [property: JsonPropertyName("content_type")] string? ContentType);
 }

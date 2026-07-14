@@ -10,6 +10,8 @@ public sealed record UpdateCheckSettings
 
     public string? LastReleaseETag { get; init; }
 
+    public string? LastReleaseETagVersion { get; init; }
+
     public UpdateCheckSettings()
     {
     }
@@ -18,12 +20,14 @@ public sealed record UpdateCheckSettings
         bool checkOnStartup,
         DateTimeOffset? lastCheckedAtUtc,
         string? skippedVersion,
-        string? lastReleaseETag)
+        string? lastReleaseETag,
+        string? lastReleaseETagVersion = null)
     {
         CheckOnStartup = checkOnStartup;
         LastCheckedAtUtc = lastCheckedAtUtc;
         SkippedVersion = skippedVersion;
         LastReleaseETag = lastReleaseETag;
+        LastReleaseETagVersion = lastReleaseETagVersion;
     }
 
     public static UpdateCheckSettings Default { get; } = new();

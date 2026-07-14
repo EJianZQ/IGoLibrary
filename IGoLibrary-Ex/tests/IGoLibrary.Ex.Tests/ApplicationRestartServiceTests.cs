@@ -20,6 +20,33 @@ public sealed class ApplicationRestartServiceTests
     }
 
     [Fact]
+    public void RestartArguments_Parse_RemovesInternalUpdateOption()
+    {
+        var transactionId = Guid.NewGuid().ToString("N");
+
+        var parsed = RestartArguments.Parse([
+            "--user-option",
+            RestartArguments.UpdateTransactionOption,
+            transactionId
+        ]);
+
+        Assert.Equal(transactionId, parsed.UpdateTransactionId);
+        Assert.Equal(["--user-option"], parsed.ApplicationArguments);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not-a-guid")]
+    [InlineData("00000000-0000-0000-0000-000000000000")]
+    public void RestartArguments_Parse_RejectsInvalidUpdateTransaction(string value)
+    {
+        Assert.Throws<ArgumentException>(() => RestartArguments.Parse([
+            RestartArguments.UpdateTransactionOption,
+            value
+        ]));
+    }
+
+    [Fact]
     public void BuildStartInfo_ForSelfContainedExecutable_DoesNotRepeatExecutablePath()
     {
         var executable = Path.GetFullPath("IGoLibrary.Ex.Desktop.exe");

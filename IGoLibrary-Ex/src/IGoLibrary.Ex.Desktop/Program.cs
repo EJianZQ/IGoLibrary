@@ -1,6 +1,7 @@
 using Avalonia;
 using System.Diagnostics;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.Startup;
 using IGoLibrary.Ex.Infrastructure.Logging;
 using IGoLibrary.Ex.Infrastructure.Persistence;
@@ -15,6 +16,7 @@ internal static class Program
     private static bool _globalExceptionLoggingRegistered;
     private static int _skipNextUnhandledExceptionLog;
     public static IHost? Host { get; private set; }
+    public static string? UpdateTransactionId { get; private set; }
 
     [STAThread]
     public static void Main(string[] args)
@@ -49,6 +51,11 @@ internal static class Program
 
     private static void RunPrimaryApplication(RestartArguments restartArguments)
     {
+        UpdateTransactionId = restartArguments.UpdateTransactionId;
+        if (OperatingSystem.IsWindows())
+        {
+            UpdateStartupMaintenance.Run(UpdateTransactionId);
+        }
         var storageLocationManager = new StorageLocationManager();
         var storageLocations = storageLocationManager
             .InitializeAsync()
@@ -157,6 +164,7 @@ internal static class Program
                     finally
                     {
                         Host = null;
+                        UpdateTransactionId = null;
                     }
                 }
             }

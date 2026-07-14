@@ -8,19 +8,18 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class UpdateCheckServiceTests
 {
     [Fact]
-    public async Task CheckAsync_IncludesPrerelease_WhenCurrentVersionIsPrerelease()
+    public async Task CheckAsync_IgnoresPrereleaseOnlyReleaseList()
     {
         var releaseClient = new FakeGitHubReleaseClient(
-            Release("v0.4.0-beta.1", prerelease: true),
+            Release("v1.1.0", prerelease: true),
             Release("Public1.3"));
         var service = CreateService(
-            currentVersion: Parse("0.3.0-beta"),
+            currentVersion: Parse("1.0.0"),
             releaseClient: releaseClient);
 
         var result = await service.CheckAsync(UpdateCheckMode.Automatic);
 
-        Assert.True(result.HasUpdate);
-        Assert.Equal("0.4.0-beta.1", result.Release?.Version.ToString());
+        Assert.Equal(UpdateCheckStatus.NoUpdate, result.Status);
     }
 
     [Fact]
@@ -90,6 +89,84 @@ public sealed class UpdateCheckServiceTests
     }
 
     [Fact]
+    public async Task CheckAsync_ManualCheckBypassesCachedEtag_AndFindsUpdate()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            Updates = UpdateCheckSettings.Default with
+            {
+                LastReleaseETag = "\"old\"",
+                LastReleaseETagVersion = "1.0.0"
+            }
+        });
+        var releaseClient = new FakeGitHubReleaseClient(Release("v1.0.1"));
+        var service = CreateService(
+            currentVersion: Parse("1.0.0"),
+            releaseClient: releaseClient,
+            settingsService: settingsService);
+
+        var result = await service.CheckAsync(UpdateCheckMode.Manual);
+
+        Assert.True(result.HasUpdate);
+        Assert.Null(Assert.Single(releaseClient.RequestedEtags));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("1.0.1")]
+    public async Task CheckAsync_AutomaticCheckIgnoresEtagNotBoundToCurrentVersion(
+        string? etagVersion)
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            Updates = UpdateCheckSettings.Default with
+            {
+                LastReleaseETag = "\"old\"",
+                LastReleaseETagVersion = etagVersion
+            }
+        });
+        var releaseClient = new FakeGitHubReleaseClient(Release("v1.0.1"));
+        var service = CreateService(
+            currentVersion: Parse("1.0.0"),
+            releaseClient: releaseClient,
+            settingsService: settingsService);
+
+        var result = await service.CheckAsync(UpdateCheckMode.Automatic);
+
+        Assert.True(result.HasUpdate);
+        Assert.Null(Assert.Single(releaseClient.RequestedEtags));
+    }
+
+    [Fact]
+    public async Task CheckAsync_AutomaticCheckUsesEtagBoundToCurrentVersion()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            Updates = UpdateCheckSettings.Default with
+            {
+                LastReleaseETag = "\"old\"",
+                LastReleaseETagVersion = "1.0.0"
+            }
+        });
+        var releaseClient = new FakeGitHubReleaseClient
+        {
+            ResultOverride = new GitHubReleaseQueryResult(
+                NotModified: true,
+                ETag: "\"old\"",
+                Releases: [])
+        };
+        var service = CreateService(
+            currentVersion: Parse("1.0.0"),
+            releaseClient: releaseClient,
+            settingsService: settingsService);
+
+        var result = await service.CheckAsync(UpdateCheckMode.Automatic);
+
+        Assert.Equal(UpdateCheckStatus.NotModified, result.Status);
+        Assert.Equal("\"old\"", Assert.Single(releaseClient.RequestedEtags));
+    }
+
+    [Fact]
     public async Task CheckAsync_RefreshesAttemptTime_WhenAutomaticCheckFails()
     {
         var now = new DateTimeOffset(2026, 6, 9, 8, 0, 0, TimeSpan.Zero);
@@ -148,6 +225,9 @@ public sealed class UpdateCheckServiceTests
 
         Assert.Equal(UpdateCheckStatus.NoUpdate, result.Status);
         Assert.Equal("\"etag\"", settingsService.CurrentSettings.Updates.LastReleaseETag);
+        Assert.Equal(
+            "1.0.0",
+            settingsService.CurrentSettings.Updates.LastReleaseETagVersion);
     }
 
     [Fact]
@@ -224,7 +304,7 @@ public sealed class UpdateCheckServiceTests
             new DateTimeOffset(2026, 6, 9, 8, 0, 0, TimeSpan.Zero),
             Draft: false,
             Prerelease: false,
-            AssetNames: []));
+            Assets: []));
         var service = CreateService(
             currentVersion: Parse("1.0.0"),
             releaseClient: releaseClient);
@@ -232,6 +312,74 @@ public sealed class UpdateCheckServiceTests
         var result = await service.CheckAsync(UpdateCheckMode.Manual);
 
         Assert.Equal(UpdateCheckStatus.NoUpdate, result.Status);
+    }
+
+    [Fact]
+    public async Task CheckAsync_SelectsExactUploadedWindowsX64Asset()
+    {
+        var release = Release("v1.0.1") with
+        {
+            Assets = [WindowsAsset("1.0.1")]
+        };
+        var service = CreateService(
+            Parse("1.0.0"),
+            new FakeGitHubReleaseClient(release));
+
+        var result = await service.CheckAsync(UpdateCheckMode.Manual);
+
+        var package = Assert.IsType<ReleaseAssetInfo>(result.Release?.WindowsX64Package);
+        Assert.Equal("IGoLibrary-Ex-v1.0.1-windows-x64.zip", package.Name);
+        Assert.Equal(123456, package.Size);
+        Assert.Equal(
+            "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            package.Digest);
+    }
+
+    [Theory]
+    [InlineData("IGoLibrary-Ex-v1.0.1-windows-arm64.zip", "uploaded", "https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/file.zip", 123456, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+    [InlineData("IGoLibrary-Ex-v1.0.1-windows-x64.zip", "new", "https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/file.zip", 123456, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+    [InlineData("IGoLibrary-Ex-v1.0.1-windows-x64.zip", "uploaded", "http://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/file.zip", 123456, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+    [InlineData("IGoLibrary-Ex-v1.0.1-windows-x64.zip", "uploaded", "https://example.com/file.zip", 123456, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+    [InlineData("IGoLibrary-Ex-v1.0.1-windows-x64.zip", "uploaded", "https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/file.zip", 0, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+    [InlineData("IGoLibrary-Ex-v1.0.1-windows-x64.zip", "uploaded", "https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/file.zip", 123456, "sha256:bad")]
+    public async Task CheckAsync_RejectsInvalidWindowsAsset(
+        string name,
+        string state,
+        string url,
+        long size,
+        string digest)
+    {
+        var release = Release("v1.0.1") with
+        {
+            Assets =
+            [
+                new GitHubReleaseAssetItem(
+                    name,
+                    new Uri(url),
+                    size,
+                    digest,
+                    state,
+                    "application/zip")
+            ]
+        };
+        var service = CreateService(Parse("1.0.0"), new FakeGitHubReleaseClient(release));
+
+        var result = await service.CheckAsync(UpdateCheckMode.Manual);
+
+        Assert.True(result.HasUpdate);
+        Assert.Null(result.Release?.WindowsX64Package);
+    }
+
+    [Fact]
+    public async Task CheckAsync_RejectsDuplicateMatchingWindowsAssets()
+    {
+        var asset = WindowsAsset("1.0.1");
+        var release = Release("v1.0.1") with { Assets = [asset, asset] };
+        var service = CreateService(Parse("1.0.0"), new FakeGitHubReleaseClient(release));
+
+        var result = await service.CheckAsync(UpdateCheckMode.Manual);
+
+        Assert.Null(result.Release?.WindowsX64Package);
     }
 
     private static UpdateCheckService CreateService(
@@ -261,7 +409,13 @@ public sealed class UpdateCheckServiceTests
             new DateTimeOffset(2026, 6, 9, 8, 0, 0, TimeSpan.Zero),
             draft,
             prerelease,
-            [$"IGoLibrary-Ex-{tagName}.zip"]);
+            [new GitHubReleaseAssetItem(
+                $"IGoLibrary-Ex-{tagName}.zip",
+                null,
+                0,
+                null,
+                null,
+                null)]);
     }
 
     private static ReleaseVersion Parse(string value)
@@ -270,11 +424,26 @@ public sealed class UpdateCheckServiceTests
         return version;
     }
 
+    private static GitHubReleaseAssetItem WindowsAsset(string version)
+    {
+        return new GitHubReleaseAssetItem(
+            $"IGoLibrary-Ex-v{version}-windows-x64.zip",
+            new Uri($"https://github.com/EJianZQ/IGoLibrary/releases/download/v{version}/IGoLibrary-Ex-v{version}-windows-x64.zip"),
+            123456,
+            "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "uploaded",
+            "application/zip");
+    }
+
     private sealed class FakeGitHubReleaseClient(params GitHubReleaseItem[] releases) : IGitHubReleaseClient
     {
         public int CallCount { get; private set; }
 
+        public List<string?> RequestedEtags { get; } = [];
+
         public Exception? ExceptionToThrow { get; init; }
+
+        public GitHubReleaseQueryResult? ResultOverride { get; init; }
 
         public Task<GitHubReleaseQueryResult> GetReleasesAsync(
             string? etag,
@@ -282,12 +451,14 @@ public sealed class UpdateCheckServiceTests
             CancellationToken cancellationToken = default)
         {
             CallCount++;
+            RequestedEtags.Add(etag);
             if (ExceptionToThrow is not null)
             {
                 throw ExceptionToThrow;
             }
 
-            return Task.FromResult(new GitHubReleaseQueryResult(false, "\"etag\"", releases));
+            return Task.FromResult(ResultOverride ??
+                new GitHubReleaseQueryResult(false, "\"etag\"", releases));
         }
     }
 

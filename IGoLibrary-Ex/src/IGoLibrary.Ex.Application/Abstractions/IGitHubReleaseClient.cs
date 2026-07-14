@@ -21,4 +21,12 @@ public sealed record GitHubReleaseItem(
     DateTimeOffset? PublishedAt,
     bool Draft,
     bool Prerelease,
-    IReadOnlyList<string> AssetNames);
+    IReadOnlyList<GitHubReleaseAssetItem> Assets);
+
+public sealed record GitHubReleaseAssetItem(
+    string Name,
+    Uri? BrowserDownloadUrl,
+    long Size,
+    string? Digest,
+    string? State,
+    string? ContentType);

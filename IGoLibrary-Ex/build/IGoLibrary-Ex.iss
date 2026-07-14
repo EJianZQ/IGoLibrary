@@ -1,5 +1,5 @@
 #define MyAppName "IGoLibrary-Ex"
-#define MyAppVersion "0.3.0-beta"
+#define MyAppVersion "1.0.0"
 #define MyAppPublisher "EJianZQ"
 #define MyAppExeName "IGoLibrary.Ex.Desktop.exe"
 
@@ -21,7 +21,7 @@ WizardStyle=modern
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Files]
-Source: "..\artifacts\publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\artifacts\publish\win-x64\*"; DestDir: "{app}"; Excludes: "portable-release.marker,update-manifest.json,IGoLibrary.Ex.Updater.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

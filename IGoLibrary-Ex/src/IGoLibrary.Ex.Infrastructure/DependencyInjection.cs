@@ -58,6 +58,15 @@ public static class DependencyInjection
             client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
             client.DefaultRequestHeaders.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
         });
+        services.AddHttpClient<IReleaseAssetDownloader, GitHubReleaseAssetDownloader>(client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("IGoLibrary-Ex");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/octet-stream");
+        }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+        {
+            ConnectTimeout = TimeSpan.FromSeconds(30)
+        });
 
         services.AddSingleton<TraceIntRequestPolicy>();
         services.AddSingleton<ITraceIntCookieHttpClient, RestSharpTraceIntCookieHttpClient>();

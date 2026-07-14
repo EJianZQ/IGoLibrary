@@ -19,6 +19,7 @@
     <ProjectReference Include="..\IGoLibrary.Ex.Application\IGoLibrary.Ex.Application.csproj" />
     <ProjectReference Include="..\IGoLibrary.Ex.Domain\IGoLibrary.Ex.Domain.csproj" />
     <ProjectReference Include="..\IGoLibrary.Ex.Infrastructure\IGoLibrary.Ex.Infrastructure.csproj" />
+    <ProjectReference Include="..\IGoLibrary.Ex.Updater.Core\IGoLibrary.Ex.Updater.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
