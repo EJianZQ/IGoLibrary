@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Infrastructure;
 using IGoLibrary.Ex.Infrastructure.Updates;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Tests;
@@ -13,6 +15,19 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
         Path.GetTempPath(),
         "IGoLibrary-Ex-downloader-tests",
         Guid.NewGuid().ToString("N"));
+
+    [Fact]
+    public void AddInfrastructure_ResolvesTypedDownloader()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddInfrastructure();
+
+        using var serviceProvider = services.BuildServiceProvider();
+
+        Assert.IsType<GitHubReleaseAssetDownloader>(
+            serviceProvider.GetRequiredService<IReleaseAssetDownloader>());
+    }
 
     [Fact]
     public async Task DownloadAsync_StreamsReportsAndAtomicallyCompletes()

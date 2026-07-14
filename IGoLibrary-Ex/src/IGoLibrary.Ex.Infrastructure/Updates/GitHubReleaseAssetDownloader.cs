@@ -28,6 +28,16 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
 
     public GitHubReleaseAssetDownloader(
         HttpClient httpClient,
+        ILogger<GitHubReleaseAssetDownloader> logger)
+        : this(
+            httpClient,
+            logger,
+            TimeProvider.System)
+    {
+    }
+
+    internal GitHubReleaseAssetDownloader(
+        HttpClient httpClient,
         TimeSpan? noProgressTimeout = null)
         : this(
             httpClient,
@@ -37,7 +47,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
     {
     }
 
-    public GitHubReleaseAssetDownloader(
+    internal GitHubReleaseAssetDownloader(
         HttpClient httpClient,
         ILogger<GitHubReleaseAssetDownloader> logger,
         TimeProvider timeProvider,
