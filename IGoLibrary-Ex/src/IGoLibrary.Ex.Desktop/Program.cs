@@ -52,9 +52,10 @@ internal static class Program
     private static void RunPrimaryApplication(RestartArguments restartArguments)
     {
         UpdateTransactionId = restartArguments.UpdateTransactionId;
+        var updateMaintenanceResult = UpdateStartupMaintenanceResult.Empty;
         if (OperatingSystem.IsWindows())
         {
-            UpdateStartupMaintenance.Run(UpdateTransactionId);
+            updateMaintenanceResult = UpdateStartupMaintenance.Run(UpdateTransactionId);
         }
         var storageLocationManager = new StorageLocationManager();
         var storageLocations = storageLocationManager
@@ -112,6 +113,7 @@ internal static class Program
                 WriteLogCleanupWarning(sharedLogWriter, applyResult);
             }
 
+            WriteUpdateMaintenanceResult(sharedLogWriter, updateMaintenanceResult);
             Host.Start();
             Host.Services.GetRequiredService<TraceListenerRegistrar>().Attach();
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(restartArguments.ApplicationArguments);
@@ -184,6 +186,36 @@ internal static class Program
             LogLevel.Warning,
             "Logging",
             $"有 {result.TotalDeleteFailureCount} 个旧日志文件暂时无法清理，将在后续启动或设置变更时重试。");
+    }
+
+    private static void WriteUpdateMaintenanceResult(
+        IAppLogWriter logWriter,
+        UpdateStartupMaintenanceResult result)
+    {
+        if (result.DeletedIncompleteDownloadCount > 0 ||
+            result.DeletedInvalidOrExpiredCacheCount > 0 ||
+            result.RetainedVerifiedCacheCount > 0 ||
+            result.DeletedUpdaterTransactionCount > 0 ||
+            result.DeletedLogCount > 0)
+        {
+            logWriter.Write(
+                LogLevel.Information,
+                "UpdateMaintenance",
+                $"更新启动维护完成：清理未完成下载 {result.DeletedIncompleteDownloadCount} 个，" +
+                $"清理损坏或过期验签缓存 {result.DeletedInvalidOrExpiredCacheCount} 个，" +
+                $"保留有效验签缓存 {result.RetainedVerifiedCacheCount} 个，" +
+                $"清理终态更新事务 {result.DeletedUpdaterTransactionCount} 个，" +
+                $"清理旧更新日志 {result.DeletedLogCount} 个。");
+        }
+
+        foreach (var failure in result.Failures)
+        {
+            logWriter.Write(
+                LogLevel.Warning,
+                "UpdateMaintenance",
+                $"{failure.Operation}：{failure.Item}。将在后续启动重试。",
+                failure.Exception);
+        }
     }
 
     private static void RegisterGlobalExceptionLogging(IAppLogWriter logWriter)

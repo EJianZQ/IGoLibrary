@@ -33,8 +33,8 @@ public sealed class WindowsUpdateProgressDialogService(
                 "主窗口尚未就绪，无法开始自动更新");
         }
 
-        var dialog = new WindowsUpdateProgressWindow(
-            (progress, token) => updateService.DownloadAndInstallAsync(release, progress, token));
+        using var operation = updateService.CreateOperation(release);
+        var dialog = new WindowsUpdateProgressWindow(operation, cancellationToken);
         return await dialog.ShowDialog<WindowsPortableUpdateResult>(owner);
     }
 }

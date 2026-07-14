@@ -59,6 +59,9 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IMainWindowSizePersistenceService, MainWindowSizePersistenceService>();
                 services.AddSingleton<IErrorDialogService, ErrorDialogService>();
                 services.AddSingleton<IUpdateDialogService, UpdateDialogService>();
+                services.AddSingleton<WindowsUpdateWorkspaceManager>();
+                services.AddSingleton<WindowsUpdatePackagePreparationService>();
+                services.AddSingleton<WindowsUpdateHandoffService>();
                 services.AddSingleton<IWindowsPortableUpdateService, WindowsPortableUpdateService>();
                 services.AddSingleton<IWindowsUpdateProgressDialogService, WindowsUpdateProgressDialogService>();
                 services.AddSingleton<IExternalLinkService, ExternalLinkService>();
