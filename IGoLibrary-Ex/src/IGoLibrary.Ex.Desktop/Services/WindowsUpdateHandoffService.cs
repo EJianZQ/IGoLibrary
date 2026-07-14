@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace IGoLibrary.Ex.Desktop.Services;
 
 internal sealed class WindowsUpdateHandoffService(
-    ILogger<WindowsUpdateHandoffService> logger)
+    ILogger<WindowsUpdateHandoffService> logger) : IWindowsUpdateHandoffService
 {
     private static readonly TimeSpan CoordinatorReadyTimeout = TimeSpan.FromMinutes(3);
     private static readonly TimeSpan BootstrapTimeout = TimeSpan.FromMinutes(2);
@@ -220,7 +220,7 @@ internal sealed class WindowsUpdateHandoffService(
         return new WindowsUpdateHandoffResult(
             outcome,
             message,
-            CanDeleteWorkspace: !handoffCompleted && updaterProcessesStopped && cleanupCompleted,
+            CanRestoreVerifiedCache: !handoffCompleted && updaterProcessesStopped && cleanupCompleted,
             failure);
     }
 
@@ -642,10 +642,18 @@ internal sealed class WindowsUpdateHandoffService(
         string TrustedUpdaterPath);
 }
 
+internal interface IWindowsUpdateHandoffService
+{
+    Task<WindowsUpdateHandoffResult> ExecuteAsync(
+        PreparedWindowsUpdatePackage package,
+        IProgress<WindowsUpdateProgress> progress,
+        CancellationToken cancellationToken);
+}
+
 internal sealed record WindowsUpdateHandoffResult(
     WindowsPortableUpdateOutcome Outcome,
     string Message,
-    bool CanDeleteWorkspace,
+    bool CanRestoreVerifiedCache,
     Exception? Failure)
 {
     public bool ReadyForExit => Outcome == WindowsPortableUpdateOutcome.ExitRequested;

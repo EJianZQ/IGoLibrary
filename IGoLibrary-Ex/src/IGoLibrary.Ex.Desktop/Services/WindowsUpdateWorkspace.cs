@@ -28,6 +28,9 @@ internal sealed class WindowsUpdateWorkspace(
 internal sealed class WindowsUpdateWorkspaceManager
 {
     internal static readonly TimeSpan VerifiedCacheRetention = TimeSpan.FromDays(7);
+    private static readonly HashSet<string> VerifiedCacheEntryNames = new(
+        ["package.zip", "staging", "verified-cache.json"],
+        StringComparer.OrdinalIgnoreCase);
     private readonly ILogger<WindowsUpdateWorkspaceManager> _logger;
     private readonly string _updatesRoot;
     private readonly TimeProvider _timeProvider;
@@ -95,15 +98,9 @@ internal sealed class WindowsUpdateWorkspaceManager
 
             try
             {
-                UpdatePathSafety.RejectReparsePoint(directory);
-                UpdatePathSafety.RejectReparsePoint(markerPath);
-                var cache = UpdateJsonFile.Read<VerifiedUpdateCache>(markerPath);
+                var cache = ReadValidVerifiedCacheLayout(directory, transactionId);
                 var now = _timeProvider.GetUtcNow();
-                if (!VerifiedUpdateCache.IsStructurallyValid(cache, transactionId) ||
-                    !string.Equals(cache.TargetVersion, targetVersion, StringComparison.OrdinalIgnoreCase) ||
-                    !string.Equals(cache.PackageDigest, asset.Digest, StringComparison.OrdinalIgnoreCase) ||
-                    cache.PackageSize != asset.Size ||
-                    cache.VerifiedAtUtc > now + TimeSpan.FromMinutes(5) ||
+                if (cache.VerifiedAtUtc > now + TimeSpan.FromMinutes(5) ||
                     now - cache.VerifiedAtUtc >= VerifiedCacheRetention)
                 {
                     _logger.LogWarning(
@@ -113,12 +110,30 @@ internal sealed class WindowsUpdateWorkspaceManager
                     continue;
                 }
 
+                if (!IsPureVerifiedCacheDirectory(directory))
+                {
+                    _logger.LogWarning(
+                        "验签缓存仍包含未完成的交接产物，暂不复用并等待安全清理。事务={TransactionId}。",
+                        transactionId);
+                    continue;
+                }
+
+                if (!string.Equals(cache.TargetVersion, targetVersion, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(cache.PackageDigest, asset.Digest, StringComparison.OrdinalIgnoreCase) ||
+                    cache.PackageSize != asset.Size)
+                {
+                    _logger.LogInformation(
+                        "跳过与当前 Release 资产不匹配的有效验签缓存。事务={TransactionId}，缓存版本={CachedVersion}，目标版本={TargetVersion}。",
+                        transactionId,
+                        cache.TargetVersion,
+                        targetVersion);
+                    continue;
+                }
+
                 var workspace = new WindowsUpdateWorkspace(
                     transactionId,
                     directory,
                     isVerifiedCache: true);
-                UpdatePathSafety.RejectReparsePoint(workspace.ArchivePath);
-                UpdatePathSafety.RejectReparsePoint(workspace.StagingDirectory);
                 await VerifyArchiveDigestAsync(workspace.ArchivePath, asset, cancellationToken);
                 var manifest = UpdatePackageValidator.LoadAndValidateManifest(
                     Path.Combine(workspace.StagingDirectory, UpdateProtocol.ManifestFileName),
@@ -168,6 +183,43 @@ internal sealed class WindowsUpdateWorkspaceManager
         workspace.MarkVerified();
     }
 
+    public bool TryRestoreVerifiedCache(
+        WindowsUpdateWorkspace workspace,
+        string reason)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        if (!workspace.IsVerifiedCache)
+        {
+            _logger.LogWarning(
+                "拒绝把未验签工作区恢复为验签缓存。事务={TransactionId}，原因={RestoreReason}。",
+                workspace.TransactionId,
+                reason);
+            return false;
+        }
+
+        try
+        {
+            RestoreVerifiedCacheDirectory(
+                UpdatesRoot,
+                workspace.TransactionDirectory,
+                workspace.TransactionId);
+            _logger.LogInformation(
+                "更新交接未完成，已恢复可复用的纯验签缓存。事务={TransactionId}，原因={RestoreReason}。",
+                workspace.TransactionId,
+                reason);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "更新交接产物暂时无法清理，保留事务并将在下次启动重试。事务={TransactionId}，原因={RestoreReason}。",
+                workspace.TransactionId,
+                reason);
+            return false;
+        }
+    }
+
     public bool TryDelete(WindowsUpdateWorkspace workspace, string reason)
     {
         return TryDelete(workspace.TransactionDirectory, reason);
@@ -177,15 +229,11 @@ internal sealed class WindowsUpdateWorkspaceManager
     {
         try
         {
-            var root = Path.GetFullPath(UpdatesRoot);
-            var target = Path.GetFullPath(transactionDirectory);
-            var parent = Path.GetDirectoryName(target);
-            var transactionId = Path.GetFileName(target);
-            if (!string.Equals(parent, root, StringComparison.OrdinalIgnoreCase) ||
-                !Guid.TryParseExact(transactionId, "N", out _))
-            {
-                throw new InvalidDataException("更新事务目录不在允许的 updates 根目录内");
-            }
+            var transactionId = Path.GetFileName(Path.GetFullPath(transactionDirectory));
+            var target = EnsureSafeTransactionDirectory(
+                UpdatesRoot,
+                transactionDirectory,
+                transactionId);
 
             if (!Directory.Exists(target))
             {
@@ -276,5 +324,114 @@ internal sealed class WindowsUpdateWorkspaceManager
         }
 
         Directory.Delete(directory, recursive: false);
+    }
+
+    internal static VerifiedUpdateCache ReadValidVerifiedCacheLayout(
+        string transactionDirectory,
+        string transactionId)
+    {
+        UpdatePathSafety.RejectReparsePoint(transactionDirectory);
+        var markerPath = Path.Combine(transactionDirectory, "verified-cache.json");
+        var archivePath = Path.Combine(transactionDirectory, "package.zip");
+        var stagingDirectory = Path.Combine(transactionDirectory, "staging");
+        var manifestPath = Path.Combine(stagingDirectory, UpdateProtocol.ManifestFileName);
+        if (!File.Exists(markerPath) ||
+            !File.Exists(archivePath) ||
+            !Directory.Exists(stagingDirectory) ||
+            !File.Exists(manifestPath))
+        {
+            throw new InvalidDataException("验签缓存缺少必要文件");
+        }
+
+        UpdatePathSafety.RejectReparsePoint(markerPath);
+        UpdatePathSafety.RejectReparsePoint(archivePath);
+        UpdatePathSafety.RejectReparsePoint(stagingDirectory);
+        UpdatePathSafety.RejectReparsePoint(manifestPath);
+        var cache = UpdateJsonFile.Read<VerifiedUpdateCache>(markerPath);
+        if (!VerifiedUpdateCache.IsStructurallyValid(cache, transactionId))
+        {
+            throw new InvalidDataException("验签缓存元数据无效");
+        }
+
+        return cache;
+    }
+
+    internal static void RestoreVerifiedCacheDirectory(
+        string updatesRoot,
+        string transactionDirectory,
+        string transactionId)
+    {
+        var target = EnsureSafeTransactionDirectory(
+            updatesRoot,
+            transactionDirectory,
+            transactionId);
+        ReadValidVerifiedCacheLayout(target, transactionId);
+
+        var extraEntries = Directory.EnumerateFileSystemEntries(target)
+            .Where(entry => !VerifiedCacheEntryNames.Contains(Path.GetFileName(entry)))
+            .ToArray();
+        foreach (var entry in extraEntries.Where(static entry =>
+                     !string.Equals(
+                         Path.GetFileName(entry),
+                         "request.json",
+                         StringComparison.OrdinalIgnoreCase)))
+        {
+            DeleteEntryWithoutFollowingReparsePoints(entry);
+        }
+
+        foreach (var requestPath in extraEntries.Where(static entry =>
+                     string.Equals(
+                         Path.GetFileName(entry),
+                         "request.json",
+                         StringComparison.OrdinalIgnoreCase)))
+        {
+            DeleteEntryWithoutFollowingReparsePoints(requestPath);
+        }
+
+        if (!IsPureVerifiedCacheDirectory(target))
+        {
+            throw new IOException("更新交接产物未能全部清理");
+        }
+    }
+
+    internal static bool IsPureVerifiedCacheDirectory(string transactionDirectory)
+    {
+        return Directory.EnumerateFileSystemEntries(transactionDirectory)
+            .All(entry => VerifiedCacheEntryNames.Contains(Path.GetFileName(entry)));
+    }
+
+    private static void DeleteEntryWithoutFollowingReparsePoints(string entry)
+    {
+        var attributes = File.GetAttributes(entry);
+        if ((attributes & FileAttributes.Directory) != 0)
+        {
+            DeleteDirectoryWithoutFollowingReparsePoints(entry);
+        }
+        else
+        {
+            File.Delete(entry);
+        }
+    }
+
+    private static string EnsureSafeTransactionDirectory(
+        string updatesRoot,
+        string transactionDirectory,
+        string transactionId)
+    {
+        var root = Path.GetFullPath(updatesRoot);
+        var target = Path.GetFullPath(transactionDirectory);
+        if (!string.Equals(Path.GetDirectoryName(target), root, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(Path.GetFileName(target), transactionId, StringComparison.Ordinal) ||
+            !Guid.TryParseExact(transactionId, "N", out _))
+        {
+            throw new InvalidDataException("更新事务目录不在允许的 updates 根目录内");
+        }
+
+        if (Directory.Exists(root))
+        {
+            UpdatePathSafety.RejectReparsePoint(root);
+        }
+
+        return target;
     }
 }

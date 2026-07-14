@@ -9,8 +9,8 @@ internal sealed class WindowsPortableUpdateOperation(
     IUpdateInstallGuard installGuard,
     IAppVersionProvider appVersionProvider,
     AppWindowService appWindowService,
-    WindowsUpdatePackagePreparationService packagePreparationService,
-    WindowsUpdateHandoffService handoffService,
+    IWindowsUpdatePackagePreparationService packagePreparationService,
+    IWindowsUpdateHandoffService handoffService,
     WindowsUpdateWorkspaceManager workspaceManager,
     ILogger<WindowsPortableUpdateOperation> logger) : IWindowsPortableUpdateOperation
 {
@@ -71,6 +71,7 @@ internal sealed class WindowsPortableUpdateOperation(
         var targetVersion = release.Version.ToString();
         WindowsUpdateWorkspace? workspace = null;
         var preserveWorkspace = false;
+        var restoreVerifiedCache = false;
         var operationStage = "验证运行平台";
 
         try
@@ -174,7 +175,10 @@ internal sealed class WindowsPortableUpdateOperation(
                 package,
                 trackedProgress,
                 cancellationToken);
-            preserveWorkspace = handoff.ReadyForExit || !handoff.CanDeleteWorkspace;
+            preserveWorkspace = handoff.ReadyForExit || !handoff.CanRestoreVerifiedCache;
+            restoreVerifiedCache = !handoff.ReadyForExit &&
+                                   handoff.CanRestoreVerifiedCache &&
+                                   workspace.IsVerifiedCache;
             if (handoff.ReadyForExit)
             {
                 logger.LogInformation(
@@ -183,7 +187,7 @@ internal sealed class WindowsPortableUpdateOperation(
                     targetVersion);
                 appWindowService.QuitApplication();
             }
-            else if (handoff.Failure is not null)
+            else if (handoff.Outcome == WindowsPortableUpdateOutcome.Failed)
             {
                 logger.LogError(
                     handoff.Failure,
@@ -217,6 +221,14 @@ internal sealed class WindowsPortableUpdateOperation(
         finally
         {
             Volatile.Write(ref _availableActions, (int)WindowsUpdateAvailableActions.None);
+            if (restoreVerifiedCache && workspace is not null)
+            {
+                preserveWorkspace = true;
+                workspaceManager.TryRestoreVerifiedCache(
+                    workspace,
+                    "独立更新组件未完成安装交接");
+            }
+
             if (workspace is not null && ShouldDeleteWorkspace(preserveWorkspace, workspace))
             {
                 workspaceManager.TryDelete(workspace, "更新操作未交接或已取消");

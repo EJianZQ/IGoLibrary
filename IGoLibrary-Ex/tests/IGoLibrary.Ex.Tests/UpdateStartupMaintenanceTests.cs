@@ -114,6 +114,80 @@ public sealed class UpdateStartupMaintenanceTests : IDisposable
     }
 
     [Fact]
+    public void RunForTests_RestoresStaleAbortedHandoffToVerifiedCache()
+    {
+        var transactionId = Guid.NewGuid().ToString("N");
+        var directory = WriteVerifiedCache(transactionId, _now - TimeSpan.FromDays(1));
+        var requestPath = Path.Combine(directory, "request.json");
+        UpdateJsonFile.WriteAtomic(requestPath, CreateRequest(transactionId, directory));
+        File.SetLastWriteTimeUtc(requestPath, (_now - TimeSpan.FromMinutes(2)).UtcDateTime);
+        File.WriteAllText(
+            Path.Combine(directory, UpdateProtocol.UpdaterExecutableName),
+            "copied updater");
+
+        var result = UpdateStartupMaintenance.RunForTests(_root, null, _now);
+
+        Assert.True(Directory.Exists(directory));
+        Assert.False(File.Exists(requestPath));
+        Assert.False(File.Exists(Path.Combine(directory, UpdateProtocol.UpdaterExecutableName)));
+        Assert.True(File.Exists(Path.Combine(directory, "verified-cache.json")));
+        Assert.True(File.Exists(Path.Combine(directory, "package.zip")));
+        Assert.True(Directory.Exists(Path.Combine(directory, "staging")));
+        Assert.Equal(1, result.RestoredVerifiedCacheCount);
+        Assert.Equal(0, result.DeletedUpdaterTransactionCount);
+        Assert.Empty(result.Failures);
+    }
+
+    [Fact]
+    public void RunForTests_CleansUpdaterArtifactCreatedBeforeRequest()
+    {
+        var transactionId = Guid.NewGuid().ToString("N");
+        var directory = WriteVerifiedCache(transactionId, _now - TimeSpan.FromDays(1));
+        var updaterPath = Path.Combine(directory, UpdateProtocol.UpdaterExecutableName);
+        File.WriteAllText(updaterPath, "partial updater");
+
+        var result = UpdateStartupMaintenance.RunForTests(_root, null, _now);
+
+        Assert.True(Directory.Exists(directory));
+        Assert.False(File.Exists(updaterPath));
+        Assert.True(File.Exists(Path.Combine(directory, "verified-cache.json")));
+        Assert.Equal(1, result.RestoredVerifiedCacheCount);
+        Assert.Equal(0, result.DeletedIncompleteDownloadCount);
+        Assert.Empty(result.Failures);
+    }
+
+    [Fact]
+    public void RunForTests_ReadyHandoffKeepsUpdaterTransactionOwnership()
+    {
+        var transactionId = Guid.NewGuid().ToString("N");
+        var directory = WriteVerifiedCache(transactionId, _now - TimeSpan.FromDays(1));
+        var requestPath = Path.Combine(directory, "request.json");
+        UpdateJsonFile.WriteAtomic(requestPath, CreateRequest(transactionId, directory));
+        File.SetLastWriteTimeUtc(requestPath, (_now - TimeSpan.FromMinutes(2)).UtcDateTime);
+        var signalPath = Path.Combine(directory, "coordinator-signal.json");
+        UpdateJsonFile.WriteAtomic(
+            signalPath,
+            new UpdateCoordinatorSignal(
+                UpdateProtocol.SchemaVersion,
+                transactionId,
+                UpdateCoordinatorSignalKind.Ready,
+                "ready",
+                _now - TimeSpan.FromMinutes(2)));
+        File.WriteAllText(
+            Path.Combine(directory, UpdateProtocol.UpdaterExecutableName),
+            "copied updater");
+
+        var result = UpdateStartupMaintenance.RunForTests(_root, null, _now);
+
+        Assert.True(File.Exists(requestPath));
+        Assert.True(File.Exists(signalPath));
+        Assert.True(File.Exists(Path.Combine(directory, UpdateProtocol.UpdaterExecutableName)));
+        Assert.Equal(0, result.RestoredVerifiedCacheCount);
+        Assert.Equal(0, result.DeletedUpdaterTransactionCount);
+        Assert.Empty(result.Failures);
+    }
+
+    [Fact]
     public void RunForTests_IgnoresNonGuidDirectory()
     {
         var unrelated = Path.Combine(_root, "unrelated");
@@ -163,5 +237,37 @@ public sealed class UpdateStartupMaintenanceTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         return Directory.CreateDirectory(Path.Combine(_root, transactionId)).FullName;
+    }
+
+    private UpdateTransactionRequest CreateRequest(
+        string transactionId,
+        string transactionDirectory)
+    {
+        var installationDirectory = Path.Combine(_root, $"installation-{transactionId}");
+        return new UpdateTransactionRequest(
+            UpdateProtocol.SchemaVersion,
+            transactionId,
+            int.MaxValue,
+            _now - TimeSpan.FromHours(1),
+            "1.0.0",
+            "1.0.1",
+            installationDirectory,
+            Path.Combine(transactionDirectory, "staging"),
+            transactionDirectory,
+            Path.Combine(transactionDirectory, "package.zip"),
+            Path.Combine(_root, $".IGoLibrary-Ex.update-{transactionId}"),
+            Path.Combine(_root, $".IGoLibrary-Ex.backup-{transactionId}"),
+            UpdateProtocol.EntryExecutableName,
+            UpdateProtocol.ManifestFileName,
+            "sha256:" + new string('a', 64),
+            3,
+            Path.Combine(transactionDirectory, "health.json"),
+            Path.Combine(transactionDirectory, "coordinator-signal.json"),
+            Path.Combine(transactionDirectory, "worker-ready.json"),
+            Path.Combine(transactionDirectory, "worker-status.json"),
+            Path.Combine(transactionDirectory, "decision.json"),
+            Path.Combine(transactionDirectory, "heartbeat.txt"),
+            Path.Combine(transactionDirectory, "launched-process.json"),
+            Path.Combine(_root, "logs"));
     }
 }

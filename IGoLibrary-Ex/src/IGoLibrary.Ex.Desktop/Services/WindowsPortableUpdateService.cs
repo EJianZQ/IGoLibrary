@@ -7,8 +7,8 @@ internal sealed class WindowsPortableUpdateService(
     IUpdateInstallGuard installGuard,
     IAppVersionProvider appVersionProvider,
     AppWindowService appWindowService,
-    WindowsUpdatePackagePreparationService packagePreparationService,
-    WindowsUpdateHandoffService handoffService,
+    IWindowsUpdatePackagePreparationService packagePreparationService,
+    IWindowsUpdateHandoffService handoffService,
     WindowsUpdateWorkspaceManager workspaceManager,
     ILogger<WindowsPortableUpdateOperation> operationLogger) : IWindowsPortableUpdateService
 {

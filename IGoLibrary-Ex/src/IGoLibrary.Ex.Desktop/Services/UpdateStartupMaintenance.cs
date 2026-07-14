@@ -82,11 +82,22 @@ internal static class UpdateStartupMaintenance
             var requestPath = Path.Combine(directory, "request.json");
             if (!File.Exists(requestPath))
             {
-                CleanDownloadWorkspace(directory, transactionId, now, result);
+                CleanDownloadWorkspace(
+                    updatesRoot,
+                    directory,
+                    transactionId,
+                    now,
+                    result);
                 return;
             }
 
-            CleanUpdaterTransaction(directory, transactionId, requestPath, now, result);
+            CleanUpdaterTransaction(
+                updatesRoot,
+                directory,
+                transactionId,
+                requestPath,
+                now,
+                result);
         }
         catch (Exception exception)
         {
@@ -95,6 +106,7 @@ internal static class UpdateStartupMaintenance
     }
 
     private static void CleanDownloadWorkspace(
+        string updatesRoot,
         string directory,
         string transactionId,
         DateTimeOffset now,
@@ -110,35 +122,36 @@ internal static class UpdateStartupMaintenance
 
         try
         {
-            UpdatePathSafety.RejectReparsePoint(cachePath);
-            var cache = UpdateJsonFile.Read<VerifiedUpdateCache>(cachePath);
-            var structurallyValid = VerifiedUpdateCache.IsStructurallyValid(
-                cache,
+            var cache = WindowsUpdateWorkspaceManager.ReadValidVerifiedCacheLayout(
+                directory,
                 transactionId);
-            var requiredFilesExist =
-                File.Exists(Path.Combine(directory, "package.zip")) &&
-                Directory.Exists(Path.Combine(directory, "staging")) &&
-                File.Exists(Path.Combine(
-                    directory,
-                    "staging",
-                    UpdateProtocol.ManifestFileName));
-            if (requiredFilesExist)
-            {
-                UpdatePathSafety.RejectReparsePoint(Path.Combine(directory, "package.zip"));
-                UpdatePathSafety.RejectReparsePoint(Path.Combine(directory, "staging"));
-                UpdatePathSafety.RejectReparsePoint(Path.Combine(
-                    directory,
-                    "staging",
-                    UpdateProtocol.ManifestFileName));
-            }
             var age = now - cache.VerifiedAtUtc;
-            if (!structurallyValid ||
-                !requiredFilesExist ||
-                cache.VerifiedAtUtc > now + MaximumFutureCacheSkew ||
+            if (cache.VerifiedAtUtc > now + MaximumFutureCacheSkew ||
                 age >= WindowsUpdateWorkspaceManager.VerifiedCacheRetention)
             {
                 DeleteTransactionDirectory(directory);
                 result.DeletedInvalidOrExpiredCacheCount++;
+                return;
+            }
+
+            if (!WindowsUpdateWorkspaceManager.IsPureVerifiedCacheDirectory(directory))
+            {
+                try
+                {
+                    WindowsUpdateWorkspaceManager.RestoreVerifiedCacheDirectory(
+                        updatesRoot,
+                        directory,
+                        transactionId);
+                    result.RestoredVerifiedCacheCount++;
+                }
+                catch (Exception exception)
+                {
+                    result.AddFailure(
+                        transactionId,
+                        "清理验签缓存中的中断交接产物失败",
+                        exception);
+                }
+
                 return;
             }
 
@@ -162,6 +175,7 @@ internal static class UpdateStartupMaintenance
     }
 
     private static void CleanUpdaterTransaction(
+        string updatesRoot,
         string directory,
         string transactionId,
         string requestPath,
@@ -183,38 +197,72 @@ internal static class UpdateStartupMaintenance
             !Directory.Exists(request.CandidateDirectory) &&
             !Directory.Exists(preparationWorkspace) &&
             !Directory.Exists(secureWorkingDirectory) &&
-            IsStaleHeartbeat(request))
+            IsStaleHeartbeat(request, now))
         {
             UpdateRecoveryRegistration.Unregister(transactionId);
         }
 
         var statusPath = request.WorkerStatusPath;
-        if (!File.Exists(statusPath))
+        UpdateWorkerStatus? status = null;
+        if (File.Exists(statusPath))
         {
-            var signalPath = request.CoordinatorReadyPath;
-            if (File.Exists(signalPath))
+            status = UpdateJsonFile.Read<UpdateWorkerStatus>(statusPath);
+            if (!string.Equals(status.TransactionId, transactionId, StringComparison.Ordinal))
             {
-                var signal = UpdateJsonFile.Read<UpdateCoordinatorSignal>(signalPath);
-                if (string.Equals(signal.TransactionId, transactionId, StringComparison.Ordinal) &&
-                    signal.Signal is UpdateCoordinatorSignalKind.Canceled or UpdateCoordinatorSignalKind.Failed &&
-                    now - signal.CreatedAtUtc >= TransactionRetention &&
-                    !Directory.Exists(request.CandidateDirectory) &&
-                    !Directory.Exists(preparationWorkspace) &&
-                    !Directory.Exists(request.BackupDirectory) &&
-                    !Directory.Exists(secureWorkingDirectory))
+                return;
+            }
+        }
+
+        UpdateCoordinatorSignal? signal = null;
+        var signalPath = request.CoordinatorReadyPath;
+        if (File.Exists(signalPath))
+        {
+            signal = UpdateJsonFile.Read<UpdateCoordinatorSignal>(signalPath);
+            if (signal.SchemaVersion != UpdateProtocol.SchemaVersion ||
+                !string.Equals(signal.TransactionId, transactionId, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("更新协调器信号无效");
+            }
+        }
+
+        if (TryRestoreAbortedVerifiedCache(
+                updatesRoot,
+                directory,
+                transactionId,
+                request,
+                status,
+                signal,
+                preparationWorkspace,
+                secureWorkingDirectory,
+                now,
+                result))
+        {
+            return;
+        }
+
+        if (status is null)
+        {
+            if (signal?.Signal is UpdateCoordinatorSignalKind.Canceled or UpdateCoordinatorSignalKind.Failed &&
+                now - signal.CreatedAtUtc >= TransactionRetention &&
+                !Directory.Exists(request.CandidateDirectory) &&
+                !Directory.Exists(preparationWorkspace) &&
+                !Directory.Exists(request.BackupDirectory) &&
+                !Directory.Exists(secureWorkingDirectory))
+            {
+                if (HasRetainableVerifiedCache(directory, transactionId, now))
                 {
-                    UpdateRecoveryRegistration.Unregister(transactionId);
-                    DeleteTransactionDirectory(directory);
-                    result.DeletedUpdaterTransactionCount++;
+                    return;
                 }
+
+                UpdateRecoveryRegistration.Unregister(transactionId);
+                DeleteTransactionDirectory(directory);
+                result.DeletedUpdaterTransactionCount++;
             }
 
             return;
         }
 
-        var status = UpdateJsonFile.Read<UpdateWorkerStatus>(statusPath);
-        if (!string.Equals(status.TransactionId, transactionId, StringComparison.Ordinal) ||
-            now - status.UpdatedAtUtc < TransactionRetention)
+        if (now - status.UpdatedAtUtc < TransactionRetention)
         {
             return;
         }
@@ -226,6 +274,11 @@ internal static class UpdateStartupMaintenance
                 !Directory.Exists(preparationWorkspace) &&
                 !Directory.Exists(secureWorkingDirectory))
             {
+                if (HasRetainableVerifiedCache(directory, transactionId, now))
+                {
+                    return;
+                }
+
                 UpdateRecoveryRegistration.Unregister(transactionId);
                 DeleteTransactionDirectory(directory);
                 result.DeletedUpdaterTransactionCount++;
@@ -252,6 +305,87 @@ internal static class UpdateStartupMaintenance
         UpdateRecoveryRegistration.Unregister(transactionId);
         DeleteTransactionDirectory(directory);
         result.DeletedUpdaterTransactionCount++;
+    }
+
+    private static bool TryRestoreAbortedVerifiedCache(
+        string updatesRoot,
+        string directory,
+        string transactionId,
+        UpdateTransactionRequest request,
+        UpdateWorkerStatus? status,
+        UpdateCoordinatorSignal? signal,
+        string preparationWorkspace,
+        string secureWorkingDirectory,
+        DateTimeOffset now,
+        ResultBuilder result)
+    {
+        var signalAllowsRestore =
+            signal is null ||
+            signal.Signal is
+                UpdateCoordinatorSignalKind.Canceled or
+                UpdateCoordinatorSignalKind.Failed;
+        var statusAllowsRestore =
+            status is null ||
+            status.Phase is
+                UpdateWorkerPhase.Starting or
+                UpdateWorkerPhase.Ready or
+                UpdateWorkerPhase.WaitingForParent or
+                UpdateWorkerPhase.Failed;
+        if (!signalAllowsRestore ||
+            !statusAllowsRestore ||
+            Directory.Exists(request.CandidateDirectory) ||
+            Directory.Exists(preparationWorkspace) ||
+            Directory.Exists(request.BackupDirectory) ||
+            Directory.Exists(secureWorkingDirectory) ||
+            !IsStaleHeartbeat(request, now) ||
+            !File.Exists(Path.Combine(directory, "verified-cache.json")))
+        {
+            return false;
+        }
+
+        try
+        {
+            var cache = WindowsUpdateWorkspaceManager.ReadValidVerifiedCacheLayout(
+                directory,
+                transactionId);
+            if (cache.VerifiedAtUtc > now + MaximumFutureCacheSkew ||
+                now - cache.VerifiedAtUtc >= WindowsUpdateWorkspaceManager.VerifiedCacheRetention)
+            {
+                return false;
+            }
+
+            WindowsUpdateWorkspaceManager.RestoreVerifiedCacheDirectory(
+                updatesRoot,
+                directory,
+                transactionId);
+            UpdateRecoveryRegistration.Unregister(transactionId);
+            result.RestoredVerifiedCacheCount++;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            result.AddFailure(transactionId, "恢复中断交接的验签缓存失败", exception);
+            return false;
+        }
+    }
+
+    private static bool HasRetainableVerifiedCache(
+        string directory,
+        string transactionId,
+        DateTimeOffset now)
+    {
+        try
+        {
+            var cache = WindowsUpdateWorkspaceManager.ReadValidVerifiedCacheLayout(
+                directory,
+                transactionId);
+            return cache.VerifiedAtUtc <= now + MaximumFutureCacheSkew &&
+                   now - cache.VerifiedAtUtc < WindowsUpdateWorkspaceManager.VerifiedCacheRetention;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static void EnsureSafeTransactionDirectory(
@@ -353,14 +487,16 @@ internal static class UpdateStartupMaintenance
         return DateTimeOffset.UtcNow - File.GetLastWriteTimeUtc(path) >= retention;
     }
 
-    private static bool IsStaleHeartbeat(UpdateTransactionRequest request)
+    private static bool IsStaleHeartbeat(
+        UpdateTransactionRequest request,
+        DateTimeOffset now)
     {
         try
         {
             var path = File.Exists(request.HeartbeatPath)
                 ? request.HeartbeatPath
                 : Path.Combine(Path.GetDirectoryName(request.HealthReportPath)!, "request.json");
-            return IsOlderThan(path, TimeSpan.FromMinutes(1));
+            return now - File.GetLastWriteTimeUtc(path) >= TimeSpan.FromMinutes(1);
         }
         catch
         {
@@ -378,6 +514,8 @@ internal static class UpdateStartupMaintenance
 
         public int RetainedVerifiedCacheCount { get; set; }
 
+        public int RestoredVerifiedCacheCount { get; set; }
+
         public int DeletedUpdaterTransactionCount { get; set; }
 
         public int DeletedLogCount { get; set; }
@@ -393,6 +531,7 @@ internal static class UpdateStartupMaintenance
                 DeletedIncompleteDownloadCount,
                 DeletedInvalidOrExpiredCacheCount,
                 RetainedVerifiedCacheCount,
+                RestoredVerifiedCacheCount,
                 DeletedUpdaterTransactionCount,
                 DeletedLogCount,
                 _failures.ToArray());
@@ -404,11 +543,12 @@ internal sealed record UpdateStartupMaintenanceResult(
     int DeletedIncompleteDownloadCount,
     int DeletedInvalidOrExpiredCacheCount,
     int RetainedVerifiedCacheCount,
+    int RestoredVerifiedCacheCount,
     int DeletedUpdaterTransactionCount,
     int DeletedLogCount,
     IReadOnlyList<UpdateStartupMaintenanceFailure> Failures)
 {
-    public static UpdateStartupMaintenanceResult Empty { get; } = new(0, 0, 0, 0, 0, []);
+    public static UpdateStartupMaintenanceResult Empty { get; } = new(0, 0, 0, 0, 0, 0, []);
 }
 
 internal sealed record UpdateStartupMaintenanceFailure(

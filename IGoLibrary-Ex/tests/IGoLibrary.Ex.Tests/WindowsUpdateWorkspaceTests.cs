@@ -44,6 +44,113 @@ public sealed class WindowsUpdateWorkspaceTests : IDisposable
     }
 
     [Fact]
+    public async Task TryFindVerifiedAsync_DifferentTargetRetainsCacheForItsOwnRelease()
+    {
+        var (manager, workspace, asset) = await CreateVerifiedWorkspaceAsync();
+
+        var differentTarget = await manager.TryFindVerifiedAsync(
+            asset,
+            "1.0.2",
+            CancellationToken.None);
+
+        Assert.Null(differentTarget);
+        Assert.True(Directory.Exists(workspace.TransactionDirectory));
+
+        var matchingTarget = await manager.TryFindVerifiedAsync(
+            asset,
+            "1.0.1",
+            CancellationToken.None);
+        Assert.NotNull(matchingTarget);
+        Assert.Equal(workspace.TransactionId, matchingTarget.TransactionId);
+    }
+
+    [Fact]
+    public async Task TryRestoreVerifiedCache_RemovesOnlyHandoffArtifactsAndRemainsReusable()
+    {
+        var (manager, workspace, asset) = await CreateVerifiedWorkspaceAsync();
+        File.WriteAllText(
+            Path.Combine(workspace.TransactionDirectory, UpdateProtocol.UpdaterExecutableName),
+            "copied updater");
+        File.WriteAllText(Path.Combine(workspace.TransactionDirectory, "request.json"), "{}");
+        File.WriteAllText(
+            Path.Combine(workspace.TransactionDirectory, "coordinator-signal.json"),
+            "{}");
+        var handoffTemporaryDirectory = Directory.CreateDirectory(
+            Path.Combine(workspace.TransactionDirectory, "handoff-temporary"));
+        File.WriteAllText(Path.Combine(handoffTemporaryDirectory.FullName, "artifact.tmp"), "temp");
+
+        var restored = manager.TryRestoreVerifiedCache(workspace, "测试交接失败");
+
+        Assert.True(restored);
+        Assert.Equal(
+            ["package.zip", "staging", "verified-cache.json"],
+            Directory.EnumerateFileSystemEntries(workspace.TransactionDirectory)
+                .Select(static entry => Path.GetFileName(entry)!)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+        var reused = await manager.TryFindVerifiedAsync(asset, "1.0.1", CancellationToken.None);
+        Assert.NotNull(reused);
+        Assert.Equal(workspace.TransactionId, reused.TransactionId);
+    }
+
+    [Fact]
+    public async Task TryFindVerifiedAsync_UpdaterArtifactBeforeRequestIsNotReused()
+    {
+        var (manager, workspace, asset) = await CreateVerifiedWorkspaceAsync();
+        File.WriteAllText(
+            Path.Combine(workspace.TransactionDirectory, UpdateProtocol.UpdaterExecutableName),
+            "partial updater");
+
+        var reused = await manager.TryFindVerifiedAsync(asset, "1.0.1", CancellationToken.None);
+
+        Assert.Null(reused);
+        Assert.True(Directory.Exists(workspace.TransactionDirectory));
+        Assert.True(File.Exists(workspace.ArchivePath));
+        Assert.True(File.Exists(Path.Combine(
+            workspace.TransactionDirectory,
+            "verified-cache.json")));
+    }
+
+    [Fact]
+    public async Task TryRestoreVerifiedCache_LockedArtifactKeepsRequestUntilRetrySucceeds()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var (manager, workspace, asset) = await CreateVerifiedWorkspaceAsync();
+        var updaterPath = Path.Combine(
+            workspace.TransactionDirectory,
+            UpdateProtocol.UpdaterExecutableName);
+        var requestPath = Path.Combine(workspace.TransactionDirectory, "request.json");
+        File.WriteAllText(updaterPath, "locked updater");
+        File.WriteAllText(requestPath, "request");
+
+        await using (var lockStream = new FileStream(
+                         updaterPath,
+                         FileMode.Open,
+                         FileAccess.Read,
+                         FileShare.None))
+        {
+            Assert.False(manager.TryRestoreVerifiedCache(workspace, "测试文件锁"));
+            Assert.True(File.Exists(requestPath));
+            Assert.Null(await manager.TryFindVerifiedAsync(
+                asset,
+                "1.0.1",
+                CancellationToken.None));
+        }
+
+        Assert.True(manager.TryRestoreVerifiedCache(workspace, "文件锁已释放"));
+        Assert.False(File.Exists(requestPath));
+        Assert.False(File.Exists(updaterPath));
+        Assert.NotNull(await manager.TryFindVerifiedAsync(
+            asset,
+            "1.0.1",
+            CancellationToken.None));
+    }
+
+    [Fact]
     public void ShouldDeleteWorkspace_PreservesVerifiedPackageBeforeHandoff()
     {
         var workspace = new WindowsUpdateWorkspace(

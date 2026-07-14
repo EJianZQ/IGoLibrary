@@ -7,7 +7,8 @@ namespace IGoLibrary.Ex.Desktop.Services;
 internal sealed class WindowsUpdatePackagePreparationService(
     IReleaseAssetDownloader downloader,
     WindowsUpdateWorkspaceManager workspaceManager,
-    ILogger<WindowsUpdatePackagePreparationService> logger)
+    ILogger<WindowsUpdatePackagePreparationService> logger) :
+    IWindowsUpdatePackagePreparationService
 {
     private const long DiskSpaceMargin = 256L * 1024 * 1024;
 
@@ -348,6 +349,21 @@ internal sealed class WindowsUpdatePackagePreparationService(
             throw new IOException($"{label}空间不足，至少还需要 {missing} MiB");
         }
     }
+}
+
+internal interface IWindowsUpdatePackagePreparationService
+{
+    string ValidateInstallationDirectory(string currentVersion);
+
+    Task<PreparedWindowsUpdatePackage> PrepareAsync(
+        WindowsUpdateWorkspace workspace,
+        string installationDirectory,
+        ReleaseAssetInfo asset,
+        string currentVersion,
+        string targetVersion,
+        ReleaseAssetDownloadPauseController transferController,
+        IProgress<WindowsUpdateProgress> progress,
+        CancellationToken cancellationToken);
 }
 
 internal sealed record PreparedWindowsUpdatePackage(

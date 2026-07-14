@@ -195,6 +195,7 @@ internal static class Program
         if (result.DeletedIncompleteDownloadCount > 0 ||
             result.DeletedInvalidOrExpiredCacheCount > 0 ||
             result.RetainedVerifiedCacheCount > 0 ||
+            result.RestoredVerifiedCacheCount > 0 ||
             result.DeletedUpdaterTransactionCount > 0 ||
             result.DeletedLogCount > 0)
         {
@@ -204,6 +205,7 @@ internal static class Program
                 $"更新启动维护完成：清理未完成下载 {result.DeletedIncompleteDownloadCount} 个，" +
                 $"清理损坏或过期验签缓存 {result.DeletedInvalidOrExpiredCacheCount} 个，" +
                 $"保留有效验签缓存 {result.RetainedVerifiedCacheCount} 个，" +
+                $"恢复中断交接的验签缓存 {result.RestoredVerifiedCacheCount} 个，" +
                 $"清理终态更新事务 {result.DeletedUpdaterTransactionCount} 个，" +
                 $"清理旧更新日志 {result.DeletedLogCount} 个。");
         }
