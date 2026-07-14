@@ -55,6 +55,23 @@ public sealed class CloudflareTunnelTests
     }
 
     [Fact]
+    public void EnsureExecutableAvailable_UsesDedicatedMissingCloudflaredError()
+    {
+        var missingPath = Path.Combine(
+            Path.GetTempPath(),
+            "IGoLibrary-Ex-missing-cloudflared-tests",
+            Guid.NewGuid().ToString("N"),
+            OperatingSystem.IsWindows() ? "cloudflared.exe" : "cloudflared");
+
+        var exception = Assert.Throws<CloudflaredUnavailableException>(() =>
+            CloudflareQuickTunnelRunner.EnsureExecutableAvailable(missingPath));
+
+        Assert.Equal(CloudflaredUnavailableException.UserMessage, exception.Message);
+        Assert.Equal(missingPath, exception.FileName);
+        Assert.Contains("-with-cloudflared", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProxyResolver_AutoUsesSystemProxyAndManualModeIsNormalized()
     {
         var resolver = new CloudflareTunnelProxyResolver(
@@ -474,6 +491,55 @@ public sealed class CloudflareTunnelTests
         Assert.Equal(0, runner.StartCallCount);
         Assert.Equal(MobileControlNetworkMode.LocalNetwork, manager.CurrentMode);
         Assert.Equal(MobileControlNetworkMode.LocalNetwork, settingsService.CurrentSettings.MobileControl.NetworkMode);
+        Assert.Empty(notifications.Warnings);
+    }
+
+    [Fact]
+    public async Task ExposureManager_MissingCloudflaredBlocksModeSwitchWithoutPersistenceOrFallback()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.LocalNetwork);
+        var unavailable = new CloudflaredUnavailableException("missing-cloudflared.exe");
+        var runner = new FakeCloudflareQuickTunnelRunner
+        {
+            ValidationException = unavailable
+        };
+        var notifications = new FakeNotificationService();
+        await using var manager = CreateManager(runner, settingsService, notificationService: notifications);
+        manager.Initialize(MobileControlNetworkMode.LocalNetwork, CloudflareTunnelProxyMode.Auto, string.Empty);
+
+        var exception = await Assert.ThrowsAsync<CloudflaredUnavailableException>(() =>
+            manager.SetModeAsync(MobileControlNetworkMode.CloudflareTunnel));
+
+        Assert.Same(unavailable, exception);
+        Assert.Equal(1, runner.ValidationCallCount);
+        Assert.Equal(0, runner.StartCallCount);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, manager.CurrentMode);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, settingsService.CurrentSettings.MobileControl.NetworkMode);
+        Assert.Empty(notifications.Warnings);
+    }
+
+    [Fact]
+    public async Task ExposureManager_MissingCloudflaredBlocksPublishWithoutAutomaticFallback()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var unavailable = new CloudflaredUnavailableException("missing-cloudflared.exe");
+        var runner = new FakeCloudflareQuickTunnelRunner
+        {
+            ValidationException = unavailable
+        };
+        var notifications = new FakeNotificationService();
+        await using var manager = CreateManager(runner, settingsService, notificationService: notifications);
+        manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
+
+        var exception = await Assert.ThrowsAsync<CloudflaredUnavailableException>(() => manager.PublishAsync(
+            new Uri("http://192.168.1.8:49153/?token=one"),
+            "/_igolibrary/health/one"));
+
+        Assert.Same(unavailable, exception);
+        Assert.Equal(1, runner.ValidationCallCount);
+        Assert.Equal(0, runner.StartCallCount);
+        Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, manager.CurrentMode);
+        Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, settingsService.CurrentSettings.MobileControl.NetworkMode);
         Assert.Empty(notifications.Warnings);
     }
 

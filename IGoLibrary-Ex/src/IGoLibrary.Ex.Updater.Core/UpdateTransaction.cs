@@ -141,6 +141,10 @@ public static class UpdateTransaction
         var nextManifest = UpdatePackageValidator.LoadAndValidateManifest(
             Path.Combine(request.StagingDirectory, request.ManifestFileName),
             request.TargetVersion);
+        await UpdatePackageValidator.ValidateUpdatePayloadDirectoryAsync(
+            request.StagingDirectory,
+            nextManifest,
+            cancellationToken);
 
         Directory.CreateDirectory(request.CandidateDirectory);
         try
@@ -153,6 +157,7 @@ public static class UpdateTransaction
 
             var ownedPaths = currentManifest.Files
                 .Select(static file => UpdatePathSafety.NormalizeRelativePath(file.Path))
+                .Where(static path => !UpdateProtocol.IsPreservedInstallationPath(path))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             ownedPaths.Add(request.ManifestFileName);
 
@@ -325,10 +330,9 @@ public static class UpdateTransaction
         var backupManifest = UpdatePackageValidator.LoadAndValidateManifest(
             Path.Combine(request.BackupDirectory, request.ManifestFileName),
             request.CurrentVersion);
-        await UpdatePackageValidator.ValidateDirectoryAsync(
+        await UpdatePackageValidator.ValidateInstalledDirectoryAsync(
             request.BackupDirectory,
             backupManifest,
-            allowAdditionalFiles: true,
             cancellationToken);
 
         var failedDirectory = request.CandidateDirectory + ".failed";
@@ -487,6 +491,7 @@ public static class UpdateTransaction
     {
         var ownedPaths = currentManifest.Files
             .Select(static file => UpdatePathSafety.NormalizeRelativePath(file.Path))
+            .Where(static path => !UpdateProtocol.IsPreservedInstallationPath(path))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         ownedPaths.Add(UpdateProtocol.ManifestFileName);
 

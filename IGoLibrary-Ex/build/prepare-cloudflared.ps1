@@ -15,6 +15,12 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$pathComparison = if ([System.OperatingSystem]::IsWindows()) {
+    [System.StringComparison]::OrdinalIgnoreCase
+}
+else {
+    [System.StringComparison]::Ordinal
+}
 $manifestPath = Join-Path $PSScriptRoot 'cloudflared-assets.json'
 $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
 $asset = $manifest.assets.$Runtime
@@ -90,7 +96,7 @@ elseif ($asset.archiveType -eq 'tgz') {
                 [System.IO.Path]::DirectorySeparatorChar,
                 [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
             $resolvedExtract = [System.IO.Path]::GetFullPath($extractDirectory)
-            if (-not $resolvedExtract.StartsWith($resolvedCache, [System.StringComparison]::OrdinalIgnoreCase)) {
+            if (-not $resolvedExtract.StartsWith($resolvedCache, $pathComparison)) {
                 throw "拒绝清理缓存目录之外的路径：$resolvedExtract"
             }
 

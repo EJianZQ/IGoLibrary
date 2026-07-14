@@ -14,6 +14,18 @@ internal interface ICloudflareQuickTunnelRunner
         CancellationToken cancellationToken = default);
 }
 
+internal sealed class CloudflaredUnavailableException : FileNotFoundException
+{
+    internal const string UserMessage =
+        "当前安装未包含 cloudflared，无法使用 Cloudflare Tunnel。" +
+        "请改用本机局域网，或安装文件名带 -with-cloudflared 的完整包";
+
+    public CloudflaredUnavailableException(string executablePath)
+        : base(UserMessage, executablePath)
+    {
+    }
+}
+
 internal sealed class CloudflareTunnelProxyConflictException : InvalidOperationException
 {
     internal const string UserMessage =

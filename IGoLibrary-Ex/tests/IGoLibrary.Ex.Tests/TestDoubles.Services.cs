@@ -35,6 +35,8 @@ internal sealed class FakeNetworkExposureManager : INetworkExposureManager
 
     public Uri TunnelBaseUri { get; set; } = new("https://unit-test.trycloudflare.com/");
 
+    public Exception? SetModeException { get; set; }
+
     public void Initialize(
         MobileControlNetworkMode networkMode,
         CloudflareTunnelProxyMode tunnelProxyMode,
@@ -100,6 +102,11 @@ internal sealed class FakeNetworkExposureManager : INetworkExposureManager
         MobileControlNetworkMode networkMode,
         CancellationToken cancellationToken = default)
     {
+        if (SetModeException is not null)
+        {
+            return Task.FromException<MobileControlNetworkMode>(SetModeException);
+        }
+
         CurrentMode = MobileControlSettings.NormalizeNetworkMode(networkMode);
         foreach (var lease in _leases)
         {

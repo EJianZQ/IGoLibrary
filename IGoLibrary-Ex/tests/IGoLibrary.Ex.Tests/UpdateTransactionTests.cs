@@ -39,7 +39,7 @@ public sealed class UpdateTransactionTests : IDisposable
     [Fact]
     public async Task Rollback_RestoresOldDirectoryAfterApply()
     {
-        var request = CreateRequest();
+        var request = CreateRequest(includeLegacyOwnedTools: true);
         await UpdateTransaction.PrepareCandidateAsync(request);
         UpdateTransaction.Apply(request);
 
@@ -51,7 +51,68 @@ public sealed class UpdateTransactionTests : IDisposable
         Assert.True(File.Exists(Path.Combine(request.InstallationDirectory, "old-only.dll")));
         Assert.False(File.Exists(Path.Combine(request.InstallationDirectory, "new-only.dll")));
         Assert.Equal("user", File.ReadAllText(Path.Combine(request.InstallationDirectory, "user.txt")));
+        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(Path.Combine(
+            request.InstallationDirectory,
+            "tools",
+            "cloudflared",
+            "cloudflared.exe")));
         Assert.False(Directory.Exists(request.BackupDirectory));
+    }
+
+    [Fact]
+    public async Task PrepareApplyAndCommit_PreservesToolsOwnedByLegacyManifest()
+    {
+        var request = CreateRequest(includeLegacyOwnedTools: true);
+
+        await UpdateTransaction.PrepareCandidateAsync(request);
+
+        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(Path.Combine(
+            request.CandidateDirectory,
+            "tools",
+            "cloudflared",
+            "cloudflared.exe")));
+        Assert.Equal("user-added-tool", File.ReadAllText(Path.Combine(
+            request.CandidateDirectory,
+            "tools",
+            "user-tool.txt")));
+
+        UpdateTransaction.Apply(request);
+        UpdateTransaction.Commit(request);
+
+        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(Path.Combine(
+            request.InstallationDirectory,
+            "tools",
+            "cloudflared",
+            "cloudflared.exe")));
+        Assert.Equal("user-added-tool", File.ReadAllText(Path.Combine(
+            request.InstallationDirectory,
+            "tools",
+            "user-tool.txt")));
+    }
+
+    [Fact]
+    public async Task PrepareCandidateAsync_DoesNotCreateToolsWhenInstallationHasNone()
+    {
+        var request = CreateRequest();
+
+        await UpdateTransaction.PrepareCandidateAsync(request);
+
+        Assert.False(Directory.Exists(Path.Combine(request.CandidateDirectory, "tools")));
+    }
+
+    [Fact]
+    public async Task PrepareCandidateAsync_RejectsTargetToolsBeforeChangingInstallation()
+    {
+        var request = CreateRequest(includeTargetTools: true);
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            UpdateTransaction.PrepareCandidateAsync(request));
+
+        Assert.Contains("保留目录", exception.Message);
+        Assert.False(Directory.Exists(request.CandidateDirectory));
+        Assert.Equal("old-desktop", File.ReadAllText(Path.Combine(
+            request.InstallationDirectory,
+            UpdateProtocol.EntryExecutableName)));
     }
 
     [Fact]
@@ -70,7 +131,7 @@ public sealed class UpdateTransactionTests : IDisposable
     [Fact]
     public async Task PrepareCandidateFromArchiveAsync_RevalidatesProtectedArchiveInsteadOfTrustingStaging()
     {
-        var request = CreateRequest();
+        var request = CreateRequest(includeLegacyOwnedTools: true);
         ZipFile.CreateFromDirectory(request.StagingDirectory, request.PackagePath);
         var digest = "sha256:" + Convert.ToHexString(
             SHA256.HashData(await File.ReadAllBytesAsync(request.PackagePath)));
@@ -89,6 +150,11 @@ public sealed class UpdateTransactionTests : IDisposable
             request.CandidateDirectory,
             UpdateProtocol.EntryExecutableName)));
         Assert.Equal("user", File.ReadAllText(Path.Combine(request.CandidateDirectory, "user.txt")));
+        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(Path.Combine(
+            request.CandidateDirectory,
+            "tools",
+            "cloudflared",
+            "cloudflared.exe")));
     }
 
     [Fact]
@@ -107,7 +173,7 @@ public sealed class UpdateTransactionTests : IDisposable
     [Fact]
     public async Task RecoverInterruptedAsync_RestoresBackupWhenInstallPathIsMissing()
     {
-        var request = CreateRequest();
+        var request = CreateRequest(includeLegacyOwnedTools: true);
         await UpdateTransaction.PrepareCandidateAsync(request);
         Directory.Move(request.InstallationDirectory, request.BackupDirectory);
 
@@ -119,6 +185,11 @@ public sealed class UpdateTransactionTests : IDisposable
         Assert.Equal("old-desktop", File.ReadAllText(Path.Combine(
             request.InstallationDirectory,
             UpdateProtocol.EntryExecutableName)));
+        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(Path.Combine(
+            request.InstallationDirectory,
+            "tools",
+            "cloudflared",
+            "cloudflared.exe")));
     }
 
     [Fact]
@@ -167,32 +238,56 @@ public sealed class UpdateTransactionTests : IDisposable
         }
     }
 
-    private UpdateTransactionRequest CreateRequest()
+    private UpdateTransactionRequest CreateRequest(
+        bool includeLegacyOwnedTools = false,
+        bool includeTargetTools = false)
     {
         Directory.CreateDirectory(_root);
         var installation = Path.Combine(_root, "IGoLibrary-Ex");
         var staging = Path.Combine(_root, "transaction", "staging");
+        var installationFiles = new Dictionary<string, string>
+        {
+            [UpdateProtocol.EntryExecutableName] = "old-desktop",
+            [UpdateProtocol.UpdaterExecutableName] = "old-updater",
+            ["old-only.dll"] = "old"
+        };
+        if (includeLegacyOwnedTools)
+        {
+            installationFiles["tools/cloudflared/cloudflared.exe"] = "release-cloudflared";
+        }
+
         UpdatePackageValidatorTests.WritePackage(
             installation,
             "1.0.0",
-            new Dictionary<string, string>
-            {
-                [UpdateProtocol.EntryExecutableName] = "old-desktop",
-                [UpdateProtocol.UpdaterExecutableName] = "old-updater",
-                ["old-only.dll"] = "old"
-            });
+            installationFiles);
         File.WriteAllText(Path.Combine(installation, "user.txt"), "user");
         File.WriteAllText(Path.Combine(installation, "appsettings.json"), "old-settings");
+        if (includeLegacyOwnedTools)
+        {
+            File.WriteAllText(
+                Path.Combine(installation, "tools", "cloudflared", "cloudflared.exe"),
+                "user-upgraded-cloudflared");
+            File.WriteAllText(
+                Path.Combine(installation, "tools", "user-tool.txt"),
+                "user-added-tool");
+        }
+
+        var stagingFiles = new Dictionary<string, string>
+        {
+            [UpdateProtocol.EntryExecutableName] = "new-desktop",
+            [UpdateProtocol.UpdaterExecutableName] = "new-updater",
+            ["new-only.dll"] = "new",
+            ["appsettings.json"] = "new-settings"
+        };
+        if (includeTargetTools)
+        {
+            stagingFiles["tools/cloudflared/cloudflared.exe"] = "forbidden-cloudflared";
+        }
+
         UpdatePackageValidatorTests.WritePackage(
             staging,
             "1.0.1",
-            new Dictionary<string, string>
-            {
-                [UpdateProtocol.EntryExecutableName] = "new-desktop",
-                [UpdateProtocol.UpdaterExecutableName] = "new-updater",
-                ["new-only.dll"] = "new",
-                ["appsettings.json"] = "new-settings"
-            });
+            stagingFiles);
 
         var id = Guid.NewGuid().ToString("N");
         var transaction = Path.GetDirectoryName(staging)!;

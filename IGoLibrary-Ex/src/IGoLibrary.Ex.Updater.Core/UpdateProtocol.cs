@@ -13,8 +13,21 @@ public static class UpdateProtocol
     public const string ManifestFileName = "update-manifest.json";
     public const string PortableMarkerFileName = "portable-release.marker";
     public const string PortableMarkerContent = "IGoLibrary-Ex|portable|win-x64|2";
+    public const string PreservedToolsDirectoryName = "tools";
 
     public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
+
+    public static bool IsPreservedInstallationPath(string relativePath)
+    {
+        var normalized = UpdatePathSafety.NormalizeRelativePath(relativePath);
+        return string.Equals(
+                   normalized,
+                   PreservedToolsDirectoryName,
+                   StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith(
+                   PreservedToolsDirectoryName + "/",
+                   StringComparison.OrdinalIgnoreCase);
+    }
 
     private static JsonSerializerOptions CreateJsonOptions()
     {

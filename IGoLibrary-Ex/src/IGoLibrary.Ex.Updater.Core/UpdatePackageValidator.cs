@@ -91,6 +91,18 @@ public static class UpdatePackageValidator
         }
     }
 
+    public static void ValidateUpdatePayloadManifest(UpdatePackageManifest manifest)
+    {
+        ValidateManifest(manifest);
+        var preservedPath = manifest.Files
+            .Select(static file => UpdatePathSafety.NormalizeRelativePath(file.Path))
+            .FirstOrDefault(UpdateProtocol.IsPreservedInstallationPath);
+        if (preservedPath is not null)
+        {
+            throw new InvalidDataException($"更新包不得管理保留目录：{preservedPath}");
+        }
+    }
+
     public static async Task<UpdatePackageManifest> ExtractAndValidateAsync(
         string archivePath,
         string destinationDirectory,
@@ -135,6 +147,11 @@ public static class UpdatePackageValidator
             if (!entryPaths.Add(relativePath))
             {
                 throw new InvalidDataException($"更新压缩包包含重复路径：{relativePath}");
+            }
+
+            if (UpdateProtocol.IsPreservedInstallationPath(relativePath))
+            {
+                throw new InvalidDataException($"更新压缩包不得包含保留目录：{relativePath}");
             }
 
             RejectLinkEntry(entry);
@@ -183,6 +200,7 @@ public static class UpdatePackageValidator
 
         var manifestPath = Path.Combine(destinationDirectory, UpdateProtocol.ManifestFileName);
         var manifest = LoadAndValidateManifest(manifestPath, expectedVersion);
+        ValidateUpdatePayloadManifest(manifest);
         await ValidateDirectoryAsync(
             destinationDirectory,
             manifest,
@@ -259,12 +277,78 @@ public static class UpdatePackageValidator
         bool allowAdditionalFiles,
         CancellationToken cancellationToken = default)
     {
+        await ValidateDirectoryCoreAsync(
+            rootDirectory,
+            manifest,
+            allowAdditionalFiles,
+            ignorePreservedPaths: false,
+            cancellationToken);
+    }
+
+    public static async Task ValidateInstalledDirectoryAsync(
+        string rootDirectory,
+        UpdatePackageManifest manifest,
+        CancellationToken cancellationToken = default)
+    {
+        await ValidateDirectoryCoreAsync(
+            rootDirectory,
+            manifest,
+            allowAdditionalFiles: true,
+            ignorePreservedPaths: true,
+            cancellationToken);
+    }
+
+    public static async Task ValidateUpdatePayloadDirectoryAsync(
+        string rootDirectory,
+        UpdatePackageManifest manifest,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateUpdatePayloadManifest(manifest);
+        var root = Path.GetFullPath(rootDirectory);
+        UpdatePathSafety.RejectReparsePoint(root);
+        var preservedRootEntry = Directory.EnumerateFileSystemEntries(root)
+            .FirstOrDefault(path => string.Equals(
+                Path.GetFileName(path),
+                UpdateProtocol.PreservedToolsDirectoryName,
+                StringComparison.OrdinalIgnoreCase));
+        if (preservedRootEntry is not null)
+        {
+            throw new InvalidDataException(
+                $"更新包不得包含保留目录：{Path.GetFileName(preservedRootEntry)}");
+        }
+
+        foreach (var filePath in EnumerateFilesWithoutReparsePoints(root))
+        {
+            var relativePath = UpdatePathSafety.NormalizeRelativePath(
+                Path.GetRelativePath(root, filePath));
+            if (UpdateProtocol.IsPreservedInstallationPath(relativePath))
+            {
+                throw new InvalidDataException($"更新包不得包含保留目录：{relativePath}");
+            }
+        }
+
+        await ValidateDirectoryCoreAsync(
+            rootDirectory,
+            manifest,
+            allowAdditionalFiles: false,
+            ignorePreservedPaths: false,
+            cancellationToken);
+    }
+
+    private static async Task ValidateDirectoryCoreAsync(
+        string rootDirectory,
+        UpdatePackageManifest manifest,
+        bool allowAdditionalFiles,
+        bool ignorePreservedPaths,
+        CancellationToken cancellationToken)
+    {
         ValidateManifest(manifest);
         var root = Path.GetFullPath(rootDirectory);
         UpdatePathSafety.RejectReparsePoint(root);
 
         var expected = manifest.Files
             .Select(static file => UpdatePathSafety.NormalizeRelativePath(file.Path))
+            .Where(path => !ignorePreservedPaths || !UpdateProtocol.IsPreservedInstallationPath(path))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         expected.Add(UpdateProtocol.ManifestFileName);
 
@@ -286,6 +370,11 @@ public static class UpdatePackageValidator
         foreach (var file in manifest.Files)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (ignorePreservedPaths && UpdateProtocol.IsPreservedInstallationPath(file.Path))
+            {
+                continue;
+            }
+
             var path = UpdatePathSafety.GetSafeChildPath(root, file.Path);
             var info = new FileInfo(path);
             if (!info.Exists || info.Length != file.Size)

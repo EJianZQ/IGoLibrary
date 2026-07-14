@@ -12,6 +12,20 @@ public sealed class UpdatePackageValidatorTests : IDisposable
         Guid.NewGuid().ToString("N"));
 
     [Theory]
+    [InlineData("tools", true)]
+    [InlineData("Tools/cloudflared/cloudflared.exe", true)]
+    [InlineData("tools\\cloudflared\\LICENSE.txt", true)]
+    [InlineData("tools-old/cloudflared.exe", false)]
+    [InlineData("my-tools/cloudflared.exe", false)]
+    [InlineData("subdir/tools/cloudflared.exe", false)]
+    public void IsPreservedInstallationPath_MatchesOnlyRootTools(
+        string relativePath,
+        bool expected)
+    {
+        Assert.Equal(expected, UpdateProtocol.IsPreservedInstallationPath(relativePath));
+    }
+
+    [Theory]
     [InlineData("../escape.dll")]
     [InlineData("/absolute.dll")]
     [InlineData("C:/drive.dll")]
@@ -146,6 +160,120 @@ public sealed class UpdatePackageValidatorTests : IDisposable
 
         Assert.Equal("1.0.1", manifest.Version);
         Assert.Equal("feature", File.ReadAllText(Path.Combine(staging, "sub", "feature.dll")));
+    }
+
+    [Fact]
+    public async Task ExtractAndValidateAsync_RejectsToolsEntryBeforeExtraction()
+    {
+        var package = Path.Combine(_root, "package-with-undeclared-tools");
+        WritePackage(package, "1.0.1", new Dictionary<string, string>
+        {
+            [UpdateProtocol.EntryExecutableName] = "desktop",
+            [UpdateProtocol.UpdaterExecutableName] = "updater"
+        });
+        var toolPath = Path.Combine(package, "tools", "cloudflared", "cloudflared.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(toolPath)!);
+        File.WriteAllText(toolPath, "must-not-be-extracted");
+        var archivePath = Path.Combine(_root, "package-with-undeclared-tools.zip");
+        ZipFile.CreateFromDirectory(package, archivePath);
+        var staging = Path.Combine(_root, "staging-with-tools");
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            UpdatePackageValidator.ExtractAndValidateAsync(
+                archivePath,
+                staging,
+                "1.0.1"));
+
+        Assert.Contains("保留目录", exception.Message);
+        Assert.False(File.Exists(Path.Combine(staging, "tools", "cloudflared", "cloudflared.exe")));
+    }
+
+    [Fact]
+    public void ValidateUpdatePayloadManifest_RejectsLegacyOwnedToolsEntry()
+    {
+        var package = Path.Combine(_root, "legacy-package");
+        WritePackage(package, "1.0.1", new Dictionary<string, string>
+        {
+            [UpdateProtocol.EntryExecutableName] = "desktop",
+            [UpdateProtocol.UpdaterExecutableName] = "updater",
+            ["TOOLS/cloudflared/cloudflared.exe"] = "legacy-tool"
+        });
+        var manifest = UpdatePackageValidator.LoadAndValidateManifest(
+            Path.Combine(package, UpdateProtocol.ManifestFileName));
+
+        var exception = Assert.Throws<InvalidDataException>(() =>
+            UpdatePackageValidator.ValidateUpdatePayloadManifest(manifest));
+
+        Assert.Contains("保留目录", exception.Message);
+    }
+
+    [Fact]
+    public async Task ValidateInstalledDirectoryAsync_IgnoresChangedMissingAndAddedToolsFiles()
+    {
+        var installation = Path.Combine(_root, "legacy-installation");
+        WritePackage(installation, "1.0.0", new Dictionary<string, string>
+        {
+            [UpdateProtocol.EntryExecutableName] = "desktop",
+            [UpdateProtocol.UpdaterExecutableName] = "updater",
+            ["feature.dll"] = "feature",
+            ["tools/cloudflared/cloudflared.exe"] = "release-tool",
+            ["tools/cloudflared/LICENSE.txt"] = "release-license"
+        });
+        var manifest = UpdatePackageValidator.LoadAndValidateManifest(
+            Path.Combine(installation, UpdateProtocol.ManifestFileName));
+        File.WriteAllText(
+            Path.Combine(installation, "tools", "cloudflared", "cloudflared.exe"),
+            "user-upgraded-tool");
+        File.Delete(Path.Combine(installation, "tools", "cloudflared", "LICENSE.txt"));
+        File.WriteAllText(
+            Path.Combine(installation, "tools", "user-tool.txt"),
+            "user-added-tool");
+
+        await UpdatePackageValidator.ValidateInstalledDirectoryAsync(installation, manifest);
+
+        File.WriteAllText(Path.Combine(installation, "feature.dll"), "damaged-feature");
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            UpdatePackageValidator.ValidateInstalledDirectoryAsync(installation, manifest));
+    }
+
+    [Fact]
+    public async Task ValidateUpdatePayloadDirectoryAsync_RejectsUndeclaredToolsFile()
+    {
+        var package = Path.Combine(_root, "payload-with-tools");
+        WritePackage(package, "1.0.1", new Dictionary<string, string>
+        {
+            [UpdateProtocol.EntryExecutableName] = "desktop",
+            [UpdateProtocol.UpdaterExecutableName] = "updater"
+        });
+        var toolPath = Path.Combine(package, "tools", "custom-tool.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(toolPath)!);
+        File.WriteAllText(toolPath, "custom-tool");
+        var manifest = UpdatePackageValidator.LoadAndValidateManifest(
+            Path.Combine(package, UpdateProtocol.ManifestFileName));
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            UpdatePackageValidator.ValidateUpdatePayloadDirectoryAsync(package, manifest));
+
+        Assert.Contains("保留目录", exception.Message);
+    }
+
+    [Fact]
+    public async Task ValidateUpdatePayloadDirectoryAsync_RejectsEmptyRootToolsDirectory()
+    {
+        var package = Path.Combine(_root, "payload-with-empty-tools");
+        WritePackage(package, "1.0.1", new Dictionary<string, string>
+        {
+            [UpdateProtocol.EntryExecutableName] = "desktop",
+            [UpdateProtocol.UpdaterExecutableName] = "updater"
+        });
+        Directory.CreateDirectory(Path.Combine(package, "ToOlS"));
+        var manifest = UpdatePackageValidator.LoadAndValidateManifest(
+            Path.Combine(package, UpdateProtocol.ManifestFileName));
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            UpdatePackageValidator.ValidateUpdatePayloadDirectoryAsync(package, manifest));
+
+        Assert.Contains("保留目录", exception.Message);
     }
 
     [Fact]

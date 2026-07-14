@@ -335,6 +335,26 @@ public sealed class UpdateCheckServiceTests
             package.Digest);
     }
 
+    [Fact]
+    public async Task CheckAsync_IgnoresBundledCloudflaredAssetAndSelectsLightweightAsset()
+    {
+        var lightweight = WindowsAsset("1.0.1");
+        var bundled = lightweight with
+        {
+            Name = "IGoLibrary-Ex-v1.0.1-windows-x64-with-cloudflared.zip",
+            BrowserDownloadUrl = new Uri(
+                "https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/" +
+                "IGoLibrary-Ex-v1.0.1-windows-x64-with-cloudflared.zip")
+        };
+        var release = Release("v1.0.1") with { Assets = [bundled, lightweight] };
+        var service = CreateService(Parse("1.0.0"), new FakeGitHubReleaseClient(release));
+
+        var result = await service.CheckAsync(UpdateCheckMode.Manual);
+
+        var package = Assert.IsType<ReleaseAssetInfo>(result.Release?.WindowsX64Package);
+        Assert.Equal("IGoLibrary-Ex-v1.0.1-windows-x64.zip", package.Name);
+    }
+
     [Theory]
     [InlineData("IGoLibrary-Ex-v1.0.1-windows-arm64.zip", "uploaded", "https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/file.zip", 123456, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
     [InlineData("IGoLibrary-Ex-v1.0.1-windows-x64.zip", "new", "https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/file.zip", 123456, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]

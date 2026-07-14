@@ -1,10 +1,12 @@
 param(
     [string]$Configuration = "Release",
+    [ValidateSet('osx-arm64', 'osx-x64')]
     [string]$Runtime = "osx-arm64",
     [string]$AppName = "IGoLibrary-Ex",
     [string]$BundleIdentifier = "com.igolibrary.ex",
     [string]$AppVersion,
     [string]$PackageName,
+    [string]$BundledPackageName,
     [string]$PublishOutput,
     [switch]$SkipPublish
 )
@@ -14,7 +16,7 @@ Set-StrictMode -Version Latest
 
 $versionPattern = '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
 if ([string]::IsNullOrWhiteSpace($AppVersion)) {
-    throw "必须通过 -AppVersion 提供版本号，例如：-AppVersion `"1.0.1`"。"
+    throw '必须通过 -AppVersion 提供版本号，例如：-AppVersion "1.0.1"。'
 }
 if ($AppVersion.StartsWith("v", [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "AppVersion 不要带 v 前缀；Git tag / Release 再使用 vN.N.N。"
@@ -26,12 +28,29 @@ $BundleVersion = $AppVersion
 
 $ExecutableName = "IGoLibrary.Ex.Desktop"
 $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+$ArtifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $Root 'artifacts'))
+$PathComparison = if ([System.OperatingSystem]::IsWindows()) {
+    [System.StringComparison]::OrdinalIgnoreCase
+}
+else {
+    [System.StringComparison]::Ordinal
+}
 $Project = Join-Path $Root "src\IGoLibrary.Ex.Desktop\IGoLibrary.Ex.Desktop.csproj"
 if ([string]::IsNullOrWhiteSpace($PublishOutput)) {
+    $UsesDefaultPublishOutput = $true
     $PublishOutput = Join-Path $Root "artifacts\publish\$Runtime"
 }
 else {
+    $UsesDefaultPublishOutput = $false
     $PublishOutput = [System.IO.Path]::GetFullPath($PublishOutput)
+}
+$PublishOutput = [System.IO.Path]::GetFullPath($PublishOutput)
+if ([string]::IsNullOrWhiteSpace($AppName) -or
+    $AppName.Contains('/') -or
+    $AppName.Contains('\') -or
+    $AppName -in @('.', '..') -or
+    [System.IO.Path]::GetFileName($AppName) -cne $AppName) {
+    throw "macOS 应用名必须是不含目录的叶名称：$AppName"
 }
 $AppOutputRoot = Join-Path $Root "artifacts\macos\$Runtime"
 $AppDir = Join-Path $AppOutputRoot "$AppName.app"
@@ -45,9 +64,52 @@ if ([string]::IsNullOrWhiteSpace($PackageName)) {
         default { "$AppName-v$AppVersion-$Runtime.zip" }
     }
 }
+if ([string]::IsNullOrWhiteSpace($BundledPackageName)) {
+    $BundledPackageName = switch ($Runtime) {
+        "osx-arm64" { "$AppName-v$AppVersion-macOS-Apple-Silicon-arm64-with-cloudflared.zip" }
+        "osx-x64" { "$AppName-v$AppVersion-macOS-Intel-x64-with-cloudflared.zip" }
+    }
+}
+foreach ($candidatePackageName in @($PackageName, $BundledPackageName)) {
+    if ([string]::IsNullOrWhiteSpace($candidatePackageName) -or
+        $candidatePackageName.Contains('/') -or
+        $candidatePackageName.Contains('\') -or
+        -not $candidatePackageName.EndsWith('.zip', [System.StringComparison]::OrdinalIgnoreCase) -or
+        [System.IO.Path]::GetFileName($candidatePackageName) -cne $candidatePackageName) {
+        throw "macOS 包名必须是不含目录的 .zip 文件名：$candidatePackageName"
+    }
+}
+if ($PackageName -ieq $BundledPackageName) {
+    throw '轻量包和 cloudflared 完整包不能使用同一个文件名。'
+}
 $ZipPath = Join-Path $AppOutputRoot $PackageName
+$BundledZipPath = Join-Path $AppOutputRoot $BundledPackageName
+$PackageStaging = [System.IO.Path]::GetFullPath((Join-Path $ArtifactsRoot "staging\macos\$Runtime\packages"))
+$StagedZipPath = Join-Path $PackageStaging $PackageName
+$StagedBundledZipPath = Join-Path $PackageStaging $BundledPackageName
 $FirstRunGuidePath = Join-Path $AppOutputRoot "macOS首次运行说明.txt"
 $FirstRunCommandPath = Join-Path $AppOutputRoot "首次运行.command"
+
+function Remove-SafeArtifactDirectory {
+    param([Parameter(Mandatory)][string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw '拒绝清理空路径。'
+    }
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $artifactsPrefix = $ArtifactsRoot.TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $fullPath.StartsWith($artifactsPrefix, $PathComparison) -or
+        $fullPath -eq $ArtifactsRoot -or
+        $fullPath -eq [System.IO.Path]::GetPathRoot($fullPath)) {
+        throw "拒绝清理 artifacts 之外或构建根级目录：$fullPath"
+    }
+    if (Test-Path -LiteralPath $fullPath) {
+        Remove-Item -LiteralPath $fullPath -Recurse -Force
+    }
+}
 
 function ConvertTo-PlistEscapedText {
     param([string]$Value)
@@ -284,55 +346,311 @@ function New-MacAppZip {
     Set-ZipCentralDirectoryHostToUnix $DestinationZip
 }
 
-if (-not $SkipPublish) {
-    Write-Host "Publishing $Project for $Runtime..."
-    dotnet publish $Project `
-        -c $Configuration `
-        -r $Runtime `
-        --self-contained true `
-        -p:DebugType=None `
-        -p:DebugSymbols=false `
-        -p:UsedAvaloniaProducts= `
-        -p:UseSharedCompilation=false `
-        -p:Version=$AppVersion `
-        -p:InformationalVersion=$AppVersion `
-        -o $PublishOutput
+function New-MacAppBundle {
+    param([Parameter(Mandatory)][bool]$IncludeTools)
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "dotnet publish failed with exit code $LASTEXITCODE."
+    Remove-SafeArtifactDirectory -Path $AppDir
+    New-Item -ItemType Directory -Path $MacOSDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $ResourcesDir -Force | Out-Null
+    foreach ($item in Get-ChildItem -LiteralPath $PublishOutput -Force) {
+        if ($item.Name.Equals('tools', [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+
+        $copyParameters = @{
+            LiteralPath = $item.FullName
+            Destination = $MacOSDir
+            Recurse = $true
+            Force = $true
+            ErrorAction = 'Stop'
+        }
+        Copy-Item @copyParameters
+    }
+    if ($IncludeTools) {
+        $cloudflaredSource = Join-Path $PublishOutput 'tools\cloudflared'
+        $cloudflaredTarget = Join-Path $MacOSDir 'tools\cloudflared'
+        New-Item -ItemType Directory -Path $cloudflaredTarget -Force | Out-Null
+        $cloudflaredFileName = 'cloudflared'
+        foreach ($fileName in @($cloudflaredFileName, 'LICENSE.txt', 'THIRD-PARTY-NOTICES.txt')) {
+            $sourcePath = Join-Path $cloudflaredSource $fileName
+            if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+                throw "完整包缺少必需的 cloudflared 文件：$sourcePath"
+            }
+            Copy-Item -LiteralPath $sourcePath -Destination (Join-Path $cloudflaredTarget $fileName) -Force
+        }
+    }
+    Write-InfoPlist (Join-Path $ContentsDir 'Info.plist')
+}
+
+function Get-ZipEntrySha256 {
+    param([Parameter(Mandatory)][System.IO.Compression.ZipArchiveEntry]$Entry)
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $stream = $Entry.Open()
+    try {
+        return [System.Convert]::ToHexString($sha.ComputeHash($stream)).ToLowerInvariant()
+    }
+    finally {
+        $stream.Dispose()
+        $sha.Dispose()
+    }
+}
+
+function Test-MacAppZip {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][bool]$IncludeTools
+    )
+
+    $resolvedPath = (Resolve-Path -LiteralPath $Path).Path
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($resolvedPath)
+    try {
+        $fileEntries = @($archive.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) })
+        $entryByPath = [System.Collections.Generic.Dictionary[string, System.IO.Compression.ZipArchiveEntry]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($entry in $fileEntries) {
+            if (-not $entryByPath.TryAdd($entry.FullName, $entry)) {
+                throw "macOS ZIP 包含大小写重复路径：$($entry.FullName)"
+            }
+        }
+
+        $appPrefix = "$AppName.app/"
+        $guideName = [System.IO.Path]::GetFileName($FirstRunGuidePath)
+        $commandName = [System.IO.Path]::GetFileName($FirstRunCommandPath)
+        foreach ($entry in $fileEntries) {
+            if (-not $entry.FullName.StartsWith($appPrefix, [System.StringComparison]::Ordinal) -and
+                $entry.FullName -cne $guideName -and
+                $entry.FullName -cne $commandName) {
+                throw "macOS ZIP 包含应用目录之外的意外文件：$($entry.FullName)"
+            }
+        }
+
+        $mainExecutablePath = $appPrefix + "Contents/MacOS/$ExecutableName"
+        foreach ($requiredPath in @($mainExecutablePath, $guideName, $commandName)) {
+            if (-not $entryByPath.ContainsKey($requiredPath)) {
+                throw "macOS ZIP 缺少必需文件：$requiredPath"
+            }
+        }
+
+        $toolsPrefix = $appPrefix + 'Contents/MacOS/tools/'
+        $actualToolPaths = @(
+            $fileEntries |
+                Where-Object {
+                    $_.FullName.StartsWith($toolsPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+                } |
+                ForEach-Object FullName
+        )
+        $expectedToolPaths = if ($IncludeTools) {
+            @(
+                ($toolsPrefix + 'cloudflared/cloudflared')
+                ($toolsPrefix + 'cloudflared/LICENSE.txt')
+                ($toolsPrefix + 'cloudflared/THIRD-PARTY-NOTICES.txt')
+            )
+        }
+        else {
+            @()
+        }
+        $actualToolSet = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($toolPath in $actualToolPaths) {
+            $null = $actualToolSet.Add($toolPath)
+        }
+        $expectedToolSet = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($toolPath in $expectedToolPaths) {
+            $null = $expectedToolSet.Add($toolPath)
+        }
+        if (-not $actualToolSet.SetEquals($expectedToolSet)) {
+            $variant = if ($IncludeTools) { '完整包' } else { '轻量包' }
+            throw "$variant 的 tools 文件集合无效。实际：$($actualToolPaths -join ', ')"
+        }
+
+        if ($IncludeTools) {
+            $cloudflaredPath = $toolsPrefix + 'cloudflared/cloudflared'
+            $actualCloudflaredHash = Get-ZipEntrySha256 -Entry $entryByPath[$cloudflaredPath]
+            $preparedCloudflaredPath = Join-Path $PublishOutput 'tools\cloudflared\cloudflared'
+            $preparedCloudflaredHash = Get-FileHash -LiteralPath $preparedCloudflaredPath -Algorithm SHA256
+            $expectedCloudflaredHash = $preparedCloudflaredHash.Hash.ToLowerInvariant()
+            if ($actualCloudflaredHash -cne $expectedCloudflaredHash) {
+                throw "macOS cloudflared SHA-256 无效：$actualCloudflaredHash"
+            }
+
+            foreach ($comparison in @(
+                [pscustomobject]@{
+                    EntryPath = $toolsPrefix + 'cloudflared/LICENSE.txt'
+                    SourcePath = Join-Path $PSScriptRoot 'third-party\cloudflared-LICENSE.txt'
+                },
+                [pscustomobject]@{
+                    EntryPath = $toolsPrefix + 'cloudflared/THIRD-PARTY-NOTICES.txt'
+                    SourcePath = Join-Path $PSScriptRoot 'third-party\THIRD-PARTY-NOTICES.txt'
+                }
+            )) {
+                $entryHash = Get-ZipEntrySha256 -Entry $entryByPath[$comparison.EntryPath]
+                $sourceHash = (Get-FileHash -LiteralPath $comparison.SourcePath -Algorithm SHA256).Hash.ToLowerInvariant()
+                if ($entryHash -cne $sourceHash) {
+                    throw "macOS ZIP 文件与仓库源文件不一致：$($comparison.EntryPath)"
+                }
+            }
+        }
+
+        $expectedExecutableMode = [System.Convert]::ToInt32('100755', 8)
+        $executableEntries = @(
+            $fileEntries | Where-Object {
+                $_.FullName -ceq $mainExecutablePath -or
+                $_.FullName -ceq $commandName -or
+                ($_.FullName.StartsWith(
+                        $appPrefix + 'Contents/MacOS/',
+                        [System.StringComparison]::Ordinal) -and
+                 ($_.Name -ceq 'createdump' -or
+                  $_.Name -ceq 'cloudflared' -or
+                  $_.Name.EndsWith('.dylib', [System.StringComparison]::OrdinalIgnoreCase)))
+            }
+        )
+        foreach ($entry in $executableEntries) {
+            $actualMode = ($entry.ExternalAttributes -shr 16) -band 0xFFFF
+            if ($actualMode -ne $expectedExecutableMode) {
+                throw "macOS ZIP 可执行权限无效：$($entry.FullName)，mode=$actualMode"
+            }
+        }
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
+
+function Install-ValidatedPackagePair {
+    param(
+        [Parameter(Mandatory)][string]$StagedLightweightPath,
+        [Parameter(Mandatory)][string]$StagedBundledPath,
+        [Parameter(Mandatory)][string]$FinalLightweightPath,
+        [Parameter(Mandatory)][string]$FinalBundledPath
+    )
+
+    $previousLightweightPath = Join-Path $PackageStaging '.previous-lightweight.zip'
+    $previousBundledPath = Join-Path $PackageStaging '.previous-bundled.zip'
+    $lightweightBackedUp = $false
+    $bundledBackedUp = $false
+    $lightweightInstalled = $false
+    $bundledInstalled = $false
+    try {
+        if (Test-Path -LiteralPath $FinalLightweightPath) {
+            Move-Item -LiteralPath $FinalLightweightPath -Destination $previousLightweightPath
+            $lightweightBackedUp = $true
+        }
+        if (Test-Path -LiteralPath $FinalBundledPath) {
+            Move-Item -LiteralPath $FinalBundledPath -Destination $previousBundledPath
+            $bundledBackedUp = $true
+        }
+
+        Move-Item -LiteralPath $StagedLightweightPath -Destination $FinalLightweightPath
+        $lightweightInstalled = $true
+        Move-Item -LiteralPath $StagedBundledPath -Destination $FinalBundledPath
+        $bundledInstalled = $true
+
+    }
+    catch {
+        if ($lightweightInstalled -and (Test-Path -LiteralPath $FinalLightweightPath)) {
+            Remove-Item -LiteralPath $FinalLightweightPath -Force
+        }
+        if ($bundledInstalled -and (Test-Path -LiteralPath $FinalBundledPath)) {
+            Remove-Item -LiteralPath $FinalBundledPath -Force
+        }
+        if ($lightweightBackedUp -and (Test-Path -LiteralPath $previousLightweightPath)) {
+            Move-Item -LiteralPath $previousLightweightPath -Destination $FinalLightweightPath
+        }
+        if ($bundledBackedUp -and (Test-Path -LiteralPath $previousBundledPath)) {
+            Move-Item -LiteralPath $previousBundledPath -Destination $FinalBundledPath
+        }
+        throw
+    }
+
+    foreach ($backupPath in @($previousLightweightPath, $previousBundledPath)) {
+        if (Test-Path -LiteralPath $backupPath) {
+            Remove-Item -LiteralPath $backupPath -Force
+        }
+    }
+}
+
+if (-not $SkipPublish) {
+    if ($UsesDefaultPublishOutput) {
+        Remove-SafeArtifactDirectory -Path $PublishOutput
+    }
+    Write-Host "Publishing $Project for $Runtime..."
+    $publishArguments = @(
+        'publish'
+        $Project
+        '-c'
+        $Configuration
+        '-r'
+        $Runtime
+        '--self-contained'
+        'true'
+        '-p:DebugType=None'
+        '-p:DebugSymbols=false'
+        '-p:UsedAvaloniaProducts='
+        '-p:UseSharedCompilation=false'
+        "-p:Version=$AppVersion"
+        "-p:InformationalVersion=$AppVersion"
+        '-o'
+        $PublishOutput
+    )
+    & dotnet @publishArguments
+    $publishExitCode = $LASTEXITCODE
+    if ($publishExitCode -ne 0) {
+        throw "dotnet publish failed with exit code $publishExitCode."
     }
 }
 else {
     Write-Host "Skipping dotnet publish; packaging existing files from $PublishOutput"
 }
 
-$prepareCloudflared = Join-Path $PSScriptRoot 'prepare-cloudflared.ps1'
-$cloudflaredDestination = Join-Path $PublishOutput 'tools\cloudflared'
-& $prepareCloudflared -Runtime $Runtime -DestinationDirectory $cloudflaredDestination
-
 $publishedExecutable = Join-Path $PublishOutput $ExecutableName
 if (-not (Test-Path -LiteralPath $publishedExecutable -PathType Leaf)) {
     throw "Published executable was not found: $publishedExecutable"
 }
 
-if (Test-Path -LiteralPath $AppDir) {
-    Remove-Item -LiteralPath $AppDir -Recurse -Force
-}
-if (Test-Path -LiteralPath $ZipPath) {
-    Remove-Item -LiteralPath $ZipPath -Force
-}
+$prepareCloudflared = Join-Path $PSScriptRoot 'prepare-cloudflared.ps1'
+$cloudflaredDestination = Join-Path $PublishOutput 'tools\cloudflared'
+& $prepareCloudflared -Runtime $Runtime -DestinationDirectory $cloudflaredDestination
 
-New-Item -ItemType Directory -Path $MacOSDir -Force | Out-Null
-New-Item -ItemType Directory -Path $ResourcesDir -Force | Out-Null
-Get-ChildItem -LiteralPath $PublishOutput -Force | ForEach-Object {
-    Copy-Item -LiteralPath $_.FullName -Destination $MacOSDir -Recurse -Force
-}
-Write-InfoPlist (Join-Path $ContentsDir "Info.plist")
+New-Item -ItemType Directory -Path $AppOutputRoot -Force | Out-Null
 Write-FirstRunGuide $FirstRunGuidePath
 Write-FirstRunCommand $FirstRunCommandPath
-New-MacAppZip -SourceAppDir $AppDir -DestinationZip $ZipPath -AdditionalFiles @($FirstRunGuidePath, $FirstRunCommandPath)
+
+Remove-SafeArtifactDirectory -Path $PackageStaging
+New-Item -ItemType Directory -Path $PackageStaging -Force | Out-Null
+try {
+    New-MacAppBundle -IncludeTools $false
+    New-MacAppZip -SourceAppDir $AppDir -DestinationZip $StagedZipPath -AdditionalFiles @($FirstRunGuidePath, $FirstRunCommandPath)
+
+    New-MacAppBundle -IncludeTools $true
+    New-MacAppZip -SourceAppDir $AppDir -DestinationZip $StagedBundledZipPath -AdditionalFiles @($FirstRunGuidePath, $FirstRunCommandPath)
+
+    Test-MacAppZip -Path $StagedZipPath -IncludeTools $false
+    Test-MacAppZip -Path $StagedBundledZipPath -IncludeTools $true
+
+    $installParameters = @{
+        StagedLightweightPath = $StagedZipPath
+        StagedBundledPath = $StagedBundledZipPath
+        FinalLightweightPath = $ZipPath
+        FinalBundledPath = $BundledZipPath
+    }
+    Install-ValidatedPackagePair @installParameters
+}
+finally {
+    Remove-SafeArtifactDirectory -Path $PackageStaging
+}
 
 Write-Host "Published files to $PublishOutput"
 Write-Host "Created macOS app bundle at $AppDir"
-Write-Host "Created permission-preserving macOS zip at $ZipPath"
+foreach ($package in @(
+    [pscustomobject]@{ Label = 'macOS lightweight ZIP'; Path = $ZipPath },
+    [pscustomobject]@{ Label = 'macOS cloudflared ZIP'; Path = $BundledZipPath }
+)) {
+    $packageInfo = Get-Item -LiteralPath $package.Path
+    $packageHash = (Get-FileHash -LiteralPath $package.Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    Write-Host "$($package.Label): $($package.Path)"
+    Write-Host "  Size: $($packageInfo.Length) bytes"
+    Write-Host "  SHA-256: $packageHash"
+}
 Write-Host "Unsigned builds may require users to remove quarantine on first run. See macOS first-run instructions inside the zip."

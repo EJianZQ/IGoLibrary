@@ -106,6 +106,10 @@ internal sealed class NetworkExposureManager(
             {
                 throw;
             }
+            catch (CloudflaredUnavailableException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Cloudflare Tunnel startup failed while switching network mode.");
@@ -341,6 +345,10 @@ internal sealed class NetworkExposureManager(
                     AttachTunnelUnderGate(lease, tunnel);
                 }
                 catch (CloudflareTunnelProxyConflictException)
+                {
+                    throw;
+                }
+                catch (CloudflaredUnavailableException)
                 {
                     throw;
                 }

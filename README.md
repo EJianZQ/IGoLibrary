@@ -197,7 +197,7 @@ xattr -dr com.apple.quarantine
 
 - 建议使用 `IGoLibrary-Ex/global.json` 指定的 `.NET SDK 10.0.201`
 - Windows 开发环境可直接使用 Visual Studio 2022 或 `dotnet CLI`
-- 仓库已提供 Windows 与 macOS 的发布脚本
+- 仓库已提供 Windows 与 macOS 的发布脚本；所有入口都需要 PowerShell 7，macOS Bash 入口也会调用 `pwsh` 复用同一套 cloudflared 下载、缓存和哈希校验逻辑
 
 ### 本地运行
 
@@ -223,6 +223,15 @@ cd .\IGoLibrary-Ex
 .\build\publish-windows.ps1 -Configuration Release -AppVersion 1.0.1
 ```
 
+Windows 脚本会从同一次发布生成两个 ZIP：
+
+```text
+artifacts\windows\win-x64\IGoLibrary-Ex-v1.0.1-windows-x64.zip
+artifacts\windows\win-x64\IGoLibrary-Ex-v1.0.1-windows-x64-with-cloudflared.zip
+```
+
+无后缀包是不含 `tools` 的轻量包，也是应用内自动更新唯一会选择的资产；`-with-cloudflared` 是带 Cloudflare Tunnel 组件、许可证和第三方声明的完整包，供需要 Tunnel 的用户手动下载。
+
 macOS
 
 如果在 Windows 上同时构建并打包 Apple Silicon 与 Intel 两个 macOS 版本，使用 PowerShell 脚本：
@@ -232,14 +241,16 @@ cd .\IGoLibrary-Ex
 .\build\publish-macos-all.ps1 -Configuration Release -AppVersion 1.0.1
 ```
 
-脚本会分别生成 `artifacts\publish\osx-arm64\` 与 `artifacts\publish\osx-x64\` 原始发布目录，然后组装为标准 macOS 应用包并输出两个最终 zip：
+脚本会分别生成 `artifacts\publish\osx-arm64\` 与 `artifacts\publish\osx-x64\` 原始发布目录，每个 RID 只发布一次，然后组装为标准 macOS 应用包并输出四个最终 zip：
 
 ```text
 artifacts\macos\osx-arm64\IGoLibrary-Ex-v1.0.1-macOS-Apple-Silicon-arm64.zip
+artifacts\macos\osx-arm64\IGoLibrary-Ex-v1.0.1-macOS-Apple-Silicon-arm64-with-cloudflared.zip
 artifacts\macos\osx-x64\IGoLibrary-Ex-v1.0.1-macOS-Intel-x64.zip
+artifacts\macos\osx-x64\IGoLibrary-Ex-v1.0.1-macOS-Intel-x64-with-cloudflared.zip
 ```
 
-发布给 M 芯片用户时发送 `IGoLibrary-Ex-v1.0.1-macOS-Apple-Silicon-arm64.zip`，发布给 Intel 芯片用户时发送 `IGoLibrary-Ex-v1.0.1-macOS-Intel-x64.zip`。用户解压后打开 `IGoLibrary-Ex.app`，不要直接双击应用包内部的 `IGoLibrary.Ex.Desktop` 可执行文件。
+按芯片架构选择包，并根据是否需要 Cloudflare Tunnel 选择轻量版或 `-with-cloudflared` 完整版。两个变体解压后都使用同一个 `IGoLibrary-Ex.app` 名称；用户应打开 `.app`，不要直接双击应用包内部的 `IGoLibrary.Ex.Desktop` 可执行文件。
 
 如果只想单独发布某一个架构，也可以直接调用单架构脚本：
 
@@ -248,12 +259,14 @@ artifacts\macos\osx-x64\IGoLibrary-Ex-v1.0.1-macOS-Intel-x64.zip
 .\build\publish-macos.ps1 -Configuration Release -Runtime osx-x64 -AppVersion 1.0.1
 ```
 
-如果在 macOS 发布机上构建，也可以使用 Bash 脚本：
+如果在 macOS 发布机上构建，也可以使用 Bash 脚本。该入口要求机器已安装 PowerShell 7，并可通过 `pwsh` 命令调用；缺少时脚本会在发布开始前退出：
 
 ```bash
 cd ./IGoLibrary-Ex
 APP_VERSION=1.0.1 ./build/publish-macos.sh Release osx-arm64
 ```
+
+轻量包仍保留 Cloudflare Tunnel 的 UI 入口，但选择 Tunnel 时会明确提示当前安装未包含 cloudflared。请改用本机局域网或安装对应架构的 `-with-cloudflared` 完整包；当前版本不会自动下载该工具。
 
 未签名、未公证的 macOS 包首次运行时，系统可能会拦截并提示“已损坏，无法打开”。zip 内已包含 `macOS首次运行说明.txt` 和 `首次运行.command`，用户可按说明解除隔离标记后再打开 `IGoLibrary-Ex.app`。
 

@@ -358,6 +358,32 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SelectingCloudflareWithoutBundledExecutable_RestoresLanAndShowsExactMessage()
+    {
+        var exposureManager = new FakeNetworkExposureManager
+        {
+            SetModeException = new CloudflaredUnavailableException("missing-cloudflared.exe")
+        };
+        var notifications = new FakeNotificationService();
+        var viewModel = CreateViewModel(
+            networkExposureManager: exposureManager,
+            notificationService: notifications);
+        await viewModel.InitializeAsync();
+
+        viewModel.SystemSettings.SelectedMobileControlNetworkModeIndex =
+            (int)MobileControlNetworkMode.CloudflareTunnel;
+        await WaitForAsync(() => notifications.Warnings.Count == 1);
+
+        Assert.Equal(
+            (int)MobileControlNetworkMode.LocalNetwork,
+            viewModel.SystemSettings.SelectedMobileControlNetworkModeIndex);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, exposureManager.CurrentMode);
+        var warning = Assert.Single(notifications.Warnings);
+        Assert.Equal("切换网络方式失败", warning.Title);
+        Assert.Equal(CloudflaredUnavailableException.UserMessage, warning.Message);
+    }
+
+    [Fact]
     public async Task CloudflareProxySettings_LoadAndApplyManualProxy()
     {
         var exposureManager = new FakeNetworkExposureManager();

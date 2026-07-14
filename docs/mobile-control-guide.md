@@ -99,7 +99,9 @@ Cloudflare Tunnel：确认电脑可以访问 Cloudflare
 
 ## ☁️ 使用 Cloudflare Tunnel 模式
 
-Cloudflare Tunnel 模式会启动软件随包附带的 `cloudflared`，为本机手机控制服务创建一个临时 `trycloudflare.com` HTTPS 地址。该方式不要求手机和电脑处于同一局域网，也不要求用户准备 Cloudflare 账号
+Cloudflare Tunnel 模式会启动完整包中附带的 `cloudflared`，为本机手机控制服务创建一个临时 `trycloudflare.com` HTTPS 地址。该方式不要求手机和电脑处于同一局域网，也不要求用户准备 Cloudflare 账号。
+
+发布页同时提供两种压缩包：无后缀文件名是体积更小、不含 `tools` 的轻量包，文件名带 `-with-cloudflared` 的是完整包。只有完整包能够直接使用 Tunnel。轻量包仍显示 Tunnel 入口，但选择或启动时会提示当前安装未包含 cloudflared；此时请改用本机局域网，或下载同版本、同系统架构的完整包。当前版本不会自动下载或修复 cloudflared。
 
 ### 配置步骤
 
@@ -312,13 +314,14 @@ Cloudflare 路由策略：境外代理
 
 先检查：
 
-1. 电脑是否能够访问互联网
-2. 系统时间是否正确
-3. 代理软件是否正在运行
-4. `自动检测` 是否找到了正确代理
-5. 手动 HTTP 代理端口是否填写正确
-6. TUN 分流是否阻断 `cloudflared`、`api.trycloudflare.com` 或 `argotunnel.com`
-7. 是否需要启用 Clash/Mihomo 兼容模式并选择可用策略组
+1. 如果提示“当前安装未包含 cloudflared”，确认下载的压缩包文件名是否带 `-with-cloudflared`；轻量包请改用本机局域网或重新安装完整包
+2. 电脑是否能够访问互联网
+3. 系统时间是否正确
+4. 代理软件是否正在运行
+5. `自动检测` 是否找到了正确代理
+6. 手动 HTTP 代理端口是否填写正确
+7. TUN 分流是否阻断 `cloudflared`、`api.trycloudflare.com` 或 `argotunnel.com`
+8. 是否需要启用 Clash/Mihomo 兼容模式并选择可用策略组
 
 ### 提示已回退到本机局域网
 

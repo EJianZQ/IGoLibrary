@@ -268,14 +268,14 @@ internal sealed class WindowsUpdatePackagePreparationService(
         var currentManifest = UpdatePackageValidator.LoadAndValidateManifest(
             Path.Combine(installationDirectory, UpdateProtocol.ManifestFileName),
             currentVersion);
-        await UpdatePackageValidator.ValidateDirectoryAsync(
+        await UpdatePackageValidator.ValidateInstalledDirectoryAsync(
             installationDirectory,
             currentManifest,
-            allowAdditionalFiles: true,
             cancellationToken);
 
         var owned = currentManifest.Files
             .Select(static file => UpdatePathSafety.NormalizeRelativePath(file.Path))
+            .Where(static path => !UpdateProtocol.IsPreservedInstallationPath(path))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         owned.Add(UpdateProtocol.ManifestFileName);
         long unknownBytes = 0;

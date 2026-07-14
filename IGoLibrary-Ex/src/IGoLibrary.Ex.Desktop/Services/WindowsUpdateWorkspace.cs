@@ -138,10 +138,9 @@ internal sealed class WindowsUpdateWorkspaceManager
                 var manifest = UpdatePackageValidator.LoadAndValidateManifest(
                     Path.Combine(workspace.StagingDirectory, UpdateProtocol.ManifestFileName),
                     targetVersion);
-                await UpdatePackageValidator.ValidateDirectoryAsync(
+                await UpdatePackageValidator.ValidateUpdatePayloadDirectoryAsync(
                     workspace.StagingDirectory,
                     manifest,
-                    allowAdditionalFiles: false,
                     cancellationToken);
                 _logger.LogInformation(
                     "已验签更新缓存复核通过。事务={TransactionId}，目标版本={TargetVersion}。",

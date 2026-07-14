@@ -21,6 +21,7 @@ internal sealed partial class CloudflareQuickTunnelRunner(
         CloudflareTunnelProxyOptions proxyOptions,
         ClashMihomoCompatibilityOptions compatibilityOptions)
     {
+        EnsureExecutableAvailable(ResolveExecutablePath());
         _ = ResolveAndValidateConfiguration(proxyOptions, compatibilityOptions);
     }
 
@@ -42,12 +43,9 @@ internal sealed partial class CloudflareQuickTunnelRunner(
             throw new ArgumentException("Tunnel 健康检查路径无效", nameof(healthCheckPath));
         }
 
-        var proxyResolution = ResolveAndValidateConfiguration(proxyOptions, compatibilityOptions);
         var executablePath = ResolveExecutablePath();
-        if (!File.Exists(executablePath))
-        {
-            throw new FileNotFoundException("未找到内置 cloudflared，无法启动 Cloudflare Tunnel", executablePath);
-        }
+        EnsureExecutableAvailable(executablePath);
+        var proxyResolution = ResolveAndValidateConfiguration(proxyOptions, compatibilityOptions);
 
         logger.LogInformation(
             "Starting Cloudflare Quick Tunnel with proxy mode {ProxyMode} and HTTP/2 transport.",
@@ -409,6 +407,14 @@ internal sealed partial class CloudflareQuickTunnelRunner(
     {
         var executableName = OperatingSystem.IsWindows() ? "cloudflared.exe" : "cloudflared";
         return Path.Combine(AppContext.BaseDirectory, "tools", "cloudflared", executableName);
+    }
+
+    internal static void EnsureExecutableAvailable(string executablePath)
+    {
+        if (!File.Exists(executablePath))
+        {
+            throw new CloudflaredUnavailableException(executablePath);
+        }
     }
 
     internal static async Task StopProcessAsync(Process process)
