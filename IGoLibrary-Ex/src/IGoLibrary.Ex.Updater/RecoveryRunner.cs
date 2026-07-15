@@ -127,7 +127,8 @@ internal static class RecoveryRunner
                 new UpdateCleanupAuthorization(
                     UpdateProtocol.SchemaVersion,
                     request.TransactionId,
-                    DateTimeOffset.UtcNow));
+                    DateTimeOffset.UtcNow),
+                UpdateJsonTypeInfo.CleanupAuthorization);
         }
         catch
         {
@@ -136,7 +137,7 @@ internal static class RecoveryRunner
 
     private static UpdateTransactionRequest ReadAndValidateRecoveryRequest(string requestPath)
     {
-        var request = UpdateJsonFile.Read<UpdateTransactionRequest>(requestPath);
+        var request = UpdateJsonFile.Read(requestPath, UpdateJsonTypeInfo.TransactionRequest);
         UpdateTransaction.ValidateRequestFile(requestPath, request);
         return request;
     }

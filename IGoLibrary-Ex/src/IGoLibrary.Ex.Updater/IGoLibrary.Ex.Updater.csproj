@@ -2,16 +2,21 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>IGoLibrary.Ex.Updater</AssemblyName>
     <RootNamespace>IGoLibrary.Ex.Updater</RootNamespace>
-    <PublishSingleFile>true</PublishSingleFile>
+    <PublishAot>true</PublishAot>
     <SelfContained>true</SelfContained>
-    <PublishTrimmed>false</PublishTrimmed>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <VerifyReferenceAotCompatibility>true</VerifyReferenceAotCompatibility>
+    <ILLinkTreatWarningsAsErrors>true</ILLinkTreatWarningsAsErrors>
+    <IlcTreatWarningsAsErrors>true</IlcTreatWarningsAsErrors>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\updater.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

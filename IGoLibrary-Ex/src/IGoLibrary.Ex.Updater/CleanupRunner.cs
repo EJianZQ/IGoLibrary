@@ -13,7 +13,7 @@ internal static class CleanupRunner
     {
         try
         {
-            var request = UpdateJsonFile.Read<UpdateTransactionRequest>(requestPath);
+            var request = UpdateJsonFile.Read(requestPath, UpdateJsonTypeInfo.TransactionRequest);
             UpdateTransaction.ValidateRequestFile(requestPath, request);
             var secureDirectory = UpdateTransaction.GetSecureWorkingDirectory(request);
             if (!string.Equals(
@@ -51,7 +51,8 @@ internal static class CleanupRunner
                 new UpdateCleanupCompletion(
                     UpdateProtocol.SchemaVersion,
                     request.TransactionId,
-                    DateTimeOffset.UtcNow));
+                    DateTimeOffset.UtcNow),
+                UpdateJsonTypeInfo.CleanupCompletion);
 
             return 0;
         }
@@ -75,8 +76,9 @@ internal static class CleanupRunner
             {
                 try
                 {
-                    var authorization = UpdateJsonFile.Read<UpdateCleanupAuthorization>(
-                        authorizationPath);
+                    var authorization = UpdateJsonFile.Read(
+                        authorizationPath,
+                        UpdateJsonTypeInfo.CleanupAuthorization);
                     if (authorization.SchemaVersion == UpdateProtocol.SchemaVersion &&
                         string.Equals(
                             authorization.TransactionId,

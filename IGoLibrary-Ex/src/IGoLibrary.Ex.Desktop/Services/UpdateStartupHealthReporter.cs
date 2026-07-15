@@ -18,7 +18,8 @@ internal static class UpdateStartupHealthReporter
                 transactionId,
                 appVersionProvider.CurrentVersionText,
                 Environment.ProcessId,
-                DateTimeOffset.UtcNow));
+                DateTimeOffset.UtcNow),
+            UpdateJsonTypeInfo.HealthReport);
     }
 
     public static async Task ObserveCompletionAsync(
@@ -36,7 +37,7 @@ internal static class UpdateStartupHealthReporter
             {
                 try
                 {
-                    var status = UpdateJsonFile.Read<UpdateWorkerStatus>(statusPath);
+                    var status = UpdateJsonFile.Read(statusPath, UpdateJsonTypeInfo.WorkerStatus);
                     if (string.Equals(status.TransactionId, transactionId, StringComparison.Ordinal))
                     {
                         if (status.Phase == UpdateWorkerPhase.Committed)

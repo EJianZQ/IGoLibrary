@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace IGoLibrary.Ex.Updater.Core;
 
@@ -7,19 +8,22 @@ public static class UpdateJsonFile
 {
     private static readonly UTF8Encoding Utf8NoBom = new(false);
 
-    public static T Read<T>(string path)
+    public static T Read<T>(string path, JsonTypeInfo<T> jsonTypeInfo)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(jsonTypeInfo);
         var json = File.ReadAllText(path, Utf8NoBom);
-        return JsonSerializer.Deserialize<T>(json, UpdateProtocol.JsonOptions)
+        return JsonSerializer.Deserialize(json, jsonTypeInfo)
                ?? throw new InvalidDataException($"JSON 文件内容为空或格式无效：{path}");
     }
 
     public static async Task<T> ReadAsync<T>(
         string path,
+        JsonTypeInfo<T> jsonTypeInfo,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(jsonTypeInfo);
         await using var stream = new FileStream(
             path,
             FileMode.Open,
@@ -27,16 +31,17 @@ public static class UpdateJsonFile
             FileShare.Read,
             bufferSize: 16 * 1024,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
-        return await JsonSerializer.DeserializeAsync<T>(
+        return await JsonSerializer.DeserializeAsync(
                    stream,
-                   UpdateProtocol.JsonOptions,
+                   jsonTypeInfo,
                    cancellationToken)
                ?? throw new InvalidDataException($"JSON 文件内容为空或格式无效：{path}");
     }
 
-    public static void WriteAtomic<T>(string path, T value)
+    public static void WriteAtomic<T>(string path, T value, JsonTypeInfo<T> jsonTypeInfo)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(jsonTypeInfo);
         var directory = Path.GetDirectoryName(Path.GetFullPath(path))
                         ?? throw new InvalidOperationException($"无法确定 JSON 文件目录：{path}");
         Directory.CreateDirectory(directory);
@@ -44,7 +49,7 @@ public static class UpdateJsonFile
         var temporaryPath = path + ".tmp-" + Guid.NewGuid().ToString("N");
         try
         {
-            var json = JsonSerializer.Serialize(value, UpdateProtocol.JsonOptions);
+            var json = JsonSerializer.Serialize(value, jsonTypeInfo);
             File.WriteAllText(temporaryPath, json, Utf8NoBom);
             File.Move(temporaryPath, path, overwrite: true);
         }
@@ -57,9 +62,11 @@ public static class UpdateJsonFile
     public static async Task WriteAtomicAsync<T>(
         string path,
         T value,
+        JsonTypeInfo<T> jsonTypeInfo,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        ArgumentNullException.ThrowIfNull(jsonTypeInfo);
         var directory = Path.GetDirectoryName(Path.GetFullPath(path))
                         ?? throw new InvalidOperationException($"无法确定 JSON 文件目录：{path}");
         Directory.CreateDirectory(directory);
@@ -78,7 +85,7 @@ public static class UpdateJsonFile
                 await JsonSerializer.SerializeAsync(
                     stream,
                     value,
-                    UpdateProtocol.JsonOptions,
+                    jsonTypeInfo,
                     cancellationToken);
                 await stream.FlushAsync(cancellationToken);
             }

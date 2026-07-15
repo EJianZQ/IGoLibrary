@@ -6,3 +6,4 @@ artifacts/
 *.zip
 .verify-build
 .agents/
+/.codex/config.toml

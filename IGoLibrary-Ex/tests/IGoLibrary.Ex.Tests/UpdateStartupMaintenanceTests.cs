@@ -65,7 +65,8 @@ public sealed class UpdateStartupMaintenanceTests : IDisposable
                 "1.0.1",
                 "sha256:" + new string('a', 64),
                 3,
-                _now - TimeSpan.FromDays(1)));
+                _now - TimeSpan.FromDays(1)),
+            DesktopUpdateJsonSerializerContext.Default.VerifiedUpdateCache);
 
         var result = UpdateStartupMaintenance.RunForTests(_root, null, _now);
 
@@ -119,7 +120,10 @@ public sealed class UpdateStartupMaintenanceTests : IDisposable
         var transactionId = Guid.NewGuid().ToString("N");
         var directory = WriteVerifiedCache(transactionId, _now - TimeSpan.FromDays(1));
         var requestPath = Path.Combine(directory, "request.json");
-        UpdateJsonFile.WriteAtomic(requestPath, CreateRequest(transactionId, directory));
+        UpdateJsonFile.WriteAtomic(
+            requestPath,
+            CreateRequest(transactionId, directory),
+            UpdateJsonTypeInfo.TransactionRequest);
         File.SetLastWriteTimeUtc(requestPath, (_now - TimeSpan.FromMinutes(2)).UtcDateTime);
         File.WriteAllText(
             Path.Combine(directory, UpdateProtocol.UpdaterExecutableName),
@@ -162,7 +166,10 @@ public sealed class UpdateStartupMaintenanceTests : IDisposable
         var transactionId = Guid.NewGuid().ToString("N");
         var directory = WriteVerifiedCache(transactionId, _now - TimeSpan.FromDays(1));
         var requestPath = Path.Combine(directory, "request.json");
-        UpdateJsonFile.WriteAtomic(requestPath, CreateRequest(transactionId, directory));
+        UpdateJsonFile.WriteAtomic(
+            requestPath,
+            CreateRequest(transactionId, directory),
+            UpdateJsonTypeInfo.TransactionRequest);
         File.SetLastWriteTimeUtc(requestPath, (_now - TimeSpan.FromMinutes(2)).UtcDateTime);
         var signalPath = Path.Combine(directory, "coordinator-signal.json");
         UpdateJsonFile.WriteAtomic(
@@ -172,7 +179,8 @@ public sealed class UpdateStartupMaintenanceTests : IDisposable
                 transactionId,
                 UpdateCoordinatorSignalKind.Ready,
                 "ready",
-                _now - TimeSpan.FromMinutes(2)));
+                _now - TimeSpan.FromMinutes(2)),
+            UpdateJsonTypeInfo.CoordinatorSignal);
         File.WriteAllText(
             Path.Combine(directory, UpdateProtocol.UpdaterExecutableName),
             "copied updater");
@@ -229,7 +237,8 @@ public sealed class UpdateStartupMaintenanceTests : IDisposable
                 "1.0.1",
                 "sha256:" + new string('a', 64),
                 3,
-                verifiedAt));
+                verifiedAt),
+            DesktopUpdateJsonSerializerContext.Default.VerifiedUpdateCache);
         return directory;
     }
 

@@ -22,7 +22,10 @@ internal static class BootstrapRunner
         UpdateBootstrapResult result;
         try
         {
-            payload = await UpdatePipeProtocol.ReadAsync<UpdateBootstrapPayload>(pipe, timeout.Token);
+            payload = await UpdatePipeProtocol.ReadAsync(
+                pipe,
+                UpdateJsonTypeInfo.BootstrapPayload,
+                timeout.Token);
             if (payload.SchemaVersion != UpdateProtocol.SchemaVersion)
             {
                 throw new InvalidDataException("更新引导协议版本不匹配");
@@ -71,9 +74,13 @@ internal static class BootstrapRunner
                     PackagePath = securePackage
                 };
                 var protectedRequestPath = Path.Combine(secureDirectory, "request.json");
-                UpdateJsonFile.WriteAtomic(protectedRequestPath, protectedRequest);
-                var persistedRequest = UpdateJsonFile.Read<UpdateTransactionRequest>(
-                    protectedRequestPath);
+                UpdateJsonFile.WriteAtomic(
+                    protectedRequestPath,
+                    protectedRequest,
+                    UpdateJsonTypeInfo.TransactionRequest);
+                var persistedRequest = UpdateJsonFile.Read(
+                    protectedRequestPath,
+                    UpdateJsonTypeInfo.TransactionRequest);
                 if (persistedRequest != protectedRequest)
                 {
                     throw new InvalidDataException("受保护事务请求写入后不一致");
@@ -109,7 +116,11 @@ internal static class BootstrapRunner
                 exception.Message);
         }
 
-        await UpdatePipeProtocol.WriteAsync(pipe, result, timeout.Token);
+        await UpdatePipeProtocol.WriteAsync(
+            pipe,
+            result,
+            UpdateJsonTypeInfo.BootstrapResult,
+            timeout.Token);
         return result.Succeeded ? 0 : 1;
     }
 

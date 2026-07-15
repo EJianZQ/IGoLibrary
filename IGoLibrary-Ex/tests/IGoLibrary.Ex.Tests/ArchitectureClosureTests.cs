@@ -181,6 +181,28 @@ public sealed class ArchitectureClosureTests
         Assert.DoesNotContain("IGoLibrary.Ex.Infrastructure", text, StringComparison.Ordinal);
         Assert.DoesNotContain("IGoLibrary.Ex.Desktop", text, StringComparison.Ordinal);
         Assert.DoesNotContain("PackageReference", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("UseWindowsForms", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("PublishTrimmed>false", text, StringComparison.Ordinal);
+        Assert.Contains("<PublishAot>true</PublishAot>", text, StringComparison.Ordinal);
+        Assert.Contains("<OptimizationPreference>Size</OptimizationPreference>", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UpdaterJsonProtocol_UsesSourceGeneratedTypeMetadataOnly()
+    {
+        var coreRoot = Path.Combine(GetRepositoryRoot().FullName, "src", "IGoLibrary.Ex.Updater.Core");
+        var protocolText = File.ReadAllText(Path.Combine(coreRoot, "UpdateProtocol.cs"));
+        var contextText = File.ReadAllText(Path.Combine(coreRoot, "UpdateJsonSerializerContext.cs"));
+        var jsonFileText = File.ReadAllText(Path.Combine(coreRoot, "UpdateJsonFile.cs"));
+        var pipeText = File.ReadAllText(Path.Combine(coreRoot, "UpdatePipeProtocol.cs"));
+
+        Assert.DoesNotContain("JsonOptions", protocolText, StringComparison.Ordinal);
+        Assert.Contains("JsonSourceGenerationOptions", contextText, StringComparison.Ordinal);
+        Assert.DoesNotContain("new JsonStringEnumConverter(", contextText, StringComparison.Ordinal);
+        Assert.Contains("JsonTypeInfo<T>", jsonFileText, StringComparison.Ordinal);
+        Assert.Contains("JsonTypeInfo<T>", pipeText, StringComparison.Ordinal);
+        Assert.DoesNotContain("UpdateProtocol.JsonOptions", jsonFileText, StringComparison.Ordinal);
+        Assert.DoesNotContain("UpdateProtocol.JsonOptions", pipeText, StringComparison.Ordinal);
     }
 
     [Fact]

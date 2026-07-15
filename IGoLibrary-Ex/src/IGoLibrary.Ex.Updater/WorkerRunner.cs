@@ -16,7 +16,7 @@ internal static class WorkerRunner
         var applied = false;
         try
         {
-            request = UpdateJsonFile.Read<UpdateTransactionRequest>(requestPath);
+            request = UpdateJsonFile.Read(requestPath, UpdateJsonTypeInfo.TransactionRequest);
             UpdateTransaction.ValidateRequestFile(requestPath, request);
             UpdateTransaction.ValidateRequest(request);
             using var parentProcess = GetValidatedParentProcess(request);
@@ -48,7 +48,8 @@ internal static class WorkerRunner
                     request.TransactionId,
                     UpdateCoordinatorSignalKind.Ready,
                     "worker-ready",
-                    DateTimeOffset.UtcNow));
+                    DateTimeOffset.UtcNow),
+                UpdateJsonTypeInfo.CoordinatorSignal);
 
             WriteStatus(request, UpdateWorkerPhase.WaitingForParent, "正在等待应用安全退出…");
             if (!await WaitForProcessExitAsync(parentProcess, request, ParentExitTimeout))
@@ -222,7 +223,7 @@ internal static class WorkerRunner
         {
             if (File.Exists(request.DecisionPath))
             {
-                var decision = UpdateJsonFile.Read<UpdateDecision>(request.DecisionPath);
+                var decision = UpdateJsonFile.Read(request.DecisionPath, UpdateJsonTypeInfo.Decision);
                 if (decision.SchemaVersion != UpdateProtocol.SchemaVersion ||
                     !string.Equals(decision.TransactionId, request.TransactionId, StringComparison.Ordinal))
                 {
@@ -274,7 +275,9 @@ internal static class WorkerRunner
                 return;
             }
 
-            var launched = UpdateJsonFile.Read<UpdateLaunchedProcessInfo>(request.LaunchedProcessPath);
+            var launched = UpdateJsonFile.Read(
+                request.LaunchedProcessPath,
+                UpdateJsonTypeInfo.LaunchedProcessInfo);
             var expectedExecutable = Path.GetFullPath(
                 Path.Combine(request.InstallationDirectory, request.EntryExecutable));
             if (!string.Equals(launched.TransactionId, request.TransactionId, StringComparison.Ordinal) ||
@@ -322,7 +325,8 @@ internal static class WorkerRunner
                 request.TransactionId,
                 phase,
                 message,
-                DateTimeOffset.UtcNow));
+                DateTimeOffset.UtcNow),
+            UpdateJsonTypeInfo.WorkerStatus);
     }
 
     private static void TryWriteFailure(UpdateTransactionRequest request, string message)

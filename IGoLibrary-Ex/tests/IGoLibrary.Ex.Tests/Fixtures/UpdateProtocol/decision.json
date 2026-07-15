@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 2,
+  "transactionId": "transaction-1",
+  "decision": "rollback",
+  "createdAtUtc": "2026-07-14T01:02:03+00:00",
+  "newProcessId": null
+}

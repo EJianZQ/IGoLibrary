@@ -178,7 +178,8 @@ internal sealed class WindowsUpdateWorkspaceManager
                 targetVersion,
                 asset.Digest,
                 asset.Size,
-                _timeProvider.GetUtcNow()));
+                _timeProvider.GetUtcNow()),
+            DesktopUpdateJsonSerializerContext.Default.VerifiedUpdateCache);
         workspace.MarkVerified();
     }
 
@@ -346,7 +347,9 @@ internal sealed class WindowsUpdateWorkspaceManager
         UpdatePathSafety.RejectReparsePoint(archivePath);
         UpdatePathSafety.RejectReparsePoint(stagingDirectory);
         UpdatePathSafety.RejectReparsePoint(manifestPath);
-        var cache = UpdateJsonFile.Read<VerifiedUpdateCache>(markerPath);
+        var cache = UpdateJsonFile.Read(
+            markerPath,
+            DesktopUpdateJsonSerializerContext.Default.VerifiedUpdateCache);
         if (!VerifiedUpdateCache.IsStructurallyValid(cache, transactionId))
         {
             throw new InvalidDataException("验签缓存元数据无效");

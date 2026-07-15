@@ -282,7 +282,7 @@ internal sealed class WindowsUpdateHandoffService(
             Path.Combine(workspace.TransactionDirectory, "launched-process.json"),
             Path.Combine(WindowsUpdateWorkspaceManager.GetUpdatesRoot(), "logs"));
         var requestPath = Path.Combine(workspace.TransactionDirectory, "request.json");
-        UpdateJsonFile.WriteAtomic(requestPath, request);
+        UpdateJsonFile.WriteAtomic(requestPath, request, UpdateJsonTypeInfo.TransactionRequest);
         UpdateTransaction.ValidateRequestFile(requestPath, request);
         UpdateTransaction.ValidateRequest(request);
         return new PreparedUpdateTransaction(
@@ -325,7 +325,9 @@ internal sealed class WindowsUpdateHandoffService(
             cancellationToken.ThrowIfCancellationRequested();
             if (File.Exists(request.CoordinatorReadyPath))
             {
-                var signal = UpdateJsonFile.Read<UpdateCoordinatorSignal>(request.CoordinatorReadyPath);
+                var signal = UpdateJsonFile.Read(
+                    request.CoordinatorReadyPath,
+                    UpdateJsonTypeInfo.CoordinatorSignal);
                 if (signal.SchemaVersion != UpdateProtocol.SchemaVersion ||
                     !string.Equals(signal.TransactionId, request.TransactionId, StringComparison.Ordinal))
                 {
@@ -450,9 +452,11 @@ internal sealed class WindowsUpdateHandoffService(
                     UpdateProtocol.SchemaVersion,
                     prepared.RequestPath,
                     prepared.Request),
+                UpdateJsonTypeInfo.BootstrapPayload,
                 timeout.Token);
-            var result = await UpdatePipeProtocol.ReadAsync<UpdateBootstrapResult>(
+            var result = await UpdatePipeProtocol.ReadAsync(
                 pipe,
+                UpdateJsonTypeInfo.BootstrapResult,
                 timeout.Token);
             if (result.SchemaVersion != UpdateProtocol.SchemaVersion ||
                 !string.Equals(
@@ -544,7 +548,9 @@ internal sealed class WindowsUpdateHandoffService(
             {
                 try
                 {
-                    var completion = UpdateJsonFile.Read<UpdateCleanupCompletion>(completionPath);
+                    var completion = UpdateJsonFile.Read(
+                        completionPath,
+                        UpdateJsonTypeInfo.CleanupCompletion);
                     return completion.SchemaVersion == UpdateProtocol.SchemaVersion &&
                            string.Equals(
                                completion.TransactionId,
@@ -602,7 +608,8 @@ internal sealed class WindowsUpdateHandoffService(
                 new UpdateCleanupAuthorization(
                     UpdateProtocol.SchemaVersion,
                     request.TransactionId,
-                    DateTimeOffset.UtcNow));
+                    DateTimeOffset.UtcNow),
+                UpdateJsonTypeInfo.CleanupAuthorization);
         }
         catch
         {

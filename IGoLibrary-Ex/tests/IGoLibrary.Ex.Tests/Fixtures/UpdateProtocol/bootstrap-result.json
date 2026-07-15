@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 2,
+  "transactionId": "transaction-1",
+  "succeeded": true,
+  "message": "ready",
+  "workerProcessId": null
+}

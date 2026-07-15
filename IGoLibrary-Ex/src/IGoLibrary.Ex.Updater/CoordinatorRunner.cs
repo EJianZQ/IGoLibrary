@@ -40,7 +40,7 @@ internal sealed class CoordinatorRunner
                 throw new PlatformNotSupportedException("自动更新仅支持 Windows x64 系统");
             }
 
-            _request = UpdateJsonFile.Read<UpdateTransactionRequest>(_requestPath);
+            _request = UpdateJsonFile.Read(_requestPath, UpdateJsonTypeInfo.TransactionRequest);
             UpdateTransaction.ValidateRequestFile(_requestPath, _request);
             UpdateTransaction.ValidateRequest(_request);
             _log = new UpdaterLog(_request.LogDirectory, _request.TransactionId, "coordinator");
@@ -69,7 +69,8 @@ internal sealed class CoordinatorRunner
                     _request.TransactionId,
                     UpdateCoordinatorSignalKind.Ready,
                     "文件更新组件已就绪",
-                    DateTimeOffset.UtcNow));
+                    DateTimeOffset.UtcNow),
+                UpdateJsonTypeInfo.CoordinatorSignal);
             _applicationWasReleased = true;
 
             _reportStatus("正在等待主程序安全退出…");
@@ -92,7 +93,8 @@ internal sealed class CoordinatorRunner
                     _request.TransactionId,
                     _newProcess.Id,
                     Path.Combine(_request.InstallationDirectory, _request.EntryExecutable),
-                    DateTimeOffset.UtcNow));
+                    DateTimeOffset.UtcNow),
+                UpdateJsonTypeInfo.LaunchedProcessInfo);
 
             var healthy = await WaitForHealthAsync(_request, _newProcess, cancellationToken);
             if (healthy)
@@ -233,7 +235,9 @@ internal sealed class CoordinatorRunner
                 return false;
             }
 
-            var signal = UpdateJsonFile.Read<UpdateCoordinatorSignal>(request.WorkerReadyPath);
+            var signal = UpdateJsonFile.Read(
+                request.WorkerReadyPath,
+                UpdateJsonTypeInfo.CoordinatorSignal);
             return signal.SchemaVersion == UpdateProtocol.SchemaVersion &&
                    string.Equals(signal.TransactionId, request.TransactionId, StringComparison.Ordinal) &&
                    signal.Signal == UpdateCoordinatorSignalKind.Ready;
@@ -275,7 +279,9 @@ internal sealed class CoordinatorRunner
             {
                 try
                 {
-                    var report = UpdateJsonFile.Read<UpdateHealthReport>(request.HealthReportPath);
+                    var report = UpdateJsonFile.Read(
+                        request.HealthReportPath,
+                        UpdateJsonTypeInfo.HealthReport);
                     return report.SchemaVersion == UpdateProtocol.SchemaVersion &&
                            string.Equals(report.TransactionId, request.TransactionId, StringComparison.Ordinal) &&
                            string.Equals(report.Version, request.TargetVersion, StringComparison.OrdinalIgnoreCase) &&
@@ -316,7 +322,8 @@ internal sealed class CoordinatorRunner
                 request.TransactionId,
                 decision,
                 DateTimeOffset.UtcNow,
-                newProcessId));
+                newProcessId),
+            UpdateJsonTypeInfo.Decision);
     }
 
     private async Task TryRollbackAndRestartAsync(CancellationToken cancellationToken)
@@ -441,7 +448,8 @@ internal sealed class CoordinatorRunner
                     _request.TransactionId,
                     signal,
                     message,
-                    DateTimeOffset.UtcNow));
+                    DateTimeOffset.UtcNow),
+                UpdateJsonTypeInfo.CoordinatorSignal);
         }
         catch (Exception exception)
         {
@@ -461,7 +469,7 @@ internal sealed class CoordinatorRunner
                 return false;
             }
 
-            status = UpdateJsonFile.Read<UpdateWorkerStatus>(request.WorkerStatusPath);
+            status = UpdateJsonFile.Read(request.WorkerStatusPath, UpdateJsonTypeInfo.WorkerStatus);
             return status.SchemaVersion == UpdateProtocol.SchemaVersion &&
                    string.Equals(status.TransactionId, request.TransactionId, StringComparison.Ordinal);
         }

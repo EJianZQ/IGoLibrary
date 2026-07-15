@@ -182,7 +182,7 @@ internal static class UpdateStartupMaintenance
         DateTimeOffset now,
         ResultBuilder result)
     {
-        var request = UpdateJsonFile.Read<UpdateTransactionRequest>(requestPath);
+        var request = UpdateJsonFile.Read(requestPath, UpdateJsonTypeInfo.TransactionRequest);
         UpdateTransaction.ValidateRequestFile(requestPath, request);
         if (!string.Equals(request.TransactionId, transactionId, StringComparison.Ordinal) ||
             IsProcessAlive(request.ParentProcessId) ||
@@ -206,7 +206,7 @@ internal static class UpdateStartupMaintenance
         UpdateWorkerStatus? status = null;
         if (File.Exists(statusPath))
         {
-            status = UpdateJsonFile.Read<UpdateWorkerStatus>(statusPath);
+            status = UpdateJsonFile.Read(statusPath, UpdateJsonTypeInfo.WorkerStatus);
             if (!string.Equals(status.TransactionId, transactionId, StringComparison.Ordinal))
             {
                 return;
@@ -217,7 +217,7 @@ internal static class UpdateStartupMaintenance
         var signalPath = request.CoordinatorReadyPath;
         if (File.Exists(signalPath))
         {
-            signal = UpdateJsonFile.Read<UpdateCoordinatorSignal>(signalPath);
+            signal = UpdateJsonFile.Read(signalPath, UpdateJsonTypeInfo.CoordinatorSignal);
             if (signal.SchemaVersion != UpdateProtocol.SchemaVersion ||
                 !string.Equals(signal.TransactionId, transactionId, StringComparison.Ordinal))
             {
@@ -422,7 +422,9 @@ internal static class UpdateStartupMaintenance
                 return false;
             }
 
-            var launched = UpdateJsonFile.Read<UpdateLaunchedProcessInfo>(request.LaunchedProcessPath);
+            var launched = UpdateJsonFile.Read(
+                request.LaunchedProcessPath,
+                UpdateJsonTypeInfo.LaunchedProcessInfo);
             return string.Equals(launched.TransactionId, request.TransactionId, StringComparison.Ordinal) &&
                    IsProcessAlive(launched.ProcessId);
         }

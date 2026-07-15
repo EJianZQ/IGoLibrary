@@ -18,7 +18,7 @@ public static class UpdatePackageValidator
         UpdatePackageManifest manifest;
         try
         {
-            manifest = UpdateJsonFile.Read<UpdatePackageManifest>(manifestPath);
+            manifest = UpdateJsonFile.Read(manifestPath, UpdateJsonTypeInfo.PackageManifest);
         }
         catch (FileNotFoundException exception)
         {

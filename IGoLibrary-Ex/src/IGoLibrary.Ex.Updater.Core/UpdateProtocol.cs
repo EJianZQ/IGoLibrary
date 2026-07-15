@@ -1,6 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
 namespace IGoLibrary.Ex.Updater.Core;
 
 public static class UpdateProtocol
@@ -15,8 +12,6 @@ public static class UpdateProtocol
     public const string PortableMarkerContent = "IGoLibrary-Ex|portable|win-x64|2";
     public const string PreservedToolsDirectoryName = "tools";
 
-    public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
-
     public static bool IsPreservedInstallationPath(string relativePath)
     {
         var normalized = UpdatePathSafety.NormalizeRelativePath(relativePath);
@@ -29,16 +24,6 @@ public static class UpdateProtocol
                    StringComparison.OrdinalIgnoreCase);
     }
 
-    private static JsonSerializerOptions CreateJsonOptions()
-    {
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
-        {
-            WriteIndented = true,
-            PropertyNameCaseInsensitive = true
-        };
-        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
-        return options;
-    }
 }
 
 public sealed record UpdatePackageManifest(

@@ -388,6 +388,7 @@ public sealed class UpdatePackageValidatorTests : IDisposable
                 version,
                 UpdateProtocol.WindowsX64Runtime,
                 UpdateProtocol.EntryExecutableName,
-                manifestFiles));
+                manifestFiles),
+            UpdateJsonTypeInfo.PackageManifest);
     }
 }

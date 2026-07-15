@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 2,
+  "sourceRequestPath": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\request.json",
+  "request": {
+    "schemaVersion": 2,
+    "transactionId": "transaction-1",
+    "parentProcessId": 42,
+    "parentProcessStartedAtUtc": "2026-07-14T01:02:03+00:00",
+    "currentVersion": "1.2.2",
+    "targetVersion": "1.2.3",
+    "installationDirectory": "C:\\\u6211\u53BB\u56FE\u4E66\u9986",
+    "stagingDirectory": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\staging",
+    "workingDirectory": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1",
+    "packagePath": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\package.zip",
+    "candidateDirectory": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\candidate",
+    "backupDirectory": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\backup",
+    "entryExecutable": "IGoLibrary.Ex.Desktop.exe",
+    "manifestFileName": "update-manifest.json",
+    "packageDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "packageSize": 123,
+    "healthReportPath": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\health.json",
+    "coordinatorReadyPath": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\coordinator-ready.json",
+    "workerReadyPath": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\worker-ready.json",
+    "workerStatusPath": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\worker-status.json",
+    "decisionPath": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\decision.json",
+    "heartbeatPath": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\heartbeat.txt",
+    "launchedProcessPath": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\launched-process.json",
+    "logDirectory": "C:\\\u6211\u53BB\u56FE\u4E66\u9986\\\u66F4\u65B0 \u4E8B\u52A1\\logs"
+  }
+}

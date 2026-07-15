@@ -15,9 +15,9 @@ public sealed class UpdatePipeProtocolTests
             1234);
         await using var stream = new MemoryStream();
 
-        await UpdatePipeProtocol.WriteAsync(stream, expected);
+        await UpdatePipeProtocol.WriteAsync(stream, expected, UpdateJsonTypeInfo.BootstrapResult);
         stream.Position = 0;
-        var actual = await UpdatePipeProtocol.ReadAsync<UpdateBootstrapResult>(stream);
+        var actual = await UpdatePipeProtocol.ReadAsync(stream, UpdateJsonTypeInfo.BootstrapResult);
 
         Assert.Equal(expected, actual);
     }
@@ -30,6 +30,6 @@ public sealed class UpdatePipeProtocolTests
         stream.Position = 0;
 
         await Assert.ThrowsAsync<InvalidDataException>(() =>
-            UpdatePipeProtocol.ReadAsync<UpdateBootstrapResult>(stream));
+            UpdatePipeProtocol.ReadAsync(stream, UpdateJsonTypeInfo.BootstrapResult));
     }
 }

@@ -41,7 +41,7 @@ public sealed class CloudflaredPackagingTests
         Assert.Contains("macOS-Apple-Silicon-arm64-with-cloudflared.zip", macAll, StringComparison.Ordinal);
         Assert.Contains("macOS-Intel-x64-with-cloudflared.zip", macAll, StringComparison.Ordinal);
         Assert.Contains("Copy-DirectoryWithoutTools", windows, StringComparison.Ordinal);
-        Assert.Contains("Install-ValidatedPackagePair", windows, StringComparison.Ordinal);
+        Assert.Contains("Install-ValidatedReleaseArtifacts", windows, StringComparison.Ordinal);
         Assert.Contains("New-MacAppBundle -IncludeTools $false", mac, StringComparison.Ordinal);
         Assert.Contains("New-MacAppBundle -IncludeTools $true", mac, StringComparison.Ordinal);
         Assert.Contains("Test-MacAppZip", mac, StringComparison.Ordinal);

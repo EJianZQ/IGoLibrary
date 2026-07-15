@@ -10,11 +10,38 @@ Set-StrictMode -Version Latest
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+$maximumUpdaterBytes = 20MB
+$maximumUpdaterCompressedBytes = 10MB
+
 function Test-IsToolsRelativePath {
     param([Parameter(Mandatory)][string]$RelativePath)
 
     return $RelativePath.Equals('tools', [System.StringComparison]::OrdinalIgnoreCase) -or
         $RelativePath.StartsWith('tools/', [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-IsForbiddenUpdaterSidecar {
+    param([Parameter(Mandatory)][string]$RelativePath)
+
+    $fileName = [System.IO.Path]::GetFileName($RelativePath)
+    if ($fileName -ieq 'IGoLibrary.Ex.Updater.exe') {
+        return $false
+    }
+    if ($fileName -ieq 'IGoLibrary.Ex.Updater.Core.dll') {
+        return $false
+    }
+    if (-not $fileName.StartsWith(
+            'IGoLibrary.Ex.Updater',
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $false
+    }
+
+    return $fileName.EndsWith('.pdb', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $fileName.EndsWith('.obj', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $fileName.EndsWith('.map', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $fileName.EndsWith('.dll', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $fileName.EndsWith('.deps.json', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $fileName.EndsWith('.runtimeconfig.json', [System.StringComparison]::OrdinalIgnoreCase)
 }
 
 function Get-ZipEntryBytes {
@@ -47,6 +74,44 @@ function Get-ZipEntrySha256 {
     finally {
         $stream.Dispose()
         $sha.Dispose()
+    }
+}
+
+function Get-ZipEntryVersionInfo {
+    param([Parameter(Mandatory)][System.IO.Compression.ZipArchiveEntry]$Entry)
+
+    $temporaryPath = Join-Path (
+        [System.IO.Path]::GetTempPath()) (
+        "IGoLibrary.Ex.Updater-version-$([Guid]::NewGuid().ToString('N')).exe")
+    try {
+        $source = $Entry.Open()
+        try {
+            $destination = [System.IO.FileStream]::new(
+                $temporaryPath,
+                [System.IO.FileMode]::CreateNew,
+                [System.IO.FileAccess]::Write,
+                [System.IO.FileShare]::None)
+            try {
+                $source.CopyTo($destination)
+            }
+            finally {
+                $destination.Dispose()
+            }
+        }
+        finally {
+            $source.Dispose()
+        }
+
+        $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($temporaryPath)
+        return [pscustomobject]@{
+            FileVersion = $versionInfo.FileVersion
+            ProductVersion = $versionInfo.ProductVersion
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporaryPath) {
+            Remove-Item -LiteralPath $temporaryPath -Force
+        }
     }
 }
 
@@ -108,6 +173,26 @@ function Test-WindowsPackage {
             $entryByPath.Add($path, $entry)
         }
 
+        $updaterEntries = @(
+            $fileEntries | Where-Object {
+                $_.Name.Equals(
+                    'IGoLibrary.Ex.Updater.exe',
+                    [System.StringComparison]::OrdinalIgnoreCase)
+            }
+        )
+        if ($updaterEntries.Count -ne 1 -or
+            $updaterEntries[0].FullName -cne 'IGoLibrary.Ex.Updater.exe') {
+            throw 'ZIP 必须且只能在根目录包含一个名称精确为 IGoLibrary.Ex.Updater.exe 的文件。'
+        }
+        $updaterSidecars = @(
+            $fileEntries | Where-Object {
+                Test-IsForbiddenUpdaterSidecar -RelativePath $_.FullName
+            }
+        )
+        if ($updaterSidecars.Count -gt 0) {
+            throw "ZIP 不得包含 updater sidecar：$($updaterSidecars.FullName -join ', ')"
+        }
+
         foreach ($requiredPath in @(
             'IGoLibrary.Ex.Desktop.exe',
             'IGoLibrary.Ex.Updater.exe',
@@ -116,6 +201,27 @@ function Test-WindowsPackage {
             if (-not $entryByPath.ContainsKey($requiredPath)) {
                 throw "ZIP 根目录缺少 $requiredPath。"
             }
+        }
+
+        $updaterEntry = $entryByPath['IGoLibrary.Ex.Updater.exe']
+        if ($updaterEntry.Length -gt $maximumUpdaterBytes) {
+            throw "IGoLibrary.Ex.Updater.exe 超过 20 MiB 门槛：$($updaterEntry.Length) bytes。"
+        }
+        if ($updaterEntry.CompressedLength -gt $maximumUpdaterCompressedBytes) {
+            throw "IGoLibrary.Ex.Updater.exe 的 ZIP 条目超过 10 MiB 门槛：$($updaterEntry.CompressedLength) bytes。"
+        }
+
+        $updaterVersionInfo = Get-ZipEntryVersionInfo -Entry $updaterEntry
+        try {
+            $actualUpdaterFileVersion = [version]::Parse([string]$updaterVersionInfo.FileVersion)
+        }
+        catch {
+            throw "IGoLibrary.Ex.Updater.exe 缺少有效 FileVersion：$($updaterVersionInfo.FileVersion)"
+        }
+        $expectedUpdaterFileVersion = [version]::Parse("${fileNameVersion}.0")
+        if ($actualUpdaterFileVersion -ne $expectedUpdaterFileVersion -or
+            [string]$updaterVersionInfo.ProductVersion -cne $fileNameVersion) {
+            throw "IGoLibrary.Ex.Updater.exe 版本资源无效。FileVersion=$($updaterVersionInfo.FileVersion)，ProductVersion=$($updaterVersionInfo.ProductVersion)，期望=$fileNameVersion。"
         }
 
         $manifestBytes = Get-ZipEntryBytes -Entry $entryByPath['update-manifest.json']
@@ -173,6 +279,10 @@ function Test-WindowsPackage {
             if ($actualHash -cne ([string]$file.sha256).ToLowerInvariant()) {
                 throw "文件 SHA-256 与 manifest 不一致：$path"
             }
+        }
+
+        if (-not $manifestPaths.Contains('IGoLibrary.Ex.Updater.exe')) {
+            throw 'manifest 必须声明根目录 IGoLibrary.Ex.Updater.exe。'
         }
 
         $sortedPaths = @($orderedPaths | Sort-Object { $_.ToUpperInvariant() }, { $_ })
@@ -250,6 +360,10 @@ function Test-WindowsPackage {
             Version = $fileNameVersion
             Variant = $variant
             ManifestBytes = $manifestBytes
+            UpdaterBytes = $updaterEntry.Length
+            UpdaterCompressedBytes = $updaterEntry.CompressedLength
+            UpdaterFileVersion = $updaterVersionInfo.FileVersion
+            UpdaterProductVersion = $updaterVersionInfo.ProductVersion
         }
     }
     finally {
@@ -278,4 +392,7 @@ foreach ($result in $results) {
     Write-Host "Windows $($result.Variant) package verification passed: $($result.Path)"
     Write-Host "ZIP size: $($packageInfo.Length) bytes"
     Write-Host "ZIP SHA-256: $packageHash"
+    Write-Host "Updater size: $($result.UpdaterBytes) bytes"
+    Write-Host "Updater compressed size: $($result.UpdaterCompressedBytes) bytes"
+    Write-Host "Updater FileVersion/ProductVersion: $($result.UpdaterFileVersion) / $($result.UpdaterProductVersion)"
 }

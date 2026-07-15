@@ -10,10 +10,24 @@
 
 ## 发布命令
 
-在仓库根目录使用 PowerShell 7 执行：
+发布机必须是 Windows x64，并安装：
+
+- .NET 10 SDK
+- Visual Studio 2026 或 Build Tools 的“使用 C++ 的桌面开发”工作负载
+- 对应的 MSVC x64 linker/runtime libraries 与 Windows 10/11 SDK
+
+脚本会在清理任何旧产物之前检查 `vcvarsall.bat`、x64 `link.exe`、`libcmt.lib`、`kernel32.lib` 和 `ucrt.lib`，缺失时给出可操作错误。准备完成后，在仓库根目录使用 PowerShell 7 执行：
+
+发布门禁还需要上一稳定版的 managed updater 做一次真实迁移测试。默认路径为已忽略的 `artifacts/validation/managed-updater-baseline/IGoLibrary.Ex.Updater.exe`；也可以通过 `-ManagedUpdaterBaselinePath` 指向其它受信任的上一版 EXE。该文件不会进入仓库或发布包，缺失时脚本会在清理旧产物前停止。
 
 ```powershell
 .\build\publish-windows.ps1 -Configuration Release -AppVersion 1.0.1
+```
+
+显式指定迁移基线时：
+
+```powershell
+.\build\publish-windows.ps1 -Configuration Release -AppVersion 1.0.1 -ManagedUpdaterBaselinePath D:\release-baseline\IGoLibrary.Ex.Updater.exe
 ```
 
 脚本只执行一次 Desktop 和一次 Updater 的 `dotnet publish`，固定生成两个 ZIP：
@@ -26,19 +40,22 @@ artifacts/windows/win-x64/IGoLibrary-Ex-v1.0.1-windows-x64-with-cloudflared.zip
 - 无后缀 ZIP 是不含整个根级 `tools` 目录的轻量包，也是唯一的应用内自动更新资产
 - `-with-cloudflared` ZIP 是供用户手动下载的完整包，仅在 manifest 管理文件之外增加 `tools/cloudflared/cloudflared.exe`、`LICENSE.txt` 和 `THIRD-PARTY-NOTICES.txt`
 - `artifacts/publish/win-x64` 最终保留包含 cloudflared 的完整发布树，供 Inno Setup 等后续打包入口复用
+- Native AOT 生成的全部 PDB 不进入 ZIP，按版本归档到 `artifacts/symbols/win-x64/v1.0.1/`
 - 第三方许可证和声明只随完整包提供；轻量包不携带 `tools` 或这些声明
 
 脚本会依次完成：
 
-1. 安全清理 `artifacts/publish/win-x64` 与 updater 临时发布目录
-2. 发布自包含 Desktop
-3. 发布 win-x64、自包含、单文件、不裁剪的 updater
-4. 将 updater 放入 Desktop 发布根目录
-5. 准备并校验固定版本的 cloudflared、许可证和第三方声明
-6. 写入固定内容的 `portable-release.marker`，并生成 UTF-8 无 BOM 的 `update-manifest.json`；manifest 大小写不敏感地排除整个根级 `tools/**`
-7. 从完整发布树组装不含 `tools` 的轻量 staging，并分别创建两个临时 ZIP
-8. 成对验证两个 ZIP 的文件集合、大小、SHA-256、清单顺序及版本；两个 manifest 必须逐字节一致
-9. 全部验证通过后才替换最终产物，并输出两个 ZIP 的大小与 SHA-256
+1. 预检 Windows x64 Native AOT 工具链
+2. 安全清理 `artifacts/publish/win-x64` 与 updater 临时发布目录
+3. 发布自包含 Desktop
+4. 以 Native AOT、`OptimizationPreference=Size`、ILLink/ILC 警告视为错误的方式发布 updater
+5. 验证 updater 只有原生 EXE、版本资源正确且原始大小不超过 20 MiB，并执行无界面启动与真实 Win32 TaskDialog smoke
+6. 直接运行发布出来的 AOT EXE，完成提交、显式回滚、包/manifest 篡改、apply 后恢复、健康成功、进程崩溃、无法启动、60 秒健康超时和 managed→AOT→AOT 共 9 条进程级验收
+7. 准备并校验固定版本的 cloudflared、许可证和第三方声明
+8. 写入固定内容的 `portable-release.marker`，并生成 UTF-8 无 BOM 的 `update-manifest.json`；manifest 大小写不敏感地排除整个根级 `tools/**`
+9. 从完整发布树组装不含 `tools` 的轻量 staging，使用 `CompressionLevel.SmallestSize` 分别创建两个临时 ZIP
+10. 成对验证两个 ZIP 的文件集合、大小、SHA-256、清单顺序及版本；两个 manifest 必须逐字节一致，updater 条目压缩后不得超过 10 MiB，且不得携带 updater PDB/map/obj/托管 sidecar
+11. 全部验证通过后，才把两个 ZIP 与本次 AOT PDB 符号目录作为同一组产物替换；任一步失败都会恢复上一组 ZIP/符号
 
 脚本校验失败时不得上传其中任何一个 ZIP
 
@@ -48,7 +65,16 @@ artifacts/windows/win-x64/IGoLibrary-Ex-v1.0.1-windows-x64-with-cloudflared.zip
 .\build\verify-windows-package.ps1 -PackagePath .\artifacts\windows\win-x64\IGoLibrary-Ex-v1.0.1-windows-x64.zip -CompanionPackagePath .\artifacts\windows\win-x64\IGoLibrary-Ex-v1.0.1-windows-x64-with-cloudflared.zip
 ```
 
-验证器会拒绝轻量包中的任何 `tools` 条目，完整包也只允许三个固定的 cloudflared 文件；可执行文件按 `cloudflared-assets.json` 校验 SHA-256，许可证和声明与仓库源文件逐字节比对。
+验证器会拒绝轻量包中的任何 `tools` 条目，完整包也只允许三个固定的 cloudflared 文件；可执行文件按 `cloudflared-assets.json` 校验 SHA-256，许可证和声明与仓库源文件逐字节比对。两个包都必须且只能在根目录包含一个名称精确的 `IGoLibrary.Ex.Updater.exe`，其 manifest 大小和 SHA-256、FileVersion/ProductVersion、20 MiB 原始大小及 10 MiB 压缩大小门槛均会被验证。
+
+## Updater 运行时与界面
+
+- `IGoLibrary.Ex.Updater.exe` 是 `win-x64` Native AOT 原生程序，不携带 `.runtimeconfig.json`、`.deps.json` 或托管 DLL
+- 普通协调器使用系统 Common Controls v6 `TaskDialogIndirect`，显示 marquee 进度并同步刷新状态；任务完成前关闭、Esc 和 Alt+F4 均被拒绝
+- 失败界面提供“前往 GitHub”和“关闭”，允许关闭按钮、窗口关闭、Esc 和 Alt+F4；浏览器启动失败时会直接显示可复制的 Release 地址并保持窗口打开
+- TaskDialog 创建失败时更新任务尚未启动，并由 `MessageBoxW` 给出兜底错误
+- `--bootstrap`、`--worker`、`--recover`、`--recover-worker` 和 `--cleanup` 仍为完全无界面模式；只有现有 bootstrap 流程可以请求 UAC
+- 应用 manifest 固定为 `asInvoker`、`uiAccess=false`、PerMonitorV2 DPI、Windows 10 compatibility
 
 ## GitHub Release 契约
 
@@ -73,10 +99,15 @@ artifacts/windows/win-x64/IGoLibrary-Ex-v1.0.1-windows-x64-with-cloudflared.zip
 
 ```powershell
 dotnet test .\IGoLibrary-Ex.sln
+dotnet test .\tests\IGoLibrary.Ex.Updater.Tests\IGoLibrary.Ex.Updater.Tests.csproj -c Release
 ```
+
+发布后进程级验收项目 `tests/IGoLibrary.Ex.Updater.AcceptanceTests` 不加入跨平台主解决方案，由 `publish-windows.ps1` 在 AOT EXE 生成后自动传入发布路径与 managed 基线并运行；不得用普通托管构建替代这一步。
 
 还应至少人工验证：
 
+- 100%、150%、200% DPI，以及浅色、深色、高对比度和键盘操作
+- 更新期间关闭、Esc、Alt+F4 均无法误关，状态文字持续刷新，失败按钮和 GitHub 跳转正常
 - 可写绿色目录的正常升级
 - 自定义文件保留、旧 manifest 独有程序文件删除
 - 从完整包安装后执行轻量更新，确认 `tools` 内容、大小和哈希保持不变
@@ -91,6 +122,7 @@ dotnet test .\IGoLibrary-Ex.sln
 - 四种活动任务均阻止进入安装
 - 断网、摘要错误、空间不足和旧进程退出超时不修改安装目录
 - 更新后的应用和更新协调器以普通权限运行
+- 当前 managed updater 能安装包含 Native AOT updater 的新包，Native AOT updater 能继续安装下一版包
 - macOS 仍只显示 GitHub 下载入口
 
 ## 故障排查

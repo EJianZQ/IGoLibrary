@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "product": "IGoLibrary-Ex",
+  "version": "1.2.3",
+  "runtime": "win-x64",
+  "entryExecutable": "IGoLibrary.Ex.Desktop.exe",
+  "files": [
+    {
+      "path": "\u76EE\u5F55/\u6587\u4EF6.dll",
+      "size": 123,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}

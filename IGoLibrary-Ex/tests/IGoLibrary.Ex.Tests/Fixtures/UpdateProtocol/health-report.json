@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 2,
+  "transactionId": "transaction-1",
+  "version": "1.2.3",
+  "processId": 42,
+  "createdAtUtc": "2026-07-14T01:02:03+00:00"
+}
