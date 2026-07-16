@@ -926,7 +926,8 @@ public sealed class MainWindowViewModelTests
                 {
                     CookieExpiring = false,
                     GrabSucceeded = false,
-                    TaskFailed = false
+                    TaskFailed = false,
+                    CloudflareTunnelInterrupted = false
                 })));
         var viewModel = CreateViewModel(settingsService: settingsService);
 
@@ -939,6 +940,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.GlobalLeakSucceededAlertsEnabled);
         Assert.True(viewModel.SessionInvalidAlertsEnabled);
         Assert.False(viewModel.TaskFailedAlertsEnabled);
+        Assert.False(viewModel.CloudflareTunnelInterruptedAlertsEnabled);
     }
 
     private async Task NotificationSettings_AutoSaveEventAlerts_WhenFieldsChange()
@@ -951,13 +953,15 @@ public sealed class MainWindowViewModelTests
         viewModel.CookieExpiringAlertsEnabled = false;
         viewModel.GrabSucceededAlertsEnabled = false;
         viewModel.GlobalLeakSucceededAlertsEnabled = false;
+        viewModel.CloudflareTunnelInterruptedAlertsEnabled = false;
         timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         await WaitForAsync(() =>
             settingsService.SaveCalls > 0 &&
             settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events.CookieExpiring == false &&
             settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events.GrabSucceeded == false &&
-            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events.GlobalLeakSucceeded == false);
+            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events.GlobalLeakSucceeded == false &&
+            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events.CloudflareTunnelInterrupted == false);
 
         var events = Assert.IsType<TaskEventAlertEventSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events);
         Assert.False(events.CookieExpiring);
@@ -967,6 +971,7 @@ public sealed class MainWindowViewModelTests
         Assert.False(events.GlobalLeakSucceeded);
         Assert.True(events.SessionInvalid);
         Assert.True(events.TaskFailed);
+        Assert.False(events.CloudflareTunnelInterrupted);
     }
 
     private async Task SendTestEmailAlertAsync_UsesCurrentNotificationSettingsSnapshot()

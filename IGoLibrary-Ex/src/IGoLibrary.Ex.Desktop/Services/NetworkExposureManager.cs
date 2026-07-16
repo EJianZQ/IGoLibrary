@@ -10,6 +10,7 @@ internal sealed class NetworkExposureManager(
     ISettingsWorkflowService settingsWorkflowService,
     IActivityLogService activityLogService,
     INotificationService notificationService,
+    ICloudflareTunnelRuntimeNotificationCoordinator runtimeNotificationCoordinator,
     ILogger<NetworkExposureManager> logger) : INetworkExposureManager
 {
     internal const string TunnelStartupFailureUserMessage =
@@ -315,17 +316,23 @@ internal sealed class NetworkExposureManager(
     }
 
     public async Task<INetworkExposureLease> PublishAsync(
+        NetworkExposurePurpose purpose,
         Uri lanUrl,
         string healthCheckPath,
         CancellationToken cancellationToken = default)
     {
+        if (!Enum.IsDefined(purpose))
+        {
+            throw new ArgumentOutOfRangeException(nameof(purpose), purpose, "未知的网络暴露用途");
+        }
+
         ArgumentNullException.ThrowIfNull(lanUrl);
         if (!lanUrl.IsAbsoluteUri || lanUrl.Scheme != Uri.UriSchemeHttp)
         {
             throw new ArgumentException("局域网发布地址必须是绝对 HTTP 地址", nameof(lanUrl));
         }
 
-        var lease = new NetworkExposureLease(this, lanUrl, healthCheckPath);
+        var lease = new NetworkExposureLease(this, purpose, lanUrl, healthCheckPath);
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -362,7 +369,7 @@ internal sealed class NetworkExposureManager(
                     }
                     else
                     {
-                        ReportTunnelFailureWithoutFallbackUnderGate(message, showNotification: false);
+                        ReportTunnelFailureWithoutFallbackUnderGate(message);
                         throw CreateTunnelStartupException(ex);
                     }
                 }
@@ -392,6 +399,7 @@ internal sealed class NetworkExposureManager(
             }
 
             _disposed = true;
+            runtimeNotificationCoordinator.CancelPendingNotifications();
             foreach (var lease in _leases.Values.ToArray())
             {
                 await lease.StopTunnelUnderManagerLockAsync();
@@ -411,7 +419,7 @@ internal sealed class NetworkExposureManager(
         ICloudflareQuickTunnelSession tunnel)
     {
         lease.AttachTunnel(tunnel);
-        _ = ObserveTunnelAsync(lease.Id, tunnel);
+        _ = ObserveTunnelSafelyAsync(lease.Id, tunnel);
     }
 
     private async Task<Dictionary<Guid, ICloudflareQuickTunnelSession>> PrepareAllTunnelsUnderGateAsync(
@@ -453,7 +461,7 @@ internal sealed class NetworkExposureManager(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to dispose replaced Cloudflare Tunnel process.");
+            logger.LogWarning(ex, "Failed to dispose a Cloudflare Tunnel session.");
         }
     }
 
@@ -495,6 +503,27 @@ internal sealed class NetworkExposureManager(
         return new ClashMihomoCompatibilityOptions(enabled, normalizedConfigPath, normalizedRoutePolicy);
     }
 
+    private async Task ObserveTunnelSafelyAsync(
+        Guid leaseId,
+        ICloudflareQuickTunnelSession tunnel)
+    {
+        try
+        {
+            await ObserveTunnelAsync(leaseId, tunnel);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Unhandled failure while observing a Cloudflare Tunnel runtime session. LeaseId={LeaseId}.",
+                leaseId);
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "Network",
+                "处理 Cloudflare Tunnel 运行故障时发生异常，详情请查看日志");
+        }
+    }
+
     private async Task ObserveTunnelAsync(
         Guid leaseId,
         ICloudflareQuickTunnelSession tunnel)
@@ -505,6 +534,8 @@ internal sealed class NetworkExposureManager(
             return;
         }
 
+        CloudflareTunnelInterruptionOutcome? alertOutcome = null;
+        AuthorizationRelayRuntimeInterruption? authorizationRelayInterruption = null;
         await _gate.WaitAsync();
         try
         {
@@ -516,9 +547,29 @@ internal sealed class NetworkExposureManager(
                 return;
             }
 
+            var hasActiveMobileControlTunnel = _leases.Values.Any(static candidate =>
+                candidate.Purpose == NetworkExposurePurpose.MobileControl &&
+                candidate.Tunnel is not null &&
+                candidate.EffectiveMode == MobileControlNetworkMode.CloudflareTunnel);
+            var affectsMobileControl = _fallbackToLocalNetworkOnTunnelFailure
+                ? hasActiveMobileControlTunnel
+                : lease.Purpose == NetworkExposurePurpose.MobileControl;
+            logger.LogWarning(
+                "Cloudflare Tunnel runtime fault observed. ExposurePurpose={ExposurePurpose}, " +
+                "AffectsMobileControl={AffectsMobileControl}, FallbackEnabled={FallbackEnabled}.",
+                lease.Purpose,
+                affectsMobileControl,
+                _fallbackToLocalNetworkOnTunnelFailure);
+
             if (_fallbackToLocalNetworkOnTunnelFailure)
             {
-                await FallbackToLocalNetworkUnderGateAsync(fault.Message);
+                var outcome = await FallbackToLocalNetworkUnderGateAsync(
+                    fault.Message,
+                    showNotification: !affectsMobileControl);
+                if (affectsMobileControl)
+                {
+                    alertOutcome = outcome;
+                }
             }
             else
             {
@@ -528,16 +579,41 @@ internal sealed class NetworkExposureManager(
                     await DisposeTunnelSafelyAsync(faultedTunnel);
                 }
 
-                ReportTunnelFailureWithoutFallbackUnderGate(fault.Message, showNotification: true);
+                if (affectsMobileControl)
+                {
+                    alertOutcome = CloudflareTunnelInterruptionOutcome.TunnelModeRetained;
+                }
+                else
+                {
+                    authorizationRelayInterruption = new AuthorizationRelayRuntimeInterruption(
+                        lease.Id,
+                        hasActiveMobileControlTunnel);
+                }
+
+                ReportTunnelFailureWithoutFallbackUnderGate(fault.Message);
             }
         }
         finally
         {
             _gate.Release();
         }
+
+        if (authorizationRelayInterruption is not null)
+        {
+            await runtimeNotificationCoordinator.NotifyAuthorizationRelayInterruptedAsync(
+                authorizationRelayInterruption.LeaseId,
+                authorizationRelayInterruption.MobileControlTunnelActive);
+        }
+
+        if (alertOutcome is not null)
+        {
+            await runtimeNotificationCoordinator.NotifyMobileControlInterruptedAsync(alertOutcome.Value);
+        }
     }
 
-    private async Task FallbackToLocalNetworkUnderGateAsync(string diagnostic)
+    private async Task<CloudflareTunnelInterruptionOutcome> FallbackToLocalNetworkUnderGateAsync(
+        string diagnostic,
+        bool showNotification = true)
     {
         LogTunnelDiagnostic(diagnostic);
         _currentMode = MobileControlNetworkMode.LocalNetwork;
@@ -548,7 +624,7 @@ internal sealed class NetworkExposureManager(
             .ToArray();
         foreach (var tunnel in tunnels)
         {
-            await tunnel.DisposeAsync();
+            await DisposeTunnelSafelyAsync(tunnel);
         }
 
         var persistenceFailed = false;
@@ -568,12 +644,17 @@ internal sealed class NetworkExposureManager(
             : "Cloudflare Tunnel 不可用，已自动回退到本机局域网。详情请查看日志";
         PublishModeChanged(_currentMode, userMessage);
         activityLogService.Write(LogEntryKind.Warning, "Network", userMessage);
-        _ = ShowFallbackNotificationAsync(userMessage);
+        if (showNotification)
+        {
+            _ = ShowFallbackNotificationAsync(userMessage);
+        }
+
+        return persistenceFailed
+            ? CloudflareTunnelInterruptionOutcome.FellBackToLocalNetworkWithPersistenceFailure
+            : CloudflareTunnelInterruptionOutcome.FellBackToLocalNetwork;
     }
 
-    private void ReportTunnelFailureWithoutFallbackUnderGate(
-        string diagnostic,
-        bool showNotification)
+    private void ReportTunnelFailureWithoutFallbackUnderGate(string diagnostic)
     {
         LogTunnelDiagnostic(diagnostic);
         PublishModeChanged(_currentMode, TunnelUnavailableWithoutFallbackUserMessage);
@@ -581,10 +662,6 @@ internal sealed class NetworkExposureManager(
             LogEntryKind.Warning,
             "Network",
             TunnelUnavailableWithoutFallbackUserMessage);
-        if (showNotification)
-        {
-            _ = ShowTunnelFailureNotificationAsync(TunnelUnavailableWithoutFallbackUserMessage);
-        }
     }
 
     private static Exception CreateTunnelStartupException(Exception innerException)
@@ -599,6 +676,7 @@ internal sealed class NetworkExposureManager(
 
     private async Task CommitLocalNetworkUnderGateAsync(string message)
     {
+        runtimeNotificationCoordinator.CancelPendingNotifications();
         _currentMode = MobileControlNetworkMode.LocalNetwork;
         var tunnels = _leases.Values
             .Select(static lease => lease.DetachTunnelAndUseLan())
@@ -619,6 +697,8 @@ internal sealed class NetworkExposureManager(
         await _gate.WaitAsync();
         try
         {
+            runtimeNotificationCoordinator.CancelAuthorizationRelayNotification(lease.Id);
+
             if (_leases.Remove(lease.Id))
             {
                 await lease.StopTunnelUnderManagerLockAsync();
@@ -644,21 +724,55 @@ internal sealed class NetworkExposureManager(
         }
     }
 
-    private async Task ShowTunnelFailureNotificationAsync(string message)
+    private void PublishModeChanged(MobileControlNetworkMode mode, string? message = null)
     {
-        try
+        var handlers = ModeChanged;
+        if (handlers is null)
         {
-            await notificationService.ShowWarningAsync("Cloudflare Tunnel 不可用", message);
+            return;
         }
-        catch (Exception ex)
+
+        var args = new NetworkModeChangedEventArgs(mode, message);
+        foreach (EventHandler<NetworkModeChangedEventArgs> handler in handlers.GetInvocationList())
         {
-            logger.LogWarning(ex, "Failed to show Cloudflare Tunnel failure notification.");
+            try
+            {
+                handler(this, args);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "A network-mode change subscriber failed. Mode={NetworkMode}.", mode);
+            }
         }
     }
 
-    private void PublishModeChanged(MobileControlNetworkMode mode, string? message = null)
+    private void PublishEndpointChangedSafely(
+        NetworkExposureLease lease,
+        EventHandler<NetworkExposureChangedEventArgs>? handlers,
+        NetworkExposureChangedEventArgs args)
     {
-        ModeChanged?.Invoke(this, new NetworkModeChangedEventArgs(mode, message));
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (EventHandler<NetworkExposureChangedEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(lease, args);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "A network-exposure endpoint subscriber failed. LeaseId={LeaseId}, " +
+                    "ExposurePurpose={ExposurePurpose}, EffectiveMode={EffectiveMode}.",
+                    lease.Id,
+                    lease.Purpose,
+                    args.EffectiveMode);
+            }
+        }
     }
 
     private void ThrowIfDisposed()
@@ -666,8 +780,13 @@ internal sealed class NetworkExposureManager(
         ObjectDisposedException.ThrowIf(_disposed, this);
     }
 
+    private sealed record AuthorizationRelayRuntimeInterruption(
+        Guid LeaseId,
+        bool MobileControlTunnelActive);
+
     private sealed class NetworkExposureLease(
         NetworkExposureManager owner,
+        NetworkExposurePurpose purpose,
         Uri lanUrl,
         string healthCheckPath) : INetworkExposureLease
     {
@@ -676,6 +795,8 @@ internal sealed class NetworkExposureManager(
         public event EventHandler<NetworkExposureChangedEventArgs>? EndpointChanged;
 
         public Guid Id { get; } = Guid.NewGuid();
+
+        public NetworkExposurePurpose Purpose { get; } = purpose;
 
         public Uri LanUrl { get; } = lanUrl;
 
@@ -699,7 +820,10 @@ internal sealed class NetworkExposureManager(
             Tunnel = tunnel;
             EffectiveMode = MobileControlNetworkMode.CloudflareTunnel;
             Url = ReplaceAuthority(LanUrl, tunnel.PublicBaseUri);
-            EndpointChanged?.Invoke(this, new NetworkExposureChangedEventArgs(Url, EffectiveMode));
+            owner.PublishEndpointChangedSafely(
+                this,
+                EndpointChanged,
+                new NetworkExposureChangedEventArgs(Url, EffectiveMode));
         }
 
         public ICloudflareQuickTunnelSession? DetachTunnelAndUseLan()
@@ -708,7 +832,10 @@ internal sealed class NetworkExposureManager(
             Tunnel = null;
             EffectiveMode = MobileControlNetworkMode.LocalNetwork;
             Url = LanUrl;
-            EndpointChanged?.Invoke(this, new NetworkExposureChangedEventArgs(Url, EffectiveMode));
+            owner.PublishEndpointChangedSafely(
+                this,
+                EndpointChanged,
+                new NetworkExposureChangedEventArgs(Url, EffectiveMode));
             return tunnel;
         }
 

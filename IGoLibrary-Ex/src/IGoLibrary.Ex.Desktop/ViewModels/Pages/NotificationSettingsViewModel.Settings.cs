@@ -136,6 +136,9 @@ public sealed partial class NotificationSettingsViewModel
     [ObservableProperty]
     private bool taskFailedAlertsEnabled = true;
 
+    [ObservableProperty]
+    private bool cloudflareTunnelInterruptedAlertsEnabled = true;
+
     partial void OnEmailAlertsEnabledChanged(bool value) => ScheduleAutoSave();
 
     partial void OnEmailAlertSmtpHostChanged(string value) => ScheduleAutoSave();
@@ -210,6 +213,8 @@ public sealed partial class NotificationSettingsViewModel
 
     partial void OnTaskFailedAlertsEnabledChanged(bool value) => ScheduleAutoSave();
 
+    partial void OnCloudflareTunnelInterruptedAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
     public void ConfigureAutoSave(Func<bool> canAutoSave)
     {
         _canAutoSave = canAutoSave;
@@ -271,6 +276,7 @@ public sealed partial class NotificationSettingsViewModel
         GlobalLeakSucceededAlertsEnabled = eventSettings.GlobalLeakSucceeded;
         SessionInvalidAlertsEnabled = eventSettings.SessionInvalid;
         TaskFailedAlertsEnabled = eventSettings.TaskFailed;
+        CloudflareTunnelInterruptedAlertsEnabled = eventSettings.CloudflareTunnelInterrupted;
     }
 
     public void CancelPendingAutoSave()
@@ -424,7 +430,8 @@ public sealed partial class NotificationSettingsViewModel
                 TomorrowReservationSucceeded = TomorrowReservationSucceededAlertsEnabled,
                 GlobalLeakSucceeded = GlobalLeakSucceededAlertsEnabled,
                 SessionInvalid = SessionInvalidAlertsEnabled,
-                TaskFailed = TaskFailedAlertsEnabled
+                TaskFailed = TaskFailedAlertsEnabled,
+                CloudflareTunnelInterrupted = CloudflareTunnelInterruptedAlertsEnabled
             },
             new BarkAlertChannelSettings(
                 BarkAlertsEnabled,

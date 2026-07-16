@@ -3,6 +3,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Threading;
 using IGoLibrary.Ex.Application.Services;
+using IGoLibrary.Ex.Application.Configuration;
 using IGoLibrary.Ex.Desktop;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
@@ -154,6 +155,71 @@ public sealed class MainWindowViewModelUiTests
             timeProvider.Advance(TimeSpan.FromMilliseconds(300));
             await WaitForAsync(() => settingsService.CurrentSettings.Ui.MainViewSize?.RememberSize == true);
             Assert.Equal((Enabled: true, CaptureCurrentSize: true), sizePersistence.Changes[^1]);
+        }
+        finally
+        {
+            window.DataContext = null;
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task CloudflareTunnelInterruptionAlertToggle_TracksNetworkModeWithoutResettingValue()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(NetworkMode: MobileControlNetworkMode.LocalNetwork),
+            Notifications = AppSettings.Default.Notifications with
+            {
+                TaskEventAlerts = TaskEventAlertSettings.Default with
+                {
+                    Events = TaskEventAlertEventSettings.Default with
+                    {
+                        CloudflareTunnelInterrupted = false
+                    }
+                }
+            }
+        });
+        var exposureManager = new FakeNetworkExposureManager();
+        var viewModel = MainWindowViewModelTests.CreateViewModel(
+            settingsService: settingsService,
+            networkExposureManager: exposureManager);
+        await viewModel.InitializeAsync();
+        viewModel.IsAuthorized = true;
+        viewModel.SelectedTabIndex = 8;
+
+        var window = new MainWindow { DataContext = viewModel };
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var card = Assert.IsType<Border>(
+                window.FindControl<Border>("CloudflareTunnelInterruptedAlertCard"));
+            Assert.False(card.IsVisible);
+            Assert.False(viewModel.CloudflareTunnelInterruptedAlertsEnabled);
+
+            viewModel.SystemSettings.SelectedMobileControlNetworkModeIndex =
+                (int)MobileControlNetworkMode.CloudflareTunnel;
+            await WaitForAsync(() => viewModel.SystemSettings.IsCloudflareTunnelSelected);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(card.IsVisible);
+            Assert.False(viewModel.CloudflareTunnelInterruptedAlertsEnabled);
+
+            exposureManager.SimulateModeChange(
+                MobileControlNetworkMode.LocalNetwork,
+                "Cloudflare Tunnel 不可用，已自动回退到本机局域网");
+            await WaitForAsync(() => !viewModel.SystemSettings.IsCloudflareTunnelSelected);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(card.IsVisible);
+
+            viewModel.SystemSettings.SelectedMobileControlNetworkModeIndex =
+                (int)MobileControlNetworkMode.CloudflareTunnel;
+            await WaitForAsync(() => viewModel.SystemSettings.IsCloudflareTunnelSelected);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(card.IsVisible);
+            Assert.False(viewModel.CloudflareTunnelInterruptedAlertsEnabled);
         }
         finally
         {

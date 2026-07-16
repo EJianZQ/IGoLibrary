@@ -718,6 +718,9 @@ public sealed class SqliteSettingsRepository(
         writer.WriteBoolean(
             "taskFailed",
             ReadBool(events, "taskFailed") ?? defaults.TaskFailed);
+        writer.WriteBoolean(
+            "cloudflareTunnelInterrupted",
+            ReadBool(events, "cloudflareTunnelInterrupted") ?? defaults.CloudflareTunnelInterrupted);
         writer.WriteEndObject();
     }
 

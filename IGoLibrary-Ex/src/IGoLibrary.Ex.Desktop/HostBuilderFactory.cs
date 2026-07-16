@@ -86,6 +86,10 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IMihomoControllerClient, MihomoControllerClient>();
                 services.AddSingleton<IClashMihomoCompatibilityService, ClashMihomoCompatibilityService>();
                 services.AddSingleton<ICloudflareQuickTunnelRunner, CloudflareQuickTunnelRunner>();
+                services.AddSingleton<ICloudflareTunnelRuntimeAlertHandler, CloudflareTunnelRuntimeAlertHandler>();
+                services.AddSingleton<
+                    ICloudflareTunnelRuntimeNotificationCoordinator,
+                    CloudflareTunnelRuntimeNotificationCoordinator>();
                 services.AddSingleton<INetworkExposureManager, NetworkExposureManager>();
                 services.AddSingleton<ILanCookieRelayService, LanCookieRelayService>();
                 services.AddSingleton<IMobileControlTaskUiStateAccessor, MobileControlTaskUiStateAccessor>();
@@ -94,6 +98,8 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IMobileControlActionService, MobileControlActionService>();
                 services.AddSingleton<IMobileControlService, MobileControlService>();
                 services.AddSingleton<ToastNotificationService>();
+                services.AddSingleton<IToastNotificationService>(
+                    serviceProvider => serviceProvider.GetRequiredService<ToastNotificationService>());
                 services.AddSingleton<INotificationService>(serviceProvider => serviceProvider.GetRequiredService<ToastNotificationService>());
                 services.AddSingleton<AlertSoundService>();
                 services.AddSingleton<IAlertSoundService>(serviceProvider => serviceProvider.GetRequiredService<AlertSoundService>());

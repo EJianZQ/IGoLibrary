@@ -646,6 +646,7 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"sendKey\": \"\"", migratedJson);
         Assert.Contains("\"cookieExpiring\": true", migratedJson);
         Assert.Contains("\"taskFailed\": true", migratedJson);
+        Assert.Contains("\"cloudflareTunnelInterrupted\": true", migratedJson);
     }
 
     [Fact]
@@ -659,7 +660,8 @@ public sealed class SettingsSerializationTests
             TomorrowReservationSucceeded = false,
             GlobalLeakSucceeded = false,
             SessionInvalid = false,
-            TaskFailed = false
+            TaskFailed = false,
+            CloudflareTunnelInterrupted = false
         };
         var expectedBark = new BarkAlertChannelSettings(
             true,
@@ -708,6 +710,7 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"globalLeakSucceeded\": false", json);
         Assert.Contains("\"sessionInvalid\": false", json);
         Assert.Contains("\"taskFailed\": false", json);
+        Assert.Contains("\"cloudflareTunnelInterrupted\": false", json);
         Assert.Contains("\"bark\":", json);
         Assert.Contains("\"deviceKey\": \"key-1\"", json);
         Assert.Contains("\"level\": \"timeSensitive\"", json);

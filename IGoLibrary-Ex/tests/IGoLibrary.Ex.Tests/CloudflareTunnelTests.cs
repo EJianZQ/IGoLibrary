@@ -6,6 +6,7 @@ using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Desktop.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 
 namespace IGoLibrary.Ex.Tests;
 
@@ -269,6 +270,7 @@ public sealed class CloudflareTunnelTests
             clashMihomoConfigPath: string.Empty,
             clashMihomoRoutePolicy: "Cloudflare Group");
         await using var lease = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49153/control?token=secret"),
             "/_igolibrary/health/test");
 
@@ -301,9 +303,11 @@ public sealed class CloudflareTunnelTests
         await using var manager = CreateManager(runner, settingsService);
         manager.Initialize(MobileControlNetworkMode.LocalNetwork, CloudflareTunnelProxyMode.Auto, string.Empty);
         await using var first = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49153/?token=one"),
             "/_igolibrary/health/one");
         await using var second = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49154/?token=two"),
             "/_igolibrary/health/two");
 
@@ -331,9 +335,11 @@ public sealed class CloudflareTunnelTests
             string.Empty,
             fallbackToLocalNetworkOnTunnelFailure: false);
         await using var first = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49153/?token=one"),
             "/_igolibrary/health/one");
         await using var second = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49154/?token=two"),
             "/_igolibrary/health/two");
 
@@ -357,9 +363,11 @@ public sealed class CloudflareTunnelTests
         await using var manager = CreateManager(runner, settingsService);
         manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
         await using var first = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49153/?token=one"),
             "/_igolibrary/health/one");
         await using var second = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49154/?token=two"),
             "/_igolibrary/health/two");
 
@@ -372,6 +380,419 @@ public sealed class CloudflareTunnelTests
         Assert.Equal(second.LanUrl, second.Url);
         Assert.All(runner.Sessions, session => Assert.True(session.Disposed));
         Assert.Equal(MobileControlNetworkMode.LocalNetwork, settingsService.CurrentSettings.MobileControl.NetworkMode);
+    }
+
+    [Fact]
+    public async Task ExposureManager_MobileControlRuntimeFaultDispatchesNewAlertWithoutLegacyToast()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        var notifications = new FakeNotificationService();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        await using var manager = CreateManager(
+            runner,
+            settingsService,
+            notificationService: notifications,
+            runtimeAlertHandler: alerts);
+        manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
+        await using var lease = await manager.PublishAsync(
+            NetworkExposurePurpose.MobileControl,
+            new Uri("http://192.168.1.8:49153/control?token=secret"),
+            "/_igolibrary/health/mobile");
+
+        runner.Sessions[0].Fail("process exited token=must-not-leak");
+        await WaitForAsync(() => alerts.Outcomes.Count == 1);
+
+        Assert.Equal(
+            [CloudflareTunnelInterruptionOutcome.FellBackToLocalNetwork],
+            alerts.Outcomes);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, manager.CurrentMode);
+        Assert.Equal(lease.LanUrl, lease.Url);
+        Assert.Empty(notifications.Warnings);
+    }
+
+    [Fact]
+    public async Task ExposureManager_MobileControlRuntimeFallbackReportsPersistenceFailureOutcome()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        var notifications = new FakeNotificationService();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        await using var manager = CreateManager(
+            runner,
+            settingsService,
+            notificationService: notifications,
+            runtimeAlertHandler: alerts);
+        manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
+        await using var lease = await manager.PublishAsync(
+            NetworkExposurePurpose.MobileControl,
+            new Uri("http://192.168.1.8:49153/control?token=secret"),
+            "/_igolibrary/health/mobile");
+        settingsService.UpdateExceptions.Enqueue(new IOException("database unavailable"));
+
+        runner.Sessions[0].Fail("process exited");
+        await WaitForAsync(() => alerts.Outcomes.Count == 1);
+
+        Assert.Equal(
+            [CloudflareTunnelInterruptionOutcome.FellBackToLocalNetworkWithPersistenceFailure],
+            alerts.Outcomes);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, manager.CurrentMode);
+        Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, settingsService.CurrentSettings.MobileControl.NetworkMode);
+        Assert.Equal(lease.LanUrl, lease.Url);
+        Assert.Empty(notifications.Warnings);
+    }
+
+    [Fact]
+    public async Task ExposureManager_MobileControlStartupFailureKeepsLegacyToastWithoutNewAlert()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner
+        {
+            StartException = new TimeoutException("startup health check failed")
+        };
+        var notifications = new FakeNotificationService();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        await using var manager = CreateManager(
+            runner,
+            settingsService,
+            notificationService: notifications,
+            runtimeAlertHandler: alerts);
+        manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
+
+        await using var lease = await manager.PublishAsync(
+            NetworkExposurePurpose.MobileControl,
+            new Uri("http://192.168.1.8:49153/control?token=secret"),
+            "/_igolibrary/health/mobile");
+        await WaitForAsync(() => notifications.Warnings.Count == 1);
+
+        Assert.Empty(alerts.Outcomes);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, manager.CurrentMode);
+        Assert.Equal(lease.LanUrl, lease.Url);
+        Assert.Equal("Cloudflare Tunnel 已回退", notifications.Warnings[0].Title);
+    }
+
+    [Fact]
+    public async Task ExposureManager_AuthorizationRelayFaultNotifiesMobileControlOnlyWhenGlobalFallbackAffectsIt()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        var notifications = new FakeNotificationService();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        await using var manager = CreateManager(
+            runner,
+            settingsService,
+            notificationService: notifications,
+            runtimeAlertHandler: alerts);
+        manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
+        await using var mobile = await manager.PublishAsync(
+            NetworkExposurePurpose.MobileControl,
+            new Uri("http://192.168.1.8:49153/control?token=mobile"),
+            "/_igolibrary/health/mobile");
+        await using var relay = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
+            new Uri("http://192.168.1.8:49154/relay?token=relay"),
+            "/_igolibrary/health/relay");
+
+        runner.Sessions[1].Fail("relay tunnel failed");
+        await WaitForAsync(() => alerts.Outcomes.Count == 1);
+
+        Assert.Equal(
+            [CloudflareTunnelInterruptionOutcome.FellBackToLocalNetwork],
+            alerts.Outcomes);
+        Assert.Equal(mobile.LanUrl, mobile.Url);
+        Assert.Equal(relay.LanUrl, relay.Url);
+        Assert.Empty(notifications.Warnings);
+    }
+
+    [Fact]
+    public async Task ExposureManager_MobileControlRuntimeFaultWithoutFallbackReportsRetainedMode()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        var notifications = new FakeNotificationService();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        await using var manager = CreateManager(
+            runner,
+            settingsService,
+            notificationService: notifications,
+            runtimeAlertHandler: alerts);
+        manager.Initialize(
+            MobileControlNetworkMode.CloudflareTunnel,
+            CloudflareTunnelProxyMode.Auto,
+            string.Empty,
+            fallbackToLocalNetworkOnTunnelFailure: false);
+        await using var lease = await manager.PublishAsync(
+            NetworkExposurePurpose.MobileControl,
+            new Uri("http://192.168.1.8:49153/control?token=secret"),
+            "/_igolibrary/health/mobile");
+
+        runner.Sessions[0].Fail("process exited");
+        await WaitForAsync(() => alerts.Outcomes.Count == 1);
+
+        Assert.Equal(
+            [CloudflareTunnelInterruptionOutcome.TunnelModeRetained],
+            alerts.Outcomes);
+        Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, manager.CurrentMode);
+        Assert.Empty(notifications.Warnings);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ExposureManager_NoFallbackCoalescesMobileAndRelayFaultsWithoutLegacyToast(
+        bool relayFailsFirst)
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        var notifications = new FakeNotificationService();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        var timeProvider = new FakeTimeProvider(
+            new DateTimeOffset(2026, 7, 16, 12, 0, 0, TimeSpan.FromHours(8)));
+        await using var manager = CreateManager(
+            runner,
+            settingsService,
+            notificationService: notifications,
+            runtimeAlertHandler: alerts,
+            timeProvider: timeProvider);
+        manager.Initialize(
+            MobileControlNetworkMode.CloudflareTunnel,
+            CloudflareTunnelProxyMode.Auto,
+            string.Empty,
+            fallbackToLocalNetworkOnTunnelFailure: false);
+        await using var mobile = await manager.PublishAsync(
+            NetworkExposurePurpose.MobileControl,
+            new Uri("http://192.168.1.8:49153/control?token=mobile"),
+            "/_igolibrary/health/mobile");
+        await using var relay = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
+            new Uri("http://192.168.1.8:49154/relay?token=relay"),
+            "/_igolibrary/health/relay");
+
+        if (relayFailsFirst)
+        {
+            runner.Sessions[1].Fail("relay tunnel failed");
+            await WaitForAsync(() => runner.Sessions[1].Disposed);
+            Assert.Empty(notifications.Warnings);
+            runner.Sessions[0].Fail("mobile tunnel failed");
+        }
+        else
+        {
+            runner.Sessions[0].Fail("mobile tunnel failed");
+            await WaitForAsync(() => alerts.Outcomes.Count == 1);
+            runner.Sessions[1].Fail("relay tunnel failed");
+        }
+
+        await WaitForAsync(() => alerts.Outcomes.Count == 1 && runner.Sessions[1].Disposed);
+        timeProvider.Advance(CloudflareTunnelRuntimeNotificationCoordinator.CoalescingWindow);
+        await Task.Yield();
+
+        Assert.Equal(
+            [CloudflareTunnelInterruptionOutcome.TunnelModeRetained],
+            alerts.Outcomes);
+        Assert.Empty(notifications.Warnings);
+        Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, manager.CurrentMode);
+    }
+
+    [Fact]
+    public async Task ExposureManager_NoFallbackStillShowsRelayWarningWhenMobileTunnelRemainsHealthy()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        var notifications = new FakeNotificationService();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        var coordinatorLogger = new CapturingRuntimeNotificationCoordinatorLogger();
+        var timeProvider = new FakeTimeProvider(
+            new DateTimeOffset(2026, 7, 16, 12, 0, 0, TimeSpan.FromHours(8)));
+        await using var manager = CreateManager(
+            runner,
+            settingsService,
+            notificationService: notifications,
+            runtimeAlertHandler: alerts,
+            timeProvider: timeProvider,
+            runtimeNotificationLogger: coordinatorLogger);
+        manager.Initialize(
+            MobileControlNetworkMode.CloudflareTunnel,
+            CloudflareTunnelProxyMode.Auto,
+            string.Empty,
+            fallbackToLocalNetworkOnTunnelFailure: false);
+        await using var mobile = await manager.PublishAsync(
+            NetworkExposurePurpose.MobileControl,
+            new Uri("http://192.168.1.8:49153/control?token=mobile"),
+            "/_igolibrary/health/mobile");
+        await using var relay = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
+            new Uri("http://192.168.1.8:49154/relay?token=relay"),
+            "/_igolibrary/health/relay");
+
+        runner.Sessions[1].Fail("relay tunnel failed");
+        await WaitForAsync(() => coordinatorLogger.Entries.Any(entry =>
+            entry.Message.Contains("Delayed the authorization-relay", StringComparison.Ordinal)));
+        Assert.Empty(notifications.Warnings);
+
+        timeProvider.Advance(CloudflareTunnelRuntimeNotificationCoordinator.CoalescingWindow);
+        await WaitForAsync(() => notifications.Warnings.Count == 1);
+
+        Assert.Empty(alerts.Outcomes);
+        Assert.Equal("Cloudflare Tunnel 不可用", notifications.Warnings[0].Title);
+        Assert.False(runner.Sessions[0].Disposed);
+    }
+
+    [Fact]
+    public async Task ExposureManager_RuntimeFallbackContinuesWhenTunnelDisposalFails()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        var notifications = new FakeNotificationService();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        var logger = new CapturingNetworkExposureLogger();
+        await using var manager = CreateManager(
+            runner,
+            settingsService,
+            logger,
+            notifications,
+            alerts);
+        manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
+        await using var mobile = await manager.PublishAsync(
+            NetworkExposurePurpose.MobileControl,
+            new Uri("http://192.168.1.8:49153/control?token=mobile"),
+            "/_igolibrary/health/mobile");
+        await using var relay = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
+            new Uri("http://192.168.1.8:49154/relay?token=relay"),
+            "/_igolibrary/health/relay");
+        var disposeFailure = new IOException("process cleanup failed");
+        runner.Sessions[1].DisposeException = disposeFailure;
+
+        runner.Sessions[0].Fail("mobile tunnel failed");
+        await WaitForAsync(() => alerts.Outcomes.Count == 1);
+
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, manager.CurrentMode);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, settingsService.CurrentSettings.MobileControl.NetworkMode);
+        Assert.Equal(mobile.LanUrl, mobile.Url);
+        Assert.Equal(relay.LanUrl, relay.Url);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.Level == LogLevel.Warning && ReferenceEquals(entry.Exception, disposeFailure));
+        Assert.Equal(
+            [CloudflareTunnelInterruptionOutcome.FellBackToLocalNetwork],
+            alerts.Outcomes);
+    }
+
+    [Fact]
+    public async Task ExposureManager_RuntimeFallbackIsolatesEventSubscriberFailures()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        var logger = new CapturingNetworkExposureLogger();
+        await using var manager = CreateManager(
+            runner,
+            settingsService,
+            logger,
+            runtimeAlertHandler: alerts);
+        manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
+        manager.ModeChanged += (_, _) => throw new InvalidOperationException("mode subscriber failed");
+        await using var mobile = await manager.PublishAsync(
+            NetworkExposurePurpose.MobileControl,
+            new Uri("http://192.168.1.8:49153/control?token=mobile"),
+            "/_igolibrary/health/mobile");
+        mobile.EndpointChanged += (_, _) => throw new InvalidOperationException("endpoint subscriber failed");
+
+        runner.Sessions[0].Fail("mobile tunnel failed");
+        await WaitForAsync(() => alerts.Outcomes.Count == 1);
+
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, manager.CurrentMode);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, settingsService.CurrentSettings.MobileControl.NetworkMode);
+        Assert.Equal(mobile.LanUrl, mobile.Url);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.Level == LogLevel.Warning &&
+                     entry.Exception?.Message == "endpoint subscriber failed");
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.Level == LogLevel.Warning &&
+                     entry.Exception?.Message == "mode subscriber failed");
+    }
+
+    [Fact]
+    public async Task ExposureManager_ObserverBoundaryLogsUnexpectedAlertHandlerFailure()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler
+        {
+            HandleException = new InvalidOperationException("unexpected alert failure")
+        };
+        var logger = new CapturingNetworkExposureLogger();
+        await using var manager = CreateManager(
+            runner,
+            settingsService,
+            logger,
+            runtimeAlertHandler: alerts);
+        manager.Initialize(
+            MobileControlNetworkMode.CloudflareTunnel,
+            CloudflareTunnelProxyMode.Auto,
+            string.Empty,
+            fallbackToLocalNetworkOnTunnelFailure: false);
+        await using var mobile = await manager.PublishAsync(
+            NetworkExposurePurpose.MobileControl,
+            new Uri("http://192.168.1.8:49153/control?token=mobile"),
+            "/_igolibrary/health/mobile");
+
+        runner.Sessions[0].Fail("mobile tunnel failed");
+        await WaitForAsync(() => logger.Entries.Any(entry =>
+            entry.Level == LogLevel.Error &&
+            entry.Message.Contains("Unhandled failure while observing", StringComparison.Ordinal)));
+
+        Assert.True(runner.Sessions[0].Disposed);
+        Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, manager.CurrentMode);
+    }
+
+    [Fact]
+    public async Task ExposureManager_AuthorizationRelayOnlyRuntimeFaultDoesNotDispatchMobileControlAlert()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        var notifications = new FakeNotificationService();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        await using var manager = CreateManager(
+            runner,
+            settingsService,
+            notificationService: notifications,
+            runtimeAlertHandler: alerts);
+        manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
+        await using var relay = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
+            new Uri("http://192.168.1.8:49154/relay?token=relay"),
+            "/_igolibrary/health/relay");
+
+        runner.Sessions[0].Fail("relay tunnel failed");
+        await WaitForAsync(() => notifications.Warnings.Count == 1);
+
+        Assert.Empty(alerts.Outcomes);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, manager.CurrentMode);
+        Assert.Equal(relay.LanUrl, relay.Url);
+        Assert.Equal("Cloudflare Tunnel 已回退", notifications.Warnings[0].Title);
+    }
+
+    [Fact]
+    public async Task ExposureManager_ManualModeSwitchDoesNotDispatchRuntimeAlert()
+    {
+        var settingsService = CreateSettingsService(MobileControlNetworkMode.CloudflareTunnel);
+        var runner = new FakeCloudflareQuickTunnelRunner();
+        var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        await using var manager = CreateManager(runner, settingsService, runtimeAlertHandler: alerts);
+        manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
+        await using var lease = await manager.PublishAsync(
+            NetworkExposurePurpose.MobileControl,
+            new Uri("http://192.168.1.8:49153/control?token=secret"),
+            "/_igolibrary/health/mobile");
+
+        await manager.SetModeAsync(MobileControlNetworkMode.LocalNetwork);
+        await Task.Yield();
+
+        Assert.Empty(alerts.Outcomes);
+        Assert.True(runner.Sessions[0].Disposed);
     }
 
     [Fact]
@@ -388,6 +809,7 @@ public sealed class CloudflareTunnelTests
         manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
 
         await using var lease = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49153/?token=one"),
             "/_igolibrary/health/one");
 
@@ -424,6 +846,7 @@ public sealed class CloudflareTunnelTests
             fallbackToLocalNetworkOnTunnelFailure: false);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49153/?token=one"),
             "/_igolibrary/health/one"));
 
@@ -454,6 +877,7 @@ public sealed class CloudflareTunnelTests
             clashMihomoRoutePolicy: "DIRECT");
 
         var exception = await Assert.ThrowsAsync<CloudflareTunnelProxyConflictException>(() => manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49153/?token=one"),
             "/_igolibrary/health/one"));
 
@@ -534,6 +958,7 @@ public sealed class CloudflareTunnelTests
         manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
 
         var exception = await Assert.ThrowsAsync<CloudflaredUnavailableException>(() => manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49153/?token=one"),
             "/_igolibrary/health/one"));
 
@@ -558,6 +983,7 @@ public sealed class CloudflareTunnelTests
             string.Empty,
             fallbackToLocalNetworkOnTunnelFailure: false);
         await using var lease = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49153/?token=one"),
             "/_igolibrary/health/one");
         var tunnelUrl = lease.Url;
@@ -596,9 +1022,11 @@ public sealed class CloudflareTunnelTests
         await using var manager = CreateManager(runner, settingsService);
         manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
         await using var first = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49153/control?token=one"),
             "/_igolibrary/health/one");
         await using var second = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49154/control?token=two"),
             "/_igolibrary/health/two");
         var oldSessions = runner.Sessions.ToArray();
@@ -626,9 +1054,11 @@ public sealed class CloudflareTunnelTests
         await using var manager = CreateManager(runner, settingsService);
         manager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
         await using var first = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49153/control?token=one"),
             "/_igolibrary/health/one");
         await using var second = await manager.PublishAsync(
+            NetworkExposurePurpose.AuthorizationRelay,
             new Uri("http://192.168.1.8:49154/control?token=two"),
             "/_igolibrary/health/two");
         var oldUrls = new[] { first.Url, second.Url };
@@ -657,13 +1087,23 @@ public sealed class CloudflareTunnelTests
         ICloudflareQuickTunnelRunner runner,
         FakeSettingsService settingsService,
         ILogger<NetworkExposureManager>? logger = null,
-        INotificationService? notificationService = null)
+        INotificationService? notificationService = null,
+        ICloudflareTunnelRuntimeAlertHandler? runtimeAlertHandler = null,
+        TimeProvider? timeProvider = null,
+        ILogger<CloudflareTunnelRuntimeNotificationCoordinator>? runtimeNotificationLogger = null)
     {
+        var resolvedNotificationService = notificationService ?? new FakeNotificationService();
+        var runtimeNotificationCoordinator = new CloudflareTunnelRuntimeNotificationCoordinator(
+            runtimeAlertHandler ?? new CapturingCloudflareTunnelRuntimeAlertHandler(),
+            resolvedNotificationService,
+            runtimeNotificationLogger ?? NullLogger<CloudflareTunnelRuntimeNotificationCoordinator>.Instance,
+            timeProvider);
         return new NetworkExposureManager(
             runner,
             new SettingsWorkflowService(settingsService),
             new ActivityLogService(),
-            notificationService ?? new FakeNotificationService(),
+            resolvedNotificationService,
+            runtimeNotificationCoordinator,
             logger ?? NullLogger<NetworkExposureManager>.Instance);
     }
 
@@ -731,6 +1171,27 @@ public sealed class CloudflareTunnelTests
         }
     }
 
+    private sealed class CapturingCloudflareTunnelRuntimeAlertHandler : ICloudflareTunnelRuntimeAlertHandler
+    {
+        public List<CloudflareTunnelInterruptionOutcome> Outcomes { get; } = [];
+
+        public Exception? HandleException { get; set; }
+
+        public Task HandleAsync(
+            CloudflareTunnelInterruptionOutcome outcome,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (HandleException is not null)
+            {
+                throw HandleException;
+            }
+
+            Outcomes.Add(outcome);
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class FakeCloudflareQuickTunnelSession(Uri publicBaseUri) : ICloudflareQuickTunnelSession
     {
         private readonly TaskCompletionSource<CloudflareTunnelFault?> _completion =
@@ -742,10 +1203,17 @@ public sealed class CloudflareTunnelTests
 
         public bool Disposed { get; private set; }
 
+        public Exception? DisposeException { get; set; }
+
         public ValueTask DisposeAsync()
         {
             Disposed = true;
             _completion.TrySetResult(null);
+            if (DisposeException is not null)
+            {
+                throw DisposeException;
+            }
+
             return ValueTask.CompletedTask;
         }
 
@@ -756,6 +1224,26 @@ public sealed class CloudflareTunnelTests
     }
 
     private sealed class CapturingNetworkExposureLogger : ILogger<NetworkExposureManager>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), exception));
+        }
+    }
+
+    private sealed class CapturingRuntimeNotificationCoordinatorLogger
+        : ILogger<CloudflareTunnelRuntimeNotificationCoordinator>
     {
         public List<CapturedLogEntry> Entries { get; } = [];
 

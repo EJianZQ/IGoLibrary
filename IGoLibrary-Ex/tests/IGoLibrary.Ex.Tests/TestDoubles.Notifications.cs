@@ -63,6 +63,29 @@ internal sealed class RecordingAlertSoundService : IAlertSoundService
     }
 }
 
+internal sealed class RecordingToastNotificationService : IToastNotificationService
+{
+    public List<(ToastVisualKind Kind, string Title, string Message)> Requests { get; } = [];
+
+    public Exception? ShowException { get; set; }
+
+    public Task ShowForcedAsync(
+        ToastVisualKind kind,
+        string title,
+        string message,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (ShowException is not null)
+        {
+            throw ShowException;
+        }
+
+        Requests.Add((kind, title, message));
+        return Task.CompletedTask;
+    }
+}
+
 internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, INotificationTestService
 {
     public List<(DateTimeOffset ExpirationTime, TimeSpan Remaining)> CookieExpiringNotifications { get; } = [];
@@ -78,6 +101,8 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
     public List<(string LibraryName, string SeatName)> GlobalLeakSucceededNotifications { get; } = [];
 
     public List<(string TaskName, string Reason)> TaskFailedNotifications { get; } = [];
+
+    public List<CloudflareTunnelInterruptionOutcome> CloudflareTunnelInterruptedNotifications { get; } = [];
 
     public TaskCompletionSource? GrabSucceededCompletion { get; set; }
 
@@ -103,6 +128,11 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
     public Exception? NotifyGlobalLeakSucceededException { get; set; }
 
     public Exception? NotifyTaskFailedException { get; set; }
+
+    public Exception? NotifyCloudflareTunnelInterruptedException { get; set; }
+
+    public TaskEventAlertDispatchResult CloudflareTunnelInterruptedDispatchResult { get; set; } =
+        TaskEventAlertDispatchResult.Dispatched;
 
     public List<EmailAlertChannelSettings> TestEmailRequests { get; } = [];
 
@@ -218,6 +248,20 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
 
         TaskFailedNotifications.Add((taskName, reason));
         return Task.CompletedTask;
+    }
+
+    public Task<TaskEventAlertDispatchResult> TryNotifyCloudflareTunnelInterruptedAsync(
+        CloudflareTunnelInterruptionOutcome outcome,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (NotifyCloudflareTunnelInterruptedException is not null)
+        {
+            throw NotifyCloudflareTunnelInterruptedException;
+        }
+
+        CloudflareTunnelInterruptedNotifications.Add(outcome);
+        return Task.FromResult(CloudflareTunnelInterruptedDispatchResult);
     }
 
     public Task SendTestEmailAsync(EmailAlertChannelSettings settings, CancellationToken cancellationToken = default)

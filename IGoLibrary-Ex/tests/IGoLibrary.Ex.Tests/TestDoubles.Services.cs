@@ -107,17 +107,28 @@ internal sealed class FakeNetworkExposureManager : INetworkExposureManager
             return Task.FromException<MobileControlNetworkMode>(SetModeException);
         }
 
+        ApplyModeChange(networkMode);
+        return Task.FromResult(CurrentMode);
+    }
+
+    public void SimulateModeChange(MobileControlNetworkMode networkMode, string? message = null)
+    {
+        ApplyModeChange(networkMode, message);
+    }
+
+    private void ApplyModeChange(MobileControlNetworkMode networkMode, string? message = null)
+    {
         CurrentMode = MobileControlSettings.NormalizeNetworkMode(networkMode);
         foreach (var lease in _leases)
         {
             lease.ApplyMode(CurrentMode, TunnelBaseUri);
         }
 
-        ModeChanged?.Invoke(this, new NetworkModeChangedEventArgs(CurrentMode));
-        return Task.FromResult(CurrentMode);
+        ModeChanged?.Invoke(this, new NetworkModeChangedEventArgs(CurrentMode, message));
     }
 
     public Task<INetworkExposureLease> PublishAsync(
+        NetworkExposurePurpose purpose,
         Uri lanUrl,
         string healthCheckPath,
         CancellationToken cancellationToken = default)

@@ -100,6 +100,7 @@ public sealed class MobileControlService(
                 appStarted = true;
                 var lanSession = BuildLanSession(sessionId, address, settings.Port, token);
                 var exposureLease = await networkExposureManager.PublishAsync(
+                    NetworkExposurePurpose.MobileControl,
                     lanSession.LanUrl,
                     healthCheckPath,
                     cancellationToken);

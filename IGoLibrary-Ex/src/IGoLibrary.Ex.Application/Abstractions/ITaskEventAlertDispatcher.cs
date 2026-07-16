@@ -22,4 +22,8 @@ public interface ITaskEventAlertDispatcher
     Task NotifyGlobalLeakSucceededAsync(string libraryName, string seatName, CancellationToken cancellationToken = default);
 
     Task NotifyTaskFailedAsync(string taskName, string reason, CancellationToken cancellationToken = default);
+
+    Task<TaskEventAlertDispatchResult> TryNotifyCloudflareTunnelInterruptedAsync(
+        CloudflareTunnelInterruptionOutcome outcome,
+        CancellationToken cancellationToken = default);
 }

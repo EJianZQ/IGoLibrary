@@ -87,6 +87,16 @@ public sealed class TaskEventAlertServiceTests
             ExpectedFallbackKind.Warning,
             "抢座失败",
             "抢座任务执行失败 详细信息：预约请求超时"
+        },
+        {
+            TaskAlertTestEvent.CloudflareTunnelInterrupted,
+            "IGoLibrary-Ex 手机控制 Cloudflare Tunnel 运行中断提醒",
+            "Cloudflare Tunnel 运行中断",
+            ["手机控制 Cloudflare Tunnel 曾成功运行，现已不可用", "处理结果：已自动回退到本机局域网", "公网手机控制地址现已不可用"],
+            ["手机控制 Cloudflare Tunnel 曾成功运行，现已不可用", "处理结果：已自动回退到本机局域网", "公网手机控制地址现已不可用"],
+            ExpectedFallbackKind.None,
+            null,
+            null
         }
     };
 
@@ -135,7 +145,7 @@ public sealed class TaskEventAlertServiceTests
         var wxPusherSender = new FakeWxPusherAlertSender();
         var serverChanSender = new FakeServerChanAlertSender();
         var notificationService = new FakeNotificationService();
-        var alertSettings = CreateAllChannelsEnabledSettings(TaskEventAlertEventSettings.Default);
+        var alertSettings = CreateAllRemoteChannelsEnabledSettings(TaskEventAlertEventSettings.Default);
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(alertSettings));
         var service = CreateService(
             settingsService,
@@ -261,13 +271,88 @@ public sealed class TaskEventAlertServiceTests
                      TaskAlertTestEvent.SessionInvalid,
                      TaskAlertTestEvent.GrabSucceeded,
                      TaskAlertTestEvent.OccupyReReserveSucceeded,
-                     TaskAlertTestEvent.TomorrowReservationSucceeded,
-                     TaskAlertTestEvent.GlobalLeakSucceeded,
-                     TaskAlertTestEvent.TaskFailed
-                 })
+                      TaskAlertTestEvent.TomorrowReservationSucceeded,
+                      TaskAlertTestEvent.GlobalLeakSucceeded,
+                      TaskAlertTestEvent.TaskFailed,
+                      TaskAlertTestEvent.CloudflareTunnelInterrupted
+                  })
         {
             await NotifyAsync_DoesNotSendAnyChannel_WhenEventIsDisabled(eventKind);
         }
+    }
+
+    [Theory]
+    [InlineData(
+        CloudflareTunnelInterruptionOutcome.FellBackToLocalNetwork,
+        "已自动回退到本机局域网")]
+    [InlineData(
+        CloudflareTunnelInterruptionOutcome.FellBackToLocalNetworkWithPersistenceFailure,
+        "已自动回退到本机局域网，但网络方式设置保存失败")]
+    [InlineData(
+        CloudflareTunnelInterruptionOutcome.TunnelModeRetained,
+        "已保持 Cloudflare Tunnel 模式且未回退")]
+    public async Task TryNotifyCloudflareTunnelInterruptedAsync_DescribesEveryOutcomeWithoutDiagnostics(
+        CloudflareTunnelInterruptionOutcome outcome,
+        string expectedOutcome)
+    {
+        var emailSender = new FakeEmailAlertSender();
+        var telegramSender = new FakeTelegramAlertSender();
+        var barkSender = new FakeBarkAlertSender();
+        var wxPusherSender = new FakeWxPusherAlertSender();
+        var serverChanSender = new FakeServerChanAlertSender();
+        var toastService = new RecordingToastNotificationService();
+        var soundService = new RecordingAlertSoundService();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            CreateEveryChannelEnabledSettings(TaskEventAlertEventSettings.Default)));
+        var service = CreateService(
+            settingsService,
+            emailSender,
+            telegramSender: telegramSender,
+            barkSender: barkSender,
+            wxPusherSender: wxPusherSender,
+            serverChanSender: serverChanSender,
+            toastNotificationService: toastService,
+            alertSoundService: soundService);
+
+        var dispatchResult = await service.TryNotifyCloudflareTunnelInterruptedAsync(outcome);
+
+        Assert.Equal(TaskEventAlertDispatchResult.Dispatched, dispatchResult);
+        var emailRequest = Assert.Single(emailSender.Requests);
+        Assert.Equal("IGoLibrary-Ex 手机控制 Cloudflare Tunnel 运行中断提醒", emailRequest.Subject);
+        AssertSafeCloudflareInterruptionPayload(emailRequest.Body, expectedOutcome);
+
+        var remoteBodies = new[]
+        {
+            Assert.Single(telegramSender.Requests).Message,
+            Assert.Single(barkSender.Requests).Body,
+            Assert.Single(wxPusherSender.Requests).Body,
+            Assert.Single(serverChanSender.Requests).Body
+        };
+        Assert.All(remoteBodies, body => AssertSafeCloudflareInterruptionPayload(body, expectedOutcome));
+
+        var toastRequest = Assert.Single(toastService.Requests);
+        Assert.Equal(ToastVisualKind.Warning, toastRequest.Kind);
+        Assert.Equal("Cloudflare Tunnel 运行中断", toastRequest.Title);
+        AssertSafeCloudflareInterruptionPayload(toastRequest.Message, expectedOutcome);
+        Assert.Equal(1, soundService.DefaultPlayCount);
+    }
+
+    [Fact]
+    public async Task TryNotifyCloudflareTunnelInterruptedAsync_SuppressesRapidDuplicateDispatch()
+    {
+        var emailSender = new FakeEmailAlertSender();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            CreateAllRemoteChannelsEnabledSettings(TaskEventAlertEventSettings.Default)));
+        var service = CreateService(settingsService, emailSender);
+
+        var firstResult = await service.TryNotifyCloudflareTunnelInterruptedAsync(
+            CloudflareTunnelInterruptionOutcome.FellBackToLocalNetwork);
+        var secondResult = await service.TryNotifyCloudflareTunnelInterruptedAsync(
+            CloudflareTunnelInterruptionOutcome.TunnelModeRetained);
+
+        Assert.Equal(TaskEventAlertDispatchResult.Dispatched, firstResult);
+        Assert.Equal(TaskEventAlertDispatchResult.Suppressed, secondResult);
+        Assert.Single(emailSender.Requests);
     }
 
     private async Task NotifyAsync_DoesNotSendAnyChannel_WhenEventIsDisabled(TaskAlertTestEvent eventKind)
@@ -277,9 +362,11 @@ public sealed class TaskEventAlertServiceTests
         var barkSender = new FakeBarkAlertSender();
         var wxPusherSender = new FakeWxPusherAlertSender();
         var serverChanSender = new FakeServerChanAlertSender();
+        var toastService = new RecordingToastNotificationService();
+        var soundService = new RecordingAlertSoundService();
         var notificationService = new FakeNotificationService();
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            CreateAllChannelsEnabledSettings(DisableEvent(eventKind))));
+            CreateEveryChannelEnabledSettings(DisableEvent(eventKind))));
         var service = CreateService(
             settingsService,
             emailSender,
@@ -287,7 +374,9 @@ public sealed class TaskEventAlertServiceTests
             telegramSender: telegramSender,
             barkSender: barkSender,
             wxPusherSender: wxPusherSender,
-            serverChanSender: serverChanSender);
+            serverChanSender: serverChanSender,
+            toastNotificationService: toastService,
+            alertSoundService: soundService);
 
         await NotifyEventAsync(service, eventKind);
 
@@ -296,6 +385,8 @@ public sealed class TaskEventAlertServiceTests
         Assert.Empty(barkSender.Requests);
         Assert.Empty(wxPusherSender.Requests);
         Assert.Empty(serverChanSender.Requests);
+        Assert.Empty(toastService.Requests);
+        Assert.Equal(0, soundService.DefaultPlayCount);
         Assert.Empty(notificationService.Successes);
         Assert.Empty(notificationService.Warnings);
         Assert.Empty(notificationService.Infos);
@@ -305,7 +396,7 @@ public sealed class TaskEventAlertServiceTests
     public async Task TryNotifyCookieExpiringAsync_ReturnsFalseWhenEventIsDisabled()
     {
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            CreateAllChannelsEnabledSettings(
+            CreateAllRemoteChannelsEnabledSettings(
                 TaskEventAlertEventSettings.Default with { CookieExpiring = false })));
         var service = CreateService(settingsService: settingsService);
 
@@ -719,10 +810,11 @@ public sealed class TaskEventAlertServiceTests
         ITelegramAlertSender? telegramSender = null,
         IBarkAlertSender? barkSender = null,
         IWxPusherAlertSender? wxPusherSender = null,
-        IServerChanAlertSender? serverChanSender = null)
+        IServerChanAlertSender? serverChanSender = null,
+        IToastNotificationService? toastNotificationService = null,
+        IAlertSoundService? alertSoundService = null)
     {
         settingsService ??= new FakeSettingsService(AppSettings.Default);
-        var toastService = new ToastNotificationService(new AppWindowService());
 
         return new TaskEventAlertService(
             settingsService,
@@ -731,9 +823,9 @@ public sealed class TaskEventAlertServiceTests
             barkSender ?? new FakeBarkAlertSender(),
             wxPusherSender ?? new FakeWxPusherAlertSender(),
             serverChanSender ?? new FakeServerChanAlertSender(),
-            toastService,
+            toastNotificationService ?? new RecordingToastNotificationService(),
             notificationService ?? new FakeNotificationService(),
-            new AlertSoundService(),
+            alertSoundService ?? new RecordingAlertSoundService(),
             activityLogService ?? new ActivityLogService());
     }
 
@@ -787,7 +879,7 @@ public sealed class TaskEventAlertServiceTests
             }
         };
 
-    private static TaskEventAlertSettings CreateAllChannelsEnabledSettings(TaskEventAlertEventSettings events)
+    private static TaskEventAlertSettings CreateAllRemoteChannelsEnabledSettings(TaskEventAlertEventSettings events)
     {
         return new TaskEventAlertSettings(
             new EmailAlertChannelSettings(
@@ -807,6 +899,24 @@ public sealed class TaskEventAlertServiceTests
             new ServerChanAlertChannelSettings(true, "SCT_xxx", true, "9|66", "user-1"));
     }
 
+    private static TaskEventAlertSettings CreateEveryChannelEnabledSettings(
+        TaskEventAlertEventSettings events)
+    {
+        return CreateAllRemoteChannelsEnabledSettings(events) with
+        {
+            Local = new LocalDesktopAlertSettings(true, true)
+        };
+    }
+
+    private static void AssertSafeCloudflareInterruptionPayload(string payload, string expectedOutcome)
+    {
+        Assert.Contains("曾成功运行，现已不可用", payload, StringComparison.Ordinal);
+        Assert.Contains(expectedOutcome, payload, StringComparison.Ordinal);
+        Assert.DoesNotContain("trycloudflare.com", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("token=", payload, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("process exited", payload, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static TaskEventAlertEventSettings DisableEvent(TaskAlertTestEvent eventKind)
     {
         return eventKind switch
@@ -818,6 +928,8 @@ public sealed class TaskEventAlertServiceTests
             TaskAlertTestEvent.TomorrowReservationSucceeded => TaskEventAlertEventSettings.Default with { TomorrowReservationSucceeded = false },
             TaskAlertTestEvent.GlobalLeakSucceeded => TaskEventAlertEventSettings.Default with { GlobalLeakSucceeded = false },
             TaskAlertTestEvent.TaskFailed => TaskEventAlertEventSettings.Default with { TaskFailed = false },
+            TaskAlertTestEvent.CloudflareTunnelInterrupted =>
+                TaskEventAlertEventSettings.Default with { CloudflareTunnelInterrupted = false },
             _ => TaskEventAlertEventSettings.Default
         };
     }
@@ -836,11 +948,14 @@ public sealed class TaskEventAlertServiceTests
             TaskAlertTestEvent.TomorrowReservationSucceeded => service.NotifyTomorrowReservationSucceededAsync("自科阅览区一", "2号座", "明日"),
             TaskAlertTestEvent.GlobalLeakSucceeded => service.NotifyGlobalLeakSucceededAsync("自科阅览区一", "2号座"),
             TaskAlertTestEvent.TaskFailed => service.NotifyTaskFailedAsync("抢座", "预约请求超时"),
+            TaskAlertTestEvent.CloudflareTunnelInterrupted => IgnoreResultAsync(
+                service.TryNotifyCloudflareTunnelInterruptedAsync(
+                    CloudflareTunnelInterruptionOutcome.FellBackToLocalNetwork)),
             _ => Task.CompletedTask
         };
     }
 
-    private static async Task IgnoreResultAsync(Task<bool> task)
+    private static async Task IgnoreResultAsync<T>(Task<T> task)
     {
         _ = await task;
     }
@@ -853,7 +968,8 @@ public sealed class TaskEventAlertServiceTests
         OccupyReReserveSucceeded,
         TomorrowReservationSucceeded,
         GlobalLeakSucceeded,
-        TaskFailed
+        TaskFailed,
+        CloudflareTunnelInterrupted
     }
 
     public enum ExpectedFallbackKind

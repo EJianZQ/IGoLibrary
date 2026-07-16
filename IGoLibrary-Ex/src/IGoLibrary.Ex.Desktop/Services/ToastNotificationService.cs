@@ -9,9 +9,18 @@ using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
+public interface IToastNotificationService
+{
+    Task ShowForcedAsync(
+        ToastVisualKind kind,
+        string title,
+        string message,
+        CancellationToken cancellationToken = default);
+}
+
 public sealed class ToastNotificationService(
     AppWindowService appWindowService,
-    IAppLogWriter? logWriter = null) : INotificationService
+    IAppLogWriter? logWriter = null) : INotificationService, IToastNotificationService
 {
     private const int MaxVisibleToasts = 5;
     private const int ToastMargin = 20;

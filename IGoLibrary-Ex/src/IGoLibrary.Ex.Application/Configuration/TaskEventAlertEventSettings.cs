@@ -16,5 +16,7 @@ public sealed record TaskEventAlertEventSettings
 
     public bool TaskFailed { get; init; } = true;
 
+    public bool CloudflareTunnelInterrupted { get; init; } = true;
+
     public static TaskEventAlertEventSettings Default { get; } = new();
 }

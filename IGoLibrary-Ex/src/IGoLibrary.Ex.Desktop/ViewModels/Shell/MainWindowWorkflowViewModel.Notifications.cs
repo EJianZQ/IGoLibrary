@@ -235,6 +235,12 @@ public partial class MainWindowWorkflowViewModel
         set => NotificationSettings.TaskFailedAlertsEnabled = value;
     }
 
+    public bool CloudflareTunnelInterruptedAlertsEnabled
+    {
+        get => NotificationSettings.CloudflareTunnelInterruptedAlertsEnabled;
+        set => NotificationSettings.CloudflareTunnelInterruptedAlertsEnabled = value;
+    }
+
     public IAsyncRelayCommand TestToastCommand => NotificationSettings.TestToastCommand;
 
     public IAsyncRelayCommand SendTestEmailAlertCommand => NotificationSettings.SendTestEmailAlertCommand;
@@ -289,7 +295,8 @@ public partial class MainWindowWorkflowViewModel
             nameof(TomorrowReservationSucceededAlertsEnabled),
             nameof(GlobalLeakSucceededAlertsEnabled),
             nameof(SessionInvalidAlertsEnabled),
-            nameof(TaskFailedAlertsEnabled));
+            nameof(TaskFailedAlertsEnabled),
+            nameof(CloudflareTunnelInterruptedAlertsEnabled));
     }
 
     private void EnsureNotificationSettingsConfigured()

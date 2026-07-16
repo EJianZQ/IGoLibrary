@@ -13,9 +13,9 @@ public sealed class TaskEventAlertService(
     IBarkAlertSender barkAlertSender,
     IWxPusherAlertSender wxPusherAlertSender,
     IServerChanAlertSender serverChanAlertSender,
-    ToastNotificationService toastNotificationService,
+    IToastNotificationService toastNotificationService,
     INotificationService notificationService,
-    AlertSoundService alertSoundService,
+    IAlertSoundService alertSoundService,
     IActivityLogService activityLogService) : ITaskEventAlertDispatcher
 {
     private readonly object _gate = new();
@@ -31,7 +31,7 @@ public sealed class TaskEventAlertService(
         var normalizedRemaining = remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
         var remoteMessage = BuildCookieExpiringRemoteMessage(localExpirationTime, normalizedRemaining);
 
-        return await DispatchAlertAsync(
+        var dispatchResult = await DispatchAlertAsync(
             eventKind: TaskEventAlertKind.CookieExpiring,
             suppressionKey: $"cookie-expiring|{localExpirationTime.ToUnixTimeSeconds()}",
             emailLabel: "Cookie 即将到期提醒",
@@ -48,6 +48,7 @@ public sealed class TaskEventAlertService(
             enableInAppFallback: false,
             cancellationToken,
             enableShortTermSuppression: false);
+        return dispatchResult != TaskEventAlertDispatchResult.Disabled;
     }
 
     public async Task NotifySessionInvalidAsync(string source, string reason, CancellationToken cancellationToken = default)
@@ -193,7 +194,32 @@ public sealed class TaskEventAlertService(
             cancellationToken);
     }
 
-    private async Task<bool> DispatchAlertAsync(
+    public async Task<TaskEventAlertDispatchResult> TryNotifyCloudflareTunnelInterruptedAsync(
+        CloudflareTunnelInterruptionOutcome outcome,
+        CancellationToken cancellationToken = default)
+    {
+        var outcomeText = GetCloudflareTunnelInterruptionOutcomeText(outcome);
+        var remoteMessage = BuildCloudflareTunnelInterruptedRemoteMessage(outcomeText);
+
+        return await DispatchAlertAsync(
+            eventKind: TaskEventAlertKind.CloudflareTunnelInterrupted,
+            suppressionKey: "cloudflare-tunnel-interrupted",
+            emailLabel: "手机控制 Cloudflare Tunnel 运行中断提醒",
+            telegramLabel: "手机控制 Cloudflare Tunnel 运行中断提醒",
+            localLabel: "手机控制 Cloudflare Tunnel 运行中断提醒",
+            emailSubject: "IGoLibrary-Ex 手机控制 Cloudflare Tunnel 运行中断提醒",
+            emailBody: BuildCloudflareTunnelInterruptedEmailBody(outcomeText),
+            telegramMessage: remoteMessage,
+            barkTitle: "Cloudflare Tunnel 运行中断",
+            barkBody: remoteMessage,
+            toastKind: ToastVisualKind.Warning,
+            toastTitle: "Cloudflare Tunnel 运行中断",
+            toastMessage: $"手机控制 Cloudflare Tunnel 曾成功运行，现已不可用；{outcomeText}。请检查网络或代理设置，详情请查看日志",
+            enableInAppFallback: false,
+            cancellationToken);
+    }
+
+    private async Task<TaskEventAlertDispatchResult> DispatchAlertAsync(
         TaskEventAlertKind eventKind,
         string suppressionKey,
         string emailLabel,
@@ -215,12 +241,12 @@ public sealed class TaskEventAlertService(
         var alertSettings = settings.Notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
         if (!IsEventEnabled(alertSettings.Events ?? TaskEventAlertEventSettings.Default, eventKind))
         {
-            return false;
+            return TaskEventAlertDispatchResult.Disabled;
         }
 
         if (enableShortTermSuppression && ShouldSuppress(suppressionKey))
         {
-            return true;
+            return TaskEventAlertDispatchResult.Suppressed;
         }
 
         var localAlertShown = false;
@@ -311,7 +337,7 @@ public sealed class TaskEventAlertService(
             await Task.WhenAll(remoteAlertTasks);
         }
 
-        return true;
+        return TaskEventAlertDispatchResult.Dispatched;
     }
 
     private async Task SendEmailAlertSafelyAsync(
@@ -466,6 +492,7 @@ public sealed class TaskEventAlertService(
             TaskEventAlertKind.GlobalLeakSucceeded => settings.GlobalLeakSucceeded,
             TaskEventAlertKind.SessionInvalid => settings.SessionInvalid,
             TaskEventAlertKind.TaskFailed => settings.TaskFailed,
+            TaskEventAlertKind.CloudflareTunnelInterrupted => settings.CloudflareTunnelInterrupted,
             _ => true
         };
     }
@@ -602,6 +629,18 @@ public sealed class TaskEventAlertService(
         return builder.ToString();
     }
 
+    private static string BuildCloudflareTunnelInterruptedEmailBody(string outcomeText)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 检测到手机控制 Cloudflare Tunnel 曾成功运行，现已不可用");
+        builder.AppendLine();
+        builder.AppendLine($"处理结果：{outcomeText}");
+        builder.AppendLine($"发生时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine();
+        builder.AppendLine("公网手机控制地址现已不可用，请检查网络或代理设置，并查看应用日志");
+        return builder.ToString();
+    }
+
     private static string BuildSessionInvalidTelegramMessage(string source, string reason)
     {
         var builder = new StringBuilder();
@@ -686,6 +725,32 @@ public sealed class TaskEventAlertService(
         return builder.ToString();
     }
 
+    private static string BuildCloudflareTunnelInterruptedRemoteMessage(string outcomeText)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 手机控制 Cloudflare Tunnel 运行中断");
+        builder.AppendLine("手机控制 Cloudflare Tunnel 曾成功运行，现已不可用");
+        builder.AppendLine($"处理结果：{outcomeText}");
+        builder.AppendLine($"发生时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine("公网手机控制地址现已不可用，请检查网络或代理设置，并查看应用日志");
+        return builder.ToString();
+    }
+
+    private static string GetCloudflareTunnelInterruptionOutcomeText(
+        CloudflareTunnelInterruptionOutcome outcome)
+    {
+        return outcome switch
+        {
+            CloudflareTunnelInterruptionOutcome.FellBackToLocalNetwork =>
+                "已自动回退到本机局域网",
+            CloudflareTunnelInterruptionOutcome.FellBackToLocalNetworkWithPersistenceFailure =>
+                "已自动回退到本机局域网，但网络方式设置保存失败",
+            CloudflareTunnelInterruptionOutcome.TunnelModeRetained =>
+                "已保持 Cloudflare Tunnel 模式且未回退",
+            _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "未知的 Tunnel 中断处理结果")
+        };
+    }
+
     private static string AppendDetail(string message, string detail)
         => string.IsNullOrWhiteSpace(detail)
             ? message
@@ -747,6 +812,7 @@ public sealed class TaskEventAlertService(
         TomorrowReservationSucceeded,
         GlobalLeakSucceeded,
         SessionInvalid,
-        TaskFailed
+        TaskFailed,
+        CloudflareTunnelInterrupted
     }
 }

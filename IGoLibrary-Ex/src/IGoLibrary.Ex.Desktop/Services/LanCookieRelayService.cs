@@ -79,6 +79,7 @@ public sealed class LanCookieRelayService(
                 appStarted = true;
                 var lanSession = BuildLanSession(app, sessionId, address, token);
                 var exposureLease = await networkExposureManager.PublishAsync(
+                    NetworkExposurePurpose.AuthorizationRelay,
                     lanSession.LanUrl,
                     healthCheckPath,
                     cancellationToken);

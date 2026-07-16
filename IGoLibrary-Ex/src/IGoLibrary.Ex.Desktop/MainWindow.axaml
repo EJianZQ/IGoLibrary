@@ -2722,6 +2722,33 @@
                                           VerticalAlignment="Center" />
                           </Grid>
                         </Border>
+
+                        <Border x:Name="CloudflareTunnelInterruptedAlertCard"
+                                Padding="12,8"
+                                IsVisible="{Binding SystemSettings.IsCloudflareTunnelSelected}">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                            <PathIcon Data="{StaticResource IconEventFailure}"
+                                      Width="20"
+                                      Height="20"
+                                      Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="Cloudflare Tunnel 运行中断提醒" />
+                              <TextBlock FontSize="12"
+                                         Foreground="{DynamicResource SemiTextTertiaryBrush}"
+                                         TextWrapping="Wrap"
+                                         Text="手机控制使用 Cloudflare Tunnel 并在成功运行后突发中断时通知" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="2"
+                                          IsChecked="{Binding CloudflareTunnelInterruptedAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
                       </StackPanel>
                     </Grid>
 

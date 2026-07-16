@@ -2,6 +2,12 @@ using IGoLibrary.Ex.Application.Configuration;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
+public enum NetworkExposurePurpose
+{
+    MobileControl = 0,
+    AuthorizationRelay = 1
+}
+
 public interface INetworkExposureManager : IAsyncDisposable
 {
     event EventHandler<NetworkModeChangedEventArgs>? ModeChanged;
@@ -37,6 +43,7 @@ public interface INetworkExposureManager : IAsyncDisposable
         CancellationToken cancellationToken = default);
 
     Task<INetworkExposureLease> PublishAsync(
+        NetworkExposurePurpose purpose,
         Uri lanUrl,
         string healthCheckPath,
         CancellationToken cancellationToken = default);
