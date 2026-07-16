@@ -9,6 +9,25 @@ namespace IGoLibrary.Ex.Tests;
 
 public sealed class LanCookieRelayServiceTests
 {
+    [Theory]
+    [InlineData(LanAuthLinkRelayPurpose.GraphQlSession, "Cookie 获取成功")]
+    [InlineData(LanAuthLinkRelayPurpose.RemoteCheckIn, "签到授权获取成功")]
+    public void MobilePage_AfterSuccessfulSubmit_ReplacesFormWithPurposeSpecificSuccessState(
+        LanAuthLinkRelayPurpose purpose,
+        string expectedTitle)
+    {
+        var html = LanCookieRelayMobilePage.Build("secret-token", purpose);
+
+        Assert.Contains("id=\"transferContent\"", html, StringComparison.Ordinal);
+        Assert.Contains("id=\"successState\"", html, StringComparison.Ordinal);
+        Assert.Contains("class=\"success-check\"", html, StringComparison.Ordinal);
+        Assert.Contains(expectedTitle, html, StringComparison.Ordinal);
+        Assert.Contains("可以关闭本页面了", html, StringComparison.Ordinal);
+        Assert.Contains("if (result.success)", html, StringComparison.Ordinal);
+        Assert.Contains("transferContent.hidden = true", html, StringComparison.Ordinal);
+        Assert.Contains("successState.hidden = false", html, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task StartAndReadEndpoints_ReturnExpectedContent()
     {

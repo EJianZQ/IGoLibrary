@@ -18,6 +18,9 @@ internal static class LanCookieRelayMobilePage
     var purposeHint = purpose == LanAuthLinkRelayPurpose.RemoteCheckIn
       ? "请重新扫码获取一个未被普通登录使用的新授权链接，提交后仅用于远程签到"
       : "提交后用于获取普通登录 Cookie";
+    var successTitle = purpose == LanAuthLinkRelayPurpose.RemoteCheckIn
+      ? "签到授权获取成功"
+      : "Cookie 获取成功";
     return $$"""
 <!doctype html>
 <html lang="zh-CN">
@@ -45,11 +48,18 @@ internal static class LanCookieRelayMobilePage
     #message { min-height: 22px; margin-top: 14px; font-size: 14px; line-height: 1.5; color: #4e5969; }
     .ok { color: #14804a; }
     .bad { color: #c2410c; }
+    [hidden] { display: none !important; }
+    .success-state { padding: 44px 22px; text-align: center; }
+    .success-check { width: 112px; height: 112px; margin: 0 auto 24px; color: #16a34a; }
+    .success-check svg { display: block; width: 100%; height: 100%; }
+    .success-state h1 { margin-bottom: 10px; color: #17211a; }
+    .success-state p { margin: 0; color: #4e5969; font-size: 15px; }
+    .success-state:focus { outline: none; }
   </style>
 </head>
 <body>
   <main>
-    <section>
+    <section id="transferContent">
       <h1>{{purposeTitle}}</h1>
       <p>在微信内长按识别下方授权二维码，完成授权后复制包含 code 的链接，返回本页提交到电脑端。{{purposeHint}}</p>
       <div class="qr-card">
@@ -64,12 +74,24 @@ internal static class LanCookieRelayMobilePage
       <button class="primary" id="send" type="button">发送到电脑</button>
       <div id="message" aria-live="polite"></div>
     </section>
+    <section class="success-state" id="successState" aria-live="assertive" tabindex="-1" hidden>
+      <div class="success-check" aria-hidden="true">
+        <svg viewBox="0 0 112 112" role="img">
+          <circle cx="56" cy="56" r="48" fill="#ecfdf3"></circle>
+          <path d="M33 57.5 49 73l31-34" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      </div>
+      <h1>{{successTitle}}</h1>
+      <p>操作已完成，可以关闭本页面了</p>
+    </section>
   </main>
   <script>
     const token = {{tokenJson}};
     const link = document.getElementById('link');
     const message = document.getElementById('message');
     const send = document.getElementById('send');
+    const transferContent = document.getElementById('transferContent');
+    const successState = document.getElementById('successState');
     document.getElementById('authQrCode').src = '/auth-qrcode?token=' + encodeURIComponent(token);
     const setMessage = (text, kind) => {
       message.textContent = text;
@@ -102,7 +124,13 @@ internal static class LanCookieRelayMobilePage
           body: JSON.stringify({ link: value })
         });
         const result = await response.json();
-        setMessage(result.message || (result.success ? '已发送成功' : '发送失败'), result.success ? 'ok' : 'bad');
+        if (result.success) {
+          transferContent.hidden = true;
+          successState.hidden = false;
+          successState.focus();
+          return;
+        }
+        setMessage(result.message || '发送失败', 'bad');
       } catch {
         setMessage('发送失败，请确认手机网络和电脑端服务可用', 'bad');
       } finally {
