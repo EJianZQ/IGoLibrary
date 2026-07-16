@@ -2,6 +2,7 @@ using IGoLibrary.Ex.Desktop.Startup;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class SingleInstanceLockTests
 {
     [Fact]

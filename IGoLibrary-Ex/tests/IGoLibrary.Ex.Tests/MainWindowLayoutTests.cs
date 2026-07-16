@@ -14,10 +14,11 @@ using IGoLibrary.Ex.Desktop.ViewModels;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class MainWindowLayoutTests
 {
     [AvaloniaFact]
-    public void MainWindow_PreservesDefaultSizeAndExposesRememberSizeToggle()
+    public void MainWindow_ExposesExpectedLayoutContracts()
     {
         var window = new MainWindow();
 
@@ -26,63 +27,18 @@ public sealed class MainWindowLayoutTests
         Assert.Equal(1000, window.MinWidth);
         Assert.Equal(680, window.MinHeight);
         Assert.NotNull(window.FindControl<ToggleSwitch>("RememberWindowSizeToggle"));
-    }
+        Assert.NotNull(window.FindControl<ToggleSwitch>("OptimalGrabStrategyReminderToggle"));
 
-    [AvaloniaFact]
-    public void GrabPage_ProvidesOuterVerticalScrollingForExpandedSeatSelection()
-    {
-        var window = new MainWindow();
-        var scrollViewer = Assert.IsType<ScrollViewer>(
+        var grabScrollViewer = Assert.IsType<ScrollViewer>(
             window.FindControl<ScrollViewer>("GrabPageScrollViewer"));
+        Assert.Equal(ScrollBarVisibility.Disabled, grabScrollViewer.HorizontalScrollBarVisibility);
+        Assert.Equal(ScrollBarVisibility.Auto, grabScrollViewer.VerticalScrollBarVisibility);
 
-        Assert.Equal(ScrollBarVisibility.Disabled, scrollViewer.HorizontalScrollBarVisibility);
-        Assert.Equal(ScrollBarVisibility.Auto, scrollViewer.VerticalScrollBarVisibility);
-    }
+        var grabModal = Assert.IsType<Border>(window.FindControl<Border>("GrabSeatSelectionModal"));
+        Assert.Equal(HorizontalAlignment.Stretch, grabModal.HorizontalAlignment);
+        Assert.Equal(1180, grabModal.MaxWidth);
 
-    [AvaloniaFact]
-    public void GrabSeatSelectionModal_StretchesToAvailableWidth()
-    {
-        var window = new MainWindow();
-        var modal = Assert.IsType<Border>(window.FindControl<Border>("GrabSeatSelectionModal"));
-
-        Assert.Equal(HorizontalAlignment.Stretch, modal.HorizontalAlignment);
-        Assert.Equal(1180, modal.MaxWidth);
-    }
-
-    [AvaloniaTheory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void SeatTemplate_MapsAvailabilityToATypeSafeForegroundStyle(bool isOccupied)
-    {
-        var window = new MainWindow();
-        var seat = new SeatItemViewModel("seat-1", "1", isOccupied);
-        var template = Assert.Single(window.DataTemplates, candidate => candidate.Match(seat));
-        var seatControl = Assert.IsAssignableFrom<Control>(template.Build(seat));
-        seatControl.DataContext = seat;
-        window.Content = seatControl;
-
-        try
-        {
-            window.Show();
-            Dispatcher.UIThread.RunJobs();
-
-            var seatName = Assert.Single(
-                seatControl.GetLogicalDescendants().OfType<TextBlock>(),
-                candidate => candidate.Name == "SeatNameTextBlock");
-            Assert.Equal(isOccupied, seatName.Classes.Contains("unavailable"));
-            Assert.IsAssignableFrom<IBrush>(seatName.Foreground);
-        }
-        finally
-        {
-            window.Close();
-        }
-    }
-
-    [AvaloniaFact]
-    public void InWindowDialogs_ExposeAttentionAnimationTargets()
-    {
-        var window = new MainWindow();
-        string[] targetNames =
+        string[] attentionTargetNames =
         [
             "LanCookieRelayDialogModal",
             "GrabSeatSelectionModal",
@@ -91,10 +47,118 @@ public sealed class MainWindowLayoutTests
             "TomorrowSeatSelectionModal",
             "VenuePickerModal"
         ];
-
-        foreach (var targetName in targetNames)
+        foreach (var targetName in attentionTargetNames)
         {
             Assert.IsType<Border>(window.FindControl<Border>(targetName));
+        }
+
+        var globalLeakModal = Assert.IsType<Border>(
+            window.FindControl<Border>("GlobalLeakLibraryPickerModal"));
+        var columns = Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerColumns"));
+        Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerContent"));
+        var priorityPanel = Assert.IsType<Border>(window.FindControl<Border>("GlobalLeakPriorityPanel"));
+        var priorityScrollViewer = Assert.IsType<ScrollViewer>(
+            window.FindControl<ScrollViewer>("GlobalLeakPriorityScrollViewer"));
+        var priorityItemsControl = Assert.IsType<AnimatedReorderItemsControl>(
+            window.FindControl<AnimatedReorderItemsControl>("GlobalLeakPriorityItemsControl"));
+        Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerActions"));
+        Assert.IsType<Button>(window.FindControl<Button>("GlobalLeakLibraryPickerCloseButton"));
+        Assert.IsType<Button>(window.FindControl<Button>("GlobalLeakLibraryPickerConfirmButton"));
+        var dragOverlay = Assert.IsType<Canvas>(window.FindControl<Canvas>("GlobalLeakPriorityDragOverlay"));
+        var dragGhost = Assert.IsType<Border>(window.FindControl<Border>("GlobalLeakPriorityDragGhost"));
+        var emptyState = Assert.IsType<Border>(window.FindControl<Border>("GlobalLeakPriorityEmptyState"));
+        Assert.Equal(HorizontalAlignment.Stretch, globalLeakModal.HorizontalAlignment);
+        Assert.Equal(1180, globalLeakModal.MaxWidth);
+        Assert.Equal(2, columns.ColumnDefinitions.Count);
+        Assert.Equal(columns.ColumnDefinitions[0].Width, columns.ColumnDefinitions[1].Width);
+        Assert.Equal(1, Grid.GetColumn(priorityPanel));
+        Assert.True(priorityPanel.IsLogicalAncestorOf(priorityScrollViewer));
+        Assert.True(DragDrop.GetAllowDrop(priorityScrollViewer));
+        Assert.Equal(TimeSpan.FromMilliseconds(220), priorityItemsControl.ReorderAnimationDuration);
+        Assert.Equal(4, Grid.GetRowSpan(dragOverlay));
+        Assert.False(dragOverlay.IsHitTestVisible);
+        Assert.Equal(0, Canvas.GetLeft(dragGhost));
+        Assert.Equal(0, Canvas.GetTop(dragGhost));
+        Assert.False(dragGhost.IsHitTestVisible);
+        Assert.False(dragGhost.IsVisible);
+        Assert.Equal(0.72, dragGhost.Opacity);
+        Assert.Equal(Colors.Transparent, Assert.IsAssignableFrom<ISolidColorBrush>(emptyState.Background).Color);
+        Assert.DoesNotContain(
+            window.GetLogicalDescendants().OfType<TextBlock>(),
+            textBlock => textBlock.Text == "勾选范围与原有逻辑一致");
+
+        var relayOverlay = Assert.IsType<Border>(window.FindControl<Border>("LanCookieRelayDialogOverlay"));
+        var relayHeader = Assert.IsType<Grid>(window.FindControl<Grid>("LanCookieRelayDialogHeader"));
+        var relayStatusPanel = Assert.IsType<Grid>(window.FindControl<Grid>("LanCookieRelayStatusPanel"));
+        var relayStatusText = Assert.IsType<TextBlock>(
+            window.FindControl<TextBlock>("LanCookieRelayStatusTextBlock"));
+        var relayCloseButton = Assert.IsType<Button>(window.FindControl<Button>("LanCookieRelayCloseButton"));
+        Assert.Equal(2, relayHeader.RowDefinitions.Count);
+        Assert.Equal(0, Grid.GetRow(relayCloseButton));
+        Assert.Equal(1, Grid.GetColumn(relayCloseButton));
+        Assert.Equal(1, Grid.GetRow(relayStatusPanel));
+        Assert.Equal(2, Grid.GetColumnSpan(relayStatusPanel));
+        Assert.Equal(TextWrapping.Wrap, relayStatusText.TextWrapping);
+        Assert.Equal(HorizontalAlignment.Stretch, relayStatusText.HorizontalAlignment);
+
+        relayOverlay.IsVisible = true;
+        relayStatusText.Text =
+            "快传启动失败：检测到系统已开启代理，但Clash/Mihomo 路由策略为 DIRECT，明显冲突" +
+            "请填写正确的路由策略或把代理方式切换为不使用显式代理";
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(relayStatusText.Bounds.Height > 20, "Long status text should occupy multiple lines.");
+            Assert.True(
+                relayStatusPanel.Bounds.Top >= relayCloseButton.Bounds.Bottom,
+                "Status row must be laid out below the close-button row.");
+            Assert.True(
+                relayStatusText.Bounds.Right <= relayStatusPanel.Bounds.Width + 0.5,
+                "Wrapped status text must stay inside the status panel.");
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void SeatTemplate_MapsBothAvailabilityStatesToATypeSafeForegroundStyle()
+    {
+        var window = new MainWindow();
+        var seats = new[]
+        {
+            new SeatItemViewModel("seat-available", "1", false),
+            new SeatItemViewModel("seat-occupied", "2", true)
+        };
+        var seatControls = seats.Select(seat =>
+        {
+            var template = Assert.Single(window.DataTemplates, candidate => candidate.Match(seat));
+            var control = Assert.IsAssignableFrom<Control>(template.Build(seat));
+            control.DataContext = seat;
+            return control;
+        }).ToArray();
+        window.Content = new StackPanel { Children = { seatControls[0], seatControls[1] } };
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            for (var index = 0; index < seats.Length; index++)
+            {
+                var seatName = Assert.Single(
+                    seatControls[index].GetLogicalDescendants().OfType<TextBlock>(),
+                    candidate => candidate.Name == "SeatNameTextBlock");
+                Assert.Equal(seats[index].IsOccupied, seatName.Classes.Contains("unavailable"));
+                Assert.IsAssignableFrom<IBrush>(seatName.Foreground);
+            }
+        }
+        finally
+        {
+            window.Close();
         }
     }
 
@@ -116,47 +180,6 @@ public sealed class MainWindowLayoutTests
     public void ModalAttentionOffset_UsesDampedHorizontalFeedback(double progress, double expected)
     {
         Assert.Equal(expected, MainWindow.CalculateModalAttentionOffset(progress), precision: 6);
-    }
-
-    [AvaloniaFact]
-    public void GlobalLeakLibraryPicker_UsesTwoColumnPriorityLayout()
-    {
-        var window = new MainWindow();
-        var modal = Assert.IsType<Border>(window.FindControl<Border>("GlobalLeakLibraryPickerModal"));
-        var columns = Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerColumns"));
-        Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerContent"));
-        var priorityPanel = Assert.IsType<Border>(window.FindControl<Border>("GlobalLeakPriorityPanel"));
-        var priorityScrollViewer = Assert.IsType<ScrollViewer>(
-            window.FindControl<ScrollViewer>("GlobalLeakPriorityScrollViewer"));
-        var priorityItemsControl = Assert.IsType<AnimatedReorderItemsControl>(
-            window.FindControl<AnimatedReorderItemsControl>("GlobalLeakPriorityItemsControl"));
-        Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerActions"));
-        Assert.IsType<Button>(window.FindControl<Button>("GlobalLeakLibraryPickerCloseButton"));
-        Assert.IsType<Button>(window.FindControl<Button>("GlobalLeakLibraryPickerConfirmButton"));
-        var dragOverlay = Assert.IsType<Canvas>(
-            window.FindControl<Canvas>("GlobalLeakPriorityDragOverlay"));
-        var dragGhost = Assert.IsType<Border>(window.FindControl<Border>("GlobalLeakPriorityDragGhost"));
-        var emptyState = Assert.IsType<Border>(window.FindControl<Border>("GlobalLeakPriorityEmptyState"));
-
-        Assert.Equal(HorizontalAlignment.Stretch, modal.HorizontalAlignment);
-        Assert.Equal(1180, modal.MaxWidth);
-        Assert.Equal(2, columns.ColumnDefinitions.Count);
-        Assert.Equal(columns.ColumnDefinitions[0].Width, columns.ColumnDefinitions[1].Width);
-        Assert.Equal(1, Grid.GetColumn(priorityPanel));
-        Assert.True(priorityPanel.IsLogicalAncestorOf(priorityScrollViewer));
-        Assert.True(DragDrop.GetAllowDrop(priorityScrollViewer));
-        Assert.Equal(TimeSpan.FromMilliseconds(220), priorityItemsControl.ReorderAnimationDuration);
-        Assert.Equal(4, Grid.GetRowSpan(dragOverlay));
-        Assert.False(dragOverlay.IsHitTestVisible);
-        Assert.Equal(0, Canvas.GetLeft(dragGhost));
-        Assert.Equal(0, Canvas.GetTop(dragGhost));
-        Assert.False(dragGhost.IsHitTestVisible);
-        Assert.False(dragGhost.IsVisible);
-        Assert.Equal(0.72, dragGhost.Opacity);
-        Assert.Equal(Colors.Transparent, Assert.IsAssignableFrom<ISolidColorBrush>(emptyState.Background).Color);
-        Assert.DoesNotContain(
-            window.GetLogicalDescendants().OfType<TextBlock>(),
-            textBlock => textBlock.Text == "勾选范围与原有逻辑一致");
     }
 
     [Fact]
@@ -314,58 +337,4 @@ public sealed class MainWindowLayoutTests
         }
     }
 
-    [AvaloniaFact]
-    public void GeneralSettings_ExposeOptimalGrabStrategyReminderToggle()
-    {
-        var window = new MainWindow();
-
-        var toggle = window.FindControl<ToggleSwitch>("OptimalGrabStrategyReminderToggle");
-
-        Assert.NotNull(toggle);
-    }
-
-    [AvaloniaFact]
-    public void LanCookieRelayDialog_StatusWrapsBelowHeaderAndCannotOverlapCloseButton()
-    {
-        var window = new MainWindow
-        {
-            Width = 1188,
-            Height = 840
-        };
-        var overlay = Assert.IsType<Border>(window.FindControl<Border>("LanCookieRelayDialogOverlay"));
-        var header = Assert.IsType<Grid>(window.FindControl<Grid>("LanCookieRelayDialogHeader"));
-        var statusPanel = Assert.IsType<Grid>(window.FindControl<Grid>("LanCookieRelayStatusPanel"));
-        var statusText = Assert.IsType<TextBlock>(window.FindControl<TextBlock>("LanCookieRelayStatusTextBlock"));
-        var closeButton = Assert.IsType<Button>(window.FindControl<Button>("LanCookieRelayCloseButton"));
-
-        Assert.Equal(2, header.RowDefinitions.Count);
-        Assert.Equal(0, Grid.GetRow(closeButton));
-        Assert.Equal(1, Grid.GetColumn(closeButton));
-        Assert.Equal(1, Grid.GetRow(statusPanel));
-        Assert.Equal(2, Grid.GetColumnSpan(statusPanel));
-        Assert.Equal(TextWrapping.Wrap, statusText.TextWrapping);
-        Assert.Equal(HorizontalAlignment.Stretch, statusText.HorizontalAlignment);
-
-        overlay.IsVisible = true;
-        statusText.Text =
-            "快传启动失败：检测到系统已开启代理，但Clash/Mihomo 路由策略为 DIRECT，明显冲突" +
-            "请填写正确的路由策略或把代理方式切换为不使用显式代理";
-        try
-        {
-            window.Show();
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.True(statusText.Bounds.Height > 20, "Long status text should occupy multiple lines.");
-            Assert.True(
-                statusPanel.Bounds.Top >= closeButton.Bounds.Bottom,
-                "Status row must be laid out below the close-button row.");
-            Assert.True(
-                statusText.Bounds.Right <= statusPanel.Bounds.Width + 0.5,
-                "Wrapped status text must stay inside the status panel.");
-        }
-        finally
-        {
-            window.Close();
-        }
-    }
 }

@@ -116,12 +116,18 @@ public sealed class BarkAlertSenderTests
             {
                 Content = new StringContent("""{"code":200,"message":"success","timestamp":2}""")
             }));
-        var sender = CreateSender(handler, AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) });
+        var timeProvider = new FakeTimeProvider();
+        var sender = CreateSender(
+            handler,
+            AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) },
+            timeProvider);
 
-        await sender.SendAsync(
+        var sendTask = sender.SendAsync(
             new BarkAlertChannelSettings(true, "https://api.day.app", "key-1", "", "", ""),
             "抢座成功",
             "测试内容");
+        timeProvider.Advance(TimeSpan.FromMilliseconds(250));
+        await sendTask;
 
         Assert.Equal(2, handler.CallCount);
     }
@@ -144,7 +150,8 @@ public sealed class BarkAlertSenderTests
 
     private static BarkAlertSender CreateSender(
         HttpMessageHandler handler,
-        AppSettings? settings = null)
+        AppSettings? settings = null,
+        TimeProvider? timeProvider = null)
     {
         return new BarkAlertSender(
             new HttpClient(handler)
@@ -154,6 +161,7 @@ public sealed class BarkAlertSenderTests
             new FakeSettingsService(settings ?? AppSettings.Default with
             {
                 Network = AppSettings.Default.Network with { MaxRetries = 0 }
-            }));
+            }),
+            timeProvider);
     }
 }

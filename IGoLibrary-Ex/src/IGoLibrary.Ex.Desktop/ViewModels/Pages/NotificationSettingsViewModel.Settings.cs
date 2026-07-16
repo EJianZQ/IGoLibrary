@@ -14,7 +14,8 @@ public sealed partial class NotificationSettingsViewModel
 
     private DeferredAutoSaveController AutoSave => _autoSave ??= new DeferredAutoSaveController(
         TimeSpan.FromMilliseconds(450),
-        cancellationToken => SaveNotificationSettingsAsync(BuildTaskEventAlertSettingsSnapshot(), cancellationToken));
+        cancellationToken => SaveNotificationSettingsAsync(BuildTaskEventAlertSettingsSnapshot(), cancellationToken),
+        _timeProvider);
 
     private static readonly string[] BarkAlertLevelValues = ["", "active", "timeSensitive", "passive", "critical"];
 

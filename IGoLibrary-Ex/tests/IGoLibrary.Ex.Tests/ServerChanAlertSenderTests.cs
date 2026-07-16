@@ -149,12 +149,18 @@ public sealed class ServerChanAlertSenderTests
                 Content = new StringContent("temporary")
             }),
             (_, _) => Task.FromResult(SuccessResponse()));
-        var sender = CreateSender(handler, AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) });
+        var timeProvider = new FakeTimeProvider();
+        var sender = CreateSender(
+            handler,
+            AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) },
+            timeProvider);
 
-        await sender.SendAsync(
+        var sendTask = sender.SendAsync(
             new ServerChanAlertChannelSettings(true, "SCT_xxx", false, "", ""),
             "抢座成功",
             "测试内容");
+        timeProvider.Advance(TimeSpan.FromMilliseconds(250));
+        await sendTask;
 
         Assert.Equal(2, handler.CallCount);
     }
@@ -198,7 +204,8 @@ public sealed class ServerChanAlertSenderTests
 
     private static ServerChanAlertSender CreateSender(
         HttpMessageHandler handler,
-        AppSettings? settings = null)
+        AppSettings? settings = null,
+        TimeProvider? timeProvider = null)
     {
         return new ServerChanAlertSender(
             new HttpClient(handler)
@@ -208,6 +215,7 @@ public sealed class ServerChanAlertSenderTests
             new FakeSettingsService(settings ?? AppSettings.Default with
             {
                 Network = AppSettings.Default.Network with { MaxRetries = 0 }
-            }));
+            }),
+            timeProvider);
     }
 }

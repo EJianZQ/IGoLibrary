@@ -605,7 +605,7 @@ public sealed partial class GrabPageViewModel : ViewModelBase
     {
         try
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(450), cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(450), _timeProvider, cancellationToken);
             await PersistGrabScheduledStartDefaultAsync(value, cancellationToken);
             ClearCompletedGrabScheduledStartDefaultAutoSave(cancellationTokenSource, value);
         }

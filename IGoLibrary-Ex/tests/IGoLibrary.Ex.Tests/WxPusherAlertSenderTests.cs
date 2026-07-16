@@ -145,12 +145,18 @@ public sealed class WxPusherAlertSenderTests
             {
                 Content = new StringContent("""{"code":1000,"msg":"处理成功","data":[],"success":true}""")
             }));
-        var sender = CreateSender(handler, AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) });
+        var timeProvider = new FakeTimeProvider();
+        var sender = CreateSender(
+            handler,
+            AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) },
+            timeProvider);
 
-        await sender.SendAsync(
+        var sendTask = sender.SendAsync(
             new WxPusherAlertChannelSettings(true, "https://wxpusher.zjiecode.com", "AT_xxx", "UID_1", ""),
             "抢座成功",
             "测试内容");
+        timeProvider.Advance(TimeSpan.FromMilliseconds(250));
+        await sendTask;
 
         Assert.Equal(2, handler.CallCount);
     }
@@ -209,7 +215,8 @@ public sealed class WxPusherAlertSenderTests
 
     private static WxPusherAlertSender CreateSender(
         HttpMessageHandler handler,
-        AppSettings? settings = null)
+        AppSettings? settings = null,
+        TimeProvider? timeProvider = null)
     {
         return new WxPusherAlertSender(
             new HttpClient(handler)
@@ -219,6 +226,7 @@ public sealed class WxPusherAlertSenderTests
             new FakeSettingsService(settings ?? AppSettings.Default with
             {
                 Network = AppSettings.Default.Network with { MaxRetries = 0 }
-            }));
+            }),
+            timeProvider);
     }
 }

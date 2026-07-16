@@ -8,66 +8,34 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class DesktopCoordinatorEventPublisherTests
 {
     [Fact]
-    public async Task PublishAsync_MapsGrabSucceededEventToTaskEventAlertDispatcher()
+    public async Task PublishAsync_MapsEveryCoordinatorEventToTaskEventAlertDispatcher()
     {
         var taskAlertService = new FakeTaskEventAlertDispatcher();
         var publisher = CreatePublisher(taskAlertService);
 
         await publisher.PublishAsync(new GrabSucceededCoordinatorEvent("自科阅览区一", "1号座"));
+        await publisher.PublishAsync(new OccupyReReserveSucceededCoordinatorEvent("2号座"));
+        await publisher.PublishAsync(new TomorrowReservationSucceededCoordinatorEvent("社科阅览区", "3号座", "明天"));
+        await publisher.PublishAsync(new GlobalLeakSucceededCoordinatorEvent("自科阅览区二", "4号座"));
+        await publisher.PublishAsync(new SessionInvalidCoordinatorEvent("抢座轮询", "Cookie 已过期。"));
+        await publisher.PublishAsync(new TaskFailedCoordinatorEvent("占座", "预约状态获取失败"));
 
         Assert.Contains(
             taskAlertService.GrabSucceededNotifications,
             item => item.LibraryName == "自科阅览区一" && item.SeatName == "1号座");
-    }
-
-    [Fact]
-    public async Task PublishAsync_MapsGlobalLeakSucceededEventToTaskEventAlertDispatcher()
-    {
-        var taskAlertService = new FakeTaskEventAlertDispatcher();
-        var publisher = CreatePublisher(taskAlertService);
-
-        await publisher.PublishAsync(new GlobalLeakSucceededCoordinatorEvent("自科阅览区一", "1号座"));
-
+        Assert.Contains("2号座", taskAlertService.OccupyReReserveSucceededNotifications);
+        Assert.Contains(
+            taskAlertService.TomorrowReservationSucceededNotifications,
+            item => item.LibraryName == "社科阅览区" && item.SeatName == "3号座" && item.Day == "明天");
         Assert.Contains(
             taskAlertService.GlobalLeakSucceededNotifications,
-            item => item.LibraryName == "自科阅览区一" && item.SeatName == "1号座");
-    }
-
-    [Fact]
-    public async Task PublishAsync_MapsSessionInvalidEventToTaskEventAlertDispatcher()
-    {
-        var taskAlertService = new FakeTaskEventAlertDispatcher();
-        var publisher = CreatePublisher(taskAlertService);
-
-        await publisher.PublishAsync(new SessionInvalidCoordinatorEvent("抢座轮询", "Cookie 已过期。"));
-
+            item => item.LibraryName == "自科阅览区二" && item.SeatName == "4号座");
         Assert.Contains(
             taskAlertService.SessionInvalidNotifications,
             item => item.Source == "抢座轮询" && item.Reason == "Cookie 已过期。");
-    }
-
-    [Fact]
-    public async Task PublishAsync_MapsTaskFailedEventToTaskEventAlertDispatcher()
-    {
-        var taskAlertService = new FakeTaskEventAlertDispatcher();
-        var publisher = CreatePublisher(taskAlertService);
-
-        await publisher.PublishAsync(new TaskFailedCoordinatorEvent("占座", "预约状态获取失败"));
-
         Assert.Contains(
             taskAlertService.TaskFailedNotifications,
             item => item.TaskName == "占座" && item.Reason == "预约状态获取失败");
-    }
-
-    [Fact]
-    public async Task PublishAsync_MapsOccupyReReserveSucceededEventToTaskEventAlertDispatcher()
-    {
-        var taskAlertService = new FakeTaskEventAlertDispatcher();
-        var publisher = CreatePublisher(taskAlertService);
-
-        await publisher.PublishAsync(new OccupyReReserveSucceededCoordinatorEvent("1号座"));
-
-        Assert.Contains("1号座", taskAlertService.OccupyReReserveSucceededNotifications);
     }
 
     [Fact]

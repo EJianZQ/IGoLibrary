@@ -9,8 +9,11 @@ public sealed partial class NotificationSettingsViewModel(
     INotificationTestService notificationTestService,
     IActivityLogService activityLogService,
     INotificationService notificationService,
-    IErrorDialogService errorDialogService) : ViewModelBase
+    IErrorDialogService errorDialogService,
+    TimeProvider? timeProvider = null) : ViewModelBase
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
     public Task SaveNotificationSettingsAsync(
         TaskEventAlertSettings alerts,
         CancellationToken cancellationToken = default)

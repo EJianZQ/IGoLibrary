@@ -5,6 +5,7 @@ using IGoLibrary.Ex.Updater.Core;
 namespace IGoLibrary.Ex.Tests;
 
 [SupportedOSPlatform("windows")]
+[Collection(NonParallelTestCollection.Name)]
 public sealed class UpdateStartupMaintenanceTests : IDisposable
 {
     private readonly string _root = Path.Combine(
@@ -128,8 +129,13 @@ public sealed class UpdateStartupMaintenanceTests : IDisposable
         File.WriteAllText(
             Path.Combine(directory, UpdateProtocol.UpdaterExecutableName),
             "copied updater");
+        var unregisteredTransactions = new List<string>();
 
-        var result = UpdateStartupMaintenance.RunForTests(_root, null, _now);
+        var result = UpdateStartupMaintenance.RunForTests(
+            _root,
+            null,
+            _now,
+            unregisteredTransactions.Add);
 
         Assert.True(Directory.Exists(directory));
         Assert.False(File.Exists(requestPath));
@@ -139,7 +145,70 @@ public sealed class UpdateStartupMaintenanceTests : IDisposable
         Assert.True(Directory.Exists(Path.Combine(directory, "staging")));
         Assert.Equal(1, result.RestoredVerifiedCacheCount);
         Assert.Equal(0, result.DeletedUpdaterTransactionCount);
+        Assert.Equal([transactionId], unregisteredTransactions);
         Assert.Empty(result.Failures);
+    }
+
+    [Fact]
+    public void RunForTests_UnregistersRecoveryExactlyOnceForEveryTerminalCleanupBranch()
+    {
+        (UpdateCoordinatorSignalKind? Signal, UpdateWorkerPhase? Phase)[] scenarios =
+        [
+            (UpdateCoordinatorSignalKind.Canceled, null),
+            (UpdateCoordinatorSignalKind.Failed, null),
+            (null, UpdateWorkerPhase.Failed),
+            (null, UpdateWorkerPhase.Committed),
+            (null, UpdateWorkerPhase.RolledBack)
+        ];
+
+        foreach (var scenario in scenarios)
+        {
+            var transactionId = Guid.NewGuid().ToString("N");
+            var directory = CreateTransactionDirectory(transactionId);
+            var request = CreateRequest(transactionId, directory);
+            UpdateJsonFile.WriteAtomic(
+                Path.Combine(directory, "request.json"),
+                request,
+                UpdateJsonTypeInfo.TransactionRequest);
+
+            if (scenario.Signal is { } signal)
+            {
+                UpdateJsonFile.WriteAtomic(
+                    request.CoordinatorReadyPath,
+                    new UpdateCoordinatorSignal(
+                        UpdateProtocol.SchemaVersion,
+                        transactionId,
+                        signal,
+                        "terminal",
+                        _now - TimeSpan.FromDays(8)),
+                    UpdateJsonTypeInfo.CoordinatorSignal);
+            }
+
+            if (scenario.Phase is { } phase)
+            {
+                UpdateJsonFile.WriteAtomic(
+                    request.WorkerStatusPath,
+                    new UpdateWorkerStatus(
+                        UpdateProtocol.SchemaVersion,
+                        transactionId,
+                        phase,
+                        "terminal",
+                        _now - TimeSpan.FromDays(8)),
+                    UpdateJsonTypeInfo.WorkerStatus);
+            }
+
+            var unregisteredTransactions = new List<string>();
+            var result = UpdateStartupMaintenance.RunForTests(
+                _root,
+                null,
+                _now,
+                unregisteredTransactions.Add);
+
+            Assert.False(Directory.Exists(directory));
+            Assert.Equal(1, result.DeletedUpdaterTransactionCount);
+            Assert.Equal([transactionId], unregisteredTransactions);
+            Assert.Empty(result.Failures);
+        }
     }
 
     [Fact]

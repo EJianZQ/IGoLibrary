@@ -21,7 +21,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Task _processingTask;
     private readonly object _stateGate = new();
-    private readonly TimeSpan _simulatedWriteDelay;
+    private readonly Func<Task>? _beforeWriteAsync;
     private long _droppedEntryCount;
     private int _acceptingWrites = 1;
     private bool _configured;
@@ -38,7 +38,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
             LogFileSettings.DefaultRetainedFileCount,
             clock: null,
             DefaultQueueCapacity,
-            TimeSpan.Zero,
+            beforeWriteAsync: null,
             startUnconfigured)
     {
     }
@@ -52,7 +52,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
             retainedFileCount,
             clock,
             DefaultQueueCapacity,
-            TimeSpan.Zero,
+            beforeWriteAsync: null,
             startUnconfigured: false)
     {
     }
@@ -62,7 +62,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
         int retainedFileCount,
         Func<DateTimeOffset>? clock,
         int queueCapacity,
-        TimeSpan simulatedWriteDelay,
+        Func<Task>? beforeWriteAsync,
         bool startUnconfigured = false)
     {
         _logDirectory = string.IsNullOrWhiteSpace(logDirectory)
@@ -70,7 +70,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
             : Path.GetFullPath(logDirectory);
         _clock = clock ?? (() => DateTimeOffset.Now);
         _runStartedAt = _clock();
-        _simulatedWriteDelay = simulatedWriteDelay > TimeSpan.Zero ? simulatedWriteDelay : TimeSpan.Zero;
+        _beforeWriteAsync = beforeWriteAsync;
         _queue = Channel.CreateBounded<QueuedWorkItem>(new BoundedChannelOptions(Math.Max(16, queueCapacity))
         {
             SingleReader = true,
@@ -268,9 +268,9 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
                             }
 
                             pendingWriteCount += await WriteDroppedEntryWarningAsync(activeWriter, entry.Timestamp);
-                            if (_simulatedWriteDelay > TimeSpan.Zero)
+                            if (_beforeWriteAsync is not null)
                             {
-                                await Task.Delay(_simulatedWriteDelay);
+                                await _beforeWriteAsync();
                             }
 
                             await activeWriter.WriteAsync(entry.Line);

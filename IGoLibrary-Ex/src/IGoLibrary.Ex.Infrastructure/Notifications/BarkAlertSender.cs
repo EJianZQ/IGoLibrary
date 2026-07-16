@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -9,8 +8,10 @@ namespace IGoLibrary.Ex.Infrastructure.Notifications;
 
 internal sealed class BarkAlertSender(
     HttpClient httpClient,
-    ISettingsService settingsService) : IBarkAlertSender
+    ISettingsService settingsService,
+    TimeProvider? timeProvider = null) : IBarkAlertSender
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -41,8 +42,11 @@ internal sealed class BarkAlertSender(
             throw new InvalidOperationException("Bark 推送内容不能为空");
         }
 
-        using var response = await ExecuteWithRequestPolicyAsync(
+        using var response = await HttpNotificationRequestPolicy.ExecuteAsync(
+            settingsService,
+            "Bark",
             token => SendOnceAsync(normalized, title.Trim(), body.Trim(), token),
+            _timeProvider,
             cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         ThrowIfBarkResponseFailed(response, raw);
@@ -169,80 +173,6 @@ internal sealed class BarkAlertSender(
 
             throw new InvalidOperationException("Bark API 返回不是有效 JSON", ex);
         }
-    }
-
-    private async Task<HttpResponseMessage> ExecuteWithRequestPolicyAsync(
-        Func<CancellationToken, Task<HttpResponseMessage>> operation,
-        CancellationToken cancellationToken)
-    {
-        var settings = await LoadNetworkSettingsAsync(cancellationToken);
-        Exception? lastException = null;
-
-        for (var attempt = 0; attempt <= settings.MaxRetries; attempt++)
-        {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(settings.Timeout);
-
-            try
-            {
-                var response = await operation(timeoutCts.Token);
-                if (!IsTransient(response.StatusCode))
-                {
-                    return response;
-                }
-
-                lastException = new HttpRequestException(
-                    $"Bark 请求失败，HTTP {(int)response.StatusCode} {response.StatusCode}",
-                    null,
-                    response.StatusCode);
-                response.Dispose();
-            }
-            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
-            {
-                lastException = new TimeoutException($"Bark 请求超时（>{settings.Timeout.TotalSeconds:0} 秒）", ex);
-            }
-            catch (HttpRequestException ex) when (IsTransient(ex.StatusCode))
-            {
-                lastException = ex;
-            }
-
-            if (attempt >= settings.MaxRetries)
-            {
-                break;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250 * (attempt + 1)), cancellationToken);
-        }
-
-        throw lastException ?? new InvalidOperationException("Bark 请求失败");
-    }
-
-    private async Task<(TimeSpan Timeout, int MaxRetries)> LoadNetworkSettingsAsync(CancellationToken cancellationToken)
-    {
-        NetworkRequestSettings settings;
-        try
-        {
-            settings = (await settingsService.LoadAsync(cancellationToken)).Network;
-        }
-        catch
-        {
-            settings = NetworkRequestSettings.Default;
-        }
-
-        var timeoutSeconds = Math.Clamp(settings.TimeoutSeconds, 1, 60);
-        var maxRetries = Math.Clamp(settings.MaxRetries, 0, 10);
-        return (TimeSpan.FromSeconds(timeoutSeconds), maxRetries);
-    }
-
-    private static bool IsTransient(HttpStatusCode? statusCode)
-    {
-        return statusCode is null
-            or HttpStatusCode.RequestTimeout
-            or HttpStatusCode.TooManyRequests
-            or HttpStatusCode.BadGateway
-            or HttpStatusCode.ServiceUnavailable
-            or HttpStatusCode.GatewayTimeout
-            || (int?)statusCode >= 500;
     }
 
     private static int ReadCode(JsonElement element)

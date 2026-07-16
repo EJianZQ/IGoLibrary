@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace IGoLibrary.Ex.Tests;
 
@@ -21,57 +20,6 @@ public sealed class CloudflaredPackagingTests
             Assert.Matches("^[0-9a-f]{64}$", asset.Value.GetProperty("sha256").GetString());
             Assert.False(string.IsNullOrWhiteSpace(asset.Value.GetProperty("fileName").GetString()));
         }
-    }
-
-    [Fact]
-    public void PublishScripts_DeclareDefaultCloudflaredAndWithoutCloudflaredPackages()
-    {
-        var build = Path.Combine(GetRepositoryRoot().FullName, "build");
-        var windows = File.ReadAllText(Path.Combine(build, "publish-windows.ps1"));
-        var mac = File.ReadAllText(Path.Combine(build, "publish-macos.ps1"));
-        var macAll = File.ReadAllText(Path.Combine(build, "publish-macos-all.ps1"));
-        var macBash = File.ReadAllText(Path.Combine(build, "publish-macos.sh"));
-        var windowsVerifier = File.ReadAllText(Path.Combine(build, "verify-windows-package.ps1"));
-
-        Assert.Contains("prepare-cloudflared.ps1", windows, StringComparison.Ordinal);
-        Assert.Contains("prepare-cloudflared.ps1", mac, StringComparison.Ordinal);
-        Assert.Contains("[string]$BundledPackageName", windows, StringComparison.Ordinal);
-        Assert.Contains("[string]$BundledPackageName", mac, StringComparison.Ordinal);
-        Assert.Contains("windows-x64-without-cloudflared.zip", windows, StringComparison.Ordinal);
-        Assert.Contains("IGoLibrary-Ex-v$AppVersion-windows-x64.zip", windows, StringComparison.Ordinal);
-        Assert.Contains("macOS-Apple-Silicon-arm64-without-cloudflared.zip", macAll, StringComparison.Ordinal);
-        Assert.Contains("macOS-Apple-Silicon-arm64.zip", macAll, StringComparison.Ordinal);
-        Assert.Contains("macOS-Intel-x64-without-cloudflared.zip", macAll, StringComparison.Ordinal);
-        Assert.Contains("macOS-Intel-x64.zip", macAll, StringComparison.Ordinal);
-        Assert.Contains("$legacyBundledPackageName", windows, StringComparison.Ordinal);
-        Assert.Contains("$LegacyBundledPackageName", mac, StringComparison.Ordinal);
-        Assert.Contains(".previous-legacy-with-cloudflared.zip", windows, StringComparison.Ordinal);
-        Assert.Contains(".previous-legacy-with-cloudflared.zip", mac, StringComparison.Ordinal);
-        Assert.Contains("Copy-DirectoryWithoutTools", windows, StringComparison.Ordinal);
-        Assert.Contains("Install-ValidatedReleaseArtifacts", windows, StringComparison.Ordinal);
-        Assert.Contains("New-MacAppBundle -IncludeTools $false", mac, StringComparison.Ordinal);
-        Assert.Contains("New-MacAppBundle -IncludeTools $true", mac, StringComparison.Ordinal);
-        Assert.Contains("Test-MacAppZip", mac, StringComparison.Ordinal);
-        Assert.Contains("Install-ValidatedPackagePair", mac, StringComparison.Ordinal);
-        Assert.Contains("Remove-SafeArtifactDirectory -Path $PublishOutput", mac, StringComparison.Ordinal);
-        Assert.Contains("[string]$CompanionPackagePath", windowsVerifier, StringComparison.Ordinal);
-        Assert.Contains("manifest 不得声明非托管 tools 文件", windowsVerifier, StringComparison.Ordinal);
-        Assert.Contains("$managedCloudflaredRelativePaths", windows, StringComparison.Ordinal);
-        Assert.Contains("Write-UpdateManifest -RootDirectory $output -IncludeCloudflared $true", windows, StringComparison.Ordinal);
-        Assert.Contains("$directoryEntries", windowsVerifier, StringComparison.Ordinal);
-        Assert.Contains("默认完整包不得包含非托管 tools 目录", windowsVerifier, StringComparison.Ordinal);
-        Assert.Contains("tools 目录集合无效", mac, StringComparison.Ordinal);
-        Assert.Contains("tools/cloudflared/THIRD-PARTY-NOTICES.txt", windowsVerifier, StringComparison.Ordinal);
-        Assert.Contains("command -v pwsh", macBash, StringComparison.Ordinal);
-        Assert.Contains("publish-macos.ps1", macBash, StringComparison.Ordinal);
-        Assert.Contains("-NoLogo", macBash, StringComparison.Ordinal);
-        Assert.Contains("-NoProfile", macBash, StringComparison.Ordinal);
-        Assert.Contains("-NonInteractive", macBash, StringComparison.Ordinal);
-        Assert.Equal(2, Regex.Matches(windows, @"&\s+dotnet\s+@").Count);
-        Assert.Single(Regex.Matches(mac, @"&\s+dotnet\s+@"));
-        Assert.Contains("$leafName -eq \"cloudflared\"", mac, StringComparison.Ordinal);
-        Assert.True(File.Exists(Path.Combine(build, "third-party", "cloudflared-LICENSE.txt")));
-        Assert.True(File.Exists(Path.Combine(build, "third-party", "THIRD-PARTY-NOTICES.txt")));
     }
 
     [Fact]

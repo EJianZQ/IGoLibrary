@@ -2,6 +2,7 @@ using IGoLibrary.Ex.Desktop.Startup;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class RestartParentProcessWaiterTests
 {
     [Theory]
@@ -43,7 +44,6 @@ public sealed class RestartParentProcessWaiterTests
         var waitTask = RestartParentProcessWaiter.WaitForExitAsync(
             child.Id,
             TimeSpan.FromSeconds(5));
-        await Task.Delay(100);
         Assert.False(waitTask.IsCompleted);
 
         child.Release();

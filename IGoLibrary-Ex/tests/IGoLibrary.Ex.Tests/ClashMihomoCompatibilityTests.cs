@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class ClashMihomoCompatibilityTests
 {
     [Theory]

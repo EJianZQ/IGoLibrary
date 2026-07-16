@@ -10,7 +10,8 @@ namespace IGoLibrary.Ex.Infrastructure.Notifications;
 
 internal sealed class ServerChanAlertSender(
     HttpClient httpClient,
-    ISettingsService settingsService) : IServerChanAlertSender
+    ISettingsService settingsService,
+    TimeProvider? timeProvider = null) : IServerChanAlertSender
 {
     private const int SuccessCode = 0;
     private const int MaxTitleLength = 32;
@@ -20,6 +21,7 @@ internal sealed class ServerChanAlertSender(
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
     public async Task SendAsync(
         ServerChanAlertChannelSettings settings,
@@ -35,6 +37,7 @@ internal sealed class ServerChanAlertSender(
             settingsService,
             "Server酱",
             token => SendOnceAsync(normalized, normalizedTitle, normalizedBody, token),
+            _timeProvider,
             cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         ThrowIfServerChanResponseFailed(response, raw);

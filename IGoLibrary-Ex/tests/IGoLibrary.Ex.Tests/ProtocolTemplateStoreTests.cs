@@ -6,6 +6,7 @@ using Microsoft.Data.Sqlite;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class ProtocolTemplateStoreTests : IDisposable
 {
     private const string DataDirEnvironmentVariable = "IGOLIBRARY_EX_DATA_DIR";

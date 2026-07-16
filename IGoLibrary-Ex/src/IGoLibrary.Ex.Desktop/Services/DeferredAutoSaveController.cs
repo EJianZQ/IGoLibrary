@@ -1,7 +1,11 @@
 namespace IGoLibrary.Ex.Desktop.Services;
 
-internal sealed class DeferredAutoSaveController(TimeSpan delay, Func<CancellationToken, Task> saveAsync)
+internal sealed class DeferredAutoSaveController(
+    TimeSpan delay,
+    Func<CancellationToken, Task> saveAsync,
+    TimeProvider? timeProvider = null)
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private CancellationTokenSource? _pending;
 
     public bool HasPending => _pending is not null;
@@ -41,7 +45,7 @@ internal sealed class DeferredAutoSaveController(TimeSpan delay, Func<Cancellati
     {
         try
         {
-            await Task.Delay(delay, source.Token);
+            await Task.Delay(delay, _timeProvider, source.Token);
             await saveAsync(source.Token);
             ClearCompleted(source);
         }

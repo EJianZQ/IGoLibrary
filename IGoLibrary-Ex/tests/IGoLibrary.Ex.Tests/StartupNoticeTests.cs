@@ -6,6 +6,7 @@ using IGoLibrary.Ex.Desktop.Startup;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class StartupNoticeTests
 {
     [Fact]
@@ -29,7 +30,13 @@ public sealed class StartupNoticeTests
     }
 
     [AvaloniaFact]
-    public void DuplicateInstanceWindow_LoadsExactNotice_AndConfirmClosesWindow()
+    public void DuplicateInstanceWindow_HandlesConfirmAndSystemCloseLifecycles()
+    {
+        DuplicateInstanceWindow_LoadsExactNotice_AndConfirmClosesWindow();
+        DuplicateInstanceWindow_SystemCloseEndsWindowLifecycle();
+    }
+
+    private static void DuplicateInstanceWindow_LoadsExactNotice_AndConfirmClosesWindow()
     {
         var app = Assert.IsType<StartupNoticeApp>(Avalonia.Application.Current);
         var icons = TrayIcon.GetIcons(app);
@@ -70,8 +77,7 @@ public sealed class StartupNoticeTests
         }
     }
 
-    [AvaloniaFact]
-    public void DuplicateInstanceWindow_SystemCloseEndsWindowLifecycle()
+    private static void DuplicateInstanceWindow_SystemCloseEndsWindowLifecycle()
     {
         var window = new StartupNoticeWindow(StartupNotice.DuplicateInstance);
         var closed = false;

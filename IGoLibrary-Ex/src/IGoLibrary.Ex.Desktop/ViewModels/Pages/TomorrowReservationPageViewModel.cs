@@ -734,7 +734,7 @@ public sealed partial class TomorrowReservationPageViewModel : ViewModelBase
     {
         try
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(450), cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(450), _timeProvider, cancellationToken);
             await PersistTomorrowScheduledStartDefaultAsync(value, cancellationToken);
             ClearCompletedTomorrowScheduledStartDefaultAutoSave(cancellationTokenSource, value);
         }

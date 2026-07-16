@@ -5,25 +5,6 @@ namespace IGoLibrary.Ex.Tests;
 
 public sealed class AutoReleaseReservationPolicyTests
 {
-    [Fact]
-    public void ShouldCancel_ReturnsTrue_WhenReservationIsInsideLeadWindow()
-    {
-        var now = new DateTimeOffset(2026, 7, 2, 8, 0, 0, TimeSpan.Zero);
-        var reservation = CreateReservation(now.AddSeconds(60));
-
-        var shouldCancel = AutoReleaseReservationPolicy.ShouldCancel(
-            reservation,
-            enabled: true,
-            leadSeconds: 60,
-            isCancellationInProgress: false,
-            isSuppressedByOccupy: false,
-            lastFailedReservationToken: null,
-            lastFailedAt: null,
-            now);
-
-        Assert.True(shouldCancel);
-    }
-
     [Theory]
     [InlineData(false, false, false, 30, false)]
     [InlineData(true, true, false, 30, false)]

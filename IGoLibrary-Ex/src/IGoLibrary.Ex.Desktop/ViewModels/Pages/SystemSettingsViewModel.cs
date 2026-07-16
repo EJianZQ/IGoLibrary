@@ -53,7 +53,8 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         IStartupEntryService startupEntryService,
         StorageSettingsViewModel storageSettings,
         INetworkExposureManager networkExposureManager,
-        IMainWindowSizePersistenceService windowSizePersistenceService)
+        IMainWindowSizePersistenceService windowSizePersistenceService,
+        TimeProvider? timeProvider = null)
     {
         _settingsWorkflowService = settingsWorkflowService;
         _protocolTemplateEditorService = protocolTemplateEditorService;
@@ -67,7 +68,8 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         StorageSettings = storageSettings;
         _systemSettingsAutoSave = new DeferredAutoSaveController(
             TimeSpan.FromMilliseconds(300),
-            cancellationToken => PersistSystemSettingsAsync(showNotification: false, cancellationToken));
+            cancellationToken => PersistSystemSettingsAsync(showNotification: false, cancellationToken),
+            timeProvider ?? TimeProvider.System);
     }
 
     public string[] SystemSettingsCategories { get; } = ["常规", "外观", "网络与接口", "存储与日志", "关于"];

@@ -117,19 +117,34 @@ public sealed class LoggingTests : IDisposable
     }
 
     [Fact]
-    public void AppLogFileWriter_WhenQueueIsBounded_RecordsDroppedEntryWarning()
+    public async Task AppLogFileWriter_WhenQueueIsBounded_RecordsDroppedEntryWarning()
     {
         var timestamp = new DateTimeOffset(2026, 4, 21, 8, 0, 0, TimeSpan.FromHours(8));
+        var processingStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseWrites = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var writer = new AppLogFileWriter(
             _tempDirectory,
             retainedFileCount: 14,
             clock: () => timestamp,
             queueCapacity: 16,
-            simulatedWriteDelay: TimeSpan.FromMilliseconds(25));
+            beforeWriteAsync: async () =>
+            {
+                processingStarted.TrySetResult();
+                await releaseWrites.Task;
+            });
 
-        for (var index = 0; index < 256; index++)
+        try
         {
-            writer.Write(LogLevel.Information, "Grab", $"日志 {index}");
+            writer.Write(LogLevel.Information, "Grab", "日志 0");
+            await processingStarted.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            for (var index = 1; index < 256; index++)
+            {
+                writer.Write(LogLevel.Information, "Grab", $"日志 {index}");
+            }
+        }
+        finally
+        {
+            releaseWrites.TrySetResult();
         }
 
         writer.Flush();

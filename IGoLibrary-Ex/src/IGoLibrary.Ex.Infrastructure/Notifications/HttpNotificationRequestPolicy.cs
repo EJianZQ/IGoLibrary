@@ -9,6 +9,7 @@ internal static class HttpNotificationRequestPolicy
         ISettingsService settingsService,
         string requestLabel,
         Func<CancellationToken, Task<HttpResponseMessage>> operation,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         var settings = await LoadNetworkSettingsAsync(settingsService, cancellationToken);
@@ -16,12 +17,12 @@ internal static class HttpNotificationRequestPolicy
 
         for (var attempt = 0; attempt <= settings.MaxRetries; attempt++)
         {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(settings.Timeout);
+            using var timeoutCts = new CancellationTokenSource(settings.Timeout, timeProvider);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
             try
             {
-                var response = await operation(timeoutCts.Token);
+                var response = await operation(linkedCts.Token);
                 if (!IsTransient(response.StatusCode))
                 {
                     return response;
@@ -47,7 +48,10 @@ internal static class HttpNotificationRequestPolicy
                 break;
             }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(250 * (attempt + 1)), cancellationToken);
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(250 * (attempt + 1)),
+                timeProvider,
+                cancellationToken);
         }
 
         throw lastException ?? new InvalidOperationException($"{requestLabel}请求失败");

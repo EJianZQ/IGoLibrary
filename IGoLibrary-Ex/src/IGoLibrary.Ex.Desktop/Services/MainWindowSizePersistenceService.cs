@@ -23,7 +23,15 @@ public sealed class MainWindowSizePersistenceService : IMainWindowSizePersistenc
     public MainWindowSizePersistenceService(
         ISettingsWorkflowService settingsWorkflowService,
         IActivityLogService activityLogService)
-        : this(settingsWorkflowService, activityLogService, DefaultDebounceDelay)
+        : this(settingsWorkflowService, activityLogService, DefaultDebounceDelay, TimeProvider.System)
+    {
+    }
+
+    public MainWindowSizePersistenceService(
+        ISettingsWorkflowService settingsWorkflowService,
+        IActivityLogService activityLogService,
+        TimeProvider timeProvider)
+        : this(settingsWorkflowService, activityLogService, DefaultDebounceDelay, timeProvider)
     {
     }
 
@@ -31,10 +39,19 @@ public sealed class MainWindowSizePersistenceService : IMainWindowSizePersistenc
         ISettingsWorkflowService settingsWorkflowService,
         IActivityLogService activityLogService,
         TimeSpan debounceDelay)
+        : this(settingsWorkflowService, activityLogService, debounceDelay, TimeProvider.System)
+    {
+    }
+
+    internal MainWindowSizePersistenceService(
+        ISettingsWorkflowService settingsWorkflowService,
+        IActivityLogService activityLogService,
+        TimeSpan debounceDelay,
+        TimeProvider timeProvider)
     {
         _settingsWorkflowService = settingsWorkflowService;
         _activityLogService = activityLogService;
-        _autoSave = new DeferredAutoSaveController(debounceDelay, PersistPendingSizeAsync);
+        _autoSave = new DeferredAutoSaveController(debounceDelay, PersistPendingSizeAsync, timeProvider);
     }
 
     public async Task InitializeAsync(Window window, CancellationToken cancellationToken = default)

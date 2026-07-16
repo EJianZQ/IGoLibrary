@@ -10,7 +10,16 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class MobileControlServiceTests
 {
     [Fact]
-    public async Task StartAsync_ListensOnConfiguredAddressAndPort()
+    public async Task StartAndReadEndpoints_ReturnExpectedContentAndSessionState()
+    {
+        await StartAsync_ListensOnConfiguredAddressAndPort();
+        await GetRoot_WithValidToken_ReturnsMobileHtmlWithNoStore();
+        await GetRoot_WithValidToken_TracksConnectedDeviceCount();
+        await GetStatus_WithValidToken_ReturnsSnapshotJson();
+        await GetAuthQrCode_WithValidToken_ReturnsPngWithNoStore();
+    }
+
+    private async Task StartAsync_ListensOnConfiguredAddressAndPort()
     {
         var port = GetFreeTcpPort();
         await using var service = CreateService();
@@ -22,8 +31,7 @@ public sealed class MobileControlServiceTests
         Assert.Equal($"http://127.0.0.1:{port}/?token=token", session.Url.ToString());
     }
 
-    [Fact]
-    public async Task GetRoot_WithValidToken_ReturnsMobileHtmlWithNoStore()
+    private async Task GetRoot_WithValidToken_ReturnsMobileHtmlWithNoStore()
     {
         var port = GetFreeTcpPort();
         await using var service = CreateService();
@@ -39,8 +47,7 @@ public sealed class MobileControlServiceTests
         Assert.Contains("/api/status", html);
     }
 
-    [Fact]
-    public async Task GetRoot_WithValidToken_TracksConnectedDeviceCount()
+    private async Task GetRoot_WithValidToken_TracksConnectedDeviceCount()
     {
         var port = GetFreeTcpPort();
         await using var service = CreateService();
@@ -61,8 +68,7 @@ public sealed class MobileControlServiceTests
         Assert.Contains(0, observedCounts);
     }
 
-    [Fact]
-    public async Task GetStatus_WithValidToken_ReturnsSnapshotJson()
+    private async Task GetStatus_WithValidToken_ReturnsSnapshotJson()
     {
         var provider = new FakeMobileControlStatusSnapshotProvider();
         var port = GetFreeTcpPort();
@@ -81,8 +87,7 @@ public sealed class MobileControlServiceTests
         Assert.Equal("运行中", document.RootElement.GetProperty("grab").GetProperty("stateText").GetString());
     }
 
-    [Fact]
-    public async Task GetAuthQrCode_WithValidToken_ReturnsPngWithNoStore()
+    private async Task GetAuthQrCode_WithValidToken_ReturnsPngWithNoStore()
     {
         var port = GetFreeTcpPort();
         await using var service = CreateService();
@@ -103,7 +108,16 @@ public sealed class MobileControlServiceTests
     }
 
     [Fact]
-    public async Task GetAuthQrCode_WithInvalidToken_IsRejected()
+    public async Task AllProtectedEndpoints_RejectInvalidAuthentication()
+    {
+        await GetAuthQrCode_WithInvalidToken_IsRejected();
+        await Requests_WithInvalidToken_AreRejected();
+        await PostCancelTask_WithInvalidToken_IsRejected();
+        await PostCancelReservation_WithInvalidToken_IsRejected();
+        await PostRefreshCookie_WithInvalidToken_IsRejected();
+    }
+
+    private async Task GetAuthQrCode_WithInvalidToken_IsRejected()
     {
         var port = GetFreeTcpPort();
         await using var service = CreateService();
@@ -115,8 +129,7 @@ public sealed class MobileControlServiceTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    [Fact]
-    public async Task Requests_WithInvalidToken_AreRejected()
+    private async Task Requests_WithInvalidToken_AreRejected()
     {
         var provider = new FakeMobileControlStatusSnapshotProvider();
         var port = GetFreeTcpPort();
@@ -131,7 +144,13 @@ public sealed class MobileControlServiceTests
     }
 
     [Fact]
-    public async Task PostCancelTask_WithValidToken_ReturnsActionJson()
+    public async Task PostCancelTask_MapsSuccessAndConflictResults()
+    {
+        await PostCancelTask_WithValidToken_ReturnsActionJson();
+        await PostCancelTask_WhenActionConflicts_ReturnsConflict();
+    }
+
+    private async Task PostCancelTask_WithValidToken_ReturnsActionJson()
     {
         var actionService = new FakeMobileControlActionService();
         var port = GetFreeTcpPort();
@@ -149,8 +168,7 @@ public sealed class MobileControlServiceTests
         Assert.Equal("已取消任务", document.RootElement.GetProperty("message").GetString());
     }
 
-    [Fact]
-    public async Task PostCancelTask_WithInvalidToken_IsRejected()
+    private async Task PostCancelTask_WithInvalidToken_IsRejected()
     {
         var actionService = new FakeMobileControlActionService();
         var port = GetFreeTcpPort();
@@ -164,8 +182,7 @@ public sealed class MobileControlServiceTests
         Assert.Empty(actionService.CancelledTaskKinds);
     }
 
-    [Fact]
-    public async Task PostCancelTask_WhenActionConflicts_ReturnsConflict()
+    private async Task PostCancelTask_WhenActionConflicts_ReturnsConflict()
     {
         var actionService = new FakeMobileControlActionService
         {
@@ -204,8 +221,7 @@ public sealed class MobileControlServiceTests
         Assert.Equal("已取消预约", document.RootElement.GetProperty("message").GetString());
     }
 
-    [Fact]
-    public async Task PostCancelReservation_WithInvalidToken_IsRejected()
+    private async Task PostCancelReservation_WithInvalidToken_IsRejected()
     {
         var actionService = new FakeMobileControlActionService();
         var port = GetFreeTcpPort();
@@ -219,11 +235,23 @@ public sealed class MobileControlServiceTests
         Assert.Equal(0, actionService.CancelReservationCalls);
     }
 
-    [Theory]
-    [InlineData("application/json", "{\"link\":\"https://example.test/auth?code=1234567890abcdef1234567890abcdef\"}")]
-    [InlineData("application/x-www-form-urlencoded", "link=https%3A%2F%2Fexample.test%2Fauth%3Fcode%3D1234567890abcdef1234567890abcdef")]
-    [InlineData("text/plain", "https://example.test/auth?code=1234567890abcdef1234567890abcdef")]
-    public async Task PostRefreshCookie_WithValidToken_ReadsSubmittedLinkAndReturnsActionJson(
+    [Fact]
+    public async Task PostRefreshCookie_AcceptsEverySupportedRequestBody()
+    {
+        (string ContentType, string Body)[] cases =
+        [
+            ("application/json", "{\"link\":\"https://example.test/auth?code=1234567890abcdef1234567890abcdef\"}"),
+            ("application/x-www-form-urlencoded", "link=https%3A%2F%2Fexample.test%2Fauth%3Fcode%3D1234567890abcdef1234567890abcdef"),
+            ("text/plain", "https://example.test/auth?code=1234567890abcdef1234567890abcdef")
+        ];
+
+        foreach (var (contentType, body) in cases)
+        {
+            await PostRefreshCookie_WithValidToken_ReadsSubmittedLinkAndReturnsActionJson(contentType, body);
+        }
+    }
+
+    private async Task PostRefreshCookie_WithValidToken_ReadsSubmittedLinkAndReturnsActionJson(
         string contentType,
         string body)
     {
@@ -249,8 +277,7 @@ public sealed class MobileControlServiceTests
         Assert.Equal("Cookie 已刷新", document.RootElement.GetProperty("message").GetString());
     }
 
-    [Fact]
-    public async Task PostRefreshCookie_WithInvalidToken_IsRejected()
+    private async Task PostRefreshCookie_WithInvalidToken_IsRejected()
     {
         var actionService = new FakeMobileControlActionService();
         var port = GetFreeTcpPort();
@@ -316,7 +343,13 @@ public sealed class MobileControlServiceTests
     }
 
     [Fact]
-    public async Task StartAsync_InCloudflareMode_ReturnsPublicUrlAndKeepsLanUrl()
+    public async Task CloudflareMode_UsesPublicEndpointAndSupportsLiveSwitching()
+    {
+        await StartAsync_InCloudflareMode_ReturnsPublicUrlAndKeepsLanUrl();
+        await ActiveSession_LiveModeSwitchPreservesKestrelSessionAndPort();
+    }
+
+    private async Task StartAsync_InCloudflareMode_ReturnsPublicUrlAndKeepsLanUrl()
     {
         var exposureManager = new FakeNetworkExposureManager();
         exposureManager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
@@ -330,8 +363,7 @@ public sealed class MobileControlServiceTests
         Assert.Equal($"http://127.0.0.1:{port}/?token=token", session.LanUrl.ToString());
     }
 
-    [Fact]
-    public async Task ActiveSession_LiveModeSwitchPreservesKestrelSessionAndPort()
+    private async Task ActiveSession_LiveModeSwitchPreservesKestrelSessionAndPort()
     {
         var exposureManager = new FakeNetworkExposureManager();
         await using var service = CreateService(exposureManager: exposureManager);

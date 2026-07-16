@@ -632,8 +632,36 @@ public sealed class SettingsSerializationTests
     }
 
     [Fact]
-    public void AppSettingsSerialization_PreservesExplicitEventSettings()
+    public void AppSettingsSerialization_PreservesCompleteExplicitNotificationSettings()
     {
+        var expectedEvents = TaskEventAlertEventSettings.Default with
+        {
+            GrabSucceeded = false,
+            OccupyReReserveSucceeded = false,
+            TomorrowReservationSucceeded = false,
+            GlobalLeakSucceeded = false,
+            SessionInvalid = false,
+            TaskFailed = false
+        };
+        var expectedBark = new BarkAlertChannelSettings(
+            true,
+            "https://bark.example.com",
+            "key-1",
+            "IGoLibrary-Ex",
+            "alarm",
+            "timeSensitive");
+        var expectedWxPusher = new WxPusherAlertChannelSettings(
+            true,
+            "https://wxpusher.example.com",
+            "AT_xxx",
+            "UID_1,UID_2",
+            "1;2");
+        var expectedServerChan = new ServerChanAlertChannelSettings(
+            true,
+            "SCT_xxx",
+            true,
+            "9|66",
+            "user-1");
         var json = JsonSerializer.Serialize(AppSettings.Default with
         {
             Notifications = AppSettings.Default.Notifications with
@@ -642,126 +670,32 @@ public sealed class SettingsSerializationTests
                     EmailAlertChannelSettings.Default,
                     LocalDesktopAlertSettings.Default,
                     TelegramAlertChannelSettings.Default,
-                    TaskEventAlertEventSettings.Default with
-                    {
-                        GrabSucceeded = false,
-                        SessionInvalid = false
-                    })
+                    expectedEvents,
+                    expectedBark,
+                    expectedWxPusher,
+                    expectedServerChan)
             }
         }, AppJson.Default);
 
         var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
-        var events = Assert.IsType<TaskEventAlertEventSettings>(settings.Notifications.TaskEventAlerts?.Events);
-        Assert.False(events.GrabSucceeded);
-        Assert.True(events.OccupyReReserveSucceeded);
-        Assert.True(events.TomorrowReservationSucceeded);
-        Assert.True(events.GlobalLeakSucceeded);
-        Assert.False(events.SessionInvalid);
-        Assert.True(events.TaskFailed);
+        var alerts = Assert.IsType<TaskEventAlertSettings>(settings.Notifications.TaskEventAlerts);
+        Assert.Equal(expectedEvents, alerts.Events);
+        Assert.Equal(expectedBark, alerts.Bark);
+        Assert.Equal(expectedWxPusher, alerts.WxPusher);
+        Assert.Equal(expectedServerChan, alerts.ServerChan);
         Assert.Contains("\"grabSucceeded\": false", json);
+        Assert.Contains("\"occupyReReserveSucceeded\": false", json);
+        Assert.Contains("\"tomorrowReservationSucceeded\": false", json);
+        Assert.Contains("\"globalLeakSucceeded\": false", json);
         Assert.Contains("\"sessionInvalid\": false", json);
-    }
-
-    [Fact]
-    public void AppSettingsSerialization_PreservesExplicitBarkSettings()
-    {
-        var json = JsonSerializer.Serialize(AppSettings.Default with
-        {
-            Notifications = AppSettings.Default.Notifications with
-            {
-                TaskEventAlerts = new TaskEventAlertSettings(
-                    EmailAlertChannelSettings.Default,
-                    LocalDesktopAlertSettings.Default,
-                    TelegramAlertChannelSettings.Default,
-                    TaskEventAlertEventSettings.Default,
-                    new BarkAlertChannelSettings(
-                        true,
-                        "https://bark.example.com",
-                        "key-1",
-                        "IGoLibrary-Ex",
-                        "alarm",
-                        "timeSensitive"))
-            }
-        }, AppJson.Default);
-
-        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
-        var bark = Assert.IsType<BarkAlertChannelSettings>(settings.Notifications.TaskEventAlerts?.Bark);
-        Assert.True(bark.Enabled);
-        Assert.Equal("https://bark.example.com", bark.ApiBaseUrl);
-        Assert.Equal("key-1", bark.DeviceKey);
-        Assert.Equal("IGoLibrary-Ex", bark.Group);
-        Assert.Equal("alarm", bark.Sound);
-        Assert.Equal("timeSensitive", bark.Level);
+        Assert.Contains("\"taskFailed\": false", json);
         Assert.Contains("\"bark\":", json);
         Assert.Contains("\"deviceKey\": \"key-1\"", json);
         Assert.Contains("\"level\": \"timeSensitive\"", json);
-    }
-
-    [Fact]
-    public void AppSettingsSerialization_PreservesExplicitWxPusherSettings()
-    {
-        var json = JsonSerializer.Serialize(AppSettings.Default with
-        {
-            Notifications = AppSettings.Default.Notifications with
-            {
-                TaskEventAlerts = new TaskEventAlertSettings(
-                    EmailAlertChannelSettings.Default,
-                    LocalDesktopAlertSettings.Default,
-                    TelegramAlertChannelSettings.Default,
-                    TaskEventAlertEventSettings.Default,
-                    BarkAlertChannelSettings.Default,
-                    new WxPusherAlertChannelSettings(
-                        true,
-                        "https://wxpusher.example.com",
-                        "AT_xxx",
-                        "UID_1,UID_2",
-                        "1;2"))
-            }
-        }, AppJson.Default);
-
-        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
-        var wxPusher = Assert.IsType<WxPusherAlertChannelSettings>(settings.Notifications.TaskEventAlerts?.WxPusher);
-        Assert.True(wxPusher.Enabled);
-        Assert.Equal("https://wxpusher.example.com", wxPusher.ApiBaseUrl);
-        Assert.Equal("AT_xxx", wxPusher.AppToken);
-        Assert.Equal("UID_1,UID_2", wxPusher.Uids);
-        Assert.Equal("1;2", wxPusher.TopicIds);
         Assert.Contains("\"wxPusher\":", json);
         Assert.Contains("\"appToken\": \"AT_xxx\"", json);
         Assert.Contains("\"uids\": \"UID_1,UID_2\"", json);
         Assert.Contains("\"topicIds\": \"1;2\"", json);
-    }
-
-    [Fact]
-    public void AppSettingsSerialization_PreservesExplicitServerChanSettings()
-    {
-        var json = JsonSerializer.Serialize(AppSettings.Default with
-        {
-            Notifications = AppSettings.Default.Notifications with
-            {
-                TaskEventAlerts = new TaskEventAlertSettings(
-                    EmailAlertChannelSettings.Default,
-                    LocalDesktopAlertSettings.Default,
-                    TelegramAlertChannelSettings.Default,
-                    TaskEventAlertEventSettings.Default,
-                    BarkAlertChannelSettings.Default,
-                    WxPusherAlertChannelSettings.Default,
-                    new ServerChanAlertChannelSettings(
-                        true,
-                        "SCT_xxx",
-                        true,
-                        "9|66",
-                        "user-1"))
-            }
-        }, AppJson.Default);
-
-        var settings = Assert.IsType<AppSettings>(JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
-        var serverChan = Assert.IsType<ServerChanAlertChannelSettings>(settings.Notifications.TaskEventAlerts?.ServerChan);
-        Assert.True(serverChan.Enabled);
-        Assert.Equal("SCT_xxx", serverChan.SendKey);
-        Assert.True(serverChan.NoIp);
-        Assert.Equal("9|66", serverChan.Channel);
-        Assert.Equal("user-1", serverChan.OpenId);
         Assert.Contains("\"serverChan\":", json);
         Assert.Contains("\"sendKey\": \"SCT_xxx\"", json);
         Assert.Contains("\"noIp\": true", json);

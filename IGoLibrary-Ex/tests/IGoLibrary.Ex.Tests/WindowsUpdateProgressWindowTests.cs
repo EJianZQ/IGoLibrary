@@ -8,10 +8,17 @@ using IGoLibrary.Ex.Desktop.Services;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class WindowsUpdateProgressWindowTests
 {
     [AvaloniaFact]
-    public async Task ProgressStatesDrivePauseResumeAndCancelButtons()
+    public async Task ProgressStatesDriveEveryAvailableAction()
+    {
+        await ProgressStatesDrivePauseResumeAndCancelButtons();
+        await RetryManualResumeVerificationAndHandoffStatesDriveAvailableActions();
+    }
+
+    private static async Task ProgressStatesDrivePauseResumeAndCancelButtons()
     {
         var owner = new Window();
         owner.Show();
@@ -64,8 +71,7 @@ public sealed class WindowsUpdateProgressWindowTests
         }
     }
 
-    [AvaloniaFact]
-    public async Task RetryManualResumeVerificationAndHandoffStatesDriveAvailableActions()
+    private static async Task RetryManualResumeVerificationAndHandoffStatesDriveAvailableActions()
     {
         var owner = new Window();
         owner.Show();

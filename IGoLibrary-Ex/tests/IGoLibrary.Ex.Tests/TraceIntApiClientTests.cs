@@ -45,9 +45,16 @@ public sealed class TraceIntApiClientTests
                 {"data":{"userAuth":{"reserve":{"libs":[{"lib_id":1,"lib_name":"自科阅览区一","lib_floor":"3","is_open":true}]}}}}
                 """));
 
-        var client = CreateClient(handler, AppSettings.Default with { Network = new NetworkRequestSettings(1, 2) });
+        var timeProvider = new FakeTimeProvider();
+        var client = CreateClient(
+            handler,
+            AppSettings.Default with { Network = new NetworkRequestSettings(1, 2) },
+            timeProvider: timeProvider);
 
-        var libraries = await client.GetLibrariesAsync("Authorization=a; SERVERID=b");
+        var librariesTask = client.GetLibrariesAsync("Authorization=a; SERVERID=b");
+        await AdvanceUntilAsync(timeProvider, () => handler.CallCount == 2);
+        await AdvanceUntilAsync(timeProvider, () => handler.CallCount == 3);
+        var libraries = await librariesTask;
 
         Assert.Single(libraries);
         Assert.Equal(3, handler.CallCount);
@@ -67,9 +74,15 @@ public sealed class TraceIntApiClientTests
                 {"data":{"userAuth":{"reserve":{"libs":[{"lib_id":2,"lib_name":"社科阅览区","lib_floor":"5","is_open":true}]}}}}
                 """));
 
-        var client = CreateClient(handler, AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) });
+        var timeProvider = new FakeTimeProvider();
+        var client = CreateClient(
+            handler,
+            AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) },
+            timeProvider: timeProvider);
 
-        var libraries = await client.GetLibrariesAsync("Authorization=a; SERVERID=b");
+        var librariesTask = client.GetLibrariesAsync("Authorization=a; SERVERID=b");
+        await AdvanceUntilAsync(timeProvider, () => handler.CallCount == 2);
+        var libraries = await librariesTask;
 
         Assert.Single(libraries);
         Assert.Equal(2, handler.CallCount);
@@ -211,12 +224,16 @@ public sealed class TraceIntApiClientTests
                 "SERVERID=b",
                 "Authorization=a")));
 
+        var timeProvider = new FakeTimeProvider();
         var client = CreateClient(
             new SequenceHttpMessageHandler(),
             AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) },
-            cookieHttpClient);
+            cookieHttpClient,
+            timeProvider: timeProvider);
 
-        var cookie = await client.GetCookieFromCodeAsync("code-1");
+        var cookieTask = client.GetCookieFromCodeAsync("code-1");
+        await AdvanceUntilAsync(timeProvider, () => cookieHttpClient.CallCount == 2);
+        var cookie = await cookieTask;
 
         Assert.Equal("Authorization=a; SERVERID=b", cookie);
         Assert.Equal(2, cookieHttpClient.CallCount);
@@ -274,12 +291,16 @@ public sealed class TraceIntApiClientTests
                 "SERVERID=b",
                 "Authorization=a")));
 
+        var timeProvider = new FakeTimeProvider();
         var client = CreateClient(
             new SequenceHttpMessageHandler(),
             AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) },
-            cookieHttpClient);
+            cookieHttpClient,
+            timeProvider: timeProvider);
 
-        var cookie = await client.GetCookieFromCodeAsync("code-1");
+        var cookieTask = client.GetCookieFromCodeAsync("code-1");
+        await AdvanceUntilAsync(timeProvider, () => cookieHttpClient.CallCount == 2);
+        var cookie = await cookieTask;
 
         Assert.Equal("Authorization=a; SERVERID=b", cookie);
         Assert.Equal(2, cookieHttpClient.CallCount);
@@ -487,14 +508,15 @@ public sealed class TraceIntApiClientTests
         HttpMessageHandler handler,
         AppSettings? settings = null,
         ITraceIntCookieHttpClient? cookieHttpClient = null,
-        TraceIntProtocolTemplates? templates = null)
+        TraceIntProtocolTemplates? templates = null,
+        TimeProvider? timeProvider = null)
     {
         var httpClient = new HttpClient(handler)
         {
             Timeout = Timeout.InfiniteTimeSpan
         };
         var settingsService = new FakeSettingsService(settings ?? AppSettings.Default);
-        var requestPolicy = new TraceIntRequestPolicy(settingsService);
+        var requestPolicy = new TraceIntRequestPolicy(settingsService, timeProvider);
         var graphQlTransport = new TraceIntGraphQlTransport(httpClient, requestPolicy);
         var protocolTemplateStore = new FakeProtocolTemplateStore(templates ?? CreateTemplates());
         var cookieTransport = new TraceIntCookieTransport(
@@ -511,6 +533,19 @@ public sealed class TraceIntApiClientTests
             protocolTemplateStore,
             graphQlTransport,
             new TraceIntTomorrowReservationQueueTransport());
+    }
+
+    private static async Task AdvanceUntilAsync(
+        FakeTimeProvider timeProvider,
+        Func<bool> condition)
+    {
+        for (var attempt = 0; attempt < 100 && !condition(); attempt++)
+        {
+            timeProvider.Advance(TimeSpan.FromMilliseconds(250));
+            await Task.Delay(1);
+        }
+
+        Assert.True(condition(), "虚拟时间推进后，请求未进入预期的重试阶段。");
     }
 
     private static TraceIntProtocolTemplates CreateTemplates()

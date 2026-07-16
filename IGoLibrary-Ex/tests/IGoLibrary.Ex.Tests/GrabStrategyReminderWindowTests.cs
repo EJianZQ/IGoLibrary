@@ -8,6 +8,7 @@ using IGoLibrary.Ex.Desktop.Services;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class GrabStrategyReminderWindowTests
 {
     [Fact]
@@ -22,7 +23,13 @@ public sealed class GrabStrategyReminderWindowTests
     }
 
     [AvaloniaFact]
-    public async Task ButtonsReturnChoiceTogetherWithCheckboxState()
+    public async Task WindowReturnsChoicesAndCancelsOnDismissal()
+    {
+        await ButtonsReturnChoiceTogetherWithCheckboxState();
+        await EscapeAndWindowCloseCancelStartingTask();
+    }
+
+    private static async Task ButtonsReturnChoiceTogetherWithCheckboxState()
     {
         var owner = new Window();
         owner.Show();
@@ -63,8 +70,7 @@ public sealed class GrabStrategyReminderWindowTests
         }
     }
 
-    [AvaloniaFact]
-    public async Task EscapeAndWindowCloseCancelStartingTask()
+    private static async Task EscapeAndWindowCloseCancelStartingTask()
     {
         var owner = new Window();
         owner.Show();

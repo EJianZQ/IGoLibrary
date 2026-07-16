@@ -17,6 +17,7 @@ using Avalonia.Threading;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class MainWindowViewModelTests
 {
     [Fact]
@@ -244,62 +245,6 @@ public sealed class MainWindowViewModelTests
         }
     }
 
-    [AvaloniaFact]
-    public async Task OpenModalOverlay_BlocksSidebarPointerInputWithoutDimmingIt()
-    {
-        var viewModel = CreateViewModel();
-        await viewModel.InitializeAsync();
-        viewModel.IsAuthorized = true;
-        viewModel.SelectedTabIndex = 2;
-        var alertSoundService = new RecordingAlertSoundService();
-        var window = new MainWindow(
-            new AppWindowService(),
-            new NoOpNotificationService(),
-            alertSoundService)
-        {
-            DataContext = viewModel
-        };
-
-        try
-        {
-            window.Show();
-            Dispatcher.UIThread.RunJobs();
-
-            var sidebar = Assert.IsType<ListBox>(
-                window.FindControl<ListBox>("SidebarNavigationList"));
-
-            Assert.True(sidebar.IsEnabled);
-            Assert.True(sidebar.IsHitTestVisible);
-
-            viewModel.IsGrabSeatSelectionOverlayOpen = true;
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.True(sidebar.IsEnabled);
-            Assert.False(sidebar.IsHitTestVisible);
-            Assert.Equal(2, viewModel.SelectedTabIndex);
-
-            var modal = Assert.IsType<Border>(
-                window.FindControl<Border>("GrabSeatSelectionModal"));
-            Assert.True(window.NotifyBlockedNavigationAttempt());
-            Assert.IsType<TransformGroup>(modal.RenderTransform);
-            Assert.Equal(1, alertSoundService.SystemPromptPlayCount);
-
-            Assert.True(window.NotifyBlockedNavigationAttempt());
-            Assert.Equal(1, alertSoundService.SystemPromptPlayCount);
-
-            viewModel.IsGrabSeatSelectionOverlayOpen = false;
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.True(sidebar.IsEnabled);
-            Assert.True(sidebar.IsHitTestVisible);
-            Assert.Null(modal.RenderTransform);
-        }
-        finally
-        {
-            window.Close();
-        }
-    }
-
     [Fact]
     public void SidebarItems_ExposeRestrictedEntries_WhenAuthorized()
     {
@@ -524,7 +469,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("本次尚未勾选场馆", viewModel.DraftGlobalLeakLibrarySummaryText);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task GlobalLeakRunning_DisablesConfiguration_AndStopCallsCoordinator()
     {
         var coordinator = new FakeGlobalLeakCoordinator();
@@ -548,7 +493,7 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.IsGlobalLeakTaskActive);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task GlobalLeakStatusAndLogs_UpdateDashboardFields()
     {
         var coordinator = new FakeGlobalLeakCoordinator();
@@ -581,7 +526,7 @@ public sealed class MainWindowViewModelTests
         Assert.Contains("全域捡漏运行中", viewModel.HomeEngineSummaryText);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task GlobalLeakSuccess_RefreshesReservation_AndRecordsDashboardMetrics()
     {
         var settingsService = new FakeSettingsService(WithDashboard(0, 0));
@@ -791,60 +736,6 @@ public sealed class MainWindowViewModelTests
         Assert.Equal([1], settingsService.CurrentSettings.Tasks.GlobalLeak.SelectedLibraries.Select(x => x.LibraryId).ToArray());
     }
 
-    [AvaloniaFact]
-    public async Task GlobalLeakLibraryPicker_DisablesMutation_WhenTaskBecomesActive()
-    {
-        var settingsService = new FakeSettingsService(AppSettings.Default);
-        var coordinator = new FakeGlobalLeakCoordinator();
-        var viewModel = CreateGlobalLeakViewModel(
-            settingsService: settingsService,
-            globalLeakCoordinator: coordinator);
-        await viewModel.InitializeAsync();
-        await viewModel.OpenGlobalLeakLibraryPickerCommand.ExecuteAsync(null);
-        viewModel.GlobalLeakLibraries[0].IsSelected = true;
-
-        var timestamp = DateTimeOffset.Now;
-        coordinator.EmitStatus(new CoordinatorStatus(
-            CoordinatorTaskState.Running,
-            "全域捡漏",
-            "运行中",
-            timestamp,
-            timestamp,
-            Reason: CoordinatorStatusReason.Running));
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.False(viewModel.CanEditGlobalLeakConfiguration);
-        Assert.True(viewModel.CanCancelGlobalLeakLibraryPicker);
-        Assert.False(viewModel.SetGlobalLeakLibraryDropIndicator(1, insertAfter: true));
-        Assert.False(viewModel.MoveDraftGlobalLeakLibrary(1, 2, insertAfter: true));
-        await viewModel.SelectAllGlobalLeakLibrariesCommand.ExecuteAsync(null);
-        await viewModel.ConfirmGlobalLeakLibrariesCommand.ExecuteAsync(null);
-
-        Assert.Equal([1], viewModel.DraftGlobalLeakLibraryPriorities.Select(x => x.LibraryId).ToArray());
-        Assert.Empty(viewModel.SelectedGlobalLeakLibraries);
-        Assert.Equal(0, settingsService.SaveCalls);
-
-        var window = new MainWindow { DataContext = viewModel };
-        try
-        {
-            window.Show();
-            Dispatcher.UIThread.RunJobs();
-
-            Assert.False(Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerActions")).IsEnabled);
-            Assert.False(Assert.IsType<Grid>(window.FindControl<Grid>("GlobalLeakLibraryPickerColumns")).IsEnabled);
-            Assert.False(Assert.IsType<Button>(window.FindControl<Button>("GlobalLeakLibraryPickerConfirmButton")).IsEnabled);
-            Assert.True(Assert.IsType<Button>(window.FindControl<Button>("GlobalLeakLibraryPickerCloseButton")).IsEnabled);
-        }
-        finally
-        {
-            window.DataContext = null;
-            window.Close();
-        }
-
-        viewModel.CancelGlobalLeakLibrariesCommand.Execute(null);
-        Assert.False(viewModel.IsGlobalLeakLibraryPickerOpen);
-    }
-
     [Fact]
     public async Task GlobalLeakLibraryPriority_CancelRestoresCommittedOrderWithoutSaving()
     {
@@ -953,15 +844,66 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task NotificationSettings_AutoSaveTaskEventAlerts_WhenFieldsChange()
+    public async Task NotificationSettings_LoadsAllChannelsAndEvents()
+    {
+        await InitializeAsync_LoadsNotificationEventSettings();
+        await InitializeAsync_LoadsTelegramNotificationSettings();
+        await InitializeAsync_LoadsServerChanNotificationSettings();
+        await InitializeAsync_LoadsWxPusherNotificationSettings();
+        await InitializeAsync_LoadsBarkNotificationSettings();
+    }
+
+    [Fact]
+    public async Task NotificationSettings_NormalizesAllNullChannelStrings()
+    {
+        await InitializeAsync_DefaultsNullTelegramNotificationStrings();
+        await InitializeAsync_DefaultsNullServerChanNotificationStrings();
+        await InitializeAsync_DefaultsNullWxPusherNotificationStrings();
+        await InitializeAsync_DefaultsNullBarkNotificationStrings();
+    }
+
+    [Fact]
+    public async Task NotificationSettings_AutoSavesEveryChannelAndEventGroup()
+    {
+        await NotificationSettings_AutoSaveTaskEventAlerts_WhenFieldsChange();
+        await NotificationSettings_AutoSaveEventAlerts_WhenFieldsChange();
+        await NotificationSettings_AutoSaveTelegramAlerts_WhenFieldsChange();
+        await NotificationSettings_AutoSaveServerChanAlerts_WhenFieldsChange();
+        await NotificationSettings_AutoSaveWxPusherAlerts_WhenFieldsChange();
+        await NotificationSettings_AutoSaveBarkAlerts_WhenFieldsChange();
+    }
+
+    [Fact]
+    public async Task NotificationSettings_TestCommandsUseEveryCurrentChannelSnapshot()
+    {
+        await SendTestEmailAlertAsync_UsesCurrentNotificationSettingsSnapshot();
+        await SendTestTelegramAlertAsync_UsesCurrentNotificationSettingsSnapshot();
+        await SendTestServerChanAlertAsync_UsesCurrentNotificationSettingsSnapshot();
+        await SendTestWxPusherAlertAsync_UsesCurrentNotificationSettingsSnapshot();
+        await SendTestBarkAlertAsync_UsesCurrentNotificationSettingsSnapshot();
+    }
+
+    [Fact]
+    public async Task NotificationSettings_TestCommandsReportEveryChannelFailure()
+    {
+        await SendTestEmailAlertAsync_ShowsErrorDialog_WhenSendingFails();
+        await SendTestTelegramAlertAsync_ShowsErrorDialog_WhenSendingFails();
+        await SendTestServerChanAlertAsync_ShowsErrorDialog_WhenSendingFails();
+        await SendTestWxPusherAlertAsync_ShowsErrorDialog_WhenSendingFails();
+        await SendTestBarkAlertAsync_ShowsErrorDialog_WhenSendingFails();
+    }
+
+    private async Task NotificationSettings_AutoSaveTaskEventAlerts_WhenFieldsChange()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
-        var viewModel = CreateViewModel(settingsService: settingsService);
+        var timeProvider = new FakeTimeProvider();
+        var viewModel = CreateViewModel(settingsService: settingsService, timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.EmailAlertSmtpHost = "smtp.example.com";
         viewModel.EmailAlertSmtpPort = 465;
         viewModel.EmailAlertsEnabled = true;
+        timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         await WaitForAsync(() =>
             settingsService.SaveCalls > 0 &&
@@ -973,8 +915,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(465, alerts.Email.Port);
     }
 
-    [Fact]
-    public async Task InitializeAsync_LoadsNotificationEventSettings()
+    private async Task InitializeAsync_LoadsNotificationEventSettings()
     {
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
@@ -998,15 +939,16 @@ public sealed class MainWindowViewModelTests
         Assert.False(viewModel.TaskFailedAlertsEnabled);
     }
 
-    [Fact]
-    public async Task NotificationSettings_AutoSaveEventAlerts_WhenFieldsChange()
+    private async Task NotificationSettings_AutoSaveEventAlerts_WhenFieldsChange()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
-        var viewModel = CreateViewModel(settingsService: settingsService);
+        var timeProvider = new FakeTimeProvider();
+        var viewModel = CreateViewModel(settingsService: settingsService, timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.GrabSucceededAlertsEnabled = false;
         viewModel.GlobalLeakSucceededAlertsEnabled = false;
+        timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         await WaitForAsync(() =>
             settingsService.SaveCalls > 0 &&
@@ -1022,8 +964,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(events.TaskFailed);
     }
 
-    [Fact]
-    public async Task SendTestEmailAlertAsync_UsesCurrentNotificationSettingsSnapshot()
+    private async Task SendTestEmailAlertAsync_UsesCurrentNotificationSettingsSnapshot()
     {
         var alertService = new FakeTaskEventAlertDispatcher();
         var viewModel = CreateViewModel(taskAlertService: alertService);
@@ -1049,8 +990,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("to@example.com", request.ToAddress);
     }
 
-    [Fact]
-    public async Task SendTestEmailAlertAsync_ShowsErrorDialog_WhenSendingFails()
+    private async Task SendTestEmailAlertAsync_ShowsErrorDialog_WhenSendingFails()
     {
         var alertService = new FakeTaskEventAlertDispatcher
         {
@@ -1074,8 +1014,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("smtp connect failed", error.ErrorMessage);
     }
 
-    [Fact]
-    public async Task InitializeAsync_LoadsTelegramNotificationSettings()
+    private async Task InitializeAsync_LoadsTelegramNotificationSettings()
     {
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
@@ -1092,8 +1031,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("chat-1", viewModel.TelegramAlertChatId);
     }
 
-    [Fact]
-    public async Task InitializeAsync_DefaultsNullTelegramNotificationStrings()
+    private async Task InitializeAsync_DefaultsNullTelegramNotificationStrings()
     {
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
@@ -1110,17 +1048,18 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(string.Empty, viewModel.TelegramAlertChatId);
     }
 
-    [Fact]
-    public async Task NotificationSettings_AutoSaveTelegramAlerts_WhenFieldsChange()
+    private async Task NotificationSettings_AutoSaveTelegramAlerts_WhenFieldsChange()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
-        var viewModel = CreateViewModel(settingsService: settingsService);
+        var timeProvider = new FakeTimeProvider();
+        var viewModel = CreateViewModel(settingsService: settingsService, timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.TelegramAlertsEnabled = true;
         viewModel.TelegramAlertApiBaseUrl = "https://telegram.example.com/";
         viewModel.TelegramAlertBotToken = " token-1 ";
         viewModel.TelegramAlertChatId = " chat-1 ";
+        timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         await WaitForAsync(() =>
             settingsService.SaveCalls > 0 &&
@@ -1133,8 +1072,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("chat-1", telegram.ChatId);
     }
 
-    [Fact]
-    public async Task SendTestTelegramAlertAsync_UsesCurrentNotificationSettingsSnapshot()
+    private async Task SendTestTelegramAlertAsync_UsesCurrentNotificationSettingsSnapshot()
     {
         var alertService = new FakeTaskEventAlertDispatcher();
         var viewModel = CreateViewModel(taskAlertService: alertService);
@@ -1154,8 +1092,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("chat-1", request.ChatId);
     }
 
-    [Fact]
-    public async Task SendTestTelegramAlertAsync_ShowsErrorDialog_WhenSendingFails()
+    private async Task SendTestTelegramAlertAsync_ShowsErrorDialog_WhenSendingFails()
     {
         var alertService = new FakeTaskEventAlertDispatcher
         {
@@ -1179,8 +1116,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("telegram send failed", error.ErrorMessage);
     }
 
-    [Fact]
-    public async Task InitializeAsync_LoadsServerChanNotificationSettings()
+    private async Task InitializeAsync_LoadsServerChanNotificationSettings()
     {
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
@@ -1202,8 +1138,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("user-1", viewModel.ServerChanAlertOpenId);
     }
 
-    [Fact]
-    public async Task InitializeAsync_DefaultsNullServerChanNotificationStrings()
+    private async Task InitializeAsync_DefaultsNullServerChanNotificationStrings()
     {
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
@@ -1225,11 +1160,11 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(string.Empty, viewModel.ServerChanAlertOpenId);
     }
 
-    [Fact]
-    public async Task NotificationSettings_AutoSaveServerChanAlerts_WhenFieldsChange()
+    private async Task NotificationSettings_AutoSaveServerChanAlerts_WhenFieldsChange()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
-        var viewModel = CreateViewModel(settingsService: settingsService);
+        var timeProvider = new FakeTimeProvider();
+        var viewModel = CreateViewModel(settingsService: settingsService, timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.ServerChanAlertsEnabled = true;
@@ -1237,6 +1172,7 @@ public sealed class MainWindowViewModelTests
         viewModel.ServerChanAlertNoIp = true;
         viewModel.ServerChanAlertChannel = " 9|66 ";
         viewModel.ServerChanAlertOpenId = " user-1 ";
+        timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         await WaitForAsync(() =>
             settingsService.SaveCalls > 0 &&
@@ -1250,8 +1186,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("user-1", serverChan.OpenId);
     }
 
-    [Fact]
-    public async Task SendTestServerChanAlertAsync_UsesCurrentNotificationSettingsSnapshot()
+    private async Task SendTestServerChanAlertAsync_UsesCurrentNotificationSettingsSnapshot()
     {
         var alertService = new FakeTaskEventAlertDispatcher();
         var viewModel = CreateViewModel(taskAlertService: alertService);
@@ -1273,8 +1208,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("user-1", request.OpenId);
     }
 
-    [Fact]
-    public async Task SendTestServerChanAlertAsync_ShowsErrorDialog_WhenSendingFails()
+    private async Task SendTestServerChanAlertAsync_ShowsErrorDialog_WhenSendingFails()
     {
         var alertService = new FakeTaskEventAlertDispatcher
         {
@@ -1296,8 +1230,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("serverchan send failed", error.ErrorMessage);
     }
 
-    [Fact]
-    public async Task InitializeAsync_LoadsWxPusherNotificationSettings()
+    private async Task InitializeAsync_LoadsWxPusherNotificationSettings()
     {
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
@@ -1318,8 +1251,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("1;2", viewModel.WxPusherAlertTopicIds);
     }
 
-    [Fact]
-    public async Task InitializeAsync_DefaultsNullWxPusherNotificationStrings()
+    private async Task InitializeAsync_DefaultsNullWxPusherNotificationStrings()
     {
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
@@ -1340,11 +1272,11 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(string.Empty, viewModel.WxPusherAlertTopicIds);
     }
 
-    [Fact]
-    public async Task NotificationSettings_AutoSaveWxPusherAlerts_WhenFieldsChange()
+    private async Task NotificationSettings_AutoSaveWxPusherAlerts_WhenFieldsChange()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
-        var viewModel = CreateViewModel(settingsService: settingsService);
+        var timeProvider = new FakeTimeProvider();
+        var viewModel = CreateViewModel(settingsService: settingsService, timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.WxPusherAlertsEnabled = true;
@@ -1352,6 +1284,7 @@ public sealed class MainWindowViewModelTests
         viewModel.WxPusherAlertAppToken = " AT_xxx ";
         viewModel.WxPusherAlertUids = " UID_1, UID_2 ";
         viewModel.WxPusherAlertTopicIds = " 1;2 ";
+        timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         await WaitForAsync(() =>
             settingsService.SaveCalls > 0 &&
@@ -1365,8 +1298,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("1;2", wxPusher.TopicIds);
     }
 
-    [Fact]
-    public async Task SendTestWxPusherAlertAsync_UsesCurrentNotificationSettingsSnapshot()
+    private async Task SendTestWxPusherAlertAsync_UsesCurrentNotificationSettingsSnapshot()
     {
         var alertService = new FakeTaskEventAlertDispatcher();
         var viewModel = CreateViewModel(taskAlertService: alertService);
@@ -1388,8 +1320,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("1", request.TopicIds);
     }
 
-    [Fact]
-    public async Task SendTestWxPusherAlertAsync_ShowsErrorDialog_WhenSendingFails()
+    private async Task SendTestWxPusherAlertAsync_ShowsErrorDialog_WhenSendingFails()
     {
         var alertService = new FakeTaskEventAlertDispatcher
         {
@@ -1413,8 +1344,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("wxpusher send failed", error.ErrorMessage);
     }
 
-    [Fact]
-    public async Task InitializeAsync_LoadsBarkNotificationSettings()
+    private async Task InitializeAsync_LoadsBarkNotificationSettings()
     {
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
@@ -1435,8 +1365,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(2, viewModel.SelectedBarkAlertLevelIndex);
     }
 
-    [Fact]
-    public async Task InitializeAsync_DefaultsNullBarkNotificationStrings()
+    private async Task InitializeAsync_DefaultsNullBarkNotificationStrings()
     {
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
             new TaskEventAlertSettings(
@@ -1457,11 +1386,11 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(0, viewModel.SelectedBarkAlertLevelIndex);
     }
 
-    [Fact]
-    public async Task NotificationSettings_AutoSaveBarkAlerts_WhenFieldsChange()
+    private async Task NotificationSettings_AutoSaveBarkAlerts_WhenFieldsChange()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
-        var viewModel = CreateViewModel(settingsService: settingsService);
+        var timeProvider = new FakeTimeProvider();
+        var viewModel = CreateViewModel(settingsService: settingsService, timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.BarkAlertsEnabled = true;
@@ -1470,6 +1399,7 @@ public sealed class MainWindowViewModelTests
         viewModel.BarkAlertGroup = " IGoLibrary-Ex ";
         viewModel.BarkAlertSound = " alarm ";
         viewModel.SelectedBarkAlertLevelIndex = 2;
+        timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         await WaitForAsync(() =>
             settingsService.SaveCalls > 0 &&
@@ -1484,8 +1414,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("timeSensitive", bark.Level);
     }
 
-    [Fact]
-    public async Task SendTestBarkAlertAsync_UsesCurrentNotificationSettingsSnapshot()
+    private async Task SendTestBarkAlertAsync_UsesCurrentNotificationSettingsSnapshot()
     {
         var alertService = new FakeTaskEventAlertDispatcher();
         var viewModel = CreateViewModel(taskAlertService: alertService);
@@ -1509,8 +1438,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("timeSensitive", request.Level);
     }
 
-    [Fact]
-    public async Task SendTestBarkAlertAsync_ShowsErrorDialog_WhenSendingFails()
+    private async Task SendTestBarkAlertAsync_ShowsErrorDialog_WhenSendingFails()
     {
         var alertService = new FakeTaskEventAlertDispatcher
         {
@@ -1642,7 +1570,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.ShowLanCookieRelayStartedStatusIcon);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task LanCookieRelaySubmission_WithValidLink_AuthenticatesAndLoadsLibraries()
     {
         var relayService = new FakeLanCookieRelayService();
@@ -1679,7 +1607,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(["场馆A"], viewModel.AvailableLibraries.Select(library => library.Name).ToArray());
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task LanCookieRelaySubmission_WithInvalidLink_ReturnsFailureAndDoesNotAuthorize()
     {
         var relayService = new FakeLanCookieRelayService();
@@ -2092,7 +2020,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(Color.Parse("#C93C37"), brush.Color);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task GrabSuccessMetrics_UseStatusReason_NotSuccessMessageText()
     {
         var settingsService = new FakeSettingsService(WithDashboard(0, 0));
@@ -2128,7 +2056,25 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task SaveSettingsAsync_PreservesDashboardMetrics()
+    public async Task SaveSettingsCommand_PreservesAllUnownedSettingsSections()
+    {
+        await SaveSettingsAsync_PreservesDashboardMetrics();
+        await SaveSettingsAsync_PreservesStoredVenueSelection();
+    }
+
+    [Fact]
+    public async Task SaveSettingsCommand_PersistsCompleteOwnedSettingsSnapshot()
+    {
+        await SaveSettingsAsync_PersistsTelegramNotificationSettings();
+        await SaveSettingsAsync_PersistsServerChanNotificationSettings();
+        await SaveSettingsAsync_PersistsBarkNotificationSettings();
+        await SaveSettingsAsync_PersistsWxPusherNotificationSettings();
+        await SaveSettingsAsync_PersistsNotificationEventSettings();
+        await SaveSettingsAsync_PersistsStartupUpdateCheckPreference();
+        await SaveSettingsAsync_PersistsAutoReleaseSettings();
+    }
+
+    private async Task SaveSettingsAsync_PreservesDashboardMetrics()
     {
         var settingsService = new FakeSettingsService(WithDashboard(4, 7200));
         var viewModel = CreateViewModel(settingsService: settingsService);
@@ -2141,8 +2087,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(7200, settingsService.CurrentSettings.Dashboard.TotalGuardSeconds);
     }
 
-    [Fact]
-    public async Task SaveSettingsAsync_PreservesStoredVenueSelection()
+    private async Task SaveSettingsAsync_PreservesStoredVenueSelection()
     {
         var settingsService = new FakeSettingsService(WithVenue(12, "自科阅览区一"));
         var viewModel = CreateViewModel(settingsService: settingsService);
@@ -2168,12 +2113,14 @@ public sealed class MainWindowViewModelTests
             }
         };
         var settingsService = new FakeSettingsService(initial);
-        var viewModel = CreateViewModel(settingsService: settingsService);
+        var timeProvider = new FakeTimeProvider();
+        var viewModel = CreateViewModel(settingsService: settingsService, timeProvider: timeProvider);
 
         await viewModel.InitializeAsync();
 
         Assert.False(viewModel.SystemSettings.OptimalGrabStrategyReminderEnabled);
         viewModel.SystemSettings.OptimalGrabStrategyReminderEnabled = true;
+        timeProvider.Advance(TimeSpan.FromMilliseconds(300));
         await WaitForAsync(() => settingsService.CurrentSettings.Tasks.Grab.OptimalStrategyReminderEnabled);
 
         Assert.True(settingsService.CurrentSettings.Tasks.Grab.OptimalStrategyReminderEnabled);
@@ -2195,8 +2142,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(saveCallsBeforeApply, settingsService.SaveCalls);
     }
 
-    [Fact]
-    public async Task SaveSettingsAsync_PersistsTelegramNotificationSettings()
+    private async Task SaveSettingsAsync_PersistsTelegramNotificationSettings()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);
         var viewModel = CreateViewModel(settingsService: settingsService);
@@ -2216,8 +2162,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("chat-1", telegram.ChatId);
     }
 
-    [Fact]
-    public async Task SaveSettingsAsync_PersistsServerChanNotificationSettings()
+    private async Task SaveSettingsAsync_PersistsServerChanNotificationSettings()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);
         var viewModel = CreateViewModel(settingsService: settingsService);
@@ -2239,8 +2184,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("user-1", serverChan.OpenId);
     }
 
-    [Fact]
-    public async Task SaveSettingsAsync_PersistsBarkNotificationSettings()
+    private async Task SaveSettingsAsync_PersistsBarkNotificationSettings()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);
         var viewModel = CreateViewModel(settingsService: settingsService);
@@ -2264,8 +2208,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("critical", bark.Level);
     }
 
-    [Fact]
-    public async Task SaveSettingsAsync_PersistsWxPusherNotificationSettings()
+    private async Task SaveSettingsAsync_PersistsWxPusherNotificationSettings()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);
         var viewModel = CreateViewModel(settingsService: settingsService);
@@ -2287,8 +2230,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("1", wxPusher.TopicIds);
     }
 
-    [Fact]
-    public async Task SaveSettingsAsync_PersistsNotificationEventSettings()
+    private async Task SaveSettingsAsync_PersistsNotificationEventSettings()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);
         var viewModel = CreateViewModel(settingsService: settingsService);
@@ -2309,17 +2251,26 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task ThemeSettings_AutoSavePreferences()
+    public async Task ThemeSettings_AppliesImmediatelyAndAutoSavesPreferences()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
         var themeService = new FakeAppThemeService();
+        var timeProvider = new FakeTimeProvider();
         var viewModel = CreateViewModel(
             settingsService: settingsService,
-            appThemeService: themeService);
+            appThemeService: themeService,
+            timeProvider: timeProvider);
         await viewModel.InitializeAsync();
+        var applyCallsAfterInitialization = themeService.ApplySettingsCalls;
 
         viewModel.SelectedAppThemeModeIndex = 2;
         viewModel.UseSystemAccent = false;
+
+        Assert.True(themeService.ApplySettingsCalls > applyCallsAfterInitialization);
+        Assert.Equal(AppThemeMode.Dark, themeService.LastAppliedTheme?.Mode);
+        Assert.False(themeService.LastAppliedTheme?.UseSystemAccent);
+
+        timeProvider.Advance(TimeSpan.FromMilliseconds(300));
 
         await WaitForAsync(() =>
             settingsService.CurrentSettings.Ui.Theme?.Mode == AppThemeMode.Dark &&
@@ -2332,42 +2283,14 @@ public sealed class MainWindowViewModelTests
         Assert.False(themeService.LastAppliedTheme?.UseSystemAccent);
     }
 
-    [AvaloniaFact]
-    public async Task RememberWindowSizeSetting_LoadsBindsAndAutoSavesWithCaptureSemantics()
+    [Fact]
+    public async Task HomeProgressSettings_AutoSaveReservationAndCookiePreferences()
     {
-        var settingsService = new FakeSettingsService(AppSettings.Default with
-        {
-            Ui = AppSettings.Default.Ui with
-            {
-                MainViewSize = new MainViewSizePreferences(true, 1260, 780)
-            }
-        });
-        var sizePersistence = new RecordingMainWindowSizePersistenceService();
-        var viewModel = CreateViewModel(
-            settingsService: settingsService,
-            windowSizePersistenceService: sizePersistence);
-
-        await viewModel.InitializeAsync();
-        var saveCallsAfterLoad = settingsService.SaveCalls;
-        var window = new MainWindow { DataContext = viewModel };
-        Dispatcher.UIThread.RunJobs();
-
-        Assert.True(viewModel.SystemSettings.RememberWindowSizeEnabled);
-        Assert.True(window.FindControl<ToggleSwitch>("RememberWindowSizeToggle")?.IsChecked);
-        Assert.Contains((Enabled: true, CaptureCurrentSize: false), sizePersistence.Changes);
-        Assert.Equal(saveCallsAfterLoad, settingsService.SaveCalls);
-
-        viewModel.SystemSettings.RememberWindowSizeEnabled = false;
-        await WaitForAsync(() => settingsService.CurrentSettings.Ui.MainViewSize?.RememberSize == false);
-        Assert.Equal((Enabled: false, CaptureCurrentSize: false), sizePersistence.Changes[^1]);
-
-        viewModel.SystemSettings.RememberWindowSizeEnabled = true;
-        await WaitForAsync(() => settingsService.CurrentSettings.Ui.MainViewSize?.RememberSize == true);
-        Assert.Equal((Enabled: true, CaptureCurrentSize: true), sizePersistence.Changes[^1]);
+        await HomeReservationProgressSettings_AutoSavePreferences();
+        await HomeCookieProgressSettings_AutoSavePreferences();
     }
 
-    [Fact]
-    public async Task HomeReservationProgressSettings_AutoSavePreferences()
+    private async Task HomeReservationProgressSettings_AutoSavePreferences()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings() with
         {
@@ -2378,7 +2301,8 @@ public sealed class MainWindowViewModelTests
                     40)
             }
         });
-        var viewModel = CreateViewModel(settingsService: settingsService);
+        var timeProvider = new FakeTimeProvider();
+        var viewModel = CreateViewModel(settingsService: settingsService, timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         Assert.Equal(1, viewModel.SelectedHomeReservationProgressTimingModeIndex);
@@ -2387,6 +2311,7 @@ public sealed class MainWindowViewModelTests
 
         viewModel.SelectedHomeReservationProgressTimingModeIndex = 0;
         viewModel.HomeReservationFixedDurationMinutes = 45;
+        timeProvider.Advance(TimeSpan.FromMilliseconds(300));
 
         await WaitForAsync(() =>
             settingsService.CurrentSettings.Ui.HomeReservationProgress?.Mode ==
@@ -2396,8 +2321,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(viewModel.IsHomeReservationFixedProgressMode);
     }
 
-    [Fact]
-    public async Task SaveSettingsAsync_PersistsStartupUpdateCheckPreference()
+    private async Task SaveSettingsAsync_PersistsStartupUpdateCheckPreference()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);
         var viewModel = CreateViewModel(settingsService: settingsService);
@@ -2570,30 +2494,6 @@ public sealed class MainWindowViewModelTests
 
         Assert.Same(release, Assert.Single(updateDialogService.Releases));
         Assert.False(viewModel.IsCheckingForUpdates);
-    }
-
-    [Fact]
-    public async Task ThemePreview_UpdatesImmediately_ThenAutoSavesSettings()
-    {
-        var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
-        var themeService = new FakeAppThemeService();
-        var viewModel = CreateViewModel(
-            settingsService: settingsService,
-            appThemeService: themeService);
-        await viewModel.InitializeAsync();
-
-        viewModel.SelectedAppThemeModeIndex = 2;
-        viewModel.UseSystemAccent = false;
-
-        await WaitForAsync(() =>
-            themeService.ApplySettingsCalls >= 2 &&
-            themeService.LastAppliedTheme?.Mode == AppThemeMode.Dark &&
-            themeService.LastAppliedTheme?.UseSystemAccent == false);
-
-        await WaitForAsync(() =>
-            settingsService.SaveCalls > 0 &&
-            settingsService.CurrentSettings.Ui.Theme?.Mode == AppThemeMode.Dark &&
-            settingsService.CurrentSettings.Ui.Theme?.UseSystemAccent == false);
     }
 
     [Fact]
@@ -2914,15 +2814,16 @@ public sealed class MainWindowViewModelTests
         Assert.InRange(viewModel.HomeCookieProgressValue, 49.9, 50.1);
     }
 
-    [Fact]
-    public async Task HomeCookieProgressSettings_AutoSavePreferences()
+    private async Task HomeCookieProgressSettings_AutoSavePreferences()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
-        var viewModel = CreateViewModel(settingsService: settingsService);
+        var timeProvider = new FakeTimeProvider();
+        var viewModel = CreateViewModel(settingsService: settingsService, timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.SelectedHomeCookieProgressTimingModeIndex = 1;
         viewModel.HomeCookieFixedDurationMinutes = 150;
+        timeProvider.Advance(TimeSpan.FromMilliseconds(300));
 
         await WaitForAsync(() =>
             settingsService.CurrentSettings.Ui.HomeCookieProgress?.Mode ==
@@ -2943,8 +2844,7 @@ public sealed class MainWindowViewModelTests
         Assert.Contains("120", viewModel.AutoReleaseStatusText);
     }
 
-    [Fact]
-    public async Task SaveSettingsAsync_PersistsAutoReleaseSettings()
+    private async Task SaveSettingsAsync_PersistsAutoReleaseSettings()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default);
         var viewModel = CreateViewModel(settingsService: settingsService);
@@ -2958,7 +2858,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(75, settingsService.CurrentSettings.Tasks.AutoRelease.LeadSeconds);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task AutoRelease_CancelsCurrentReservation_WhenInsideLeadWindow()
     {
         var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
@@ -3000,7 +2900,7 @@ public sealed class MainWindowViewModelTests
         Assert.Contains(notifications.Successes, x => x.Title == "已自动退座");
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task AutoRelease_RefreshesCurrentReservationAfterInitialization_WhenNoVenueIsBound()
     {
         var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
@@ -3045,7 +2945,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(0, libraryService.BindLibraryCalls);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task AutoRelease_RefreshesCurrentReservationAfterManualAuthorization()
     {
         var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
@@ -3088,7 +2988,7 @@ public sealed class MainWindowViewModelTests
         });
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task AutoRelease_SuccessNotificationFailure_DoesNotRecordCancellationFailure()
     {
         var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
@@ -3145,7 +3045,7 @@ public sealed class MainWindowViewModelTests
                      entry.Message.StartsWith("自动退座失败", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task AutoRelease_DoesNotCancel_WhenOccupyIsStarting()
     {
         var session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true);
@@ -3343,13 +3243,16 @@ public sealed class MainWindowViewModelTests
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
         var notifications = new FakeNotificationService();
+        var timeProvider = new FakeTimeProvider();
         var viewModel = CreateViewModel(
             settingsService: settingsService,
-            notificationService: notifications);
+            notificationService: notifications,
+            timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.ScheduledStartTime = new TimeSpan(7, 59, 55);
         viewModel.TomorrowScheduledStartTime = new TimeSpan(22, 1, 2);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         await WaitForAsync(() =>
             settingsService.CurrentSettings.Tasks.Grab.DefaultScheduledStartTime == new TimeSpan(7, 59, 55) &&
@@ -3365,9 +3268,11 @@ public sealed class MainWindowViewModelTests
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
         var notifications = new FakeNotificationService();
+        var timeProvider = new FakeTimeProvider();
         var viewModel = CreateViewModel(
             settingsService: settingsService,
-            notificationService: notifications);
+            notificationService: notifications,
+            timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.ScheduledStartTime = new TimeSpan(7, 59, 55);
@@ -3375,7 +3280,7 @@ public sealed class MainWindowViewModelTests
 
         await viewModel.FlushPendingScheduledStartDefaultsAsync();
         var saveCallsAfterFlush = settingsService.SaveCalls;
-        await Task.Delay(650);
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
 
         Assert.Equal(new TimeSpan(7, 59, 55), settingsService.CurrentSettings.Tasks.Grab.DefaultScheduledStartTime);
         Assert.Equal(new TimeSpan(22, 1, 2), settingsService.CurrentSettings.Tasks.TomorrowReservation.DefaultScheduledStartTime);
@@ -3389,12 +3294,13 @@ public sealed class MainWindowViewModelTests
     public async Task ScheduledStartDefaults_DoNotAutoSave_WhenTimePickerValuesAreOutOfRange()
     {
         var settingsService = new FakeSettingsService(CreateDesktopDefaultSettings());
-        var viewModel = CreateViewModel(settingsService: settingsService);
+        var timeProvider = new FakeTimeProvider();
+        var viewModel = CreateViewModel(settingsService: settingsService, timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.ScheduledStartTime = TimeSpan.FromDays(1);
         viewModel.TomorrowScheduledStartTime = TimeSpan.FromSeconds(-1);
-        await Task.Delay(650);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         Assert.Equal(0, settingsService.SaveCalls);
         Assert.Equal(TimeSpan.Zero, settingsService.CurrentSettings.Tasks.Grab.DefaultScheduledStartTime);
@@ -3604,7 +3510,7 @@ public sealed class MainWindowViewModelTests
         Assert.Contains(notifications.Warnings, warning => warning.Message == "请重新选择明日预约目标座位");
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunTomorrowReservationNowAsync_RefreshesVerificationText_WhenNewTaskStarts()
     {
         var (viewModel, _) = await CreateBoundTomorrowViewModelAsync();
@@ -3630,7 +3536,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(1, coordinator.StopCalls);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task TomorrowReservationSuccessMetrics_UseStatusReason_NotMessageText()
     {
         var settingsService = new FakeSettingsService(WithDashboard(0, 0));
@@ -3654,7 +3560,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(1, settingsService.CurrentSettings.Dashboard.SuccessfulReservationCount);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task TomorrowReservationRunningStatus_UpdatesVerificationText()
     {
         var tomorrowCoordinator = new FakeTomorrowReservationCoordinator();
@@ -3681,12 +3587,15 @@ public sealed class MainWindowViewModelTests
             TraceIntProtocol = new TraceIntProtocolSettings(true)
         });
         var protocolTemplateStore = new FakeProtocolTemplateStore(TestProtocolTemplates.Create());
+        var timeProvider = new FakeTimeProvider();
         var viewModel = CreateViewModel(
             settingsService: settingsService,
-            protocolTemplateStore: protocolTemplateStore);
+            protocolTemplateStore: protocolTemplateStore,
+            timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.TomorrowReservationSaveTemplateText = "save-override";
+        timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         await WaitForAsync(() =>
             protocolTemplateStore.SaveCalls > 0 &&
@@ -3731,13 +3640,15 @@ public sealed class MainWindowViewModelTests
             TraceIntProtocol = new TraceIntProtocolSettings(true)
         });
         var protocolTemplateStore = new FakeProtocolTemplateStore(TestProtocolTemplates.Create());
+        var timeProvider = new FakeTimeProvider();
         var viewModel = CreateViewModel(
             settingsService: settingsService,
-            protocolTemplateStore: protocolTemplateStore);
+            protocolTemplateStore: protocolTemplateStore,
+            timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
         viewModel.GraphQlEndpointUrlText = "relative/graphql";
-        await Task.Delay(650);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         Assert.True(viewModel.HasProtocolValidationErrors);
         Assert.False(viewModel.SaveProtocolOverridesCommand.CanExecute(null));
@@ -3745,6 +3656,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(0, protocolTemplateStore.SaveCalls);
 
         viewModel.GraphQlEndpointUrlText = "http://127.0.0.1:18080/graphql";
+        timeProvider.Advance(TimeSpan.FromMilliseconds(450));
         await WaitForAsync(() => protocolTemplateStore.SaveCalls > 0);
 
         Assert.False(viewModel.HasProtocolValidationErrors);
@@ -3867,7 +3779,7 @@ public sealed class MainWindowViewModelTests
         await WaitForAsync(() => settingsService.CurrentSettings.Ui.LaunchOnStartup == false);
     }
 
-    private static MainWindowViewModel CreateViewModel(
+    internal static MainWindowViewModel CreateViewModel(
         FakeSessionService? sessionService = null,
         FakeLibraryService? libraryService = null,
         FakeSettingsService? settingsService = null,
@@ -3889,7 +3801,7 @@ public sealed class MainWindowViewModelTests
         FakeLanCookieRelayService? lanCookieRelayService = null,
         FakeQrCodeImageFactory? qrCodeImageFactory = null,
         FakeMobileControlService? mobileControlService = null,
-        FakeTimeProvider? timeProvider = null,
+        TimeProvider? timeProvider = null,
         FakeNetworkExposureManager? networkExposureManager = null,
         IMainWindowSizePersistenceService? windowSizePersistenceService = null,
         FakeWindowsUpdateProgressDialogService? windowsUpdateProgressDialogService = null)
@@ -3924,7 +3836,7 @@ public sealed class MainWindowViewModelTests
             externalLinkService ?? new FakeExternalLinkService(),
             new FakeAppVersionProvider(),
             appThemeService ?? new FakeAppThemeService(),
-            timeProvider ?? new FakeTimeProvider(),
+            timeProvider ?? TimeProvider.System,
             new AppWindowService(),
             startupEntryService ?? new FakeStartupEntryService(),
             lanCookieRelayService ?? new FakeLanCookieRelayService(),
@@ -3974,7 +3886,7 @@ public sealed class MainWindowViewModelTests
         return (result.ViewModel, coordinator);
     }
 
-    private static MainWindowViewModel CreateGlobalLeakViewModel(
+    internal static MainWindowViewModel CreateGlobalLeakViewModel(
         FakeSettingsService? settingsService = null,
         FakeTraceIntApiClient? apiClient = null,
         FakeGlobalLeakCoordinator? globalLeakCoordinator = null,

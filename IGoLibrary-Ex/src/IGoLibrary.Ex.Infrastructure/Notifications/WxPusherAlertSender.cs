@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -8,8 +7,10 @@ namespace IGoLibrary.Ex.Infrastructure.Notifications;
 
 internal sealed class WxPusherAlertSender(
     HttpClient httpClient,
-    ISettingsService settingsService) : IWxPusherAlertSender
+    ISettingsService settingsService,
+    TimeProvider? timeProvider = null) : IWxPusherAlertSender
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private const int SuccessCode = 1000;
     private const int ContentTypeText = 1;
     private const int VerifyPayTypeDisabled = 0;
@@ -37,8 +38,11 @@ internal sealed class WxPusherAlertSender(
         var uids = ParseUids(normalized.Uids);
         var topicIds = ParseTopicIds(normalized.TopicIds);
 
-        using var response = await ExecuteWithRequestPolicyAsync(
+        using var response = await HttpNotificationRequestPolicy.ExecuteAsync(
+            settingsService,
+            "WxPusher",
             token => SendOnceAsync(normalized, content, summary, uids, topicIds, token),
+            _timeProvider,
             cancellationToken);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         ThrowIfWxPusherResponseFailed(response, raw);
@@ -177,80 +181,6 @@ internal sealed class WxPusherAlertSender(
 
             throw new InvalidOperationException("WxPusher API 返回不是有效 JSON", ex);
         }
-    }
-
-    private async Task<HttpResponseMessage> ExecuteWithRequestPolicyAsync(
-        Func<CancellationToken, Task<HttpResponseMessage>> operation,
-        CancellationToken cancellationToken)
-    {
-        var settings = await LoadNetworkSettingsAsync(cancellationToken);
-        Exception? lastException = null;
-
-        for (var attempt = 0; attempt <= settings.MaxRetries; attempt++)
-        {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(settings.Timeout);
-
-            try
-            {
-                var response = await operation(timeoutCts.Token);
-                if (!IsTransient(response.StatusCode))
-                {
-                    return response;
-                }
-
-                lastException = new HttpRequestException(
-                    $"WxPusher 请求失败，HTTP {(int)response.StatusCode} {response.StatusCode}",
-                    null,
-                    response.StatusCode);
-                response.Dispose();
-            }
-            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
-            {
-                lastException = new TimeoutException($"WxPusher 请求超时（>{settings.Timeout.TotalSeconds:0} 秒）", ex);
-            }
-            catch (HttpRequestException ex) when (IsTransient(ex.StatusCode))
-            {
-                lastException = ex;
-            }
-
-            if (attempt >= settings.MaxRetries)
-            {
-                break;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(250 * (attempt + 1)), cancellationToken);
-        }
-
-        throw lastException ?? new InvalidOperationException("WxPusher 请求失败");
-    }
-
-    private async Task<(TimeSpan Timeout, int MaxRetries)> LoadNetworkSettingsAsync(CancellationToken cancellationToken)
-    {
-        NetworkRequestSettings settings;
-        try
-        {
-            settings = (await settingsService.LoadAsync(cancellationToken)).Network;
-        }
-        catch
-        {
-            settings = NetworkRequestSettings.Default;
-        }
-
-        var timeoutSeconds = Math.Clamp(settings.TimeoutSeconds, 1, 60);
-        var maxRetries = Math.Clamp(settings.MaxRetries, 0, 10);
-        return (TimeSpan.FromSeconds(timeoutSeconds), maxRetries);
-    }
-
-    private static bool IsTransient(HttpStatusCode? statusCode)
-    {
-        return statusCode is null
-            or HttpStatusCode.RequestTimeout
-            or HttpStatusCode.TooManyRequests
-            or HttpStatusCode.BadGateway
-            or HttpStatusCode.ServiceUnavailable
-            or HttpStatusCode.GatewayTimeout
-            || (int?)statusCode >= 500;
     }
 
     private static string NormalizeContent(string? body)

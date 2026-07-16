@@ -12,8 +12,10 @@ namespace IGoLibrary.Ex.Desktop.ViewModels;
 public sealed partial class ProtocolTemplatesViewModel(
     IProtocolTemplateEditorService protocolTemplateEditorService,
     IActivityLogService activityLogService,
-    INotificationService notificationService) : ViewModelBase, INotifyDataErrorInfo
+    INotificationService notificationService,
+    TimeProvider? timeProvider = null) : ViewModelBase, INotifyDataErrorInfo
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private readonly Dictionary<string, string[]> _validationErrors = new(StringComparer.Ordinal);
     private TraceIntProtocolValidationResult _validationResult = new([], []);
     private TraceIntProtocolTemplates? _defaultTemplates;
@@ -24,7 +26,8 @@ public sealed partial class ProtocolTemplatesViewModel(
 
     private DeferredAutoSaveController AutoSave => _autoSave ??= new DeferredAutoSaveController(
         TimeSpan.FromMilliseconds(450),
-        cancellationToken => protocolTemplateEditorService.SaveOverridesAsync(BuildOverridesSnapshot(), cancellationToken));
+        cancellationToken => protocolTemplateEditorService.SaveOverridesAsync(BuildOverridesSnapshot(), cancellationToken),
+        _timeProvider);
 
     public event EventHandler<DataErrorsChangedEventArgs>? ErrorsChanged;
 

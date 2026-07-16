@@ -10,82 +10,58 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class MainWindowClipboardTests
 {
     [Fact]
-    public void CanTryAutoParseClipboard_ReturnsFalse_WhenActivePageIsNotAccountAndVenue()
+    public void CanTryAutoParseClipboard_RespectsPageAndAuthorizationState()
     {
         var viewModel = CreateViewModel();
         viewModel.IsInitializationComplete = true;
         viewModel.SelectedTabIndex = 0;
 
-        var canParse = MainWindow.CanTryAutoParseClipboard(
+        Assert.False(MainWindow.CanTryAutoParseClipboard(
             viewModel,
             isWindowActive: true,
             clipboardAvailable: true,
-            isAutoParsingClipboard: false);
+            isAutoParsingClipboard: false));
 
-        Assert.False(canParse);
-    }
-
-    [Fact]
-    public void CanTryAutoParseClipboard_ReturnsTrue_WhenAccountAndVenuePageIsActive()
-    {
-        var viewModel = CreateViewModel();
-        viewModel.IsInitializationComplete = true;
         viewModel.SelectedTabIndex = MainWindowViewModel.AccountAndVenueTabIndex;
-
-        var canParse = MainWindow.CanTryAutoParseClipboard(
+        Assert.True(MainWindow.CanTryAutoParseClipboard(
             viewModel,
             isWindowActive: true,
             clipboardAvailable: true,
-            isAutoParsingClipboard: false);
+            isAutoParsingClipboard: false));
 
-        Assert.True(canParse);
-    }
-
-    [Fact]
-    public void CanTryAutoParseClipboard_ReturnsFalse_WhenUserIsAlreadyAuthorized()
-    {
-        var viewModel = CreateViewModel();
-        viewModel.IsInitializationComplete = true;
         viewModel.IsAuthorized = true;
-        viewModel.SelectedTabIndex = MainWindowViewModel.AccountAndVenueTabIndex;
-
-        var canParse = MainWindow.CanTryAutoParseClipboard(
+        Assert.False(MainWindow.CanTryAutoParseClipboard(
             viewModel,
             isWindowActive: true,
             clipboardAvailable: true,
-            isAutoParsingClipboard: false);
-
-        Assert.False(canParse);
+            isAutoParsingClipboard: false));
     }
 
     [Fact]
-    public void ShouldSkipClipboardText_ReturnsTrue_WhenClipboardMatchesPreviousAttempt()
+    public void ShouldSkipClipboardText_UsesNormalizedAuthorizationCodeIdentity()
     {
-        var shouldSkip = MainWindow.ShouldSkipClipboardText(
-            "https://example.com/?code=1234567890abcdef1234567890abcdef",
-            "https://example.com/?code=1234567890abcdef1234567890abcdef");
+        var scenarios = new[]
+        {
+            (
+                Current: "https://example.com/?code=1234567890abcdef1234567890abcdef",
+                Previous: "https://example.com/?code=1234567890abcdef1234567890abcdef",
+                Expected: true),
+            (
+                Current: "https://example.com/?code=1234567890abcdef1234567890abcdef",
+                Previous: "https://example.com/?code=abcdef1234567890abcdef1234567890",
+                Expected: false),
+            (
+                Current: "https://example.com/callback?code=1234567890abcdef1234567890abcdef&state=1",
+                Previous: "https://another.example.com/auth?foo=1&code=1234567890abcdef1234567890abcdef",
+                Expected: true)
+        };
 
-        Assert.True(shouldSkip);
-    }
-
-    [Fact]
-    public void ShouldSkipClipboardText_ReturnsFalse_WhenClipboardChanged()
-    {
-        var shouldSkip = MainWindow.ShouldSkipClipboardText(
-            "https://example.com/?code=1234567890abcdef1234567890abcdef",
-            "https://example.com/?code=abcdef1234567890abcdef1234567890");
-
-        Assert.False(shouldSkip);
-    }
-
-    [Fact]
-    public void ShouldSkipClipboardText_ReturnsTrue_WhenCodeMatchesButLinkTextDiffers()
-    {
-        var shouldSkip = MainWindow.ShouldSkipClipboardText(
-            "https://example.com/callback?code=1234567890abcdef1234567890abcdef&state=1",
-            "https://another.example.com/auth?foo=1&code=1234567890abcdef1234567890abcdef");
-
-        Assert.True(shouldSkip);
+        foreach (var scenario in scenarios)
+        {
+            Assert.Equal(
+                scenario.Expected,
+                MainWindow.ShouldSkipClipboardText(scenario.Current, scenario.Previous));
+        }
     }
 
     [Fact]

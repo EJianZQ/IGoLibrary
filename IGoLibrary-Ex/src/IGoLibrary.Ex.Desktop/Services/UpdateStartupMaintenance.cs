@@ -16,21 +16,28 @@ internal static class UpdateStartupMaintenance
         return RunCore(
             WindowsUpdateWorkspaceManager.GetUpdatesRoot(),
             currentTransactionId,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            UpdateRecoveryRegistration.Unregister);
     }
 
     internal static UpdateStartupMaintenanceResult RunForTests(
         string updatesRoot,
         string? currentTransactionId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Action<string>? unregisterRecovery = null)
     {
-        return RunCore(Path.GetFullPath(updatesRoot), currentTransactionId, now);
+        return RunCore(
+            Path.GetFullPath(updatesRoot),
+            currentTransactionId,
+            now,
+            unregisterRecovery ?? (static _ => { }));
     }
 
     private static UpdateStartupMaintenanceResult RunCore(
         string updatesRoot,
         string? currentTransactionId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Action<string> unregisterRecovery)
     {
         var result = new ResultBuilder();
         try
@@ -51,7 +58,13 @@ internal static class UpdateStartupMaintenance
                     continue;
                 }
 
-                TryCleanTransaction(updatesRoot, directory, transactionId, now, result);
+                TryCleanTransaction(
+                    updatesRoot,
+                    directory,
+                    transactionId,
+                    now,
+                    unregisterRecovery,
+                    result);
             }
         }
         catch (Exception exception)
@@ -67,6 +80,7 @@ internal static class UpdateStartupMaintenance
         string directory,
         string transactionId,
         DateTimeOffset now,
+        Action<string> unregisterRecovery,
         ResultBuilder result)
     {
         try
@@ -97,6 +111,7 @@ internal static class UpdateStartupMaintenance
                 transactionId,
                 requestPath,
                 now,
+                unregisterRecovery,
                 result);
         }
         catch (Exception exception)
@@ -180,8 +195,21 @@ internal static class UpdateStartupMaintenance
         string transactionId,
         string requestPath,
         DateTimeOffset now,
+        Action<string> unregisterRecovery,
         ResultBuilder result)
     {
+        var recoveryUnregistered = false;
+        void UnregisterRecoveryOnce(string id)
+        {
+            if (recoveryUnregistered)
+            {
+                return;
+            }
+
+            unregisterRecovery(id);
+            recoveryUnregistered = true;
+        }
+
         var request = UpdateJsonFile.Read(requestPath, UpdateJsonTypeInfo.TransactionRequest);
         UpdateTransaction.ValidateRequestFile(requestPath, request);
         if (!string.Equals(request.TransactionId, transactionId, StringComparison.Ordinal) ||
@@ -199,7 +227,7 @@ internal static class UpdateStartupMaintenance
             !Directory.Exists(secureWorkingDirectory) &&
             IsStaleHeartbeat(request, now))
         {
-            UpdateRecoveryRegistration.Unregister(transactionId);
+            UnregisterRecoveryOnce(transactionId);
         }
 
         var statusPath = request.WorkerStatusPath;
@@ -235,6 +263,7 @@ internal static class UpdateStartupMaintenance
                 preparationWorkspace,
                 secureWorkingDirectory,
                 now,
+                UnregisterRecoveryOnce,
                 result))
         {
             return;
@@ -254,7 +283,7 @@ internal static class UpdateStartupMaintenance
                     return;
                 }
 
-                UpdateRecoveryRegistration.Unregister(transactionId);
+                UnregisterRecoveryOnce(transactionId);
                 DeleteTransactionDirectory(directory);
                 result.DeletedUpdaterTransactionCount++;
             }
@@ -279,7 +308,7 @@ internal static class UpdateStartupMaintenance
                     return;
                 }
 
-                UpdateRecoveryRegistration.Unregister(transactionId);
+                UnregisterRecoveryOnce(transactionId);
                 DeleteTransactionDirectory(directory);
                 result.DeletedUpdaterTransactionCount++;
             }
@@ -302,7 +331,7 @@ internal static class UpdateStartupMaintenance
             UpdateTransaction.CleanupRollbackArtifacts(request);
         }
 
-        UpdateRecoveryRegistration.Unregister(transactionId);
+        UnregisterRecoveryOnce(transactionId);
         DeleteTransactionDirectory(directory);
         result.DeletedUpdaterTransactionCount++;
     }
@@ -317,6 +346,7 @@ internal static class UpdateStartupMaintenance
         string preparationWorkspace,
         string secureWorkingDirectory,
         DateTimeOffset now,
+        Action<string> unregisterRecovery,
         ResultBuilder result)
     {
         var signalAllowsRestore =
@@ -358,7 +388,7 @@ internal static class UpdateStartupMaintenance
                 updatesRoot,
                 directory,
                 transactionId);
-            UpdateRecoveryRegistration.Unregister(transactionId);
+            unregisterRecovery(transactionId);
             result.RestoredVerifiedCacheCount++;
             return true;
         }

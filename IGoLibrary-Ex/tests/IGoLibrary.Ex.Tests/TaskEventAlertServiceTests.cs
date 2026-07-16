@@ -8,6 +8,78 @@ namespace IGoLibrary.Ex.Tests;
 
 public sealed class TaskEventAlertServiceTests
 {
+    public static TheoryData<
+        TaskAlertTestEvent,
+        string,
+        string,
+        string[],
+        string[],
+        ExpectedFallbackKind,
+        string?,
+        string?> AlertDispatchScenarios => new()
+    {
+        {
+            TaskAlertTestEvent.SessionInvalid,
+            "IGoLibrary-Ex Cookie 失效提醒",
+            "Cookie 已失效",
+            ["IGoLibrary-Ex 检测到 Cookie 已失效", "触发模块：抢座轮询", "详细信息：Cookie 无效", "请尽快重新授权，以恢复抢座/占座轮询"],
+            ["IGoLibrary-Ex Cookie 已失效", "触发模块：抢座轮询", "详细信息：Cookie 无效", "请尽快重新授权，以恢复抢座/占座轮询"],
+            ExpectedFallbackKind.None,
+            null,
+            null
+        },
+        {
+            TaskAlertTestEvent.GrabSucceeded,
+            "IGoLibrary-Ex 抢座成功提醒",
+            "抢座成功",
+            ["IGoLibrary-Ex 已成功预约到目标座位", "目标场馆：自科阅览区一", "目标座位：2号座", "你可以返回应用查看最新预约状态"],
+            ["IGoLibrary-Ex 抢座成功", "目标场馆：自科阅览区一", "目标座位：2号座", "你可以返回应用查看最新预约状态"],
+            ExpectedFallbackKind.Success,
+            "抢座成功",
+            "自科阅览区一 · 2号座 已成功预约"
+        },
+        {
+            TaskAlertTestEvent.OccupyReReserveSucceeded,
+            "IGoLibrary-Ex 占座成功提醒",
+            "占座成功",
+            ["IGoLibrary-Ex 已完成占座重新预约", "目标座位：2号座", "你可以返回应用查看最新预约状态"],
+            ["IGoLibrary-Ex 占座成功", "目标座位：2号座", "你可以返回应用查看最新预约状态"],
+            ExpectedFallbackKind.Success,
+            "占座成功",
+            "2号座 已重新预约"
+        },
+        {
+            TaskAlertTestEvent.TomorrowReservationSucceeded,
+            "IGoLibrary-Ex 明日预约成功提醒",
+            "明日预约成功",
+            ["IGoLibrary-Ex 已成功完成明日预约", "预约日期：明日", "目标场馆：自科阅览区一", "目标座位：2号座", "你可以返回应用查看明日预约任务状态"],
+            ["IGoLibrary-Ex 明日预约成功", "预约日期：明日", "目标场馆：自科阅览区一", "目标座位：2号座", "你可以返回应用查看明日预约任务状态"],
+            ExpectedFallbackKind.Success,
+            "明日预约成功",
+            "明日 · 自科阅览区一 · 2号座 已成功预约"
+        },
+        {
+            TaskAlertTestEvent.GlobalLeakSucceeded,
+            "IGoLibrary-Ex 全域捡漏成功提醒",
+            "全域捡漏成功",
+            ["IGoLibrary-Ex 已通过全域捡漏预约到空座", "目标场馆：自科阅览区一", "目标座位：2号座", "你可以返回应用查看最新预约状态"],
+            ["IGoLibrary-Ex 全域捡漏成功", "目标场馆：自科阅览区一", "目标座位：2号座", "你可以返回应用查看最新预约状态"],
+            ExpectedFallbackKind.Success,
+            "全域捡漏成功",
+            "自科阅览区一 · 2号座 已成功预约"
+        },
+        {
+            TaskAlertTestEvent.TaskFailed,
+            "IGoLibrary-Ex 抢座任务失败提醒",
+            "抢座失败",
+            ["IGoLibrary-Ex 检测到 抢座任务执行失败", "任务模块：抢座", "详细信息：预约请求超时", "请返回应用检查任务状态、授权信息与场馆配置"],
+            ["IGoLibrary-Ex 抢座任务失败", "任务模块：抢座", "详细信息：预约请求超时", "请返回应用检查任务状态、授权信息与场馆配置"],
+            ExpectedFallbackKind.Warning,
+            "抢座失败",
+            "抢座任务执行失败 详细信息：预约请求超时"
+        }
+    };
+
     [Fact]
     public async Task SendTestEmailAsync_ThrowsWhenOnlyUsernameIsProvided()
     {
@@ -35,31 +107,89 @@ public sealed class TaskEventAlertServiceTests
         Assert.Equal("SMTP 用户名和邮箱授权码/密码需要同时填写，或同时留空", exception.Message);
     }
 
-    [Fact]
-    public async Task NotifySessionInvalidAsync_SendsEmailUsingPersistedSettings()
+    [Theory]
+    [MemberData(nameof(AlertDispatchScenarios))]
+    public async Task NotifyAsync_DispatchesEveryEventToAllEnabledChannels(
+        TaskAlertTestEvent eventKind,
+        string expectedEmailSubject,
+        string expectedRemoteTitle,
+        string[] expectedEmailFragments,
+        string[] expectedRemoteFragments,
+        ExpectedFallbackKind expectedFallbackKind,
+        string? expectedFallbackTitle,
+        string? expectedFallbackMessage)
     {
         var emailSender = new FakeEmailAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                new EmailAlertChannelSettings(
-                    Enabled: true,
-                    SmtpHost: "smtp.example.com",
-                    Port: 587,
-                    SecurityMode: EmailSecurityMode.Tls,
-                    Username: "tester",
-                    Password: "secret",
-                    FromAddress: "sender@example.com",
-                    ToAddress: "receiver@example.com"),
-                new LocalDesktopAlertSettings(false, false))));
+        var telegramSender = new FakeTelegramAlertSender();
+        var barkSender = new FakeBarkAlertSender();
+        var wxPusherSender = new FakeWxPusherAlertSender();
+        var serverChanSender = new FakeServerChanAlertSender();
+        var notificationService = new FakeNotificationService();
+        var alertSettings = CreateAllChannelsEnabledSettings(TaskEventAlertEventSettings.Default);
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(alertSettings));
+        var service = CreateService(
+            settingsService,
+            emailSender,
+            notificationService: notificationService,
+            telegramSender: telegramSender,
+            barkSender: barkSender,
+            wxPusherSender: wxPusherSender,
+            serverChanSender: serverChanSender);
 
-        var service = CreateService(settingsService, emailSender);
+        await NotifyEventAsync(service, eventKind);
 
-        await service.NotifySessionInvalidAsync("抢座轮询", "Cookie 无效");
+        var emailRequest = Assert.Single(emailSender.Requests);
+        Assert.Equal(expectedEmailSubject, emailRequest.Subject);
+        Assert.Equal(alertSettings.Email, emailRequest.Settings);
+        AssertPayloadContainsAll(emailRequest.Body, expectedEmailFragments);
 
-        var request = Assert.Single(emailSender.Requests);
-        Assert.Equal("IGoLibrary-Ex Cookie 失效提醒", request.Subject);
-        Assert.Contains("触发模块：抢座轮询", request.Body);
-        Assert.Contains("详细信息：Cookie 无效", request.Body);
+        var telegramRequest = Assert.Single(telegramSender.Requests);
+        Assert.Equal(alertSettings.Telegram, telegramRequest.Settings);
+        AssertPayloadContainsAll(telegramRequest.Message, expectedRemoteFragments);
+
+        var barkRequest = Assert.Single(barkSender.Requests);
+        Assert.Equal(expectedRemoteTitle, barkRequest.Title);
+        Assert.Equal(alertSettings.Bark, barkRequest.Settings);
+        AssertPayloadContainsAll(barkRequest.Body, expectedRemoteFragments);
+
+        var wxPusherRequest = Assert.Single(wxPusherSender.Requests);
+        Assert.Equal(expectedRemoteTitle, wxPusherRequest.Title);
+        Assert.Equal(alertSettings.WxPusher, wxPusherRequest.Settings);
+        AssertPayloadContainsAll(wxPusherRequest.Body, expectedRemoteFragments);
+
+        var serverChanRequest = Assert.Single(serverChanSender.Requests);
+        Assert.Equal(expectedRemoteTitle, serverChanRequest.Title);
+        Assert.Equal(alertSettings.ServerChan, serverChanRequest.Settings);
+        AssertPayloadContainsAll(serverChanRequest.Body, expectedRemoteFragments);
+
+        var fallbackCount = notificationService.Successes.Count
+                            + notificationService.Warnings.Count
+                            + notificationService.Infos.Count;
+        if (expectedFallbackKind == ExpectedFallbackKind.None)
+        {
+            Assert.Equal(0, fallbackCount);
+        }
+        else
+        {
+            Assert.Equal(1, fallbackCount);
+            var fallback = expectedFallbackKind switch
+            {
+                ExpectedFallbackKind.Success => Assert.Single(notificationService.Successes),
+                ExpectedFallbackKind.Warning => Assert.Single(notificationService.Warnings),
+                ExpectedFallbackKind.Info => Assert.Single(notificationService.Infos),
+                _ => throw new InvalidOperationException("未知应用内提醒类型。")
+            };
+            Assert.Equal(expectedFallbackTitle, fallback.Title);
+            Assert.Equal(expectedFallbackMessage, fallback.Message);
+        }
+    }
+
+    private static void AssertPayloadContainsAll(string payload, IEnumerable<string> expectedFragments)
+    {
+        foreach (var fragment in expectedFragments)
+        {
+            Assert.Contains(fragment, payload, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -95,60 +225,6 @@ public sealed class TaskEventAlertServiceTests
     }
 
     [Fact]
-    public async Task NotifyGrabSucceededAsync_SendsEmailUsingPersistedSettings()
-    {
-        var emailSender = new FakeEmailAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                new EmailAlertChannelSettings(
-                    Enabled: true,
-                    SmtpHost: "smtp.example.com",
-                    Port: 587,
-                    SecurityMode: EmailSecurityMode.Tls,
-                    Username: "tester",
-                    Password: "secret",
-                    FromAddress: "sender@example.com",
-                    ToAddress: "receiver@example.com"),
-                new LocalDesktopAlertSettings(false, false))));
-
-        var service = CreateService(settingsService, emailSender);
-
-        await service.NotifyGrabSucceededAsync("自科阅览区一", "2号座");
-
-        var request = Assert.Single(emailSender.Requests);
-        Assert.Equal("IGoLibrary-Ex 抢座成功提醒", request.Subject);
-        Assert.Contains("目标场馆：自科阅览区一", request.Body);
-        Assert.Contains("目标座位：2号座", request.Body);
-    }
-
-    [Fact]
-    public async Task NotifyTaskFailedAsync_SendsEmailUsingPersistedSettings()
-    {
-        var emailSender = new FakeEmailAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                new EmailAlertChannelSettings(
-                    Enabled: true,
-                    SmtpHost: "smtp.example.com",
-                    Port: 587,
-                    SecurityMode: EmailSecurityMode.Tls,
-                    Username: "tester",
-                    Password: "secret",
-                    FromAddress: "sender@example.com",
-                    ToAddress: "receiver@example.com"),
-                new LocalDesktopAlertSettings(false, false))));
-
-        var service = CreateService(settingsService, emailSender);
-
-        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
-
-        var request = Assert.Single(emailSender.Requests);
-        Assert.Equal("IGoLibrary-Ex 抢座任务失败提醒", request.Subject);
-        Assert.Contains("任务模块：抢座", request.Body);
-        Assert.Contains("详细信息：预约请求超时", request.Body);
-    }
-
-    [Fact]
     public async Task NotifyTaskFailedAsync_FallsBackToInAppToast_WhenLocalAlertIsDisabled()
     {
         var notificationService = new FakeNotificationService();
@@ -166,14 +242,24 @@ public sealed class TaskEventAlertServiceTests
         Assert.Contains("预约请求超时", warning.Message);
     }
 
-    [Theory]
-    [InlineData(TaskAlertTestEvent.SessionInvalid)]
-    [InlineData(TaskAlertTestEvent.GrabSucceeded)]
-    [InlineData(TaskAlertTestEvent.OccupyReReserveSucceeded)]
-    [InlineData(TaskAlertTestEvent.TomorrowReservationSucceeded)]
-    [InlineData(TaskAlertTestEvent.GlobalLeakSucceeded)]
-    [InlineData(TaskAlertTestEvent.TaskFailed)]
-    public async Task NotifyAsync_DoesNotSendAnyChannel_WhenEventIsDisabled(TaskAlertTestEvent eventKind)
+    [Fact]
+    public async Task NotifyAsync_DisabledEventsDoNotSendAnyChannel()
+    {
+        foreach (var eventKind in new[]
+                 {
+                     TaskAlertTestEvent.SessionInvalid,
+                     TaskAlertTestEvent.GrabSucceeded,
+                     TaskAlertTestEvent.OccupyReReserveSucceeded,
+                     TaskAlertTestEvent.TomorrowReservationSucceeded,
+                     TaskAlertTestEvent.GlobalLeakSucceeded,
+                     TaskAlertTestEvent.TaskFailed
+                 })
+        {
+            await NotifyAsync_DoesNotSendAnyChannel_WhenEventIsDisabled(eventKind);
+        }
+    }
+
+    private async Task NotifyAsync_DoesNotSendAnyChannel_WhenEventIsDisabled(TaskAlertTestEvent eventKind)
     {
         var emailSender = new FakeEmailAlertSender();
         var telegramSender = new FakeTelegramAlertSender();
@@ -243,260 +329,19 @@ public sealed class TaskEventAlertServiceTests
         Assert.Equal(2, notificationService.Successes.Count);
     }
 
+
+
+
     [Fact]
-    public async Task NotifySessionInvalidAsync_SendsTelegramUsingPersistedSettings()
+    public async Task NotifyTaskFailedAsync_IsolatesAndLogsEveryRemoteChannelFailure()
     {
-        var telegramSender = new FakeTelegramAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalDesktopAlertSettings(false, false),
-                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
-
-        var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
-
-        await service.NotifySessionInvalidAsync("抢座轮询", "Cookie 无效");
-
-        var request = Assert.Single(telegramSender.Requests);
-        Assert.Equal("chat-1", request.Settings.ChatId);
-        Assert.Contains("IGoLibrary-Ex Cookie 已失效", request.Message);
-        Assert.Contains("触发模块：抢座轮询", request.Message);
-        Assert.Contains("详细信息：Cookie 无效", request.Message);
+        await NotifyTaskFailedAsync_LogsWarningWhenTelegramSendFails_AndContinuesEmail();
+        await NotifyTaskFailedAsync_LogsWarningWhenBarkSendFails_AndContinuesEmail();
+        await NotifyTaskFailedAsync_LogsWarningWhenWxPusherSendFails_AndContinuesEmail();
+        await NotifyTaskFailedAsync_LogsWarningWhenServerChanSendFails_AndContinuesEmail();
     }
 
-    [Fact]
-    public async Task NotifySessionInvalidAsync_SendsBarkUsingPersistedSettings()
-    {
-        var barkSender = new FakeBarkAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalDesktopAlertSettings(false, false),
-                TelegramAlertChannelSettings.Default,
-                TaskEventAlertEventSettings.Default,
-                new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "timeSensitive"))));
-
-        var service = CreateService(settingsService: settingsService, barkSender: barkSender);
-
-        await service.NotifySessionInvalidAsync("抢座轮询", "Cookie 无效");
-
-        var request = Assert.Single(barkSender.Requests);
-        Assert.Equal("bark-key", request.Settings.DeviceKey);
-        Assert.Equal("Cookie 已失效", request.Title);
-        Assert.Contains("IGoLibrary-Ex Cookie 已失效", request.Body);
-        Assert.Contains("触发模块：抢座轮询", request.Body);
-        Assert.Contains("详细信息：Cookie 无效", request.Body);
-    }
-
-    [Fact]
-    public async Task NotifySessionInvalidAsync_SendsWxPusherUsingPersistedSettings()
-    {
-        var wxPusherSender = new FakeWxPusherAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalDesktopAlertSettings(false, false),
-                TelegramAlertChannelSettings.Default,
-                TaskEventAlertEventSettings.Default,
-                BarkAlertChannelSettings.Default,
-                new WxPusherAlertChannelSettings(true, "https://wxpusher.zjiecode.com", "AT_xxx", "UID_xxx", ""))));
-
-        var service = CreateService(settingsService: settingsService, wxPusherSender: wxPusherSender);
-
-        await service.NotifySessionInvalidAsync("抢座轮询", "Cookie 无效");
-
-        var request = Assert.Single(wxPusherSender.Requests);
-        Assert.Equal("AT_xxx", request.Settings.AppToken);
-        Assert.Equal("Cookie 已失效", request.Title);
-        Assert.Contains("IGoLibrary-Ex Cookie 已失效", request.Body);
-        Assert.Contains("触发模块：抢座轮询", request.Body);
-        Assert.Contains("详细信息：Cookie 无效", request.Body);
-    }
-
-    [Fact]
-    public async Task NotifySessionInvalidAsync_SendsServerChanUsingPersistedSettings()
-    {
-        var serverChanSender = new FakeServerChanAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalDesktopAlertSettings(false, false),
-                TelegramAlertChannelSettings.Default,
-                TaskEventAlertEventSettings.Default,
-                BarkAlertChannelSettings.Default,
-                WxPusherAlertChannelSettings.Default,
-                new ServerChanAlertChannelSettings(true, "SCT_xxx", true, "9|66", "user-1"))));
-
-        var service = CreateService(settingsService: settingsService, serverChanSender: serverChanSender);
-
-        await service.NotifySessionInvalidAsync("抢座轮询", "Cookie 无效");
-
-        var request = Assert.Single(serverChanSender.Requests);
-        Assert.Equal("SCT_xxx", request.Settings.SendKey);
-        Assert.True(request.Settings.NoIp);
-        Assert.Equal("9|66", request.Settings.Channel);
-        Assert.Equal("user-1", request.Settings.OpenId);
-        Assert.Equal("Cookie 已失效", request.Title);
-        Assert.Contains("IGoLibrary-Ex Cookie 已失效", request.Body);
-        Assert.Contains("触发模块：抢座轮询", request.Body);
-        Assert.Contains("详细信息：Cookie 无效", request.Body);
-    }
-
-    [Fact]
-    public async Task NotifyGrabSucceededAsync_SendsTelegramUsingPersistedSettings()
-    {
-        var telegramSender = new FakeTelegramAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalDesktopAlertSettings(false, false),
-                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
-
-        var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
-
-        await service.NotifyGrabSucceededAsync("自科阅览区一", "2号座");
-
-        var request = Assert.Single(telegramSender.Requests);
-        Assert.Contains("IGoLibrary-Ex 抢座成功", request.Message);
-        Assert.Contains("目标场馆：自科阅览区一", request.Message);
-        Assert.Contains("目标座位：2号座", request.Message);
-    }
-
-    [Fact]
-    public async Task NotifyGrabSucceededAsync_SendsBarkUsingPersistedSettings()
-    {
-        var barkSender = new FakeBarkAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalDesktopAlertSettings(false, false),
-                TelegramAlertChannelSettings.Default,
-                TaskEventAlertEventSettings.Default,
-                new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "active"))));
-
-        var service = CreateService(settingsService: settingsService, barkSender: barkSender);
-
-        await service.NotifyGrabSucceededAsync("自科阅览区一", "2号座");
-
-        var request = Assert.Single(barkSender.Requests);
-        Assert.Equal("抢座成功", request.Title);
-        Assert.Contains("IGoLibrary-Ex 抢座成功", request.Body);
-        Assert.Contains("目标场馆：自科阅览区一", request.Body);
-        Assert.Contains("目标座位：2号座", request.Body);
-    }
-
-    [Fact]
-    public async Task NotifyGrabSucceededAsync_SendsServerChanUsingPersistedSettings()
-    {
-        var serverChanSender = new FakeServerChanAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalDesktopAlertSettings(false, false),
-                TelegramAlertChannelSettings.Default,
-                TaskEventAlertEventSettings.Default,
-                BarkAlertChannelSettings.Default,
-                WxPusherAlertChannelSettings.Default,
-                new ServerChanAlertChannelSettings(true, "SCT_xxx", false, "", ""))));
-
-        var service = CreateService(settingsService: settingsService, serverChanSender: serverChanSender);
-
-        await service.NotifyGrabSucceededAsync("自科阅览区一", "2号座");
-
-        var request = Assert.Single(serverChanSender.Requests);
-        Assert.Equal("抢座成功", request.Title);
-        Assert.Contains("IGoLibrary-Ex 抢座成功", request.Body);
-        Assert.Contains("目标场馆：自科阅览区一", request.Body);
-        Assert.Contains("目标座位：2号座", request.Body);
-    }
-
-    [Fact]
-    public async Task NotifyGlobalLeakSucceededAsync_SendsEmailTelegramAndInAppFallback()
-    {
-        var emailSender = new FakeEmailAlertSender();
-        var telegramSender = new FakeTelegramAlertSender();
-        var notificationService = new FakeNotificationService();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                new EmailAlertChannelSettings(
-                    Enabled: true,
-                    SmtpHost: "smtp.example.com",
-                    Port: 587,
-                    SecurityMode: EmailSecurityMode.Tls,
-                    Username: "tester",
-                    Password: "secret",
-                    FromAddress: "sender@example.com",
-                    ToAddress: "receiver@example.com"),
-                new LocalDesktopAlertSettings(false, false),
-                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
-        var service = CreateService(
-            settingsService,
-            emailSender,
-            notificationService: notificationService,
-            telegramSender: telegramSender);
-
-        await service.NotifyGlobalLeakSucceededAsync("自科阅览区一", "2号座");
-
-        var emailRequest = Assert.Single(emailSender.Requests);
-        Assert.Equal("IGoLibrary-Ex 全域捡漏成功提醒", emailRequest.Subject);
-        Assert.Contains("目标场馆：自科阅览区一", emailRequest.Body);
-        Assert.Contains("目标座位：2号座", emailRequest.Body);
-
-        var telegramRequest = Assert.Single(telegramSender.Requests);
-        Assert.Contains("IGoLibrary-Ex 全域捡漏成功", telegramRequest.Message);
-        Assert.Contains("目标场馆：自科阅览区一", telegramRequest.Message);
-        Assert.Contains("目标座位：2号座", telegramRequest.Message);
-
-        var success = Assert.Single(notificationService.Successes);
-        Assert.Equal("全域捡漏成功", success.Title);
-        Assert.Contains("自科阅览区一 · 2号座", success.Message);
-    }
-
-    [Fact]
-    public async Task NotifyTaskFailedAsync_SendsTelegramUsingPersistedSettings()
-    {
-        var telegramSender = new FakeTelegramAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalDesktopAlertSettings(false, false),
-                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
-
-        var service = CreateService(settingsService: settingsService, telegramSender: telegramSender);
-
-        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
-
-        var request = Assert.Single(telegramSender.Requests);
-        Assert.Contains("IGoLibrary-Ex 抢座任务失败", request.Message);
-        Assert.Contains("任务模块：抢座", request.Message);
-        Assert.Contains("详细信息：预约请求超时", request.Message);
-    }
-
-    [Fact]
-    public async Task NotifyTaskFailedAsync_SendsBarkUsingPersistedSettings()
-    {
-        var barkSender = new FakeBarkAlertSender();
-        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
-            new TaskEventAlertSettings(
-                EmailAlertChannelSettings.Default with { Enabled = false },
-                new LocalDesktopAlertSettings(false, false),
-                TelegramAlertChannelSettings.Default,
-                TaskEventAlertEventSettings.Default,
-                new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "critical"))));
-
-        var service = CreateService(settingsService: settingsService, barkSender: barkSender);
-
-        await service.NotifyTaskFailedAsync("抢座", "预约请求超时");
-
-        var request = Assert.Single(barkSender.Requests);
-        Assert.Equal("抢座失败", request.Title);
-        Assert.Contains("IGoLibrary-Ex 抢座任务失败", request.Body);
-        Assert.Contains("任务模块：抢座", request.Body);
-        Assert.Contains("详细信息：预约请求超时", request.Body);
-    }
-
-    [Fact]
-    public async Task NotifyTaskFailedAsync_LogsWarningWhenTelegramSendFails_AndContinuesEmail()
+    private async Task NotifyTaskFailedAsync_LogsWarningWhenTelegramSendFails_AndContinuesEmail()
     {
         var emailSender = new FakeEmailAlertSender();
         var telegramSender = new FakeTelegramAlertSender
@@ -530,8 +375,7 @@ public sealed class TaskEventAlertServiceTests
                      && entry.Message.Contains("发送抢座任务失败提醒Telegram提醒失败：telegram boom", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public async Task NotifyTaskFailedAsync_LogsWarningWhenBarkSendFails_AndContinuesEmail()
+    private async Task NotifyTaskFailedAsync_LogsWarningWhenBarkSendFails_AndContinuesEmail()
     {
         var emailSender = new FakeEmailAlertSender();
         var barkSender = new FakeBarkAlertSender
@@ -567,8 +411,7 @@ public sealed class TaskEventAlertServiceTests
                      && entry.Message.Contains("发送抢座任务失败提醒Bark提醒失败：bark boom", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public async Task NotifyTaskFailedAsync_LogsWarningWhenWxPusherSendFails_AndContinuesEmail()
+    private async Task NotifyTaskFailedAsync_LogsWarningWhenWxPusherSendFails_AndContinuesEmail()
     {
         var emailSender = new FakeEmailAlertSender();
         var wxPusherSender = new FakeWxPusherAlertSender
@@ -609,8 +452,7 @@ public sealed class TaskEventAlertServiceTests
                      && entry.Message.Contains("发送抢座任务失败提醒WxPusher提醒失败：wxpusher boom", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public async Task NotifyTaskFailedAsync_LogsWarningWhenServerChanSendFails_AndContinuesEmail()
+    private async Task NotifyTaskFailedAsync_LogsWarningWhenServerChanSendFails_AndContinuesEmail()
     {
         var emailSender = new FakeEmailAlertSender();
         var serverChanSender = new FakeServerChanAlertSender
@@ -653,7 +495,15 @@ public sealed class TaskEventAlertServiceTests
     }
 
     [Fact]
-    public async Task NotifyTaskFailedAsync_SuppressesDuplicateTelegramWithinWindow()
+    public async Task NotifyTaskFailedAsync_SuppressesDuplicatesBeforeEveryRemoteChannelDispatch()
+    {
+        await NotifyTaskFailedAsync_SuppressesDuplicateTelegramWithinWindow();
+        await NotifyTaskFailedAsync_SuppressesDuplicateBarkWithinWindow();
+        await NotifyTaskFailedAsync_SuppressesDuplicateWxPusherWithinWindow();
+        await NotifyTaskFailedAsync_SuppressesDuplicateServerChanWithinWindow();
+    }
+
+    private async Task NotifyTaskFailedAsync_SuppressesDuplicateTelegramWithinWindow()
     {
         var telegramSender = new FakeTelegramAlertSender();
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
@@ -670,8 +520,7 @@ public sealed class TaskEventAlertServiceTests
         Assert.Single(telegramSender.Requests);
     }
 
-    [Fact]
-    public async Task NotifyTaskFailedAsync_SuppressesDuplicateBarkWithinWindow()
+    private async Task NotifyTaskFailedAsync_SuppressesDuplicateBarkWithinWindow()
     {
         var barkSender = new FakeBarkAlertSender();
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
@@ -690,8 +539,7 @@ public sealed class TaskEventAlertServiceTests
         Assert.Single(barkSender.Requests);
     }
 
-    [Fact]
-    public async Task NotifyTaskFailedAsync_SuppressesDuplicateWxPusherWithinWindow()
+    private async Task NotifyTaskFailedAsync_SuppressesDuplicateWxPusherWithinWindow()
     {
         var wxPusherSender = new FakeWxPusherAlertSender();
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
@@ -711,8 +559,7 @@ public sealed class TaskEventAlertServiceTests
         Assert.Single(wxPusherSender.Requests);
     }
 
-    [Fact]
-    public async Task NotifyTaskFailedAsync_SuppressesDuplicateServerChanWithinWindow()
+    private async Task NotifyTaskFailedAsync_SuppressesDuplicateServerChanWithinWindow()
     {
         var serverChanSender = new FakeServerChanAlertSender();
         var settingsService = new FakeSettingsService(WithTaskEventAlerts(
@@ -812,7 +659,7 @@ public sealed class TaskEventAlertServiceTests
             events,
             new BarkAlertChannelSettings(true, "https://api.day.app", "bark-key", "IGoLibrary-Ex", "alarm", "timeSensitive"),
             new WxPusherAlertChannelSettings(true, "https://wxpusher.zjiecode.com", "AT_xxx", "UID_xxx", ""),
-            new ServerChanAlertChannelSettings(true, "SCT_xxx", false, "9", ""));
+            new ServerChanAlertChannelSettings(true, "SCT_xxx", true, "9|66", "user-1"));
     }
 
     private static TaskEventAlertEventSettings DisableEvent(TaskAlertTestEvent eventKind)
@@ -851,6 +698,14 @@ public sealed class TaskEventAlertServiceTests
         TomorrowReservationSucceeded,
         GlobalLeakSucceeded,
         TaskFailed
+    }
+
+    public enum ExpectedFallbackKind
+    {
+        None,
+        Success,
+        Warning,
+        Info
     }
 
     private static async Task WaitForAsync(Func<bool> predicate)

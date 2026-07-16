@@ -67,11 +67,17 @@ public sealed class TelegramAlertSenderTests
             {
                 Content = new StringContent("""{"ok":true,"result":{"message_id":2}}""")
             }));
-        var sender = CreateSender(handler, AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) });
+        var timeProvider = new FakeTimeProvider();
+        var sender = CreateSender(
+            handler,
+            AppSettings.Default with { Network = new NetworkRequestSettings(1, 1) },
+            timeProvider);
 
-        await sender.SendAsync(
+        var sendTask = sender.SendAsync(
             new TelegramAlertChannelSettings(true, "https://api.telegram.org", "123:ABC", "456"),
             "测试消息");
+        timeProvider.Advance(TimeSpan.FromMilliseconds(250));
+        await sendTask;
 
         Assert.Equal(2, handler.CallCount);
     }
@@ -95,7 +101,8 @@ public sealed class TelegramAlertSenderTests
 
     private static TelegramAlertSender CreateSender(
         HttpMessageHandler handler,
-        AppSettings? settings = null)
+        AppSettings? settings = null,
+        TimeProvider? timeProvider = null)
     {
         return new TelegramAlertSender(
             new HttpClient(handler)
@@ -105,6 +112,7 @@ public sealed class TelegramAlertSenderTests
             new FakeSettingsService(settings ?? AppSettings.Default with
             {
                 Network = AppSettings.Default.Network with { MaxRetries = 0 }
-            }));
+            }),
+            timeProvider);
     }
 }

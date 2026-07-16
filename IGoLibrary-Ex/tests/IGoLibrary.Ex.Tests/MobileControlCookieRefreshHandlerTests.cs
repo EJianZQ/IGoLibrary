@@ -1,4 +1,5 @@
 using Avalonia.Threading;
+using Avalonia.Headless.XUnit;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Desktop.Services;
@@ -8,9 +9,10 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class MobileControlCookieRefreshHandlerTests
 {
-    [Fact]
+    [AvaloniaFact]
     public async Task RefreshCookieFromLinkAsync_WhenRequestIsCanceledAfterUiWorkStarts_WaitsForUiWorkToComplete()
     {
         const string code = "1234567890abcdef1234567890abcdef";

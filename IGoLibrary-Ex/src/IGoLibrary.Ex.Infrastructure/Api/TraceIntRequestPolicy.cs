@@ -3,20 +3,24 @@ using IGoLibrary.Ex.Application.Abstractions;
 
 namespace IGoLibrary.Ex.Infrastructure.Api;
 
-internal sealed class TraceIntRequestPolicy(ISettingsService settingsService)
+internal sealed class TraceIntRequestPolicy(
+    ISettingsService settingsService,
+    TimeProvider? timeProvider = null)
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
     public async Task<T> ExecuteOnceAsync<T>(
         Func<CancellationToken, Task<T>> operation,
         string timeoutMessagePrefix,
         CancellationToken cancellationToken)
     {
         var settings = await LoadNetworkSettingsAsync(cancellationToken);
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(settings.Timeout);
+        using var timeoutCts = new CancellationTokenSource(settings.Timeout, _timeProvider);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
         try
         {
-            return await operation(timeoutCts.Token);
+            return await operation(linkedCts.Token);
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
         {
@@ -36,12 +40,12 @@ internal sealed class TraceIntRequestPolicy(ISettingsService settingsService)
 
         for (var attempt = 0; attempt <= settings.MaxRetries; attempt++)
         {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(settings.Timeout);
+            using var timeoutCts = new CancellationTokenSource(settings.Timeout, _timeProvider);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
             try
             {
-                return await operation(timeoutCts.Token);
+                return await operation(linkedCts.Token);
             }
             catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
             {
@@ -59,7 +63,10 @@ internal sealed class TraceIntRequestPolicy(ISettingsService settingsService)
                 break;
             }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(250 * (attempt + 1)), cancellationToken);
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(250 * (attempt + 1)),
+                _timeProvider,
+                cancellationToken);
         }
 
         throw lastException ?? new InvalidOperationException($"{timeoutMessagePrefix}失败");

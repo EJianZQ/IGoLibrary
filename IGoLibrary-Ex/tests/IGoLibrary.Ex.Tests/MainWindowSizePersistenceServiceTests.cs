@@ -7,6 +7,7 @@ using IGoLibrary.Ex.Desktop.Services;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class MainWindowSizePersistenceServiceTests
 {
     [Fact]
@@ -100,12 +101,14 @@ public sealed class MainWindowSizePersistenceServiceTests
     public async Task UserResizeBurst_DebouncesAndPersistsOnlyLatestNormalSize()
     {
         var settingsService = CreateSettingsService(rememberSize: true);
-        var service = CreateService(settingsService, TimeSpan.FromMilliseconds(30));
+        var timeProvider = new FakeTimeProvider();
+        var service = CreateService(settingsService, TimeSpan.FromMilliseconds(30), timeProvider);
         service.SetRememberSizeEnabled(enabled: true, captureCurrentSize: false);
 
         service.ProcessResize(new Size(1100, 700), WindowResizeReason.User, WindowState.Normal);
         service.ProcessResize(new Size(1200, 740), WindowResizeReason.User, WindowState.Normal);
         service.ProcessResize(new Size(1300.126, 760.124), WindowResizeReason.User, WindowState.Normal);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(30));
 
         await WaitForAsync(() => settingsService.SaveCalls == 1);
 
@@ -120,14 +123,15 @@ public sealed class MainWindowSizePersistenceServiceTests
     [InlineData(WindowResizeReason.Application)]
     [InlineData(WindowResizeReason.Layout)]
     [InlineData(WindowResizeReason.DpiChange)]
-    public async Task NonUserResizeReasons_DoNotPersist(WindowResizeReason reason)
+    public void NonUserResizeReasons_DoNotPersist(WindowResizeReason reason)
     {
         var settingsService = CreateSettingsService(rememberSize: true);
-        var service = CreateService(settingsService, TimeSpan.FromMilliseconds(20));
+        var timeProvider = new FakeTimeProvider();
+        var service = CreateService(settingsService, TimeSpan.FromMilliseconds(20), timeProvider);
         service.SetRememberSizeEnabled(enabled: true, captureCurrentSize: false);
 
         service.ProcessResize(new Size(1300, 760), reason, WindowState.Normal);
-        await Task.Delay(60);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(60));
 
         Assert.Equal(0, settingsService.SaveCalls);
     }
@@ -135,28 +139,30 @@ public sealed class MainWindowSizePersistenceServiceTests
     [Theory]
     [InlineData(WindowState.Maximized)]
     [InlineData(WindowState.Minimized)]
-    public async Task NonNormalWindowStates_DoNotPersistUserResize(WindowState windowState)
+    public void NonNormalWindowStates_DoNotPersistUserResize(WindowState windowState)
     {
         var settingsService = CreateSettingsService(rememberSize: true);
-        var service = CreateService(settingsService, TimeSpan.FromMilliseconds(20));
+        var timeProvider = new FakeTimeProvider();
+        var service = CreateService(settingsService, TimeSpan.FromMilliseconds(20), timeProvider);
         service.SetRememberSizeEnabled(enabled: true, captureCurrentSize: false);
 
         service.ProcessResize(new Size(1920, 1080), WindowResizeReason.User, windowState);
-        await Task.Delay(60);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(60));
 
         Assert.Equal(0, settingsService.SaveCalls);
     }
 
     [Fact]
-    public async Task DisablingRememberSize_CancelsPendingSave()
+    public void DisablingRememberSize_CancelsPendingSave()
     {
         var settingsService = CreateSettingsService(rememberSize: true);
-        var service = CreateService(settingsService, TimeSpan.FromMilliseconds(30));
+        var timeProvider = new FakeTimeProvider();
+        var service = CreateService(settingsService, TimeSpan.FromMilliseconds(30), timeProvider);
         service.SetRememberSizeEnabled(enabled: true, captureCurrentSize: false);
         service.ProcessResize(new Size(1300, 760), WindowResizeReason.User, WindowState.Normal);
 
         service.SetRememberSizeEnabled(enabled: false, captureCurrentSize: false);
-        await Task.Delay(80);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(80));
 
         Assert.Equal(0, settingsService.SaveCalls);
     }
@@ -220,13 +226,16 @@ public sealed class MainWindowSizePersistenceServiceTests
         var settingsService = CreateSettingsService(rememberSize: true);
         settingsService.UpdateExceptions.Enqueue(new InvalidOperationException("database unavailable"));
         var activityLog = new ActivityLogService();
+        var timeProvider = new FakeTimeProvider();
         var service = new MainWindowSizePersistenceService(
             new SettingsWorkflowService(settingsService),
             activityLog,
-            TimeSpan.FromMilliseconds(20));
+            TimeSpan.FromMilliseconds(20),
+            timeProvider);
         service.SetRememberSizeEnabled(enabled: true, captureCurrentSize: false);
 
         service.ProcessResize(new Size(1280, 720), WindowResizeReason.User, WindowState.Normal);
+        timeProvider.Advance(TimeSpan.FromMilliseconds(20));
         await WaitForAsync(() => activityLog.Entries.Any(entry =>
             entry.Category == "Window" && entry.Message.Contains("database unavailable", StringComparison.Ordinal)));
         await service.FlushAsync();
@@ -253,12 +262,14 @@ public sealed class MainWindowSizePersistenceServiceTests
 
     private static MainWindowSizePersistenceService CreateService(
         FakeSettingsService settingsService,
-        TimeSpan debounceDelay)
+        TimeSpan debounceDelay,
+        TimeProvider? timeProvider = null)
     {
         return new MainWindowSizePersistenceService(
             new SettingsWorkflowService(settingsService),
             new ActivityLogService(),
-            debounceDelay);
+            debounceDelay,
+            timeProvider ?? TimeProvider.System);
     }
 
     private static async Task WaitForAsync(Func<bool> condition)

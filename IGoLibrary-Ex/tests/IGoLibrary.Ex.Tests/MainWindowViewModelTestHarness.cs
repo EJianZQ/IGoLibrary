@@ -129,7 +129,8 @@ internal static class MainWindowViewModelTestHarness
                 notificationTestService,
                 activityLogService,
                 notificationService,
-                errorDialogService),
+                errorDialogService,
+                timeProvider),
             new SystemSettingsViewModel(
                 settingsWorkflowService,
                 protocolTemplateEditorService,
@@ -145,11 +146,13 @@ internal static class MainWindowViewModelTestHarness
                     activityLogService,
                     notificationService),
                 networkExposureManager,
-                windowSizePersistenceService),
+                windowSizePersistenceService,
+                timeProvider),
             new ProtocolTemplatesViewModel(
                 protocolTemplateEditorService,
                 activityLogService,
-                notificationService),
+                notificationService,
+                timeProvider),
             new ShellNavigationViewModel(
                 appWindowService,
                 grabSeatCoordinator,

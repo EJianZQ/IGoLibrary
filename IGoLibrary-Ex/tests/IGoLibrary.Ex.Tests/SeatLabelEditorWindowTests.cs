@@ -8,30 +8,42 @@ using IGoLibrary.Ex.Desktop.ViewModels;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class SeatLabelEditorWindowTests
 {
     [AvaloniaFact]
-    public void Window_DisablesConfirmationUntilInputIsValid()
+    public async Task Window_ValidatesInputAndHandlesEnterAndEscape()
+    {
+        Window_DisablesConfirmationUntilInputIsValid();
+        await EnterConfirmsAndEscapeCancelsDialog();
+    }
+
+    private static void Window_DisablesConfirmationUntilInputIsValid()
     {
         var viewModel = new SeatLabelEditorViewModel(new SeatLabelDialogRequest("设置标签", "说明"));
         var window = new SeatLabelEditorWindow(viewModel);
         var input = Assert.IsType<TextBox>(window.FindControl<TextBox>("LabelTextBox"));
         var confirm = Assert.IsType<Button>(window.FindControl<Button>("ConfirmButton"));
         var validation = Assert.IsType<TextBlock>(window.FindControl<TextBlock>("ValidationText"));
+        try
+        {
+            Assert.Equal(32, input.MaxLength);
+            Assert.False(confirm.IsEnabled);
+            Assert.NotEmpty(validation.Text ?? string.Empty);
 
-        Assert.Equal(32, input.MaxLength);
-        Assert.False(confirm.IsEnabled);
-        Assert.NotEmpty(validation.Text ?? string.Empty);
+            viewModel.LabelText = "  靠窗  ";
 
-        viewModel.LabelText = "  靠窗  ";
-
-        Assert.True(confirm.IsEnabled);
-        Assert.Equal(string.Empty, validation.Text);
-        Assert.Equal("靠窗", viewModel.GetNormalizedText());
+            Assert.True(confirm.IsEnabled);
+            Assert.Equal(string.Empty, validation.Text);
+            Assert.Equal("靠窗", viewModel.GetNormalizedText());
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
-    [AvaloniaFact]
-    public async Task EnterConfirmsAndEscapeCancelsDialog()
+    private static async Task EnterConfirmsAndEscapeCancelsDialog()
     {
         var owner = new Window();
         owner.Show();

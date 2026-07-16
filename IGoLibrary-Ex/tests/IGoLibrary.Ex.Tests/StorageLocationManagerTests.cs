@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace IGoLibrary.Ex.Tests;
 
+[Collection(NonParallelTestCollection.Name)]
 public sealed class StorageLocationManagerTests : IDisposable
 {
     private readonly string _root = Path.Combine(

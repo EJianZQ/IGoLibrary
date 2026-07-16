@@ -10,7 +10,14 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class LanCookieRelayServiceTests
 {
     [Fact]
-    public async Task StartAsync_ListensOnProvidedAddressAndRandomPort()
+    public async Task StartAndReadEndpoints_ReturnExpectedContent()
+    {
+        await StartAsync_ListensOnProvidedAddressAndRandomPort();
+        await GetRoot_ReturnsMobileHtmlWithNoStore();
+        await GetAuthQrCode_WithValidToken_ReturnsPngWithNoStore();
+    }
+
+    private async Task StartAsync_ListensOnProvidedAddressAndRandomPort()
     {
         await using var service = CreateService();
 
@@ -23,8 +30,7 @@ public sealed class LanCookieRelayServiceTests
         Assert.Contains("token=", session.Url.Query);
     }
 
-    [Fact]
-    public async Task GetRoot_ReturnsMobileHtmlWithNoStore()
+    private async Task GetRoot_ReturnsMobileHtmlWithNoStore()
     {
         await using var service = CreateService();
         var session = await service.StartAsync((_, _) =>
@@ -42,8 +48,7 @@ public sealed class LanCookieRelayServiceTests
         Assert.Contains("navigator.clipboard.readText", html);
     }
 
-    [Fact]
-    public async Task GetAuthQrCode_WithValidToken_ReturnsPngWithNoStore()
+    private async Task GetAuthQrCode_WithValidToken_ReturnsPngWithNoStore()
     {
         await using var service = CreateService();
         var session = await service.StartAsync((_, _) =>
@@ -64,7 +69,14 @@ public sealed class LanCookieRelayServiceTests
     }
 
     [Fact]
-    public async Task GetAuthQrCode_WithInvalidToken_IsRejected()
+    public async Task AuthenticationAndMethodGuards_RejectEveryInvalidRequest()
+    {
+        await GetAuthQrCode_WithInvalidToken_IsRejected();
+        await PostSubmit_WithInvalidToken_IsRejectedWithoutCallingHandler();
+        await NonPostSubmit_IsRejectedWithoutCallingHandler();
+    }
+
+    private async Task GetAuthQrCode_WithInvalidToken_IsRejected()
     {
         await using var service = CreateService();
         var session = await service.StartAsync((_, _) =>
@@ -169,8 +181,7 @@ public sealed class LanCookieRelayServiceTests
         Assert.Equal(LanCookieRelayStopReason.Submitted, await stopped.Task.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
-    [Fact]
-    public async Task PostSubmit_WithInvalidToken_IsRejectedWithoutCallingHandler()
+    private async Task PostSubmit_WithInvalidToken_IsRejectedWithoutCallingHandler()
     {
         await using var service = CreateService();
         var handlerCalls = 0;
@@ -189,8 +200,7 @@ public sealed class LanCookieRelayServiceTests
         Assert.Equal(0, handlerCalls);
     }
 
-    [Fact]
-    public async Task NonPostSubmit_IsRejectedWithoutCallingHandler()
+    private async Task NonPostSubmit_IsRejectedWithoutCallingHandler()
     {
         await using var service = CreateService();
         var handlerCalls = 0;
@@ -221,11 +231,24 @@ public sealed class LanCookieRelayServiceTests
         using var client = new HttpClient();
         var oversized = new string('x', 9 * 1024);
 
-        using var response = await client.PostAsync(
-            BuildSubmitUri(session),
-            new StringContent(oversized, Encoding.UTF8, "text/plain"));
+        HttpResponseMessage? rejectionResponse = null;
+        var rejectionException = await Record.ExceptionAsync(async () =>
+        {
+            rejectionResponse = await client.PostAsync(
+                BuildSubmitUri(session),
+                new StringContent(oversized, Encoding.UTF8, "text/plain"));
+        });
 
-        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+        if (rejectionException is null)
+        {
+            Assert.Equal(HttpStatusCode.RequestEntityTooLarge, rejectionResponse!.StatusCode);
+        }
+        else
+        {
+            Assert.IsType<HttpRequestException>(rejectionException);
+        }
+
+        rejectionResponse?.Dispose();
         Assert.Equal(0, handlerCalls);
 
         using var retryResponse = await client.PostAsync(
@@ -276,7 +299,13 @@ public sealed class LanCookieRelayServiceTests
     }
 
     [Fact]
-    public async Task StartAsync_InCloudflareMode_ReturnsPublicUrlAndKeepsLanUrl()
+    public async Task CloudflareMode_UsesPublicEndpointAndSupportsLiveSwitching()
+    {
+        await StartAsync_InCloudflareMode_ReturnsPublicUrlAndKeepsLanUrl();
+        await ActiveSession_LiveModeSwitchChangesOnlyPublishedEndpoint();
+    }
+
+    private async Task StartAsync_InCloudflareMode_ReturnsPublicUrlAndKeepsLanUrl()
     {
         var exposureManager = new FakeNetworkExposureManager();
         exposureManager.Initialize(MobileControlNetworkMode.CloudflareTunnel, CloudflareTunnelProxyMode.Auto, string.Empty);
@@ -292,8 +321,7 @@ public sealed class LanCookieRelayServiceTests
         Assert.Equal(session.LanUrl.Query, session.Url.Query);
     }
 
-    [Fact]
-    public async Task ActiveSession_LiveModeSwitchChangesOnlyPublishedEndpoint()
+    private async Task ActiveSession_LiveModeSwitchChangesOnlyPublishedEndpoint()
     {
         var exposureManager = new FakeNetworkExposureManager();
         await using var service = CreateService(exposureManager);

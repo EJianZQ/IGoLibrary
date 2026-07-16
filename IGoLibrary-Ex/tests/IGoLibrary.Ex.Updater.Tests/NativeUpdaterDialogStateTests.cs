@@ -32,6 +32,25 @@ public sealed class NativeUpdaterDialogStateTests
         Assert.Equal(0x0400U + 107, GetConstant<uint>("TaskDialogMessageSetProgressBarMarquee"));
         Assert.Equal(0x0400U + 108, GetConstant<uint>("TaskDialogMessageSetElementText"));
         Assert.Equal(0x0400U + 111, GetConstant<uint>("TaskDialogMessageEnableButton"));
+        Assert.Equal(0x00000400U, GetConstant<uint>("TaskDialogFlagShowMarqueeProgressBar"));
+        Assert.Equal(0x01000000U, GetConstant<uint>("TaskDialogFlagSizeToContent"));
+        Assert.Equal(0x00000008U, GetConstant<uint>("TaskDialogFlagAllowDialogCancellation"));
+
+        var dialogPath = Path.Combine(
+            FindProjectRoot(),
+            "src",
+            "IGoLibrary.Ex.Updater",
+            "NativeUpdaterDialog.cs");
+        var dialogText = File.ReadAllText(dialogPath);
+        Assert.Contains(
+            "Flags = TaskDialogFlagShowMarqueeProgressBar | TaskDialogFlagSizeToContent",
+            dialogText,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            2,
+            System.Text.RegularExpressions.Regex.Matches(
+                dialogText,
+                "Flags = TaskDialogFlagSizeToContent \\| TaskDialogFlagAllowDialogCancellation").Count);
     }
 
     [Fact]

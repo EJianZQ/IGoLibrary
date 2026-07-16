@@ -754,26 +754,6 @@ internal sealed class FakeCoordinatorRuntime : ICoordinatorRuntime
     }
 }
 
-internal sealed class FakeTimeProvider(DateTimeOffset? initialLocalTime = null) : TimeProvider
-{
-    private DateTimeOffset _utcNow = (initialLocalTime ?? DateTimeOffset.Now).ToUniversalTime();
-
-    public override DateTimeOffset GetUtcNow()
-    {
-        return _utcNow;
-    }
-
-    public void SetLocalTime(DateTimeOffset timestamp)
-    {
-        _utcNow = timestamp.ToUniversalTime();
-    }
-
-    public void Advance(TimeSpan duration)
-    {
-        _utcNow += duration;
-    }
-}
-
 internal sealed class FakeSessionService : ISessionService
 {
     public SessionCredentials? CurrentSession { get; set; }
