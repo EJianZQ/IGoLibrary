@@ -185,11 +185,11 @@ public sealed class UpdateCheckService(
         GitHubReleaseItem release,
         ReleaseVersion version)
     {
-        var expectedName = $"IGoLibrary-Ex-v{version}-windows-x64.zip";
+        var expectedDefaultPackageName = $"IGoLibrary-Ex-v{version}-windows-x64.zip";
         var matches = release.Assets
             .Where(asset => string.Equals(
                 asset.Name,
-                expectedName,
+                expectedDefaultPackageName,
                 StringComparison.Ordinal))
             .ToArray();
         if (matches.Length != 1)

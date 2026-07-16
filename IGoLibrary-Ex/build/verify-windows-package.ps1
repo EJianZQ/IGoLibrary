@@ -20,6 +20,31 @@ function Test-IsToolsRelativePath {
         $RelativePath.StartsWith('tools/', [System.StringComparison]::OrdinalIgnoreCase)
 }
 
+$managedCloudflaredRelativePaths = @(
+    'tools/cloudflared/cloudflared.exe',
+    'tools/cloudflared/LICENSE.txt',
+    'tools/cloudflared/THIRD-PARTY-NOTICES.txt'
+)
+
+function Test-IsManagedCloudflaredRelativePath {
+    param([Parameter(Mandatory)][string]$RelativePath)
+
+    foreach ($managedPath in $managedCloudflaredRelativePaths) {
+        if ($RelativePath.Equals($managedPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-IsManagedCloudflaredContainerRelativePath {
+    param([Parameter(Mandatory)][string]$RelativePath)
+
+    return $RelativePath.Equals('tools', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $RelativePath.Equals('tools/cloudflared', [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 function Test-IsForbiddenUpdaterSidecar {
     param([Parameter(Mandatory)][string]$RelativePath)
 
@@ -135,8 +160,8 @@ function Test-WindowsPackage {
 
     $resolvedPackage = (Resolve-Path -LiteralPath $Path).Path
     $packageName = [System.IO.Path]::GetFileName($resolvedPackage)
-    $lightweightPattern = '^IGoLibrary-Ex-v(?<version>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))-windows-x64\.zip$'
-    $bundledPattern = '^IGoLibrary-Ex-v(?<version>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))-windows-x64-with-cloudflared\.zip$'
+    $lightweightPattern = '^IGoLibrary-Ex-v(?<version>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))-windows-x64-without-cloudflared\.zip$'
+    $bundledPattern = '^IGoLibrary-Ex-v(?<version>(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))-windows-x64\.zip$'
     $variant = $null
     $fileNameVersion = $null
     if ($packageName -match $lightweightPattern) {
@@ -144,7 +169,7 @@ function Test-WindowsPackage {
         $fileNameVersion = $Matches.version
     }
     elseif ($packageName -match $bundledPattern) {
-        $variant = 'Bundled'
+        $variant = 'Default'
         $fileNameVersion = $Matches.version
     }
     else {
@@ -153,15 +178,23 @@ function Test-WindowsPackage {
 
     $archive = [System.IO.Compression.ZipFile]::OpenRead($resolvedPackage)
     try {
-        $fileEntries = @($archive.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) })
+        $archiveEntries = @($archive.Entries | Where-Object {
+            $_.FullName.TrimEnd('/', '\').Length -gt 0
+        })
+        $fileEntries = @($archiveEntries | Where-Object {
+            -not ($_.FullName.EndsWith('/') -or $_.FullName.EndsWith('\'))
+        })
+        $directoryEntries = @($archiveEntries | Where-Object {
+            $_.FullName.EndsWith('/') -or $_.FullName.EndsWith('\')
+        })
         $pathSet = [System.Collections.Generic.HashSet[string]]::new(
             [System.StringComparer]::OrdinalIgnoreCase)
         $entryByPath = [System.Collections.Generic.Dictionary[string, System.IO.Compression.ZipArchiveEntry]]::new(
             [System.StringComparer]::OrdinalIgnoreCase)
 
-        foreach ($entry in $fileEntries) {
-            $path = $entry.FullName
-            if ($path.Contains('\') -or
+        foreach ($entry in $archiveEntries) {
+            $path = $entry.FullName.TrimEnd('/', '\')
+            if ($entry.FullName.Contains('\') -or
                 $path.StartsWith('/', [System.StringComparison]::Ordinal) -or
                 $path -match '^[A-Za-z]:' -or
                 $path.Split('/') -contains '..') {
@@ -170,7 +203,23 @@ function Test-WindowsPackage {
             if (-not $pathSet.Add($path)) {
                 throw "ZIP 包含大小写重复路径：$path"
             }
-            $entryByPath.Add($path, $entry)
+            if (-not ($entry.FullName.EndsWith('/') -or $entry.FullName.EndsWith('\'))) {
+                $entryByPath.Add($path, $entry)
+            }
+        }
+
+        $actualToolDirectoryPaths = @(
+            $directoryEntries |
+                ForEach-Object { $_.FullName.TrimEnd('/', '\') } |
+                Where-Object { Test-IsToolsRelativePath -RelativePath $_ }
+        )
+        foreach ($directoryPath in $actualToolDirectoryPaths) {
+            if ($variant -ceq 'Lightweight') {
+                throw "轻量包不得包含 tools 目录：$directoryPath"
+            }
+            if (-not (Test-IsManagedCloudflaredContainerRelativePath -RelativePath $directoryPath)) {
+                throw "默认完整包不得包含非托管 tools 目录：$directoryPath"
+            }
         }
 
         $updaterEntries = @(
@@ -255,6 +304,7 @@ function Test-WindowsPackage {
         $manifestPaths = [System.Collections.Generic.HashSet[string]]::new(
             [System.StringComparer]::OrdinalIgnoreCase)
         $orderedPaths = @()
+        $manifestToolPaths = @()
         foreach ($file in @($manifest.files)) {
             $path = [string]$file.path
             if ([string]::IsNullOrWhiteSpace($path) -or
@@ -264,7 +314,10 @@ function Test-WindowsPackage {
                 throw "manifest 包含非法或重复文件路径：$path"
             }
             if (Test-IsToolsRelativePath -RelativePath $path) {
-                throw "manifest 不得声明 tools 保留目录：$path"
+                if (-not (Test-IsManagedCloudflaredRelativePath -RelativePath $path)) {
+                    throw "manifest 不得声明非托管 tools 文件：$path"
+                }
+                $manifestToolPaths += $path
             }
             $orderedPaths += $path
             if (-not $entryByPath.ContainsKey($path)) {
@@ -285,6 +338,26 @@ function Test-WindowsPackage {
             throw 'manifest 必须声明根目录 IGoLibrary.Ex.Updater.exe。'
         }
 
+        $expectedToolPaths = if ($variant -ceq 'Default') {
+            $managedCloudflaredRelativePaths
+        }
+        else {
+            @()
+        }
+        $manifestToolSet = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($toolPath in $manifestToolPaths) {
+            $null = $manifestToolSet.Add($toolPath)
+        }
+        $expectedToolSet = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($toolPath in $expectedToolPaths) {
+            $null = $expectedToolSet.Add($toolPath)
+        }
+        if (-not $manifestToolSet.SetEquals($expectedToolSet)) {
+            throw "Windows $variant 包的 manifest cloudflared 文件集合无效。实际：$($manifestToolPaths -join ', ')"
+        }
+
         $sortedPaths = @($orderedPaths | Sort-Object { $_.ToUpperInvariant() }, { $_ })
         for ($index = 0; $index -lt $orderedPaths.Count; $index++) {
             if ($orderedPaths[$index] -cne $sortedPaths[$index]) {
@@ -300,16 +373,7 @@ function Test-WindowsPackage {
                 } |
                 ForEach-Object FullName
         )
-        $expectedExtras = if ($variant -ceq 'Bundled') {
-            @(
-                'tools/cloudflared/cloudflared.exe',
-                'tools/cloudflared/LICENSE.txt',
-                'tools/cloudflared/THIRD-PARTY-NOTICES.txt'
-            )
-        }
-        else {
-            @()
-        }
+        $expectedExtras = @()
         $actualExtraSet = [System.Collections.Generic.HashSet[string]]::new(
             [System.StringComparer]::OrdinalIgnoreCase)
         foreach ($extraPath in $actualExtras) {
@@ -324,12 +388,23 @@ function Test-WindowsPackage {
             throw "ZIP 的 manifest 外文件集合无效。实际：$($actualExtras -join ', ')"
         }
 
+        $actualToolPaths = @(
+            $fileEntries |
+                Where-Object { Test-IsToolsRelativePath -RelativePath $_.FullName } |
+                ForEach-Object FullName
+        )
+        $actualToolSet = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($toolPath in $actualToolPaths) {
+            $null = $actualToolSet.Add($toolPath)
+        }
+        if (-not $actualToolSet.SetEquals($expectedToolSet)) {
+            throw "Windows $variant 包的 tools 文件集合无效。实际：$($actualToolPaths -join ', ')"
+        }
+
         if ($variant -ceq 'Lightweight') {
-            $toolsEntry = $fileEntries | Where-Object {
-                Test-IsToolsRelativePath -RelativePath $_.FullName
-            } | Select-Object -First 1
-            if ($null -ne $toolsEntry) {
-                throw "轻量包不得包含 tools：$($toolsEntry.FullName)"
+            if ($actualToolPaths.Count -ne 0) {
+                throw "轻量包不得包含 tools：$($actualToolPaths -join ', ')"
             }
         }
         else {
@@ -354,12 +429,21 @@ function Test-WindowsPackage {
             Assert-EntryMatchesFile @noticeComparison
         }
 
+        $applicationManifestFingerprint = @(
+            foreach ($file in @($manifest.files)) {
+                $path = [string]$file.path
+                if (-not (Test-IsToolsRelativePath -RelativePath $path)) {
+                    "{0}`t{1}`t{2}" -f $path, [long]$file.size, ([string]$file.sha256).ToLowerInvariant()
+                }
+            }
+        ) -join "`n"
+
         return [pscustomobject]@{
             Path = $resolvedPackage
             Name = $packageName
             Version = $fileNameVersion
             Variant = $variant
-            ManifestBytes = $manifestBytes
+            ApplicationManifestFingerprint = $applicationManifestFingerprint
             UpdaterBytes = $updaterEntry.Length
             UpdaterCompressedBytes = $updaterEntry.CompressedLength
             UpdaterFileVersion = $updaterVersionInfo.FileVersion
@@ -380,9 +464,9 @@ if (-not [string]::IsNullOrWhiteSpace($CompanionPackagePath)) {
     if ($results[0].Version -cne $results[1].Version) {
         throw '成对验证的两个 Windows ZIP 版本不一致。'
     }
-    if ([System.Convert]::ToBase64String($results[0].ManifestBytes) -cne
-        [System.Convert]::ToBase64String($results[1].ManifestBytes)) {
-        throw '轻量包与 cloudflared 完整包的 update-manifest.json 不一致。'
+    if ($results[0].ApplicationManifestFingerprint -cne
+        $results[1].ApplicationManifestFingerprint) {
+        throw '轻量包与默认完整包的应用 manifest 文件项不一致。'
     }
 }
 

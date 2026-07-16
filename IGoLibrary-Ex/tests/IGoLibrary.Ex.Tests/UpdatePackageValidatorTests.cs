@@ -13,16 +13,31 @@ public sealed class UpdatePackageValidatorTests : IDisposable
 
     [Theory]
     [InlineData("tools", true)]
-    [InlineData("Tools/cloudflared/cloudflared.exe", true)]
-    [InlineData("tools\\cloudflared\\LICENSE.txt", true)]
+    [InlineData("Tools/cloudflared/cloudflared.exe", false)]
+    [InlineData("tools\\cloudflared\\LICENSE.txt", false)]
+    [InlineData("tools/cloudflared/custom.json", true)]
+    [InlineData("tools/user-tool.exe", true)]
     [InlineData("tools-old/cloudflared.exe", false)]
     [InlineData("my-tools/cloudflared.exe", false)]
     [InlineData("subdir/tools/cloudflared.exe", false)]
-    public void IsPreservedInstallationPath_MatchesOnlyRootTools(
+    public void IsPreservedInstallationPath_ExcludesOnlyManagedCloudflaredFiles(
         string relativePath,
         bool expected)
     {
         Assert.Equal(expected, UpdateProtocol.IsPreservedInstallationPath(relativePath));
+    }
+
+    [Theory]
+    [InlineData("tools/cloudflared/cloudflared.exe", true)]
+    [InlineData("TOOLS/CLOUDFLARED/license.txt", true)]
+    [InlineData("tools/cloudflared/THIRD-PARTY-NOTICES.txt", true)]
+    [InlineData("tools/cloudflared/custom.json", false)]
+    [InlineData("tools/cloudflared", false)]
+    public void IsManagedCloudflaredFilePath_MatchesOnlyOfficialFiles(
+        string relativePath,
+        bool expected)
+    {
+        Assert.Equal(expected, UpdateProtocol.IsManagedCloudflaredFilePath(relativePath));
     }
 
     [Theory]
@@ -124,7 +139,10 @@ public sealed class UpdatePackageValidatorTests : IDisposable
         {
             [UpdateProtocol.EntryExecutableName] = "desktop",
             [UpdateProtocol.UpdaterExecutableName] = "updater",
-            ["feature.dll"] = "feature"
+            ["feature.dll"] = "feature",
+            [UpdateProtocol.ManagedCloudflaredExecutablePath] = "release-cloudflared",
+            [UpdateProtocol.ManagedCloudflaredLicensePath] = "release-license",
+            [UpdateProtocol.ManagedCloudflaredNoticesPath] = "release-notices"
         });
         File.WriteAllText(Path.Combine(package, "extra.dll"), "extra");
         var archivePath = Path.Combine(_root, "extra.zip");
@@ -140,7 +158,7 @@ public sealed class UpdatePackageValidatorTests : IDisposable
     }
 
     [Fact]
-    public async Task ExtractAndValidateAsync_ExtractsAValidPackage()
+    public async Task ExtractAndValidateAsync_RejectsPackageWithoutManagedCloudflaredSet()
     {
         var package = Path.Combine(_root, "package");
         WritePackage(package, "1.0.1", new Dictionary<string, string>
@@ -153,17 +171,45 @@ public sealed class UpdatePackageValidatorTests : IDisposable
         ZipFile.CreateFromDirectory(package, archivePath);
         var staging = Path.Combine(_root, "staging");
 
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            UpdatePackageValidator.ExtractAndValidateAsync(
+                archivePath,
+                staging,
+                "1.0.1"));
+
+        Assert.Contains("必须完整声明", exception.Message);
+    }
+
+    [Fact]
+    public async Task ExtractAndValidateAsync_ExtractsAValidPackageWithManagedCloudflaredSet()
+    {
+        var package = Path.Combine(_root, "package-with-cloudflared");
+        WritePackage(package, "1.0.1", new Dictionary<string, string>
+        {
+            [UpdateProtocol.EntryExecutableName] = "desktop",
+            [UpdateProtocol.UpdaterExecutableName] = "updater",
+            [UpdateProtocol.ManagedCloudflaredExecutablePath] = "release-cloudflared",
+            [UpdateProtocol.ManagedCloudflaredLicensePath] = "release-license",
+            [UpdateProtocol.ManagedCloudflaredNoticesPath] = "release-notices"
+        });
+        var archivePath = Path.Combine(_root, "valid-with-cloudflared.zip");
+        ZipFile.CreateFromDirectory(package, archivePath);
+        var staging = Path.Combine(_root, "staging-with-cloudflared");
+
         var manifest = await UpdatePackageValidator.ExtractAndValidateAsync(
             archivePath,
             staging,
             "1.0.1");
 
-        Assert.Equal("1.0.1", manifest.Version);
-        Assert.Equal("feature", File.ReadAllText(Path.Combine(staging, "sub", "feature.dll")));
+        Assert.Equal(3, manifest.Files.Count(file =>
+            UpdateProtocol.IsManagedCloudflaredFilePath(file.Path)));
+        Assert.Equal("release-cloudflared", File.ReadAllText(Path.Combine(
+            staging,
+            UpdateProtocol.ManagedCloudflaredExecutablePath.Replace('/', Path.DirectorySeparatorChar))));
     }
 
     [Fact]
-    public async Task ExtractAndValidateAsync_RejectsToolsEntryBeforeExtraction()
+    public async Task ExtractAndValidateAsync_RejectsNonManagedToolsEntryBeforeExtraction()
     {
         var package = Path.Combine(_root, "package-with-undeclared-tools");
         WritePackage(package, "1.0.1", new Dictionary<string, string>
@@ -171,7 +217,7 @@ public sealed class UpdatePackageValidatorTests : IDisposable
             [UpdateProtocol.EntryExecutableName] = "desktop",
             [UpdateProtocol.UpdaterExecutableName] = "updater"
         });
-        var toolPath = Path.Combine(package, "tools", "cloudflared", "cloudflared.exe");
+        var toolPath = Path.Combine(package, "tools", "custom-tool.exe");
         Directory.CreateDirectory(Path.GetDirectoryName(toolPath)!);
         File.WriteAllText(toolPath, "must-not-be-extracted");
         var archivePath = Path.Combine(_root, "package-with-undeclared-tools.zip");
@@ -184,19 +230,19 @@ public sealed class UpdatePackageValidatorTests : IDisposable
                 staging,
                 "1.0.1"));
 
-        Assert.Contains("保留目录", exception.Message);
-        Assert.False(File.Exists(Path.Combine(staging, "tools", "cloudflared", "cloudflared.exe")));
+        Assert.Contains("非托管 tools", exception.Message);
+        Assert.False(File.Exists(Path.Combine(staging, "tools", "custom-tool.exe")));
     }
 
     [Fact]
-    public void ValidateUpdatePayloadManifest_RejectsLegacyOwnedToolsEntry()
+    public void ValidateUpdatePayloadManifest_RejectsNonManagedToolsEntry()
     {
         var package = Path.Combine(_root, "legacy-package");
         WritePackage(package, "1.0.1", new Dictionary<string, string>
         {
             [UpdateProtocol.EntryExecutableName] = "desktop",
             [UpdateProtocol.UpdaterExecutableName] = "updater",
-            ["TOOLS/cloudflared/cloudflared.exe"] = "legacy-tool"
+            ["TOOLS/custom-tool.exe"] = "legacy-tool"
         });
         var manifest = UpdatePackageValidator.LoadAndValidateManifest(
             Path.Combine(package, UpdateProtocol.ManifestFileName));
@@ -204,7 +250,26 @@ public sealed class UpdatePackageValidatorTests : IDisposable
         var exception = Assert.Throws<InvalidDataException>(() =>
             UpdatePackageValidator.ValidateUpdatePayloadManifest(manifest));
 
-        Assert.Contains("保留目录", exception.Message);
+        Assert.Contains("非托管 tools", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateUpdatePayloadManifest_RejectsPartialManagedCloudflaredSet()
+    {
+        var package = Path.Combine(_root, "partial-cloudflared-package");
+        WritePackage(package, "1.0.1", new Dictionary<string, string>
+        {
+            [UpdateProtocol.EntryExecutableName] = "desktop",
+            [UpdateProtocol.UpdaterExecutableName] = "updater",
+            [UpdateProtocol.ManagedCloudflaredExecutablePath] = "release-tool"
+        });
+        var manifest = UpdatePackageValidator.LoadAndValidateManifest(
+            Path.Combine(package, UpdateProtocol.ManifestFileName));
+
+        var exception = Assert.Throws<InvalidDataException>(() =>
+            UpdatePackageValidator.ValidateUpdatePayloadManifest(manifest));
+
+        Assert.Contains("必须完整声明", exception.Message);
     }
 
     [Fact]
@@ -217,7 +282,8 @@ public sealed class UpdatePackageValidatorTests : IDisposable
             [UpdateProtocol.UpdaterExecutableName] = "updater",
             ["feature.dll"] = "feature",
             ["tools/cloudflared/cloudflared.exe"] = "release-tool",
-            ["tools/cloudflared/LICENSE.txt"] = "release-license"
+            ["tools/cloudflared/LICENSE.txt"] = "release-license",
+            ["tools/cloudflared/THIRD-PARTY-NOTICES.txt"] = "release-notices"
         });
         var manifest = UpdatePackageValidator.LoadAndValidateManifest(
             Path.Combine(installation, UpdateProtocol.ManifestFileName));
@@ -243,7 +309,10 @@ public sealed class UpdatePackageValidatorTests : IDisposable
         WritePackage(package, "1.0.1", new Dictionary<string, string>
         {
             [UpdateProtocol.EntryExecutableName] = "desktop",
-            [UpdateProtocol.UpdaterExecutableName] = "updater"
+            [UpdateProtocol.UpdaterExecutableName] = "updater",
+            [UpdateProtocol.ManagedCloudflaredExecutablePath] = "release-cloudflared",
+            [UpdateProtocol.ManagedCloudflaredLicensePath] = "release-license",
+            [UpdateProtocol.ManagedCloudflaredNoticesPath] = "release-notices"
         });
         var toolPath = Path.Combine(package, "tools", "custom-tool.exe");
         Directory.CreateDirectory(Path.GetDirectoryName(toolPath)!);
@@ -254,26 +323,47 @@ public sealed class UpdatePackageValidatorTests : IDisposable
         var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
             UpdatePackageValidator.ValidateUpdatePayloadDirectoryAsync(package, manifest));
 
-        Assert.Contains("保留目录", exception.Message);
+        Assert.Contains("非托管 tools", exception.Message);
     }
 
     [Fact]
-    public async Task ValidateUpdatePayloadDirectoryAsync_RejectsEmptyRootToolsDirectory()
+    public async Task ValidateUpdatePayloadDirectoryAsync_RejectsExtraEmptyToolsDirectory()
     {
         var package = Path.Combine(_root, "payload-with-empty-tools");
         WritePackage(package, "1.0.1", new Dictionary<string, string>
         {
             [UpdateProtocol.EntryExecutableName] = "desktop",
-            [UpdateProtocol.UpdaterExecutableName] = "updater"
+            [UpdateProtocol.UpdaterExecutableName] = "updater",
+            [UpdateProtocol.ManagedCloudflaredExecutablePath] = "release-cloudflared",
+            [UpdateProtocol.ManagedCloudflaredLicensePath] = "release-license",
+            [UpdateProtocol.ManagedCloudflaredNoticesPath] = "release-notices"
         });
-        Directory.CreateDirectory(Path.Combine(package, "ToOlS"));
+        Directory.CreateDirectory(Path.Combine(package, "ToOlS", "custom"));
         var manifest = UpdatePackageValidator.LoadAndValidateManifest(
             Path.Combine(package, UpdateProtocol.ManifestFileName));
 
         var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
             UpdatePackageValidator.ValidateUpdatePayloadDirectoryAsync(package, manifest));
 
-        Assert.Contains("保留目录", exception.Message);
+        Assert.Contains("非托管 tools 目录", exception.Message);
+    }
+
+    [Fact]
+    public async Task ValidateUpdatePayloadDirectoryAsync_AllowsExactManagedCloudflaredSet()
+    {
+        var package = Path.Combine(_root, "payload-with-managed-cloudflared");
+        WritePackage(package, "1.0.1", new Dictionary<string, string>
+        {
+            [UpdateProtocol.EntryExecutableName] = "desktop",
+            [UpdateProtocol.UpdaterExecutableName] = "updater",
+            [UpdateProtocol.ManagedCloudflaredExecutablePath] = "release-tool",
+            [UpdateProtocol.ManagedCloudflaredLicensePath] = "release-license",
+            [UpdateProtocol.ManagedCloudflaredNoticesPath] = "release-notices"
+        });
+        var manifest = UpdatePackageValidator.LoadAndValidateManifest(
+            Path.Combine(package, UpdateProtocol.ManifestFileName));
+
+        await UpdatePackageValidator.ValidateUpdatePayloadDirectoryAsync(package, manifest);
     }
 
     [Fact]

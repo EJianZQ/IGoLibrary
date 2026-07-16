@@ -216,7 +216,10 @@ public sealed class WindowsUpdateWorkspaceTests : IDisposable
             {
                 [UpdateProtocol.EntryExecutableName] = "desktop",
                 [UpdateProtocol.UpdaterExecutableName] = "updater",
-                ["feature.dll"] = "feature"
+                ["feature.dll"] = "feature",
+                [UpdateProtocol.ManagedCloudflaredExecutablePath] = "release-cloudflared",
+                [UpdateProtocol.ManagedCloudflaredLicensePath] = "release-license",
+                [UpdateProtocol.ManagedCloudflaredNoticesPath] = "release-notices"
             });
         ZipFile.CreateFromDirectory(packageSource, workspace.ArchivePath);
         await UpdatePackageValidator.ExtractAndValidateAsync(

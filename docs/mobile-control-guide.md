@@ -101,7 +101,7 @@ Cloudflare Tunnel：确认电脑可以访问 Cloudflare
 
 Cloudflare Tunnel 模式会启动完整包中附带的 `cloudflared`，为本机手机控制服务创建一个临时 `trycloudflare.com` HTTPS 地址。该方式不要求手机和电脑处于同一局域网，也不要求用户准备 Cloudflare 账号。
 
-发布页同时提供两种压缩包：无后缀文件名是体积更小、不含 `tools` 的轻量包，文件名带 `-with-cloudflared` 的是完整包。只有完整包能够直接使用 Tunnel。轻量包仍显示 Tunnel 入口，但选择或启动时会提示当前安装未包含 cloudflared；此时请改用本机局域网，或下载同版本、同系统架构的完整包。当前版本不会自动下载或修复 cloudflared。
+发布页同时提供两种压缩包：无后缀文件名是包含 cloudflared 的默认完整包，文件名带 `-without-cloudflared` 的是额外轻量包。只有完整包能够直接使用 Tunnel。轻量包仍显示 Tunnel 入口，但选择或启动时会提示当前安装未包含 cloudflared；此时请改用本机局域网，或下载同版本、同系统架构且文件名不带 `-without-cloudflared` 的默认完整包。Windows 自动更新会随目标版本安装或更新官方 cloudflared 文件；macOS 仍需手动安装完整包。
 
 ### 配置步骤
 
@@ -314,7 +314,7 @@ Cloudflare 路由策略：境外代理
 
 先检查：
 
-1. 如果提示“当前安装未包含 cloudflared”，确认下载的压缩包文件名是否带 `-with-cloudflared`；轻量包请改用本机局域网或重新安装完整包
+1. 如果提示“当前安装未包含 cloudflared”，确认下载的是同版本、同架构且文件名不带 `-without-cloudflared` 的默认完整包；轻量包请改用本机局域网或重新安装完整包
 2. 电脑是否能够访问互联网
 3. 系统时间是否正确
 4. 代理软件是否正在运行

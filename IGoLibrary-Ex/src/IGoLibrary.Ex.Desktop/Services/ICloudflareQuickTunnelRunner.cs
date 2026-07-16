@@ -18,7 +18,7 @@ internal sealed class CloudflaredUnavailableException : FileNotFoundException
 {
     internal const string UserMessage =
         "当前安装未包含 cloudflared，无法使用 Cloudflare Tunnel。" +
-        "请改用本机局域网，或安装文件名带 -with-cloudflared 的完整包";
+        "请改用本机局域网，或安装同版本、同架构且文件名不带 -without-cloudflared 的默认完整包";
 
     public CloudflaredUnavailableException(string executablePath)
         : base(UserMessage, executablePath)

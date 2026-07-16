@@ -39,9 +39,15 @@ public sealed class UpdateTransactionTests : IDisposable
     [Fact]
     public async Task Rollback_RestoresOldDirectoryAfterApply()
     {
-        var request = CreateRequest(includeLegacyOwnedTools: true);
+        var request = CreateRequest(
+            includeCurrentManagedCloudflared: true,
+            includeTargetManagedCloudflared: true);
         await UpdateTransaction.PrepareCandidateAsync(request);
         UpdateTransaction.Apply(request);
+
+        Assert.Equal("new-cloudflared", File.ReadAllText(GetManagedPath(
+            request.InstallationDirectory,
+            UpdateProtocol.ManagedCloudflaredExecutablePath)));
 
         UpdateTransaction.Rollback(request);
 
@@ -51,64 +57,125 @@ public sealed class UpdateTransactionTests : IDisposable
         Assert.True(File.Exists(Path.Combine(request.InstallationDirectory, "old-only.dll")));
         Assert.False(File.Exists(Path.Combine(request.InstallationDirectory, "new-only.dll")));
         Assert.Equal("user", File.ReadAllText(Path.Combine(request.InstallationDirectory, "user.txt")));
-        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(Path.Combine(
+        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(GetManagedPath(
             request.InstallationDirectory,
-            "tools",
-            "cloudflared",
-            "cloudflared.exe")));
+            UpdateProtocol.ManagedCloudflaredExecutablePath)));
+        Assert.False(File.Exists(GetManagedPath(
+            request.InstallationDirectory,
+            UpdateProtocol.ManagedCloudflaredLicensePath)));
         Assert.False(Directory.Exists(request.BackupDirectory));
     }
 
     [Fact]
-    public async Task PrepareApplyAndCommit_PreservesToolsOwnedByLegacyManifest()
+    public async Task PrepareApplyAndCommit_ReplacesManagedCloudflaredAndPreservesOtherTools()
     {
-        var request = CreateRequest(includeLegacyOwnedTools: true);
+        var request = CreateRequest(
+            includeCurrentManagedCloudflared: true,
+            includeTargetManagedCloudflared: true);
 
         await UpdateTransaction.PrepareCandidateAsync(request);
 
-        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(Path.Combine(
+        Assert.Equal("new-cloudflared", File.ReadAllText(GetManagedPath(
             request.CandidateDirectory,
-            "tools",
-            "cloudflared",
-            "cloudflared.exe")));
+            UpdateProtocol.ManagedCloudflaredExecutablePath)));
+        Assert.Equal("new-license", File.ReadAllText(GetManagedPath(
+            request.CandidateDirectory,
+            UpdateProtocol.ManagedCloudflaredLicensePath)));
+        Assert.Equal("new-notices", File.ReadAllText(GetManagedPath(
+            request.CandidateDirectory,
+            UpdateProtocol.ManagedCloudflaredNoticesPath)));
         Assert.Equal("user-added-tool", File.ReadAllText(Path.Combine(
             request.CandidateDirectory,
             "tools",
             "user-tool.txt")));
+        Assert.Equal("custom-cloudflared-config", File.ReadAllText(Path.Combine(
+            request.CandidateDirectory,
+            "tools",
+            "cloudflared",
+            "custom.json")));
 
         UpdateTransaction.Apply(request);
         UpdateTransaction.Commit(request);
 
-        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(Path.Combine(
+        Assert.Equal("new-cloudflared", File.ReadAllText(GetManagedPath(
             request.InstallationDirectory,
-            "tools",
-            "cloudflared",
-            "cloudflared.exe")));
+            UpdateProtocol.ManagedCloudflaredExecutablePath)));
         Assert.Equal("user-added-tool", File.ReadAllText(Path.Combine(
             request.InstallationDirectory,
             "tools",
             "user-tool.txt")));
+        Assert.Equal("custom-cloudflared-config", File.ReadAllText(Path.Combine(
+            request.InstallationDirectory,
+            "tools",
+            "cloudflared",
+            "custom.json")));
     }
 
     [Fact]
-    public async Task PrepareCandidateAsync_DoesNotCreateToolsWhenInstallationHasNone()
+    public async Task PrepareApplyAndCommit_InstallsManagedCloudflaredIntoLightweightInstallation()
+    {
+        var request = CreateRequest(includeTargetManagedCloudflared: true);
+
+        await UpdateTransaction.PrepareCandidateAsync(request);
+        UpdateTransaction.Apply(request);
+        UpdateTransaction.Commit(request);
+
+        Assert.Equal("new-cloudflared", File.ReadAllText(GetManagedPath(
+            request.InstallationDirectory,
+            UpdateProtocol.ManagedCloudflaredExecutablePath)));
+        Assert.Equal("new-license", File.ReadAllText(GetManagedPath(
+            request.InstallationDirectory,
+            UpdateProtocol.ManagedCloudflaredLicensePath)));
+        Assert.Equal("new-notices", File.ReadAllText(GetManagedPath(
+            request.InstallationDirectory,
+            UpdateProtocol.ManagedCloudflaredNoticesPath)));
+    }
+
+    [Fact]
+    public async Task PrepareCandidateAsync_CreatesOnlyManagedToolsForLightweightInstallation()
     {
         var request = CreateRequest();
 
         await UpdateTransaction.PrepareCandidateAsync(request);
 
-        Assert.False(Directory.Exists(Path.Combine(request.CandidateDirectory, "tools")));
+        var actualTools = Directory.EnumerateFiles(
+                Path.Combine(request.CandidateDirectory, "tools"),
+                "*",
+                SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(request.CandidateDirectory, path).Replace('\\', '/'))
+            .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        Assert.Equal(
+            UpdateProtocol.ManagedCloudflaredFilePaths
+                .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase),
+            actualTools,
+            StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task PrepareCandidateAsync_RejectsTargetToolsBeforeChangingInstallation()
+    public async Task PrepareCandidateAsync_RejectsTargetNonManagedToolsBeforeChangingInstallation()
     {
-        var request = CreateRequest(includeTargetTools: true);
+        var request = CreateRequest(includeTargetNonManagedTools: true);
 
         var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
             UpdateTransaction.PrepareCandidateAsync(request));
 
-        Assert.Contains("保留目录", exception.Message);
+        Assert.Contains("非托管 tools", exception.Message);
+        Assert.False(Directory.Exists(request.CandidateDirectory));
+        Assert.Equal("old-desktop", File.ReadAllText(Path.Combine(
+            request.InstallationDirectory,
+            UpdateProtocol.EntryExecutableName)));
+    }
+
+    [Fact]
+    public async Task PrepareCandidateAsync_RejectsTargetWithoutManagedCloudflaredBeforeChangingInstallation()
+    {
+        var request = CreateRequest(includeTargetManagedCloudflared: false);
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            UpdateTransaction.PrepareCandidateAsync(request));
+
+        Assert.Contains("必须完整声明", exception.Message);
         Assert.False(Directory.Exists(request.CandidateDirectory));
         Assert.Equal("old-desktop", File.ReadAllText(Path.Combine(
             request.InstallationDirectory,
@@ -131,7 +198,9 @@ public sealed class UpdateTransactionTests : IDisposable
     [Fact]
     public async Task PrepareCandidateFromArchiveAsync_RevalidatesProtectedArchiveInsteadOfTrustingStaging()
     {
-        var request = CreateRequest(includeLegacyOwnedTools: true);
+        var request = CreateRequest(
+            includeCurrentManagedCloudflared: true,
+            includeTargetManagedCloudflared: true);
         ZipFile.CreateFromDirectory(request.StagingDirectory, request.PackagePath);
         var digest = "sha256:" + Convert.ToHexString(
             SHA256.HashData(await File.ReadAllBytesAsync(request.PackagePath)));
@@ -150,11 +219,13 @@ public sealed class UpdateTransactionTests : IDisposable
             request.CandidateDirectory,
             UpdateProtocol.EntryExecutableName)));
         Assert.Equal("user", File.ReadAllText(Path.Combine(request.CandidateDirectory, "user.txt")));
-        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(Path.Combine(
+        Assert.Equal("new-cloudflared", File.ReadAllText(GetManagedPath(
+            request.CandidateDirectory,
+            UpdateProtocol.ManagedCloudflaredExecutablePath)));
+        Assert.Equal("user-added-tool", File.ReadAllText(Path.Combine(
             request.CandidateDirectory,
             "tools",
-            "cloudflared",
-            "cloudflared.exe")));
+            "user-tool.txt")));
     }
 
     [Fact]
@@ -173,7 +244,9 @@ public sealed class UpdateTransactionTests : IDisposable
     [Fact]
     public async Task RecoverInterruptedAsync_RestoresBackupWhenInstallPathIsMissing()
     {
-        var request = CreateRequest(includeLegacyOwnedTools: true);
+        var request = CreateRequest(
+            includeCurrentManagedCloudflared: true,
+            includeTargetManagedCloudflared: true);
         await UpdateTransaction.PrepareCandidateAsync(request);
         Directory.Move(request.InstallationDirectory, request.BackupDirectory);
 
@@ -185,11 +258,9 @@ public sealed class UpdateTransactionTests : IDisposable
         Assert.Equal("old-desktop", File.ReadAllText(Path.Combine(
             request.InstallationDirectory,
             UpdateProtocol.EntryExecutableName)));
-        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(Path.Combine(
+        Assert.Equal("user-upgraded-cloudflared", File.ReadAllText(GetManagedPath(
             request.InstallationDirectory,
-            "tools",
-            "cloudflared",
-            "cloudflared.exe")));
+            UpdateProtocol.ManagedCloudflaredExecutablePath)));
     }
 
     [Fact]
@@ -239,8 +310,9 @@ public sealed class UpdateTransactionTests : IDisposable
     }
 
     private UpdateTransactionRequest CreateRequest(
-        bool includeLegacyOwnedTools = false,
-        bool includeTargetTools = false)
+        bool includeCurrentManagedCloudflared = false,
+        bool includeTargetManagedCloudflared = true,
+        bool includeTargetNonManagedTools = false)
     {
         Directory.CreateDirectory(_root);
         var installation = Path.Combine(_root, "IGoLibrary-Ex");
@@ -251,9 +323,11 @@ public sealed class UpdateTransactionTests : IDisposable
             [UpdateProtocol.UpdaterExecutableName] = "old-updater",
             ["old-only.dll"] = "old"
         };
-        if (includeLegacyOwnedTools)
+        if (includeCurrentManagedCloudflared)
         {
-            installationFiles["tools/cloudflared/cloudflared.exe"] = "release-cloudflared";
+            installationFiles[UpdateProtocol.ManagedCloudflaredExecutablePath] = "release-cloudflared";
+            installationFiles[UpdateProtocol.ManagedCloudflaredLicensePath] = "release-license";
+            installationFiles[UpdateProtocol.ManagedCloudflaredNoticesPath] = "release-notices";
         }
 
         UpdatePackageValidatorTests.WritePackage(
@@ -262,14 +336,18 @@ public sealed class UpdateTransactionTests : IDisposable
             installationFiles);
         File.WriteAllText(Path.Combine(installation, "user.txt"), "user");
         File.WriteAllText(Path.Combine(installation, "appsettings.json"), "old-settings");
-        if (includeLegacyOwnedTools)
+        if (includeCurrentManagedCloudflared)
         {
             File.WriteAllText(
-                Path.Combine(installation, "tools", "cloudflared", "cloudflared.exe"),
+                GetManagedPath(installation, UpdateProtocol.ManagedCloudflaredExecutablePath),
                 "user-upgraded-cloudflared");
+            File.Delete(GetManagedPath(installation, UpdateProtocol.ManagedCloudflaredLicensePath));
             File.WriteAllText(
                 Path.Combine(installation, "tools", "user-tool.txt"),
                 "user-added-tool");
+            File.WriteAllText(
+                Path.Combine(installation, "tools", "cloudflared", "custom.json"),
+                "custom-cloudflared-config");
         }
 
         var stagingFiles = new Dictionary<string, string>
@@ -279,9 +357,15 @@ public sealed class UpdateTransactionTests : IDisposable
             ["new-only.dll"] = "new",
             ["appsettings.json"] = "new-settings"
         };
-        if (includeTargetTools)
+        if (includeTargetManagedCloudflared)
         {
-            stagingFiles["tools/cloudflared/cloudflared.exe"] = "forbidden-cloudflared";
+            stagingFiles[UpdateProtocol.ManagedCloudflaredExecutablePath] = "new-cloudflared";
+            stagingFiles[UpdateProtocol.ManagedCloudflaredLicensePath] = "new-license";
+            stagingFiles[UpdateProtocol.ManagedCloudflaredNoticesPath] = "new-notices";
+        }
+        if (includeTargetNonManagedTools)
+        {
+            stagingFiles["tools/custom-tool.exe"] = "forbidden-tool";
         }
 
         UpdatePackageValidatorTests.WritePackage(
@@ -316,5 +400,10 @@ public sealed class UpdateTransactionTests : IDisposable
             Path.Combine(transaction, "heartbeat.txt"),
             Path.Combine(transaction, "launched-process.json"),
             Path.Combine(_root, "logs"));
+    }
+
+    private static string GetManagedPath(string root, string relativePath)
+    {
+        return Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
     }
 }

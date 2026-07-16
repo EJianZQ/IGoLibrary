@@ -94,12 +94,26 @@ public static class UpdatePackageValidator
     public static void ValidateUpdatePayloadManifest(UpdatePackageManifest manifest)
     {
         ValidateManifest(manifest);
-        var preservedPath = manifest.Files
-            .Select(static file => UpdatePathSafety.NormalizeRelativePath(file.Path))
-            .FirstOrDefault(UpdateProtocol.IsPreservedInstallationPath);
-        if (preservedPath is not null)
+        var managedCloudflaredPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in manifest.Files)
         {
-            throw new InvalidDataException($"更新包不得管理保留目录：{preservedPath}");
+            var path = UpdatePathSafety.NormalizeRelativePath(file.Path);
+            if (!UpdateProtocol.IsRootToolsPath(path))
+            {
+                continue;
+            }
+
+            if (!UpdateProtocol.IsManagedCloudflaredFilePath(path))
+            {
+                throw new InvalidDataException($"更新包不得管理非托管 tools 文件：{path}");
+            }
+
+            managedCloudflaredPaths.Add(path);
+        }
+
+        if (!managedCloudflaredPaths.SetEquals(UpdateProtocol.ManagedCloudflaredFilePaths))
+        {
+            throw new InvalidDataException("自动更新目标包必须完整声明 cloudflared 可执行文件、许可证和第三方声明");
         }
     }
 
@@ -149,13 +163,17 @@ public static class UpdatePackageValidator
                 throw new InvalidDataException($"更新压缩包包含重复路径：{relativePath}");
             }
 
-            if (UpdateProtocol.IsPreservedInstallationPath(relativePath))
+            RejectLinkEntry(entry);
+            var isDirectory = entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\');
+            if (UpdateProtocol.IsRootToolsPath(relativePath) &&
+                !(isDirectory
+                    ? UpdateProtocol.IsManagedCloudflaredContainerPath(relativePath)
+                    : UpdateProtocol.IsManagedCloudflaredFilePath(relativePath)))
             {
-                throw new InvalidDataException($"更新压缩包不得包含保留目录：{relativePath}");
+                throw new InvalidDataException($"更新压缩包不得包含非托管 tools 路径：{relativePath}");
             }
 
-            RejectLinkEntry(entry);
-            if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\'))
+            if (isDirectory)
             {
                 continue;
             }
@@ -200,11 +218,9 @@ public static class UpdatePackageValidator
 
         var manifestPath = Path.Combine(destinationDirectory, UpdateProtocol.ManifestFileName);
         var manifest = LoadAndValidateManifest(manifestPath, expectedVersion);
-        ValidateUpdatePayloadManifest(manifest);
-        await ValidateDirectoryAsync(
+        await ValidateUpdatePayloadDirectoryAsync(
             destinationDirectory,
             manifest,
-            allowAdditionalFiles: false,
             cancellationToken);
         return manifest;
     }
@@ -281,7 +297,7 @@ public static class UpdatePackageValidator
             rootDirectory,
             manifest,
             allowAdditionalFiles,
-            ignorePreservedPaths: false,
+            ignoreRootToolsPaths: false,
             cancellationToken);
     }
 
@@ -294,7 +310,7 @@ public static class UpdatePackageValidator
             rootDirectory,
             manifest,
             allowAdditionalFiles: true,
-            ignorePreservedPaths: true,
+            ignoreRootToolsPaths: true,
             cancellationToken);
     }
 
@@ -306,32 +322,44 @@ public static class UpdatePackageValidator
         ValidateUpdatePayloadManifest(manifest);
         var root = Path.GetFullPath(rootDirectory);
         UpdatePathSafety.RejectReparsePoint(root);
-        var preservedRootEntry = Directory.EnumerateFileSystemEntries(root)
-            .FirstOrDefault(path => string.Equals(
-                Path.GetFileName(path),
-                UpdateProtocol.PreservedToolsDirectoryName,
-                StringComparison.OrdinalIgnoreCase));
-        if (preservedRootEntry is not null)
+        var hasToolsDirectory = false;
+        foreach (var directoryPath in EnumerateDirectoriesWithoutReparsePoints(root))
         {
-            throw new InvalidDataException(
-                $"更新包不得包含保留目录：{Path.GetFileName(preservedRootEntry)}");
+            var relativePath = UpdatePathSafety.NormalizeRelativePath(
+                Path.GetRelativePath(root, directoryPath));
+            if (!UpdateProtocol.IsRootToolsPath(relativePath))
+            {
+                continue;
+            }
+
+            hasToolsDirectory = true;
+            if (!UpdateProtocol.IsManagedCloudflaredContainerPath(relativePath))
+            {
+                throw new InvalidDataException($"更新包不得包含非托管 tools 目录：{relativePath}");
+            }
         }
 
         foreach (var filePath in EnumerateFilesWithoutReparsePoints(root))
         {
             var relativePath = UpdatePathSafety.NormalizeRelativePath(
                 Path.GetRelativePath(root, filePath));
-            if (UpdateProtocol.IsPreservedInstallationPath(relativePath))
+            if (UpdateProtocol.IsRootToolsPath(relativePath) &&
+                !UpdateProtocol.IsManagedCloudflaredFilePath(relativePath))
             {
-                throw new InvalidDataException($"更新包不得包含保留目录：{relativePath}");
+                throw new InvalidDataException($"更新包不得包含非托管 tools 文件：{relativePath}");
             }
+        }
+
+        if (!hasToolsDirectory)
+        {
+            throw new InvalidDataException("自动更新目标包缺少 cloudflared tools 目录");
         }
 
         await ValidateDirectoryCoreAsync(
             rootDirectory,
             manifest,
             allowAdditionalFiles: false,
-            ignorePreservedPaths: false,
+            ignoreRootToolsPaths: false,
             cancellationToken);
     }
 
@@ -339,7 +367,7 @@ public static class UpdatePackageValidator
         string rootDirectory,
         UpdatePackageManifest manifest,
         bool allowAdditionalFiles,
-        bool ignorePreservedPaths,
+        bool ignoreRootToolsPaths,
         CancellationToken cancellationToken)
     {
         ValidateManifest(manifest);
@@ -348,7 +376,7 @@ public static class UpdatePackageValidator
 
         var expected = manifest.Files
             .Select(static file => UpdatePathSafety.NormalizeRelativePath(file.Path))
-            .Where(path => !ignorePreservedPaths || !UpdateProtocol.IsPreservedInstallationPath(path))
+            .Where(path => !ignoreRootToolsPaths || !UpdateProtocol.IsRootToolsPath(path))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         expected.Add(UpdateProtocol.ManifestFileName);
 
@@ -370,7 +398,7 @@ public static class UpdatePackageValidator
         foreach (var file in manifest.Files)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (ignorePreservedPaths && UpdateProtocol.IsPreservedInstallationPath(file.Path))
+            if (ignoreRootToolsPaths && UpdateProtocol.IsRootToolsPath(file.Path))
             {
                 continue;
             }
@@ -476,6 +504,32 @@ public static class UpdatePackageValidator
                 {
                     yield return entry;
                 }
+            }
+        }
+    }
+
+    internal static IEnumerable<string> EnumerateDirectoriesWithoutReparsePoints(string rootDirectory)
+    {
+        var pending = new Stack<string>();
+        pending.Push(rootDirectory);
+        while (pending.Count > 0)
+        {
+            var directory = pending.Pop();
+            foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+            {
+                var attributes = File.GetAttributes(entry);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new InvalidDataException($"目录包含不受支持的链接或联接：{entry}");
+                }
+
+                if ((attributes & FileAttributes.Directory) == 0)
+                {
+                    continue;
+                }
+
+                yield return entry;
+                pending.Push(entry);
             }
         }
     }

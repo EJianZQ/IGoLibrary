@@ -57,18 +57,23 @@ $AppDir = Join-Path $AppOutputRoot "$AppName.app"
 $ContentsDir = Join-Path $AppDir "Contents"
 $MacOSDir = Join-Path $ContentsDir "MacOS"
 $ResourcesDir = Join-Path $ContentsDir "Resources"
+$ExpectedPackageName = switch ($Runtime) {
+    "osx-arm64" { "$AppName-v$AppVersion-macOS-Apple-Silicon-arm64-without-cloudflared.zip" }
+    "osx-x64" { "$AppName-v$AppVersion-macOS-Intel-x64-without-cloudflared.zip" }
+}
+$ExpectedBundledPackageName = switch ($Runtime) {
+    "osx-arm64" { "$AppName-v$AppVersion-macOS-Apple-Silicon-arm64.zip" }
+    "osx-x64" { "$AppName-v$AppVersion-macOS-Intel-x64.zip" }
+}
+$LegacyBundledPackageName = switch ($Runtime) {
+    "osx-arm64" { "$AppName-v$AppVersion-macOS-Apple-Silicon-arm64-with-cloudflared.zip" }
+    "osx-x64" { "$AppName-v$AppVersion-macOS-Intel-x64-with-cloudflared.zip" }
+}
 if ([string]::IsNullOrWhiteSpace($PackageName)) {
-    $PackageName = switch ($Runtime) {
-        "osx-arm64" { "$AppName-v$AppVersion-macOS-Apple-Silicon-arm64.zip" }
-        "osx-x64" { "$AppName-v$AppVersion-macOS-Intel-x64.zip" }
-        default { "$AppName-v$AppVersion-$Runtime.zip" }
-    }
+    $PackageName = $ExpectedPackageName
 }
 if ([string]::IsNullOrWhiteSpace($BundledPackageName)) {
-    $BundledPackageName = switch ($Runtime) {
-        "osx-arm64" { "$AppName-v$AppVersion-macOS-Apple-Silicon-arm64-with-cloudflared.zip" }
-        "osx-x64" { "$AppName-v$AppVersion-macOS-Intel-x64-with-cloudflared.zip" }
-    }
+    $BundledPackageName = $ExpectedBundledPackageName
 }
 foreach ($candidatePackageName in @($PackageName, $BundledPackageName)) {
     if ([string]::IsNullOrWhiteSpace($candidatePackageName) -or
@@ -84,6 +89,14 @@ if ($PackageName -ieq $BundledPackageName) {
 }
 $ZipPath = Join-Path $AppOutputRoot $PackageName
 $BundledZipPath = Join-Path $AppOutputRoot $BundledPackageName
+$LegacyBundledZipPath = if (
+    $PackageName -ceq $ExpectedPackageName -and
+    $BundledPackageName -ceq $ExpectedBundledPackageName) {
+    Join-Path $AppOutputRoot $LegacyBundledPackageName
+}
+else {
+    $null
+}
 $PackageStaging = [System.IO.Path]::GetFullPath((Join-Path $ArtifactsRoot "staging\macos\$Runtime\packages"))
 $StagedZipPath = Join-Path $PackageStaging $PackageName
 $StagedBundledZipPath = Join-Path $PackageStaging $BundledPackageName
@@ -405,23 +418,44 @@ function Test-MacAppZip {
     $resolvedPath = (Resolve-Path -LiteralPath $Path).Path
     $archive = [System.IO.Compression.ZipFile]::OpenRead($resolvedPath)
     try {
-        $fileEntries = @($archive.Entries | Where-Object { -not [string]::IsNullOrEmpty($_.Name) })
+        $archiveEntries = @($archive.Entries | Where-Object {
+            $_.FullName.TrimEnd('/', '\').Length -gt 0
+        })
+        $fileEntries = @($archiveEntries | Where-Object {
+            -not ($_.FullName.EndsWith('/') -or $_.FullName.EndsWith('\'))
+        })
+        $directoryEntries = @($archiveEntries | Where-Object {
+            $_.FullName.EndsWith('/') -or $_.FullName.EndsWith('\')
+        })
         $entryByPath = [System.Collections.Generic.Dictionary[string, System.IO.Compression.ZipArchiveEntry]]::new(
             [System.StringComparer]::OrdinalIgnoreCase)
-        foreach ($entry in $fileEntries) {
-            if (-not $entryByPath.TryAdd($entry.FullName, $entry)) {
-                throw "macOS ZIP 包含大小写重复路径：$($entry.FullName)"
+        $pathSet = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($entry in $archiveEntries) {
+            $path = $entry.FullName.TrimEnd('/', '\')
+            if ($entry.FullName.Contains('\') -or
+                $path.StartsWith('/', [System.StringComparison]::Ordinal) -or
+                $path.Split('/') -contains '..') {
+                throw "macOS ZIP 包含非法路径：$path"
+            }
+            if (-not $pathSet.Add($path)) {
+                throw "macOS ZIP 包含大小写重复路径：$path"
+            }
+            if (-not ($entry.FullName.EndsWith('/') -or $entry.FullName.EndsWith('\'))) {
+                $entryByPath.Add($path, $entry)
             }
         }
 
         $appPrefix = "$AppName.app/"
         $guideName = [System.IO.Path]::GetFileName($FirstRunGuidePath)
         $commandName = [System.IO.Path]::GetFileName($FirstRunCommandPath)
-        foreach ($entry in $fileEntries) {
-            if (-not $entry.FullName.StartsWith($appPrefix, [System.StringComparison]::Ordinal) -and
-                $entry.FullName -cne $guideName -and
-                $entry.FullName -cne $commandName) {
-                throw "macOS ZIP 包含应用目录之外的意外文件：$($entry.FullName)"
+        foreach ($entry in $archiveEntries) {
+            $path = $entry.FullName.TrimEnd('/', '\')
+            if ($path -cne ($AppName + '.app') -and
+                -not $path.StartsWith($appPrefix, [System.StringComparison]::Ordinal) -and
+                $path -cne $guideName -and
+                $path -cne $commandName) {
+                throw "macOS ZIP 包含应用目录之外的意外条目：$path"
             }
         }
 
@@ -433,6 +467,35 @@ function Test-MacAppZip {
         }
 
         $toolsPrefix = $appPrefix + 'Contents/MacOS/tools/'
+        $toolsRoot = $toolsPrefix.TrimEnd('/')
+        $actualToolDirectoryPaths = @(
+            $directoryEntries |
+                ForEach-Object { $_.FullName.TrimEnd('/', '\') } |
+                Where-Object {
+                    $_.Equals($toolsRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+                    $_.StartsWith($toolsRoot + '/', [System.StringComparison]::OrdinalIgnoreCase)
+                }
+        )
+        $expectedToolDirectoryPaths = if ($IncludeTools) {
+            @($toolsRoot, ($toolsRoot + '/cloudflared'))
+        }
+        else {
+            @()
+        }
+        $actualToolDirectorySet = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($directoryPath in $actualToolDirectoryPaths) {
+            $null = $actualToolDirectorySet.Add($directoryPath)
+        }
+        $expectedToolDirectorySet = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($directoryPath in $expectedToolDirectoryPaths) {
+            $null = $expectedToolDirectorySet.Add($directoryPath)
+        }
+        if (-not $actualToolDirectorySet.SetEquals($expectedToolDirectorySet)) {
+            $variant = if ($IncludeTools) { '完整包' } else { '轻量包' }
+            throw "$variant 的 tools 目录集合无效。实际：$($actualToolDirectoryPaths -join ', ')"
+        }
         $actualToolPaths = @(
             $fileEntries |
                 Where-Object {
@@ -523,13 +586,16 @@ function Install-ValidatedPackagePair {
         [Parameter(Mandatory)][string]$StagedLightweightPath,
         [Parameter(Mandatory)][string]$StagedBundledPath,
         [Parameter(Mandatory)][string]$FinalLightweightPath,
-        [Parameter(Mandatory)][string]$FinalBundledPath
+        [Parameter(Mandatory)][string]$FinalBundledPath,
+        [AllowNull()][string]$LegacyBundledPath
     )
 
     $previousLightweightPath = Join-Path $PackageStaging '.previous-lightweight.zip'
     $previousBundledPath = Join-Path $PackageStaging '.previous-bundled.zip'
+    $previousLegacyBundledPath = Join-Path $PackageStaging '.previous-legacy-with-cloudflared.zip'
     $lightweightBackedUp = $false
     $bundledBackedUp = $false
+    $legacyBundledBackedUp = $false
     $lightweightInstalled = $false
     $bundledInstalled = $false
     try {
@@ -540,6 +606,11 @@ function Install-ValidatedPackagePair {
         if (Test-Path -LiteralPath $FinalBundledPath) {
             Move-Item -LiteralPath $FinalBundledPath -Destination $previousBundledPath
             $bundledBackedUp = $true
+        }
+        if (-not [string]::IsNullOrWhiteSpace($LegacyBundledPath) -and
+            (Test-Path -LiteralPath $LegacyBundledPath)) {
+            Move-Item -LiteralPath $LegacyBundledPath -Destination $previousLegacyBundledPath
+            $legacyBundledBackedUp = $true
         }
 
         Move-Item -LiteralPath $StagedLightweightPath -Destination $FinalLightweightPath
@@ -561,10 +632,16 @@ function Install-ValidatedPackagePair {
         if ($bundledBackedUp -and (Test-Path -LiteralPath $previousBundledPath)) {
             Move-Item -LiteralPath $previousBundledPath -Destination $FinalBundledPath
         }
+        if ($legacyBundledBackedUp -and (Test-Path -LiteralPath $previousLegacyBundledPath)) {
+            Move-Item -LiteralPath $previousLegacyBundledPath -Destination $LegacyBundledPath
+        }
         throw
     }
 
-    foreach ($backupPath in @($previousLightweightPath, $previousBundledPath)) {
+    foreach ($backupPath in @(
+        $previousLightweightPath,
+        $previousBundledPath,
+        $previousLegacyBundledPath)) {
         if (Test-Path -LiteralPath $backupPath) {
             Remove-Item -LiteralPath $backupPath -Force
         }
@@ -634,6 +711,7 @@ try {
         StagedBundledPath = $StagedBundledZipPath
         FinalLightweightPath = $ZipPath
         FinalBundledPath = $BundledZipPath
+        LegacyBundledPath = $LegacyBundledZipPath
     }
     Install-ValidatedPackagePair @installParameters
 }
@@ -644,8 +722,8 @@ finally {
 Write-Host "Published files to $PublishOutput"
 Write-Host "Created macOS app bundle at $AppDir"
 foreach ($package in @(
-    [pscustomobject]@{ Label = 'macOS lightweight ZIP'; Path = $ZipPath },
-    [pscustomobject]@{ Label = 'macOS cloudflared ZIP'; Path = $BundledZipPath }
+    [pscustomobject]@{ Label = 'macOS without-cloudflared ZIP'; Path = $ZipPath },
+    [pscustomobject]@{ Label = 'macOS default cloudflared ZIP'; Path = $BundledZipPath }
 )) {
     $packageInfo = Get-Item -LiteralPath $package.Path
     $packageHash = (Get-FileHash -LiteralPath $package.Path -Algorithm SHA256).Hash.ToLowerInvariant()

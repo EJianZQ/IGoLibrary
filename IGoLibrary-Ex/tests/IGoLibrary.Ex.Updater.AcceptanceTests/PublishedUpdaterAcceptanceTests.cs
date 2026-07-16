@@ -25,6 +25,81 @@ public sealed class PublishedUpdaterAcceptanceTests
     }
 
     [Fact]
+    public async Task PublishedAotWorker_InstallsManagedCloudflaredAndPreservesOtherTools()
+    {
+        await using var scenario = new AcceptanceDirectory("worker-cloudflared-commit");
+        var aotUpdater = PublishedUpdaterEnvironment.AotUpdaterPath;
+        await PublishedUpdaterTestHarness.CreateInstallationAsync(
+            scenario,
+            "1.0.0",
+            aotUpdater);
+        var customToolPath = Path.Combine(
+            scenario.InstallationDirectory,
+            "tools",
+            "cloudflared",
+            "custom.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(customToolPath)!);
+        await File.WriteAllTextAsync(customToolPath, "custom-tool-content");
+
+        await PublishedUpdaterTestHarness.RunWorkerTransactionAsync(
+            scenario,
+            "1.0.0",
+            "1.0.1",
+            aotUpdater,
+            aotUpdater,
+            UpdateDecisionKind.Commit,
+            includeManagedCloudflared: true);
+
+        Assert.Equal("custom-tool-content", await File.ReadAllTextAsync(customToolPath));
+    }
+
+    [Fact]
+    public async Task PublishedAotWorker_RollbackRestoresUserReplacedCloudflared()
+    {
+        await using var scenario = new AcceptanceDirectory("worker-cloudflared-rollback");
+        var aotUpdater = PublishedUpdaterEnvironment.AotUpdaterPath;
+        await PublishedUpdaterTestHarness.CreateInstallationAsync(
+            scenario,
+            "1.0.0",
+            aotUpdater);
+        foreach (var (relativePath, content) in new[]
+                 {
+                     (UpdateProtocol.ManagedCloudflaredExecutablePath, "user-cloudflared"),
+                     (UpdateProtocol.ManagedCloudflaredLicensePath, "user-license"),
+                     (UpdateProtocol.ManagedCloudflaredNoticesPath, "user-notices")
+                 })
+        {
+            var path = UpdatePathSafety.GetSafeChildPath(
+                scenario.InstallationDirectory,
+                relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await File.WriteAllTextAsync(path, content);
+        }
+
+        await PublishedUpdaterTestHarness.RunWorkerTransactionAsync(
+            scenario,
+            "1.0.0",
+            "1.0.1",
+            aotUpdater,
+            aotUpdater,
+            UpdateDecisionKind.Rollback,
+            includeManagedCloudflared: true);
+
+        Assert.Equal("user-cloudflared", await File.ReadAllTextAsync(
+            UpdatePathSafety.GetSafeChildPath(
+                scenario.InstallationDirectory,
+                UpdateProtocol.ManagedCloudflaredExecutablePath)));
+        Assert.Equal("user-license", await File.ReadAllTextAsync(
+            UpdatePathSafety.GetSafeChildPath(
+                scenario.InstallationDirectory,
+                UpdateProtocol.ManagedCloudflaredLicensePath)));
+        Assert.Equal("user-notices", await File.ReadAllTextAsync(
+            UpdatePathSafety.GetSafeChildPath(
+                scenario.InstallationDirectory,
+                UpdateProtocol.ManagedCloudflaredNoticesPath)));
+    }
+
+    [Fact]
     public async Task PublishedAotWorker_RollsBackAfterExplicitDecision()
     {
         await using var scenario = new AcceptanceDirectory("worker-rollback");
@@ -70,6 +145,16 @@ public sealed class PublishedUpdaterAcceptanceTests
             aotUpdater,
             decision: null,
             corruptPayloadAfterManifest: true);
+
+        await PublishedUpdaterTestHarness.RunWorkerTransactionAsync(
+            scenario,
+            "1.0.0",
+            "1.0.1",
+            aotUpdater,
+            aotUpdater,
+            decision: null,
+            corruptPayloadAfterManifest: true,
+            corruptManagedCloudflaredAfterManifest: true);
     }
 
     [Fact]
@@ -105,7 +190,8 @@ public sealed class PublishedUpdaterAcceptanceTests
             scenario.InstallationDirectory,
             "1.0.1",
             aotUpdater,
-            expectPreservedTools: true);
+            expectPreservedTools: true,
+            expectedManagedCloudflaredVersion: "1.0.1");
 
         using var recovery = PublishedUpdaterTestHarness.StartProcess(
             artifacts.TransactionUpdaterPath,
@@ -121,6 +207,8 @@ public sealed class PublishedUpdaterAcceptanceTests
             "1.0.0",
             aotUpdater,
             expectPreservedTools: true);
+        PublishedUpdaterTestHarness.AssertManagedCloudflaredAbsent(
+            scenario.InstallationDirectory);
         Assert.False(Directory.Exists(request.BackupDirectory));
         Assert.False(Directory.Exists(request.CandidateDirectory));
     }
@@ -145,7 +233,8 @@ public sealed class PublishedUpdaterAcceptanceTests
             "1.0.1",
             aotUpdater,
             managedUpdater,
-            UpdateDecisionKind.Commit);
+            UpdateDecisionKind.Commit,
+            includeManagedCloudflared: false);
 
         var installedAotUpdater = Path.Combine(
             scenario.InstallationDirectory,
@@ -161,7 +250,8 @@ public sealed class PublishedUpdaterAcceptanceTests
             scenario.InstallationDirectory,
             "1.0.2",
             aotUpdater,
-            expectPreservedTools: true);
+            expectPreservedTools: true,
+            expectedManagedCloudflaredVersion: "1.0.2");
     }
 
     [Fact]
@@ -290,7 +380,8 @@ public sealed class PublishedUpdaterAcceptanceTests
                     scenario.InstallationDirectory,
                     "1.0.1",
                     aotUpdater,
-                    expectPreservedTools: true);
+                    expectPreservedTools: true,
+                    expectedManagedCloudflaredVersion: "1.0.1");
                 Assert.False(File.Exists(artifacts.PackagePath));
                 Assert.False(Directory.Exists(artifacts.StagingDirectory));
                 return;
@@ -318,6 +409,8 @@ public sealed class PublishedUpdaterAcceptanceTests
                 "1.0.0",
                 aotUpdater,
                 expectPreservedTools: true);
+            PublishedUpdaterTestHarness.AssertManagedCloudflaredAbsent(
+                scenario.InstallationDirectory);
             Assert.False(Directory.Exists(request.BackupDirectory));
             Assert.False(Directory.Exists(request.CandidateDirectory));
         }

@@ -336,17 +336,17 @@ public sealed class UpdateCheckServiceTests
     }
 
     [Fact]
-    public async Task CheckAsync_IgnoresBundledCloudflaredAssetAndSelectsLightweightAsset()
+    public async Task CheckAsync_IgnoresWithoutCloudflaredAssetAndSelectsDefaultPackage()
     {
-        var lightweight = WindowsAsset("1.0.1");
-        var bundled = lightweight with
+        var defaultPackage = WindowsAsset("1.0.1");
+        var withoutCloudflared = defaultPackage with
         {
-            Name = "IGoLibrary-Ex-v1.0.1-windows-x64-with-cloudflared.zip",
+            Name = "IGoLibrary-Ex-v1.0.1-windows-x64-without-cloudflared.zip",
             BrowserDownloadUrl = new Uri(
                 "https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/" +
-                "IGoLibrary-Ex-v1.0.1-windows-x64-with-cloudflared.zip")
+                "IGoLibrary-Ex-v1.0.1-windows-x64-without-cloudflared.zip")
         };
-        var release = Release("v1.0.1") with { Assets = [bundled, lightweight] };
+        var release = Release("v1.0.1") with { Assets = [withoutCloudflared, defaultPackage] };
         var service = CreateService(Parse("1.0.0"), new FakeGitHubReleaseClient(release));
 
         var result = await service.CheckAsync(UpdateCheckMode.Manual);

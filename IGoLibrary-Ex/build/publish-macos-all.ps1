@@ -26,14 +26,14 @@ $targets = @(
     [pscustomobject]@{
         Runtime = "osx-arm64"
         DisplayName = "Apple Silicon"
-        PackageName = "IGoLibrary-Ex-v$AppVersion-macOS-Apple-Silicon-arm64.zip"
-        BundledPackageName = "IGoLibrary-Ex-v$AppVersion-macOS-Apple-Silicon-arm64-with-cloudflared.zip"
+        PackageName = "IGoLibrary-Ex-v$AppVersion-macOS-Apple-Silicon-arm64-without-cloudflared.zip"
+        BundledPackageName = "IGoLibrary-Ex-v$AppVersion-macOS-Apple-Silicon-arm64.zip"
     },
     [pscustomobject]@{
         Runtime = "osx-x64"
         DisplayName = "Intel"
-        PackageName = "IGoLibrary-Ex-v$AppVersion-macOS-Intel-x64.zip"
-        BundledPackageName = "IGoLibrary-Ex-v$AppVersion-macOS-Intel-x64-with-cloudflared.zip"
+        PackageName = "IGoLibrary-Ex-v$AppVersion-macOS-Intel-x64-without-cloudflared.zip"
+        BundledPackageName = "IGoLibrary-Ex-v$AppVersion-macOS-Intel-x64.zip"
     }
 )
 
@@ -61,8 +61,8 @@ Write-Host "macOS packages are ready:"
 foreach ($target in $targets) {
     $runtimeOutput = Join-Path $OutputRoot $target.Runtime
     foreach ($package in @(
-        [pscustomobject]@{ Label = 'lightweight'; Name = $target.PackageName },
-        [pscustomobject]@{ Label = 'with cloudflared'; Name = $target.BundledPackageName }
+        [pscustomobject]@{ Label = 'without cloudflared'; Name = $target.PackageName },
+        [pscustomobject]@{ Label = 'default with cloudflared'; Name = $target.BundledPackageName }
     )) {
         $packagePath = Join-Path $runtimeOutput $package.Name
         $packageInfo = Get-Item -LiteralPath $packagePath

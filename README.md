@@ -227,10 +227,10 @@ Windows 脚本会从同一次发布生成两个 ZIP：
 
 ```text
 artifacts\windows\win-x64\IGoLibrary-Ex-v1.0.1-windows-x64.zip
-artifacts\windows\win-x64\IGoLibrary-Ex-v1.0.1-windows-x64-with-cloudflared.zip
+artifacts\windows\win-x64\IGoLibrary-Ex-v1.0.1-windows-x64-without-cloudflared.zip
 ```
 
-无后缀包是不含 `tools` 的轻量包，也是应用内自动更新唯一会选择的资产；`-with-cloudflared` 是带 Cloudflare Tunnel 组件、许可证和第三方声明的完整包，供需要 Tunnel 的用户手动下载。
+无后缀包是带 Cloudflare Tunnel 组件、许可证和第三方声明的默认完整包，也是应用内自动更新唯一会选择的资产；`-without-cloudflared` 是完全不含 `tools` 的额外轻量包。Windows 自动更新会安装或更新官方 cloudflared 三文件，同时保留 `tools` 下用户添加的其它文件。
 
 macOS
 
@@ -245,12 +245,12 @@ cd .\IGoLibrary-Ex
 
 ```text
 artifacts\macos\osx-arm64\IGoLibrary-Ex-v1.0.1-macOS-Apple-Silicon-arm64.zip
-artifacts\macos\osx-arm64\IGoLibrary-Ex-v1.0.1-macOS-Apple-Silicon-arm64-with-cloudflared.zip
+artifacts\macos\osx-arm64\IGoLibrary-Ex-v1.0.1-macOS-Apple-Silicon-arm64-without-cloudflared.zip
 artifacts\macos\osx-x64\IGoLibrary-Ex-v1.0.1-macOS-Intel-x64.zip
-artifacts\macos\osx-x64\IGoLibrary-Ex-v1.0.1-macOS-Intel-x64-with-cloudflared.zip
+artifacts\macos\osx-x64\IGoLibrary-Ex-v1.0.1-macOS-Intel-x64-without-cloudflared.zip
 ```
 
-按芯片架构选择包，并根据是否需要 Cloudflare Tunnel 选择轻量版或 `-with-cloudflared` 完整版。两个变体解压后都使用同一个 `IGoLibrary-Ex.app` 名称；用户应打开 `.app`，不要直接双击应用包内部的 `IGoLibrary.Ex.Desktop` 可执行文件。
+按芯片架构选择包：通常下载无后缀默认完整包；只有明确不需要 Cloudflare Tunnel 时才选择 `-without-cloudflared` 轻量包。两个变体解压后都使用同一个 `IGoLibrary-Ex.app` 名称；用户应打开 `.app`，不要直接双击应用包内部的 `IGoLibrary.Ex.Desktop` 可执行文件。
 
 如果只想单独发布某一个架构，也可以直接调用单架构脚本：
 
@@ -266,7 +266,7 @@ cd ./IGoLibrary-Ex
 APP_VERSION=1.0.1 ./build/publish-macos.sh Release osx-arm64
 ```
 
-轻量包仍保留 Cloudflare Tunnel 的 UI 入口，但选择 Tunnel 时会明确提示当前安装未包含 cloudflared。请改用本机局域网或安装对应架构的 `-with-cloudflared` 完整包；当前版本不会自动下载该工具。
+轻量包仍保留 Cloudflare Tunnel 的 UI 入口，但选择 Tunnel 时会明确提示当前安装未包含 cloudflared。请改用本机局域网，或安装同版本、同架构且文件名不带 `-without-cloudflared` 的默认完整包。Windows 用户也可升级到提供新自动更新契约的版本，由后续自动更新安装并更新官方 cloudflared 文件；macOS 仍需手动安装完整包。
 
 未签名、未公证的 macOS 包首次运行时，系统可能会拦截并提示“已损坏，无法打开”。zip 内已包含 `macOS首次运行说明.txt` 和 `首次运行.command`，用户可按说明解除隔离标记后再打开 `IGoLibrary-Ex.app`。
 

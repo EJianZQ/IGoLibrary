@@ -52,10 +52,9 @@ $symbolsOutput = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "symbol
 $packageOutput = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "windows\$Runtime"))
 $lightweightStaging = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "staging\windows\$Runtime\no-tools"))
 $packageStaging = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "staging\windows\$Runtime\packages"))
-$manifestPath = Join-Path $output 'update-manifest.json'
-
-$expectedPackageName = "IGoLibrary-Ex-v$AppVersion-windows-x64.zip"
-$expectedBundledPackageName = "IGoLibrary-Ex-v$AppVersion-windows-x64-with-cloudflared.zip"
+$expectedPackageName = "IGoLibrary-Ex-v$AppVersion-windows-x64-without-cloudflared.zip"
+$expectedBundledPackageName = "IGoLibrary-Ex-v$AppVersion-windows-x64.zip"
+$legacyBundledPackageName = "IGoLibrary-Ex-v$AppVersion-windows-x64-with-cloudflared.zip"
 if ([string]::IsNullOrWhiteSpace($PackageName)) {
     $PackageName = $expectedPackageName
 }
@@ -63,10 +62,10 @@ if ([string]::IsNullOrWhiteSpace($BundledPackageName)) {
     $BundledPackageName = $expectedBundledPackageName
 }
 if ($PackageName -cne $expectedPackageName) {
-    throw "Windows 自动更新包名称必须为 $expectedPackageName。"
+    throw "Windows 不含 cloudflared 的轻量包名称必须为 $expectedPackageName。"
 }
 if ($BundledPackageName -cne $expectedBundledPackageName) {
-    throw "Windows cloudflared 完整包名称必须为 $expectedBundledPackageName。"
+    throw "Windows 默认 cloudflared 完整包名称必须为 $expectedBundledPackageName。"
 }
 if ($PackageName -ieq $BundledPackageName) {
     throw '轻量包和 cloudflared 完整包不能使用同一个文件名。'
@@ -74,6 +73,7 @@ if ($PackageName -ieq $BundledPackageName) {
 
 $zipPath = Join-Path $packageOutput $PackageName
 $bundledZipPath = Join-Path $packageOutput $BundledPackageName
+$legacyBundledZipPath = Join-Path $packageOutput $legacyBundledPackageName
 $stagedZipPath = Join-Path $packageStaging $PackageName
 $stagedBundledZipPath = Join-Path $packageStaging $BundledPackageName
 $stagedSymbolsOutput = Join-Path $packageStaging 'symbols'
@@ -404,6 +404,112 @@ function Test-IsToolsRelativePath {
         $RelativePath.StartsWith('tools/', [System.StringComparison]::OrdinalIgnoreCase)
 }
 
+$managedCloudflaredRelativePaths = @(
+    'tools/cloudflared/cloudflared.exe',
+    'tools/cloudflared/LICENSE.txt',
+    'tools/cloudflared/THIRD-PARTY-NOTICES.txt'
+)
+
+function Test-IsManagedCloudflaredRelativePath {
+    param([Parameter(Mandatory)][string]$RelativePath)
+
+    foreach ($managedPath in $managedCloudflaredRelativePaths) {
+        if ($RelativePath.Equals($managedPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-IsManagedCloudflaredContainerRelativePath {
+    param([Parameter(Mandatory)][string]$RelativePath)
+
+    return $RelativePath.Equals('tools', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $RelativePath.Equals('tools/cloudflared', [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Write-UpdateManifest {
+    param(
+        [Parameter(Mandatory)][string]$RootDirectory,
+        [Parameter(Mandatory)][bool]$IncludeCloudflared
+    )
+
+    $toolDirectories = @(
+        Get-ChildItem -LiteralPath $RootDirectory -Directory -Recurse | ForEach-Object {
+            [System.IO.Path]::GetRelativePath($RootDirectory, $_.FullName).Replace('\', '/')
+        } | Where-Object { Test-IsToolsRelativePath -RelativePath $_ }
+    )
+    foreach ($relativePath in $toolDirectories) {
+        if (-not $IncludeCloudflared) {
+            throw "不含 cloudflared 的轻量包不得包含 tools 目录：$relativePath"
+        }
+        if (-not (Test-IsManagedCloudflaredContainerRelativePath -RelativePath $relativePath)) {
+            throw "默认完整包包含不受支持的 tools 目录：$relativePath"
+        }
+    }
+
+    $manifestFiles = @(
+        Get-ChildItem -LiteralPath $RootDirectory -File -Recurse | ForEach-Object {
+            $relativePath = [System.IO.Path]::GetRelativePath($RootDirectory, $_.FullName).Replace('\', '/')
+            if ($relativePath -ceq 'update-manifest.json') {
+                return
+            }
+
+            if (Test-IsToolsRelativePath -RelativePath $relativePath) {
+                if (-not $IncludeCloudflared) {
+                    throw "不含 cloudflared 的轻量包不得包含 tools 文件：$relativePath"
+                }
+                if (-not (Test-IsManagedCloudflaredRelativePath -RelativePath $relativePath)) {
+                    throw "默认完整包包含不受支持的 tools 文件：$relativePath"
+                }
+            }
+
+            [pscustomobject][ordered]@{
+                path = $relativePath
+                size = [long]$_.Length
+                sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+        } | Sort-Object { $_.path.ToUpperInvariant() }, path
+    )
+
+    $actualManagedPaths = @(
+        $manifestFiles |
+            Where-Object { Test-IsManagedCloudflaredRelativePath -RelativePath $_.path } |
+            ForEach-Object path
+    )
+    $actualManagedSet = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($path in $actualManagedPaths) {
+        $null = $actualManagedSet.Add($path)
+    }
+    $expectedManagedSet = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase)
+    if ($IncludeCloudflared) {
+        foreach ($path in $managedCloudflaredRelativePaths) {
+            $null = $expectedManagedSet.Add($path)
+        }
+    }
+    if (-not $actualManagedSet.SetEquals($expectedManagedSet)) {
+        $variant = if ($IncludeCloudflared) { '默认完整包' } else { '轻量包' }
+        throw "$variant 的 cloudflared manifest 文件集合无效。实际：$($actualManagedPaths -join ', ')"
+    }
+
+    $manifest = [pscustomobject][ordered]@{
+        schemaVersion = 2
+        product = 'IGoLibrary-Ex'
+        version = $AppVersion
+        runtime = 'win-x64'
+        entryExecutable = 'IGoLibrary.Ex.Desktop.exe'
+        files = $manifestFiles
+    }
+    $manifestJson = $manifest | ConvertTo-Json -Depth 6
+    [System.IO.File]::WriteAllText(
+        (Join-Path $RootDirectory 'update-manifest.json'),
+        $manifestJson,
+        [System.Text.UTF8Encoding]::new($false))
+}
+
 function Copy-DirectoryWithoutTools {
     param(
         [Parameter(Mandatory)][string]$Source,
@@ -434,14 +540,17 @@ function Install-ValidatedReleaseArtifacts {
         [Parameter(Mandatory)][string]$StagedSymbolsPath,
         [Parameter(Mandatory)][string]$FinalLightweightPath,
         [Parameter(Mandatory)][string]$FinalBundledPath,
+        [Parameter(Mandatory)][string]$LegacyBundledPath,
         [Parameter(Mandatory)][string]$FinalSymbolsPath
     )
 
     $previousLightweightPath = Join-Path $packageStaging '.previous-lightweight.zip'
     $previousBundledPath = Join-Path $packageStaging '.previous-bundled.zip'
+    $previousLegacyBundledPath = Join-Path $packageStaging '.previous-legacy-with-cloudflared.zip'
     $previousSymbolsPath = Join-Path $packageStaging '.previous-symbols'
     $lightweightBackedUp = $false
     $bundledBackedUp = $false
+    $legacyBundledBackedUp = $false
     $symbolsBackedUp = $false
     $lightweightInstalled = $false
     $bundledInstalled = $false
@@ -461,6 +570,10 @@ function Install-ValidatedReleaseArtifacts {
         if (Test-Path -LiteralPath $FinalBundledPath) {
             Move-Item -LiteralPath $FinalBundledPath -Destination $previousBundledPath
             $bundledBackedUp = $true
+        }
+        if (Test-Path -LiteralPath $LegacyBundledPath) {
+            Move-Item -LiteralPath $LegacyBundledPath -Destination $previousLegacyBundledPath
+            $legacyBundledBackedUp = $true
         }
         if (Test-Path -LiteralPath $FinalSymbolsPath) {
             Move-Item -LiteralPath $FinalSymbolsPath -Destination $previousSymbolsPath
@@ -490,13 +603,19 @@ function Install-ValidatedReleaseArtifacts {
         if ($bundledBackedUp -and (Test-Path -LiteralPath $previousBundledPath)) {
             Move-Item -LiteralPath $previousBundledPath -Destination $FinalBundledPath
         }
+        if ($legacyBundledBackedUp -and (Test-Path -LiteralPath $previousLegacyBundledPath)) {
+            Move-Item -LiteralPath $previousLegacyBundledPath -Destination $LegacyBundledPath
+        }
         if ($symbolsBackedUp -and (Test-Path -LiteralPath $previousSymbolsPath)) {
             Move-Item -LiteralPath $previousSymbolsPath -Destination $FinalSymbolsPath
         }
         throw
     }
 
-    foreach ($backupPath in @($previousLightweightPath, $previousBundledPath)) {
+    foreach ($backupPath in @(
+        $previousLightweightPath,
+        $previousBundledPath,
+        $previousLegacyBundledPath)) {
         if (Test-Path -LiteralPath $backupPath) {
             Remove-Item -LiteralPath $backupPath -Force
         }
@@ -627,38 +746,10 @@ $prepareCloudflared = Join-Path $PSScriptRoot 'prepare-cloudflared.ps1'
 $cloudflaredDestination = Join-Path $output 'tools\cloudflared'
 & $prepareCloudflared -Runtime $Runtime -DestinationDirectory $cloudflaredDestination
 
-$manifestFiles = @(
-    Get-ChildItem -LiteralPath $output -File -Recurse | ForEach-Object {
-        $relativePath = [System.IO.Path]::GetRelativePath($output, $_.FullName).Replace('\', '/')
-        if ($relativePath -ceq 'update-manifest.json' -or
-            (Test-IsToolsRelativePath -RelativePath $relativePath)) {
-            return
-        }
-
-        [pscustomobject][ordered]@{
-            path = $relativePath
-            size = [long]$_.Length
-            sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-        }
-    } | Sort-Object { $_.path.ToUpperInvariant() }, path
-)
-
-$manifest = [pscustomobject][ordered]@{
-    schemaVersion = 2
-    product = 'IGoLibrary-Ex'
-    version = $AppVersion
-    runtime = 'win-x64'
-    entryExecutable = 'IGoLibrary.Ex.Desktop.exe'
-    files = $manifestFiles
-}
-$manifestJson = $manifest | ConvertTo-Json -Depth 6
-[System.IO.File]::WriteAllText(
-    $manifestPath,
-    $manifestJson,
-    [System.Text.UTF8Encoding]::new($false))
-
 try {
     Copy-DirectoryWithoutTools -Source $output -Destination $lightweightStaging
+    Write-UpdateManifest -RootDirectory $lightweightStaging -IncludeCloudflared $false
+    Write-UpdateManifest -RootDirectory $output -IncludeCloudflared $true
     New-Item -ItemType Directory -Path $packageStaging -Force | Out-Null
     New-Item -ItemType Directory -Path $stagedSymbolsOutput -Force | Out-Null
     foreach ($symbol in $publishedSymbols) {
@@ -686,6 +777,7 @@ try {
         StagedSymbolsPath = $stagedSymbolsOutput
         FinalLightweightPath = $zipPath
         FinalBundledPath = $bundledZipPath
+        LegacyBundledPath = $legacyBundledZipPath
         FinalSymbolsPath = $symbolsOutput
     }
     Install-ValidatedReleaseArtifacts @installParameters
@@ -697,8 +789,8 @@ finally {
 
 Write-Host "Published complete desktop tree to $output"
 foreach ($package in @(
-    [pscustomobject]@{ Label = 'Windows lightweight ZIP'; Path = $zipPath },
-    [pscustomobject]@{ Label = 'Windows cloudflared ZIP'; Path = $bundledZipPath }
+    [pscustomobject]@{ Label = 'Windows without-cloudflared ZIP'; Path = $zipPath },
+    [pscustomobject]@{ Label = 'Windows default cloudflared ZIP'; Path = $bundledZipPath }
 )) {
     $packageInfo = Get-Item -LiteralPath $package.Path
     $packageHash = (Get-FileHash -LiteralPath $package.Path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -732,4 +824,4 @@ try {
 finally {
     $lightweightArchive.Dispose()
 }
-Write-Host '无后缀轻量包是唯一的应用内自动更新资产；首次启用自动更新仍需手动安装一次绿色版。'
+Write-Host '无后缀完整包是唯一的应用内自动更新资产；-without-cloudflared 是额外轻量包。首次启用自动更新仍需手动安装一次绿色版。'

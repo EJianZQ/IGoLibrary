@@ -283,7 +283,8 @@ internal sealed class WindowsUpdatePackagePreparationService(
         {
             var relative = UpdatePathSafety.NormalizeRelativePath(
                 Path.GetRelativePath(installationDirectory, path));
-            if (!owned.Contains(relative))
+            if (!owned.Contains(relative) &&
+                !UpdateProtocol.IsManagedCloudflaredFilePath(relative))
             {
                 checked
                 {

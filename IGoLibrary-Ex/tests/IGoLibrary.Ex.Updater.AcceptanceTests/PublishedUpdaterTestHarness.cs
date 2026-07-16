@@ -128,7 +128,8 @@ internal static class PublishedUpdaterTestHarness
             scenario.InstallationDirectory,
             version,
             updaterPath,
-            invalidEntryExecutable: false);
+            invalidEntryExecutable: false,
+            includeManagedCloudflared: false);
         if (createPreservedTools)
         {
             var toolsDirectory = Path.Combine(
@@ -149,7 +150,9 @@ internal static class PublishedUpdaterTestHarness
         string targetUpdaterPath,
         string transactionUpdaterPath,
         bool corruptPayloadAfterManifest = false,
-        bool invalidEntryExecutable = false)
+        bool invalidEntryExecutable = false,
+        bool corruptManagedCloudflaredAfterManifest = false,
+        bool includeManagedCloudflared = true)
     {
         var transactionId = Guid.NewGuid().ToString("N");
         var controlDirectory = Path.Combine(scenario.UpdatesDirectory, transactionId);
@@ -165,11 +168,17 @@ internal static class PublishedUpdaterTestHarness
             stagingDirectory,
             targetVersion,
             targetUpdaterPath,
-            invalidEntryExecutable);
+            invalidEntryExecutable,
+            includeManagedCloudflared);
         if (corruptPayloadAfterManifest)
         {
+            var tamperPath = corruptManagedCloudflaredAfterManifest
+                ? UpdatePathSafety.GetSafeChildPath(
+                    stagingDirectory,
+                    UpdateProtocol.ManagedCloudflaredExecutablePath)
+                : Path.Combine(stagingDirectory, "version.txt");
             await File.WriteAllTextAsync(
-                Path.Combine(stagingDirectory, "version.txt"),
+                tamperPath,
                 targetVersion + "-tampered",
                 Utf8NoBom);
         }
@@ -253,14 +262,18 @@ internal static class PublishedUpdaterTestHarness
         string transactionUpdaterPath,
         UpdateDecisionKind? decision,
         bool corruptArchiveAfterDigest = false,
-        bool corruptPayloadAfterManifest = false)
+        bool corruptPayloadAfterManifest = false,
+        bool corruptManagedCloudflaredAfterManifest = false,
+        bool includeManagedCloudflared = true)
     {
         var artifacts = await CreateTransactionArtifactsAsync(
             scenario,
             targetVersion,
             targetUpdaterPath,
             transactionUpdaterPath,
-            corruptPayloadAfterManifest);
+            corruptPayloadAfterManifest,
+            corruptManagedCloudflaredAfterManifest: corruptManagedCloudflaredAfterManifest,
+            includeManagedCloudflared: includeManagedCloudflared);
         await using var parent = await ParentProcessLease.StartAsync(
             scenario.InstallationDirectory,
             artifacts.ControlDirectory);
@@ -340,7 +353,11 @@ internal static class PublishedUpdaterTestHarness
                 scenario.InstallationDirectory,
                 decision == UpdateDecisionKind.Commit ? targetVersion : currentVersion,
                 decision == UpdateDecisionKind.Commit ? targetUpdaterPath : null,
-                expectPreservedTools: true);
+                expectPreservedTools: true,
+                expectedManagedCloudflaredVersion:
+                    decision == UpdateDecisionKind.Commit && includeManagedCloudflared
+                        ? targetVersion
+                        : null);
             Assert.False(Directory.Exists(request.BackupDirectory));
             Assert.False(Directory.Exists(request.CandidateDirectory));
         }
@@ -358,7 +375,8 @@ internal static class PublishedUpdaterTestHarness
         string installationDirectory,
         string expectedVersion,
         string? expectedUpdaterPath,
-        bool expectPreservedTools)
+        bool expectPreservedTools,
+        string? expectedManagedCloudflaredVersion = null)
     {
         var manifest = UpdatePackageValidator.LoadAndValidateManifest(
             Path.Combine(installationDirectory, UpdateProtocol.ManifestFileName),
@@ -387,6 +405,35 @@ internal static class PublishedUpdaterTestHarness
         if (expectPreservedTools)
         {
             Assert.Equal("preserved-tools-content", await File.ReadAllTextAsync(preservedPath));
+        }
+
+        if (expectedManagedCloudflaredVersion is not null)
+        {
+            Assert.Equal(
+                $"cloudflared-{expectedManagedCloudflaredVersion}",
+                await File.ReadAllTextAsync(UpdatePathSafety.GetSafeChildPath(
+                    installationDirectory,
+                    UpdateProtocol.ManagedCloudflaredExecutablePath)));
+            Assert.Equal(
+                $"license-{expectedManagedCloudflaredVersion}",
+                await File.ReadAllTextAsync(UpdatePathSafety.GetSafeChildPath(
+                    installationDirectory,
+                    UpdateProtocol.ManagedCloudflaredLicensePath)));
+            Assert.Equal(
+                $"notices-{expectedManagedCloudflaredVersion}",
+                await File.ReadAllTextAsync(UpdatePathSafety.GetSafeChildPath(
+                    installationDirectory,
+                    UpdateProtocol.ManagedCloudflaredNoticesPath)));
+        }
+    }
+
+    public static void AssertManagedCloudflaredAbsent(string installationDirectory)
+    {
+        foreach (var relativePath in UpdateProtocol.ManagedCloudflaredFilePaths)
+        {
+            Assert.False(File.Exists(UpdatePathSafety.GetSafeChildPath(
+                installationDirectory,
+                relativePath)));
         }
     }
 
@@ -612,7 +659,8 @@ internal static class PublishedUpdaterTestHarness
         string destinationDirectory,
         string version,
         string updaterPath,
-        bool invalidEntryExecutable)
+        bool invalidEntryExecutable,
+        bool includeManagedCloudflared)
     {
         Directory.CreateDirectory(destinationDirectory);
         var testProcessOutput = PublishedUpdaterEnvironment.TestProcessOutputDirectory;
@@ -659,6 +707,21 @@ internal static class PublishedUpdaterTestHarness
             Path.Combine(destinationDirectory, "version.txt"),
             version,
             Utf8NoBom);
+        if (includeManagedCloudflared)
+        {
+            await WriteManagedCloudflaredFileAsync(
+                destinationDirectory,
+                UpdateProtocol.ManagedCloudflaredExecutablePath,
+                $"cloudflared-{version}");
+            await WriteManagedCloudflaredFileAsync(
+                destinationDirectory,
+                UpdateProtocol.ManagedCloudflaredLicensePath,
+                $"license-{version}");
+            await WriteManagedCloudflaredFileAsync(
+                destinationDirectory,
+                UpdateProtocol.ManagedCloudflaredNoticesPath,
+                $"notices-{version}");
+        }
 
         var manifestFiles = new List<UpdateManifestFile>();
         var relativePaths = Directory.EnumerateFiles(
@@ -694,6 +757,16 @@ internal static class PublishedUpdaterTestHarness
                 UpdateProtocol.EntryExecutableName,
                 manifestFiles),
             UpdateJsonTypeInfo.PackageManifest);
+    }
+
+    private static async Task WriteManagedCloudflaredFileAsync(
+        string rootDirectory,
+        string relativePath,
+        string content)
+    {
+        var path = UpdatePathSafety.GetSafeChildPath(rootDirectory, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, content, Utf8NoBom);
     }
 
     private static void CorruptOneByte(string path)

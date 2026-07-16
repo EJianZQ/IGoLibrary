@@ -137,7 +137,10 @@ public sealed class WindowsPortableUpdateOperationTests : IDisposable
             {
                 [UpdateProtocol.EntryExecutableName] = "desktop",
                 [UpdateProtocol.UpdaterExecutableName] = "updater",
-                ["feature.dll"] = "feature"
+                ["feature.dll"] = "feature",
+                [UpdateProtocol.ManagedCloudflaredExecutablePath] = "release-cloudflared",
+                [UpdateProtocol.ManagedCloudflaredLicensePath] = "release-license",
+                [UpdateProtocol.ManagedCloudflaredNoticesPath] = "release-notices"
             });
         var archive = Path.Combine(_root, "package.zip");
         ZipFile.CreateFromDirectory(source, archive);

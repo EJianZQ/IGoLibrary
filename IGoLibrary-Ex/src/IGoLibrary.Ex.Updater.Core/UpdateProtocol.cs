@@ -11,8 +11,21 @@ public static class UpdateProtocol
     public const string PortableMarkerFileName = "portable-release.marker";
     public const string PortableMarkerContent = "IGoLibrary-Ex|portable|win-x64|2";
     public const string PreservedToolsDirectoryName = "tools";
+    public const string ManagedCloudflaredDirectoryPath = "tools/cloudflared";
+    public const string ManagedCloudflaredExecutablePath = "tools/cloudflared/cloudflared.exe";
+    public const string ManagedCloudflaredLicensePath = "tools/cloudflared/LICENSE.txt";
+    public const string ManagedCloudflaredNoticesPath = "tools/cloudflared/THIRD-PARTY-NOTICES.txt";
 
-    public static bool IsPreservedInstallationPath(string relativePath)
+    private static readonly string[] ManagedCloudflaredPaths =
+    [
+        ManagedCloudflaredExecutablePath,
+        ManagedCloudflaredLicensePath,
+        ManagedCloudflaredNoticesPath
+    ];
+
+    public static IReadOnlyList<string> ManagedCloudflaredFilePaths => ManagedCloudflaredPaths;
+
+    public static bool IsRootToolsPath(string relativePath)
     {
         var normalized = UpdatePathSafety.NormalizeRelativePath(relativePath);
         return string.Equals(
@@ -22,6 +35,31 @@ public static class UpdateProtocol
                normalized.StartsWith(
                    PreservedToolsDirectoryName + "/",
                    StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsManagedCloudflaredFilePath(string relativePath)
+    {
+        var normalized = UpdatePathSafety.NormalizeRelativePath(relativePath);
+        return ManagedCloudflaredPaths.Contains(normalized, StringComparer.OrdinalIgnoreCase);
+    }
+
+    public static bool IsManagedCloudflaredContainerPath(string relativePath)
+    {
+        var normalized = UpdatePathSafety.NormalizeRelativePath(relativePath);
+        return string.Equals(
+                   normalized,
+                   PreservedToolsDirectoryName,
+                   StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(
+                   normalized,
+                   ManagedCloudflaredDirectoryPath,
+                   StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsPreservedInstallationPath(string relativePath)
+    {
+        return IsRootToolsPath(relativePath) &&
+               !IsManagedCloudflaredFilePath(relativePath);
     }
 
 }

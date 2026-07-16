@@ -68,7 +68,9 @@ public sealed class CloudflareTunnelTests
 
         Assert.Equal(CloudflaredUnavailableException.UserMessage, exception.Message);
         Assert.Equal(missingPath, exception.FileName);
-        Assert.Contains("-with-cloudflared", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("同版本、同架构", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("不带 -without-cloudflared", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("-with-cloudflared", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
