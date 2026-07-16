@@ -22,6 +22,8 @@ public partial class MainWindowWorkflowViewModel
 
     public bool IsMobileControlStopped => MobileControl.IsMobileControlStopped;
 
+    public bool IsMobileControlStarting => MobileControl.IsMobileControlStarting;
+
     public string MobileControlToggleButtonText => MobileControl.MobileControlToggleButtonText;
 
     public int MobileControlPort
@@ -105,6 +107,7 @@ public partial class MainWindowWorkflowViewModel
         propertyBridge.ForwardSame(
             MobileControl,
             nameof(MobileControl.IsMobileControlRunning),
+            nameof(MobileControl.IsMobileControlStarting),
             nameof(MobileControl.IsMobileControlAutoStartEnabled),
             nameof(MobileControl.IsMobileControlStopped),
             nameof(MobileControl.MobileControlToggleButtonText),

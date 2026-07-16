@@ -77,7 +77,9 @@ public sealed class MobileControlPageViewModelTests
         await viewModel.StartMobileControlCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.IsMobileControlRunning);
+        Assert.False(viewModel.IsMobileControlStarting);
         Assert.Equal("启动失败", viewModel.MobileControlStatusText);
+        Assert.Equal("启用手机控制", viewModel.MobileControlToggleButtonText);
         var warning = Assert.Single(notifications.Warnings);
         Assert.Equal("启动手机控制失败", warning.Title);
         Assert.Equal(CloudflareTunnelProxyConflictException.UserMessage, warning.Message);
@@ -137,6 +139,39 @@ public sealed class MobileControlPageViewModelTests
         Assert.Equal("启用手机控制", viewModel.MobileControlToggleButtonText);
         Assert.Equal(1, mobileControlService.StopCalls);
         Assert.True(viewModel.HasNoMobileControlQrCode);
+    }
+
+    [Fact]
+    public async Task ToggleMobileControlAsync_ExposesStartingStateUntilSlowStartupCompletes()
+    {
+        var startBlocker = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var mobileControlService = new FakeMobileControlService
+        {
+            StartBlocker = startBlocker.Task
+        };
+        var viewModel = new MobileControlPageViewModel(
+            mobileControlService,
+            new SettingsWorkflowService(new FakeSettingsService(AppSettings.Default with
+            {
+                MobileControl = new MobileControlSettings(9527, "token")
+            })),
+            new FakeQrCodeImageFactory(),
+            new ActivityLogService(),
+            new FakeNotificationService());
+
+        var startTask = viewModel.ToggleMobileControlCommand.ExecuteAsync(null);
+        await mobileControlService.StartEntered.Task;
+
+        Assert.True(viewModel.IsMobileControlStarting);
+        Assert.Equal("正在启动中", viewModel.MobileControlToggleButtonText);
+        Assert.False(viewModel.ToggleMobileControlCommand.CanExecute(null));
+
+        startBlocker.SetResult(null);
+        await startTask;
+
+        Assert.False(viewModel.IsMobileControlStarting);
+        Assert.True(viewModel.IsMobileControlRunning);
+        Assert.Equal("停用手机控制", viewModel.MobileControlToggleButtonText);
     }
 
     [Fact]

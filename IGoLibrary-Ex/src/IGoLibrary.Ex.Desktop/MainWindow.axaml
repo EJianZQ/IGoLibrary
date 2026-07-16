@@ -2484,13 +2484,47 @@
                       ColumnDefinitions="Auto,Auto,Auto,*"
                       ColumnSpacing="12"
                       Margin="0,8,0,0">
-                  <Button Content="{Binding MobileControlToggleButtonText}"
+                  <Button x:Name="MobileControlToggleButton"
                           Command="{Binding ToggleMobileControlCommand}"
                           Background="{DynamicResource AppAccentBrush}"
                           Foreground="{DynamicResource AppAccentForegroundBrush}"
                           FontWeight="Bold"
                           MinWidth="160"
-                          HorizontalContentAlignment="Center" />
+                          HorizontalContentAlignment="Center">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8"
+                                VerticalAlignment="Center">
+                      <PathIcon x:Name="MobileControlStartingSpinner"
+                                Width="16"
+                                Height="16"
+                                Data="M17.65,6.35 C16.2,4.9 14.21,4 12,4 C7.58,4 4,7.58 4,12 C4,16.42 7.58,20 12,20 C15.73,20 18.84,17.45 19.73,14 L17.65,14 C16.83,16.33 14.61,18 12,18 C8.69,18 6,15.31 6,12 C6,8.69 8.69,6 12,6 C13.66,6 15.14,6.69 16.22,7.78 L13,11 L20,11 L20,4 Z"
+                                IsVisible="{Binding IsMobileControlStarting}"
+                                RenderTransformOrigin="50%,50%"
+                                VerticalAlignment="Center">
+                        <PathIcon.RenderTransform>
+                          <RotateTransform />
+                        </PathIcon.RenderTransform>
+                        <PathIcon.Styles>
+                          <Style Selector="PathIcon">
+                            <Style.Animations>
+                              <Animation Duration="0:0:0.8"
+                                         IterationCount="INFINITE">
+                                <KeyFrame Cue="0%">
+                                  <Setter Property="RotateTransform.Angle" Value="0" />
+                                </KeyFrame>
+                                <KeyFrame Cue="100%">
+                                  <Setter Property="RotateTransform.Angle" Value="360" />
+                                </KeyFrame>
+                              </Animation>
+                            </Style.Animations>
+                          </Style>
+                        </PathIcon.Styles>
+                      </PathIcon>
+                      <TextBlock x:Name="MobileControlToggleButtonTextBlock"
+                                 Text="{Binding MobileControlToggleButtonText}"
+                                 VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
                   <Button Grid.Column="1"
                           Content="服务详情"
                           Command="{Binding OpenMobileControlDetailsCommand}"

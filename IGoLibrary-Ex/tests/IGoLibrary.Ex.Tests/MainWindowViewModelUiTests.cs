@@ -15,6 +15,58 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class MainWindowViewModelUiTests
 {
     [AvaloniaFact]
+    public async Task MobileControlToggleButton_RendersStartingTextAndSpinnerDuringSlowStartup()
+    {
+        var startBlocker = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var mobileControlService = new FakeMobileControlService
+        {
+            StartBlocker = startBlocker.Task
+        };
+        var viewModel = MainWindowViewModelTests.CreateViewModel(
+            settingsService: new FakeSettingsService(AppSettings.Default with
+            {
+                MobileControl = new MobileControlSettings(9527, "token")
+            }),
+            mobileControlService: mobileControlService);
+        await viewModel.InitializeAsync();
+        viewModel.SelectedTabIndex = 7;
+        var window = new MainWindow { DataContext = viewModel };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.IsType<Button>(window.FindControl<Button>("MobileControlToggleButton"));
+        var spinner = Assert.IsType<PathIcon>(window.FindControl<PathIcon>("MobileControlStartingSpinner"));
+        var buttonText = Assert.IsType<TextBlock>(
+            window.FindControl<TextBlock>("MobileControlToggleButtonTextBlock"));
+        var startTask = viewModel.ToggleMobileControlCommand.ExecuteAsync(null);
+
+        try
+        {
+            await mobileControlService.StartEntered.Task;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(viewModel.ToggleMobileControlCommand.CanExecute(null));
+            Assert.True(spinner.IsVisible);
+            Assert.Equal("正在启动中", buttonText.Text);
+            Assert.IsType<RotateTransform>(spinner.RenderTransform);
+
+            startBlocker.SetResult(null);
+            await startTask;
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(viewModel.ToggleMobileControlCommand.CanExecute(null));
+            Assert.False(spinner.IsVisible);
+            Assert.Equal("停用手机控制", buttonText.Text);
+        }
+        finally
+        {
+            startBlocker.TrySetResult(null);
+            await startTask;
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task OpenModalOverlay_BlocksSidebarPointerInputWithoutDimmingIt()
     {
         var viewModel = MainWindowViewModelTests.CreateViewModel();

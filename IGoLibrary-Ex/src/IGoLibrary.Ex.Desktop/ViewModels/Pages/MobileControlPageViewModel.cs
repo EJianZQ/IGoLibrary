@@ -44,6 +44,9 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
     private bool isMobileControlRunning;
 
     [ObservableProperty]
+    private bool isMobileControlStarting;
+
+    [ObservableProperty]
     private bool isMobileControlAutoStartEnabled;
 
     [ObservableProperty]
@@ -72,7 +75,11 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
 
     public bool IsMobileControlStopped => !IsMobileControlRunning;
 
-    public string MobileControlToggleButtonText => IsMobileControlRunning ? "停用手机控制" : "启用手机控制";
+    public string MobileControlToggleButtonText => IsMobileControlStarting
+        ? "正在启动中"
+        : IsMobileControlRunning
+            ? "停用手机控制"
+            : "启用手机控制";
 
     public string MobileControlAccessTokenFullText => string.IsNullOrWhiteSpace(_accessToken) ? "未生成" : _accessToken;
 
@@ -226,6 +233,12 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
         CancellationToken cancellationToken = default,
         bool requireAutoStartEnabled = false)
     {
+        if (IsMobileControlStarting)
+        {
+            return;
+        }
+
+        IsMobileControlStarting = true;
         try
         {
             var settings = await settingsWorkflowService.EnsureMobileControlSettingsAsync(cancellationToken);
@@ -262,6 +275,10 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
             {
                 await notificationService.ShowWarningAsync(failureNotificationTitle, ex.Message);
             }
+        }
+        finally
+        {
+            IsMobileControlStarting = false;
         }
     }
 
@@ -316,6 +333,11 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
     partial void OnIsMobileControlRunningChanged(bool value)
     {
         OnPropertyChanged(nameof(IsMobileControlStopped));
+        OnPropertyChanged(nameof(MobileControlToggleButtonText));
+    }
+
+    partial void OnIsMobileControlStartingChanged(bool value)
+    {
         OnPropertyChanged(nameof(MobileControlToggleButtonText));
     }
 

@@ -290,6 +290,11 @@ internal sealed class FakeMobileControlService : IMobileControlService
 
     public Exception? StartException { get; set; }
 
+    public TaskCompletionSource<object?> StartEntered { get; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public Task? StartBlocker { get; set; }
+
     public MobileControlSession NextSession { get; set; } = new(
         Guid.NewGuid(),
         new Uri("http://127.0.0.1:49153/?token=test-token"),
@@ -299,14 +304,20 @@ internal sealed class FakeMobileControlService : IMobileControlService
         DateTimeOffset.Now,
         MobileControlNetworkMode.LocalNetwork);
 
-    public Task<MobileControlSession> StartAsync(
+    public async Task<MobileControlSession> StartAsync(
         MobileControlSettings settings,
         CancellationToken cancellationToken = default)
     {
         StartCalls++;
+        StartEntered.TrySetResult(null);
         if (StartException is not null)
         {
             throw StartException;
+        }
+
+        if (StartBlocker is not null)
+        {
+            await StartBlocker.WaitAsync(cancellationToken);
         }
 
         CurrentSession = NextSession with
@@ -315,7 +326,7 @@ internal sealed class FakeMobileControlService : IMobileControlService
             LanUrl = new Uri($"http://127.0.0.1:{settings.Port}/?token={settings.AccessToken}"),
             Port = settings.Port
         };
-        return Task.FromResult(CurrentSession);
+        return CurrentSession;
     }
 
     public Task StopAsync(
