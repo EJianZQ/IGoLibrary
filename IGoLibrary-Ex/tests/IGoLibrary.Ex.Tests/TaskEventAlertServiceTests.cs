@@ -19,6 +19,16 @@ public sealed class TaskEventAlertServiceTests
         string?> AlertDispatchScenarios => new()
     {
         {
+            TaskAlertTestEvent.CookieExpiring,
+            "IGoLibrary-Ex Cookie 即将到期提醒",
+            "Cookie 即将到期",
+            ["IGoLibrary-Ex 检测到 Cookie 即将在 10 分钟内到期", "到期时间：", "剩余时间：9 分", "请尽快重新授权"],
+            ["IGoLibrary-Ex Cookie 即将到期", "到期时间：", "剩余时间：9 分", "请尽快重新授权"],
+            ExpectedFallbackKind.None,
+            null,
+            null
+        },
+        {
             TaskAlertTestEvent.SessionInvalid,
             "IGoLibrary-Ex Cookie 失效提醒",
             "Cookie 已失效",
@@ -247,6 +257,7 @@ public sealed class TaskEventAlertServiceTests
     {
         foreach (var eventKind in new[]
                  {
+                     TaskAlertTestEvent.CookieExpiring,
                      TaskAlertTestEvent.SessionInvalid,
                      TaskAlertTestEvent.GrabSucceeded,
                      TaskAlertTestEvent.OccupyReReserveSucceeded,
@@ -288,6 +299,99 @@ public sealed class TaskEventAlertServiceTests
         Assert.Empty(notificationService.Successes);
         Assert.Empty(notificationService.Warnings);
         Assert.Empty(notificationService.Infos);
+    }
+
+    [Fact]
+    public async Task TryNotifyCookieExpiringAsync_ReturnsFalseWhenEventIsDisabled()
+    {
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            CreateAllChannelsEnabledSettings(
+                TaskEventAlertEventSettings.Default with { CookieExpiring = false })));
+        var service = CreateService(settingsService: settingsService);
+
+        var accepted = await service.TryNotifyCookieExpiringAsync(
+            DateTimeOffset.Now.AddMinutes(5),
+            TimeSpan.FromMinutes(5));
+
+        Assert.False(accepted);
+    }
+
+    [Fact]
+    public async Task TryNotifyCookieExpiringAsync_DoesNotUseUnconfiguredInAppFallback()
+    {
+        var notificationService = new FakeNotificationService();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalDesktopAlertSettings(false, false))));
+        var service = CreateService(
+            settingsService: settingsService,
+            notificationService: notificationService);
+
+        var accepted = await service.TryNotifyCookieExpiringAsync(
+            DateTimeOffset.Now.AddMinutes(5),
+            TimeSpan.FromMinutes(5));
+
+        Assert.True(accepted);
+        Assert.Empty(notificationService.Successes);
+        Assert.Empty(notificationService.Warnings);
+        Assert.Empty(notificationService.Infos);
+    }
+
+    [Fact]
+    public async Task TryNotifyCookieExpiringAsync_LeavesPerCookieDeduplicationToMonitor()
+    {
+        var telegramSender = new FakeTelegramAlertSender();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            new TaskEventAlertSettings(
+                EmailAlertChannelSettings.Default with { Enabled = false },
+                new LocalDesktopAlertSettings(false, false),
+                new TelegramAlertChannelSettings(true, "https://api.telegram.org", "token-1", "chat-1"))));
+        var service = CreateService(
+            settingsService: settingsService,
+            telegramSender: telegramSender);
+        var expirationTime = DateTimeOffset.Now.AddMinutes(5);
+
+        await service.TryNotifyCookieExpiringAsync(expirationTime, TimeSpan.FromMinutes(5));
+        await service.TryNotifyCookieExpiringAsync(expirationTime, TimeSpan.FromMinutes(5));
+
+        Assert.Equal(2, telegramSender.Requests.Count);
+    }
+
+    [Theory]
+    [InlineData(RemoteCancellationChannel.Email)]
+    [InlineData(RemoteCancellationChannel.Telegram)]
+    [InlineData(RemoteCancellationChannel.Bark)]
+    [InlineData(RemoteCancellationChannel.WxPusher)]
+    [InlineData(RemoteCancellationChannel.ServerChan)]
+    public async Task TryNotifyCookieExpiringAsync_PropagatesCallerCancellationFromRemoteChannel(
+        RemoteCancellationChannel channel)
+    {
+        var sender = new BlockingTaskEventAlertSender();
+        var activityLog = new ActivityLogService();
+        var settingsService = new FakeSettingsService(WithTaskEventAlerts(
+            CreateSingleRemoteChannelEnabledSettings(channel)));
+        var service = CreateService(
+            settingsService,
+            sender,
+            activityLog,
+            telegramSender: sender,
+            barkSender: sender,
+            wxPusherSender: sender,
+            serverChanSender: sender);
+        using var cancellationSource = new CancellationTokenSource();
+
+        var notifyTask = service.TryNotifyCookieExpiringAsync(
+            DateTimeOffset.Now.AddMinutes(5),
+            TimeSpan.FromMinutes(5),
+            cancellationSource.Token);
+        await sender.SendStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await notifyTask);
+        Assert.DoesNotContain(
+            activityLog.Entries,
+            entry => entry.Kind == LogEntryKind.Warning && entry.Category == "Alert");
     }
 
     [Fact]
@@ -609,13 +713,13 @@ public sealed class TaskEventAlertServiceTests
 
     private static TaskEventAlertService CreateService(
         FakeSettingsService? settingsService = null,
-        FakeEmailAlertSender? emailSender = null,
+        IEmailAlertSender? emailSender = null,
         ActivityLogService? activityLogService = null,
         INotificationService? notificationService = null,
-        FakeTelegramAlertSender? telegramSender = null,
-        FakeBarkAlertSender? barkSender = null,
-        FakeWxPusherAlertSender? wxPusherSender = null,
-        FakeServerChanAlertSender? serverChanSender = null)
+        ITelegramAlertSender? telegramSender = null,
+        IBarkAlertSender? barkSender = null,
+        IWxPusherAlertSender? wxPusherSender = null,
+        IServerChanAlertSender? serverChanSender = null)
     {
         settingsService ??= new FakeSettingsService(AppSettings.Default);
         var toastService = new ToastNotificationService(new AppWindowService());
@@ -631,6 +735,47 @@ public sealed class TaskEventAlertServiceTests
             notificationService ?? new FakeNotificationService(),
             new AlertSoundService(),
             activityLogService ?? new ActivityLogService());
+    }
+
+    private static TaskEventAlertSettings CreateSingleRemoteChannelEnabledSettings(
+        RemoteCancellationChannel channel)
+    {
+        return new TaskEventAlertSettings(
+            new EmailAlertChannelSettings(
+                Enabled: channel == RemoteCancellationChannel.Email,
+                SmtpHost: "smtp.example.com",
+                Port: 587,
+                SecurityMode: EmailSecurityMode.Tls,
+                Username: "tester",
+                Password: "secret",
+                FromAddress: "sender@example.com",
+                ToAddress: "receiver@example.com"),
+            new LocalDesktopAlertSettings(false, false),
+            new TelegramAlertChannelSettings(
+                channel == RemoteCancellationChannel.Telegram,
+                "https://api.telegram.org",
+                "token-1",
+                "chat-1"),
+            TaskEventAlertEventSettings.Default,
+            new BarkAlertChannelSettings(
+                channel == RemoteCancellationChannel.Bark,
+                "https://api.day.app",
+                "bark-key",
+                "IGoLibrary-Ex",
+                "alarm",
+                "timeSensitive"),
+            new WxPusherAlertChannelSettings(
+                channel == RemoteCancellationChannel.WxPusher,
+                "https://wxpusher.zjiecode.com",
+                "AT_xxx",
+                "UID_xxx",
+                string.Empty),
+            new ServerChanAlertChannelSettings(
+                channel == RemoteCancellationChannel.ServerChan,
+                "SCT_xxx",
+                false,
+                string.Empty,
+                string.Empty));
     }
 
     private static AppSettings WithTaskEventAlerts(TaskEventAlertSettings alerts)
@@ -666,6 +811,7 @@ public sealed class TaskEventAlertServiceTests
     {
         return eventKind switch
         {
+            TaskAlertTestEvent.CookieExpiring => TaskEventAlertEventSettings.Default with { CookieExpiring = false },
             TaskAlertTestEvent.SessionInvalid => TaskEventAlertEventSettings.Default with { SessionInvalid = false },
             TaskAlertTestEvent.GrabSucceeded => TaskEventAlertEventSettings.Default with { GrabSucceeded = false },
             TaskAlertTestEvent.OccupyReReserveSucceeded => TaskEventAlertEventSettings.Default with { OccupyReReserveSucceeded = false },
@@ -680,6 +826,10 @@ public sealed class TaskEventAlertServiceTests
     {
         return eventKind switch
         {
+            TaskAlertTestEvent.CookieExpiring => IgnoreResultAsync(
+                service.TryNotifyCookieExpiringAsync(
+                    DateTimeOffset.Now.AddMinutes(9).AddSeconds(30),
+                    TimeSpan.FromMinutes(9.5))),
             TaskAlertTestEvent.SessionInvalid => service.NotifySessionInvalidAsync("抢座轮询", "Cookie 无效"),
             TaskAlertTestEvent.GrabSucceeded => service.NotifyGrabSucceededAsync("自科阅览区一", "2号座"),
             TaskAlertTestEvent.OccupyReReserveSucceeded => service.NotifyOccupyReReserveSucceededAsync("2号座"),
@@ -690,8 +840,14 @@ public sealed class TaskEventAlertServiceTests
         };
     }
 
+    private static async Task IgnoreResultAsync(Task<bool> task)
+    {
+        _ = await task;
+    }
+
     public enum TaskAlertTestEvent
     {
+        CookieExpiring,
         SessionInvalid,
         GrabSucceeded,
         OccupyReReserveSucceeded,
@@ -706,6 +862,15 @@ public sealed class TaskEventAlertServiceTests
         Success,
         Warning,
         Info
+    }
+
+    public enum RemoteCancellationChannel
+    {
+        Email,
+        Telegram,
+        Bark,
+        WxPusher,
+        ServerChan
     }
 
     private static async Task WaitForAsync(Func<bool> predicate)

@@ -116,6 +116,9 @@ public sealed partial class NotificationSettingsViewModel
     private bool localSoundAlertsEnabled;
 
     [ObservableProperty]
+    private bool cookieExpiringAlertsEnabled = true;
+
+    [ObservableProperty]
     private bool grabSucceededAlertsEnabled = true;
 
     [ObservableProperty]
@@ -193,6 +196,8 @@ public sealed partial class NotificationSettingsViewModel
 
     partial void OnLocalSoundAlertsEnabledChanged(bool value) => ScheduleAutoSave();
 
+    partial void OnCookieExpiringAlertsEnabledChanged(bool value) => ScheduleAutoSave();
+
     partial void OnGrabSucceededAlertsEnabledChanged(bool value) => ScheduleAutoSave();
 
     partial void OnOccupyReReserveSucceededAlertsEnabledChanged(bool value) => ScheduleAutoSave();
@@ -259,6 +264,7 @@ public sealed partial class NotificationSettingsViewModel
         WxPusherAlertTopicIds = wxPusherSettings.TopicIds ?? string.Empty;
         LocalToastAlertsEnabled = alertSettings.Local.PopupEnabled;
         LocalSoundAlertsEnabled = alertSettings.Local.SoundEnabled;
+        CookieExpiringAlertsEnabled = eventSettings.CookieExpiring;
         GrabSucceededAlertsEnabled = eventSettings.GrabSucceeded;
         OccupyReReserveSucceededAlertsEnabled = eventSettings.OccupyReReserveSucceeded;
         TomorrowReservationSucceededAlertsEnabled = eventSettings.TomorrowReservationSucceeded;
@@ -412,6 +418,7 @@ public sealed partial class NotificationSettingsViewModel
                 (TelegramAlertChatId ?? string.Empty).Trim()),
             new TaskEventAlertEventSettings
             {
+                CookieExpiring = CookieExpiringAlertsEnabled,
                 GrabSucceeded = GrabSucceededAlertsEnabled,
                 OccupyReReserveSucceeded = OccupyReReserveSucceededAlertsEnabled,
                 TomorrowReservationSucceeded = TomorrowReservationSucceededAlertsEnabled,

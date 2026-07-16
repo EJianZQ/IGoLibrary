@@ -249,6 +249,22 @@ public sealed class SettingsSerializationTests
         Assert.DoesNotContain("appBannerNotificationsEnabled", migratedJson);
         Assert.Contains("\"popupEnabled\": true", migratedJson);
         Assert.Contains("\"events\":", migratedJson);
+        Assert.Contains("\"cookieExpiring\": true", migratedJson);
+    }
+
+    [Fact]
+    public void PreviousCanonicalJsonMissingOnlyCookieExpiring_BackfillsEnabledDefault()
+    {
+        var currentJson = JsonSerializer.Serialize(AppSettings.Default, AppJson.Default);
+        var previousJson = currentJson.Replace(
+            "\"cookieExpiring\": true,",
+            string.Empty,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("\"cookieExpiring\"", previousJson, StringComparison.Ordinal);
+
+        var migratedJson = MigrateLegacyAppSettingsJson(previousJson);
+
+        Assert.Contains("\"cookieExpiring\": true", migratedJson, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -628,6 +644,7 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"apiBaseUrl\": \"https://wxpusher.zjiecode.com\"", migratedJson);
         Assert.Contains("\"serverChan\":", migratedJson);
         Assert.Contains("\"sendKey\": \"\"", migratedJson);
+        Assert.Contains("\"cookieExpiring\": true", migratedJson);
         Assert.Contains("\"taskFailed\": true", migratedJson);
     }
 
@@ -636,6 +653,7 @@ public sealed class SettingsSerializationTests
     {
         var expectedEvents = TaskEventAlertEventSettings.Default with
         {
+            CookieExpiring = false,
             GrabSucceeded = false,
             OccupyReReserveSucceeded = false,
             TomorrowReservationSucceeded = false,
@@ -683,6 +701,7 @@ public sealed class SettingsSerializationTests
         Assert.Equal(expectedBark, alerts.Bark);
         Assert.Equal(expectedWxPusher, alerts.WxPusher);
         Assert.Equal(expectedServerChan, alerts.ServerChan);
+        Assert.Contains("\"cookieExpiring\": false", json);
         Assert.Contains("\"grabSucceeded\": false", json);
         Assert.Contains("\"occupyReReserveSucceeded\": false", json);
         Assert.Contains("\"tomorrowReservationSucceeded\": false", json);

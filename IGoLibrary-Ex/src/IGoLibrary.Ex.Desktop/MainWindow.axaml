@@ -2550,6 +2550,31 @@
                                   HorizontalAlignment="Stretch">
                         <Border Padding="12,8">
                           <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                            <PathIcon Data="{StaticResource IconClock}"
+                                      Width="20"
+                                      Height="20"
+                                      Foreground="{DynamicResource SemiTextSecondaryBrush}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                              <TextBlock FontSize="15"
+                                         FontWeight="SemiBold"
+                                         Text="Cookie 即将到期提醒" />
+                              <TextBlock FontSize="12"
+                                         Foreground="{DynamicResource SemiTextTertiaryBrush}"
+                                         TextWrapping="Wrap"
+                                         Text="当前 Cookie 剩余有效期进入 10 分钟时通知" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="2"
+                                          IsChecked="{Binding CookieExpiringAlertsEnabled}"
+                                          OnContent="开"
+                                          OffContent="关"
+                                          VerticalAlignment="Center" />
+                          </Grid>
+                        </Border>
+
+                        <Border Padding="12,8">
+                          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
                             <PathIcon Data="{StaticResource IconEventKey}"
                                       Width="20"
                                       Height="20"
@@ -2796,7 +2821,7 @@
                                          FontWeight="SemiBold"
                                          Text="开启邮件提醒" />
                               <TextBlock Classes="helper-text"
-                                         Text="Cookie 失效、抢座成功或任务失败时，会自动按上方 SMTP 参数向目标邮箱发送提醒邮件" />
+                                         Text="Cookie 即将到期、Cookie 失效、抢座成功或任务失败时，会自动按上方 SMTP 参数向目标邮箱发送提醒邮件" />
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1"
                                           IsChecked="{Binding EmailAlertsEnabled}"
@@ -2863,7 +2888,7 @@
                                          FontWeight="SemiBold"
                                          Text="开启 Telegram 提醒" />
                               <TextBlock Classes="helper-text"
-                                         Text="Cookie 失效、抢座成功或任务失败时，会通过 Telegram Bot 向指定 Chat ID 发送文本提醒" />
+                                         Text="Cookie 即将到期、Cookie 失效、抢座成功或任务失败时，会通过 Telegram Bot 向指定 Chat ID 发送文本提醒" />
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1"
                                           IsChecked="{Binding TelegramAlertsEnabled}"
@@ -2952,7 +2977,7 @@
                                          FontWeight="SemiBold"
                                          Text="开启 Server酱 推送" />
                               <TextBlock Classes="helper-text"
-                                         Text="Cookie 失效、抢座成功或任务失败时，会通过 Server酱 向配置的微信、企业微信或群机器人通道发送提醒" />
+                                         Text="Cookie 即将到期、Cookie 失效、抢座成功或任务失败时，会通过 Server酱 向配置的微信、企业微信或群机器人通道发送提醒" />
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1"
                                           IsChecked="{Binding ServerChanAlertsEnabled}"
@@ -3034,7 +3059,7 @@
                                          FontWeight="SemiBold"
                                          Text="开启 WxPusher 推送" />
                               <TextBlock Classes="helper-text"
-                                         Text="Cookie 失效、抢座成功或任务失败时，会通过 WxPusher 标准推送发送到指定 UID 或 Topic" />
+                                         Text="Cookie 即将到期、Cookie 失效、抢座成功或任务失败时，会通过 WxPusher 标准推送发送到指定 UID 或 Topic" />
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1"
                                           IsChecked="{Binding WxPusherAlertsEnabled}"
@@ -3123,7 +3148,7 @@
                                          FontWeight="SemiBold"
                                          Text="开启 Bark 推送" />
                               <TextBlock Classes="helper-text"
-                                         Text="Cookie 失效、抢座成功或任务失败时，会通过 Bark 向绑定 iPhone 发送推送提醒" />
+                                         Text="Cookie 即将到期、Cookie 失效、抢座成功或任务失败时，会通过 Bark 向绑定 iPhone 发送推送提醒" />
                             </StackPanel>
                             <ToggleSwitch Grid.Column="1"
                                           IsChecked="{Binding BarkAlertsEnabled}"
@@ -3153,7 +3178,7 @@
                                        FontWeight="SemiBold"
                                        Text="开启屏幕右下角通知" />
                             <TextBlock Classes="helper-text"
-                                       Text="当检测到 Cookie 已失效、抢座成功或任务失败时，使用 Toast 弹窗形式，在屏幕右下角弹出提醒。即使你正在浏览其他网页，也能看到这一角的弹窗" />
+                                       Text="当检测到 Cookie 即将到期、Cookie 已失效、抢座成功或任务失败时，使用 Toast 弹窗形式，在屏幕右下角弹出提醒。即使你正在浏览其他网页，也能看到这一角的弹窗" />
                           </StackPanel>
                           <ToggleSwitch Grid.Column="1"
                                         IsChecked="{Binding LocalToastAlertsEnabled}"
@@ -3170,7 +3195,7 @@
                                        FontWeight="SemiBold"
                                        Text="开启提示音" />
                             <TextBlock Classes="helper-text"
-                                       Text="开启后，Toast 弹窗在弹出时会同时播放提示音，用于在后台工作时更快感知抢座结果、任务失败或 Cookie 失效" />
+                                       Text="开启后，Toast 弹窗在弹出时会同时播放提示音，用于在后台工作时更快感知抢座结果、任务失败、Cookie 即将到期或 Cookie 失效" />
                           </StackPanel>
                           <ToggleSwitch Grid.Column="1"
                                         IsChecked="{Binding LocalSoundAlertsEnabled}"

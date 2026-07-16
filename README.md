@@ -33,7 +33,7 @@
 - 📱 支持通过局域网或 Cloudflare Tunnel 使用手机控制，远程查看 Cookie、预约和任务状态，并可刷新 Cookie、取消任务或取消预约
 - ⭐ 支持收藏常用座位，并为每个场馆分别持久化座位收藏
 - 📊 首页面板展示当前场馆、预约状态、累计成功次数和守护时长
-- 🔔 支持 Cookie 失效、抢座成功、全域捡漏成功、占座成功、明日预约成功和任务失败提醒，可通过右下角 Toast 弹窗、提示音、SMTP 邮件、 Telegram Bot、 Bark、 Server酱 和 WxPusher 通知用户
+- 🔔 支持 Cookie 到期前 10 分钟、Cookie 失效、抢座成功、全域捡漏成功、占座成功、明日预约成功和任务失败提醒，可通过右下角 Toast 弹窗、提示音、SMTP 邮件、 Telegram Bot、 Bark、 Server酱 和 WxPusher 通知用户
 - 🧩 支持自定义 API 地址覆盖，便于在接口地址或 GraphQL 模板变化时快速调整
 
 ## 🧱 项目结构
@@ -114,7 +114,7 @@ IGoLibrary-Ex/
 参见 [远程蓝牙签到详细使用指南](docs/remote-bluetooth-check-in-guide.md)
 
 ### 8️⃣ 系统提醒
-系统提醒目前包含 Cookie 过期提醒、抢座成功提醒、全域捡漏成功提醒、占座成功提醒、明日预约成功提醒和任务失败提醒，可按需开启本地弹窗、提示音、SMTP 邮件、Telegram Bot 和 Bark 推送通知
+系统提醒目前包含 Cookie 到期前 10 分钟提醒、Cookie 失效提醒、抢座成功提醒、全域捡漏成功提醒、占座成功提醒、明日预约成功提醒和任务失败提醒，可按需开启本地弹窗、提示音、SMTP 邮件、Telegram Bot、Bark、Server酱和 WxPusher 推送通知
 ####  邮件提醒配置
 参见 [SMTP 邮件提醒配置指南](docs/smtp-email-alert-configuration.md)
 #### Telegram Bot 提醒配置
@@ -154,7 +154,7 @@ https://api.telegram.org/bot<BotToken>/getUpdates
 
 </details>
 
-开启后，Cookie 失效、抢座成功、全域捡漏成功、占座成功、明日预约成功和任务失败都会通过 Telegram Bot 发送提醒。Telegram 发送失败时只会写入应用日志，不会阻塞本地弹窗、邮件、Bark 或任务执行流程
+开启后，Cookie 到期前 10 分钟、Cookie 失效、抢座成功、全域捡漏成功、占座成功、明日预约成功和任务失败都会通过 Telegram Bot 发送提醒。Telegram 发送失败时只会写入应用日志，不会阻塞本地弹窗、邮件、Bark 或任务执行流程
 #### Bark 推送提醒配置
 1. 在 `通知设置` 页面切换到 `Bark 推送配置` 页
 2. 开启 `Bark 推送`

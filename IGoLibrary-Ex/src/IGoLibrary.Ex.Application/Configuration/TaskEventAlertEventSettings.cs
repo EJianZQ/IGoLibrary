@@ -2,6 +2,8 @@ namespace IGoLibrary.Ex.Application.Configuration;
 
 public sealed record TaskEventAlertEventSettings
 {
+    public bool CookieExpiring { get; init; } = true;
+
     public bool GrabSucceeded { get; init; } = true;
 
     public bool OccupyReReserveSucceeded { get; init; } = true;

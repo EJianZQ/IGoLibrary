@@ -65,6 +65,8 @@ internal sealed class RecordingAlertSoundService : IAlertSoundService
 
 internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, INotificationTestService
 {
+    public List<(DateTimeOffset ExpirationTime, TimeSpan Remaining)> CookieExpiringNotifications { get; } = [];
+
     public List<(string Source, string Reason)> SessionInvalidNotifications { get; } = [];
 
     public List<(string LibraryName, string SeatName)> GrabSucceededNotifications { get; } = [];
@@ -78,6 +80,17 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
     public List<(string TaskName, string Reason)> TaskFailedNotifications { get; } = [];
 
     public TaskCompletionSource? GrabSucceededCompletion { get; set; }
+
+    public bool CookieExpiringAccepted { get; set; } = true;
+
+    public TaskCompletionSource<object?> CookieExpiringNotificationReceived { get; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public TaskCompletionSource<object?>? CookieExpiringStarted { get; set; }
+
+    public Task? CookieExpiringBlocker { get; set; }
+
+    public Exception? NotifyCookieExpiringException { get; set; }
 
     public Exception? NotifySessionInvalidException { get; set; }
 
@@ -114,6 +127,28 @@ internal sealed class FakeTaskEventAlertDispatcher : ITaskEventAlertDispatcher, 
     public Exception? SendTestServerChanException { get; set; }
 
     public Exception? SendTestLocalException { get; set; }
+
+    public async Task<bool> TryNotifyCookieExpiringAsync(
+        DateTimeOffset expirationTime,
+        TimeSpan remaining,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (NotifyCookieExpiringException is not null)
+        {
+            throw NotifyCookieExpiringException;
+        }
+
+        CookieExpiringStarted?.TrySetResult(null);
+        if (CookieExpiringBlocker is not null)
+        {
+            await CookieExpiringBlocker.WaitAsync(cancellationToken);
+        }
+
+        CookieExpiringNotifications.Add((expirationTime, remaining));
+        CookieExpiringNotificationReceived.TrySetResult(null);
+        return CookieExpiringAccepted;
+    }
 
     public Task NotifySessionInvalidAsync(string source, string reason, CancellationToken cancellationToken = default)
     {
@@ -397,6 +432,60 @@ internal sealed class FakeServerChanAlertSender : IServerChanAlertSender
 
         Requests.Add((settings, title, body));
         return SendCompletion?.Task ?? Task.CompletedTask;
+    }
+}
+
+internal sealed class BlockingTaskEventAlertSender :
+    IEmailAlertSender,
+    ITelegramAlertSender,
+    IBarkAlertSender,
+    IWxPusherAlertSender,
+    IServerChanAlertSender
+{
+    public TaskCompletionSource<object?> SendStarted { get; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public TaskCompletionSource<object?> SendCompletion { get; } =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public Task SendAsync(
+        EmailAlertChannelSettings settings,
+        string subject,
+        string body,
+        CancellationToken cancellationToken = default)
+        => WaitForCompletionAsync(cancellationToken);
+
+    public Task SendAsync(
+        TelegramAlertChannelSettings settings,
+        string message,
+        CancellationToken cancellationToken = default)
+        => WaitForCompletionAsync(cancellationToken);
+
+    public Task SendAsync(
+        BarkAlertChannelSettings settings,
+        string title,
+        string body,
+        CancellationToken cancellationToken = default)
+        => WaitForCompletionAsync(cancellationToken);
+
+    public Task SendAsync(
+        WxPusherAlertChannelSettings settings,
+        string title,
+        string body,
+        CancellationToken cancellationToken = default)
+        => WaitForCompletionAsync(cancellationToken);
+
+    public Task SendAsync(
+        ServerChanAlertChannelSettings settings,
+        string title,
+        string body,
+        CancellationToken cancellationToken = default)
+        => WaitForCompletionAsync(cancellationToken);
+
+    private async Task WaitForCompletionAsync(CancellationToken cancellationToken)
+    {
+        SendStarted.TrySetResult(null);
+        await SendCompletion.Task.WaitAsync(cancellationToken);
     }
 }
 

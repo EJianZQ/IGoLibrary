@@ -193,6 +193,12 @@ public partial class MainWindowWorkflowViewModel
         set => NotificationSettings.LocalSoundAlertsEnabled = value;
     }
 
+    public bool CookieExpiringAlertsEnabled
+    {
+        get => NotificationSettings.CookieExpiringAlertsEnabled;
+        set => NotificationSettings.CookieExpiringAlertsEnabled = value;
+    }
+
     public bool GrabSucceededAlertsEnabled
     {
         get => NotificationSettings.GrabSucceededAlertsEnabled;
@@ -277,6 +283,7 @@ public partial class MainWindowWorkflowViewModel
             nameof(WxPusherAlertTopicIds),
             nameof(LocalToastAlertsEnabled),
             nameof(LocalSoundAlertsEnabled),
+            nameof(CookieExpiringAlertsEnabled),
             nameof(GrabSucceededAlertsEnabled),
             nameof(OccupyReReserveSucceededAlertsEnabled),
             nameof(TomorrowReservationSucceededAlertsEnabled),

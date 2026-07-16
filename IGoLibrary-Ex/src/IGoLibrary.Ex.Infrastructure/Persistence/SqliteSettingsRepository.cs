@@ -514,10 +514,14 @@ public sealed class SqliteSettingsRepository(
 
     private static bool IsCanonicalShape(JsonElement root)
     {
+        var notifications = ReadObject(root, "notifications");
+        var taskEventAlerts = ReadObject(notifications, "taskEventAlerts");
+        var taskEventAlertEvents = ReadObject(taskEventAlerts, "events");
         var ui = ReadObject(root, "ui");
         var windowSize = ReadObject(ui, "windowSize");
         var logging = ReadObject(root, "logging");
-        return windowSize.ValueKind == JsonValueKind.Object &&
+        return ReadBool(taskEventAlertEvents, "cookieExpiring").HasValue &&
+               windowSize.ValueKind == JsonValueKind.Object &&
                ReadBool(windowSize, "rememberSize").HasValue &&
                HasCanonicalWindowSizeDimensions(windowSize) &&
                root.TryGetProperty("traceIntProtocol", out _) &&
@@ -693,6 +697,9 @@ public sealed class SqliteSettingsRepository(
         TaskEventAlertEventSettings defaults)
     {
         writer.WriteStartObject();
+        writer.WriteBoolean(
+            "cookieExpiring",
+            ReadBool(events, "cookieExpiring") ?? defaults.CookieExpiring);
         writer.WriteBoolean(
             "grabSucceeded",
             ReadBool(events, "grabSucceeded") ?? defaults.GrabSucceeded);

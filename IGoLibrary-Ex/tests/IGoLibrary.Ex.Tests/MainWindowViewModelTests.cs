@@ -924,6 +924,7 @@ public sealed class MainWindowViewModelTests
                 TelegramAlertChannelSettings.Default,
                 TaskEventAlertEventSettings.Default with
                 {
+                    CookieExpiring = false,
                     GrabSucceeded = false,
                     TaskFailed = false
                 })));
@@ -931,6 +932,7 @@ public sealed class MainWindowViewModelTests
 
         await viewModel.InitializeAsync();
 
+        Assert.False(viewModel.CookieExpiringAlertsEnabled);
         Assert.False(viewModel.GrabSucceededAlertsEnabled);
         Assert.True(viewModel.OccupyReReserveSucceededAlertsEnabled);
         Assert.True(viewModel.TomorrowReservationSucceededAlertsEnabled);
@@ -946,16 +948,19 @@ public sealed class MainWindowViewModelTests
         var viewModel = CreateViewModel(settingsService: settingsService, timeProvider: timeProvider);
         await viewModel.InitializeAsync();
 
+        viewModel.CookieExpiringAlertsEnabled = false;
         viewModel.GrabSucceededAlertsEnabled = false;
         viewModel.GlobalLeakSucceededAlertsEnabled = false;
         timeProvider.Advance(TimeSpan.FromMilliseconds(450));
 
         await WaitForAsync(() =>
             settingsService.SaveCalls > 0 &&
+            settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events.CookieExpiring == false &&
             settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events.GrabSucceeded == false &&
             settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events.GlobalLeakSucceeded == false);
 
         var events = Assert.IsType<TaskEventAlertEventSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events);
+        Assert.False(events.CookieExpiring);
         Assert.False(events.GrabSucceeded);
         Assert.True(events.OccupyReReserveSucceeded);
         Assert.True(events.TomorrowReservationSucceeded);
@@ -2236,12 +2241,14 @@ public sealed class MainWindowViewModelTests
         var viewModel = CreateViewModel(settingsService: settingsService);
         await viewModel.InitializeAsync();
 
+        viewModel.CookieExpiringAlertsEnabled = false;
         viewModel.SessionInvalidAlertsEnabled = false;
         viewModel.TaskFailedAlertsEnabled = false;
 
         await viewModel.SaveSettingsCommand.ExecuteAsync(null);
 
         var events = Assert.IsType<TaskEventAlertEventSettings>(settingsService.CurrentSettings.Notifications.TaskEventAlerts?.Events);
+        Assert.False(events.CookieExpiring);
         Assert.True(events.GrabSucceeded);
         Assert.True(events.OccupyReReserveSucceeded);
         Assert.True(events.TomorrowReservationSucceeded);

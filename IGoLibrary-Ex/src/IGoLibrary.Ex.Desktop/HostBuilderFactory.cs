@@ -1,5 +1,6 @@
 using IGoLibrary.Ex.Application;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Infrastructure;
@@ -97,6 +98,8 @@ internal static class HostBuilderFactory
                 services.AddSingleton<AlertSoundService>();
                 services.AddSingleton<IAlertSoundService>(serviceProvider => serviceProvider.GetRequiredService<AlertSoundService>());
                 services.AddSingleton<ITaskEventAlertDispatcher, TaskEventAlertService>();
+                services.AddSingleton<CookieExpirationAlertMonitor>();
+                services.AddHostedService<CookieExpirationAlertHostedService>();
                 services.AddSingleton<INotificationTestService, DesktopNotificationTestService>();
                 services.AddSingleton<ICoordinatorEventPublisher, DesktopCoordinatorEventPublisher>();
                 services.AddSingleton<OAuthCodeConsumptionRegistry>();

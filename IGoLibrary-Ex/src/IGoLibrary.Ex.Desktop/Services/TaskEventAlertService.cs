@@ -22,6 +22,34 @@ public sealed class TaskEventAlertService(
     private string? _lastAlertKey;
     private DateTimeOffset _lastAlertAt = DateTimeOffset.MinValue;
 
+    public async Task<bool> TryNotifyCookieExpiringAsync(
+        DateTimeOffset expirationTime,
+        TimeSpan remaining,
+        CancellationToken cancellationToken = default)
+    {
+        var localExpirationTime = expirationTime.ToLocalTime();
+        var normalizedRemaining = remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+        var remoteMessage = BuildCookieExpiringRemoteMessage(localExpirationTime, normalizedRemaining);
+
+        return await DispatchAlertAsync(
+            eventKind: TaskEventAlertKind.CookieExpiring,
+            suppressionKey: $"cookie-expiring|{localExpirationTime.ToUnixTimeSeconds()}",
+            emailLabel: "Cookie 即将到期提醒",
+            telegramLabel: "Cookie 即将到期提醒",
+            localLabel: "Cookie 即将到期提醒",
+            emailSubject: "IGoLibrary-Ex Cookie 即将到期提醒",
+            emailBody: BuildCookieExpiringEmailBody(localExpirationTime, normalizedRemaining),
+            telegramMessage: remoteMessage,
+            barkTitle: "Cookie 即将到期",
+            barkBody: remoteMessage,
+            toastKind: ToastVisualKind.Warning,
+            toastTitle: "Cookie 即将到期",
+            toastMessage: $"当前 Cookie 将于 {localExpirationTime:M月d日 HH:mm:ss} 到期，剩余 {FormatRemaining(normalizedRemaining)}，请尽快重新授权",
+            enableInAppFallback: false,
+            cancellationToken,
+            enableShortTermSuppression: false);
+    }
+
     public async Task NotifySessionInvalidAsync(string source, string reason, CancellationToken cancellationToken = default)
     {
         var title = "Cookie 已失效";
@@ -165,7 +193,7 @@ public sealed class TaskEventAlertService(
             cancellationToken);
     }
 
-    private async Task DispatchAlertAsync(
+    private async Task<bool> DispatchAlertAsync(
         TaskEventAlertKind eventKind,
         string suppressionKey,
         string emailLabel,
@@ -180,18 +208,19 @@ public sealed class TaskEventAlertService(
         string toastTitle,
         string toastMessage,
         bool enableInAppFallback,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool enableShortTermSuppression = true)
     {
         var settings = await settingsService.LoadAsync(cancellationToken);
         var alertSettings = settings.Notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
         if (!IsEventEnabled(alertSettings.Events ?? TaskEventAlertEventSettings.Default, eventKind))
         {
-            return;
+            return false;
         }
 
-        if (ShouldSuppress(suppressionKey))
+        if (enableShortTermSuppression && ShouldSuppress(suppressionKey))
         {
-            return;
+            return true;
         }
 
         var localAlertShown = false;
@@ -211,6 +240,10 @@ public sealed class TaskEventAlertService(
                 {
                     await alertSoundService.PlayAsync(cancellationToken);
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -277,6 +310,8 @@ public sealed class TaskEventAlertService(
         {
             await Task.WhenAll(remoteAlertTasks);
         }
+
+        return true;
     }
 
     private async Task SendEmailAlertSafelyAsync(
@@ -294,6 +329,10 @@ public sealed class TaskEventAlertService(
                 subject: emailSubject,
                 body: emailBody,
                 cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -313,6 +352,10 @@ public sealed class TaskEventAlertService(
                 settings,
                 telegramMessage,
                 cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -335,6 +378,10 @@ public sealed class TaskEventAlertService(
                 barkBody,
                 cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{barkLabel}Bark提醒失败：{ex.Message}");
@@ -356,6 +403,10 @@ public sealed class TaskEventAlertService(
                 wxPusherBody,
                 cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{wxPusherLabel}WxPusher提醒失败：{ex.Message}");
@@ -376,6 +427,10 @@ public sealed class TaskEventAlertService(
                 serverChanTitle,
                 serverChanBody,
                 cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -404,6 +459,7 @@ public sealed class TaskEventAlertService(
     {
         return eventKind switch
         {
+            TaskEventAlertKind.CookieExpiring => settings.CookieExpiring,
             TaskEventAlertKind.GrabSucceeded => settings.GrabSucceeded,
             TaskEventAlertKind.OccupyReReserveSucceeded => settings.OccupyReReserveSucceeded,
             TaskEventAlertKind.TomorrowReservationSucceeded => settings.TomorrowReservationSucceeded,
@@ -461,6 +517,19 @@ public sealed class TaskEventAlertService(
 
         builder.AppendLine();
         builder.AppendLine("请尽快重新授权，以恢复抢座/占座轮询");
+        return builder.ToString();
+    }
+
+    private static string BuildCookieExpiringEmailBody(DateTimeOffset expirationTime, TimeSpan remaining)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex 检测到 Cookie 即将在 10 分钟内到期");
+        builder.AppendLine();
+        builder.AppendLine($"到期时间：{expirationTime:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine($"剩余时间：{FormatRemaining(remaining)}");
+        builder.AppendLine($"触发时间：{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine();
+        builder.AppendLine("请尽快重新授权，以免抢座、占座或明日预约任务因 Cookie 失效而中断");
         return builder.ToString();
     }
 
@@ -548,6 +617,16 @@ public sealed class TaskEventAlertService(
         return builder.ToString();
     }
 
+    private static string BuildCookieExpiringRemoteMessage(DateTimeOffset expirationTime, TimeSpan remaining)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("IGoLibrary-Ex Cookie 即将到期");
+        builder.AppendLine($"到期时间：{expirationTime:yyyy-MM-dd HH:mm:ss zzz}");
+        builder.AppendLine($"剩余时间：{FormatRemaining(remaining)}");
+        builder.AppendLine("请尽快重新授权，以免正在运行或计划执行的任务中断");
+        return builder.ToString();
+    }
+
     private static string BuildGrabSucceededTelegramMessage(string libraryName, string seatName)
     {
         var builder = new StringBuilder();
@@ -621,6 +700,14 @@ public sealed class TaskEventAlertService(
     private static string NormalizeTaskName(string taskName)
         => string.IsNullOrWhiteSpace(taskName) ? "任务" : taskName.Trim();
 
+    private static string FormatRemaining(TimeSpan remaining)
+    {
+        var totalSeconds = Math.Max(0, (int)Math.Ceiling(remaining.TotalSeconds));
+        var minutes = totalSeconds / 60;
+        var seconds = totalSeconds % 60;
+        return $"{minutes} 分 {seconds} 秒";
+    }
+
     private async Task ShowInAppFallbackAsync(
         ToastVisualKind kind,
         string title,
@@ -642,6 +729,10 @@ public sealed class TaskEventAlertService(
                     break;
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             activityLogService.Write(LogEntryKind.Warning, "Alert", $"展示应用内提醒失败：{ex.Message}");
@@ -650,6 +741,7 @@ public sealed class TaskEventAlertService(
 
     private enum TaskEventAlertKind
     {
+        CookieExpiring,
         GrabSucceeded,
         OccupyReReserveSucceeded,
         TomorrowReservationSucceeded,
