@@ -1496,6 +1496,8 @@
                           CornerRadius="18"
                           Padding="16">
                     <ScrollViewer x:Name="GrabLogScrollViewer"
+                                  MinHeight="220"
+                                  MaxHeight="360"
                                   HorizontalScrollBarVisibility="Disabled"
                                   VerticalScrollBarVisibility="Auto">
                       <SelectableTextBlock Text="{Binding GrabLogsText}"
@@ -1957,6 +1959,8 @@
                         CornerRadius="18"
                         Padding="16">
                   <ScrollViewer x:Name="TomorrowLogScrollViewer"
+                                MinHeight="220"
+                                MaxHeight="360"
                                 HorizontalScrollBarVisibility="Disabled"
                                 VerticalScrollBarVisibility="Auto">
                     <SelectableTextBlock Text="{Binding TomorrowLogsText}"

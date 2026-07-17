@@ -15,6 +15,56 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class MainWindowViewModelUiTests
 {
     [AvaloniaFact]
+    public async Task WorkflowLogPanels_AutoScrollToNewestEntry()
+    {
+        var activityLogService = new ActivityLogService();
+        var viewModel = MainWindowViewModelTests.CreateViewModel(
+            activityLogService: activityLogService);
+        await viewModel.InitializeAsync();
+        viewModel.IsAuthorized = true;
+        var window = new MainWindow { DataContext = viewModel };
+
+        (int TabIndex, string Category, string ScrollViewerName)[] scenarios =
+        [
+            (2, "Grab", "GrabLogScrollViewer"),
+            (3, "GlobalLeak", "GlobalLeakLogScrollViewer"),
+            (4, "Tomorrow", "TomorrowLogScrollViewer")
+        ];
+
+        try
+        {
+            window.Show();
+            foreach (var scenario in scenarios)
+            {
+                viewModel.SelectedTabIndex = scenario.TabIndex;
+                Dispatcher.UIThread.RunJobs();
+
+                var scrollViewer = Assert.IsType<ScrollViewer>(
+                    window.FindControl<ScrollViewer>(scenario.ScrollViewerName));
+                for (var index = 0; index < 80; index++)
+                {
+                    activityLogService.Write(
+                        LogEntryKind.Info,
+                        scenario.Category,
+                        $"自动滚动验证日志 {index:D2}");
+                }
+
+                Dispatcher.UIThread.RunJobs();
+                Dispatcher.UIThread.RunJobs();
+
+                var maximumOffset = Math.Max(0, scrollViewer.Extent.Height - scrollViewer.Viewport.Height);
+                Assert.True(maximumOffset > 0, $"{scenario.ScrollViewerName} should have overflowing content.");
+                Assert.InRange(Math.Abs(scrollViewer.Offset.Y - maximumOffset), 0, 1);
+            }
+        }
+        finally
+        {
+            window.DataContext = null;
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task MobileControlToggleButton_RendersStartingTextAndSpinnerDuringSlowStartup()
     {
         var startBlocker = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);

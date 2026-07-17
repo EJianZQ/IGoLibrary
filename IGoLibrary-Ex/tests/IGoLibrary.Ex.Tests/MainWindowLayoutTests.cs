@@ -34,6 +34,27 @@ public sealed class MainWindowLayoutTests
         Assert.Equal(ScrollBarVisibility.Disabled, grabScrollViewer.HorizontalScrollBarVisibility);
         Assert.Equal(ScrollBarVisibility.Auto, grabScrollViewer.VerticalScrollBarVisibility);
 
+        string[] boundedLogScrollViewerNames =
+        [
+            "GrabLogScrollViewer",
+            "GlobalLeakLogScrollViewer",
+            "TomorrowLogScrollViewer"
+        ];
+        foreach (var scrollViewerName in boundedLogScrollViewerNames)
+        {
+            var logScrollViewer = Assert.IsType<ScrollViewer>(
+                window.FindControl<ScrollViewer>(scrollViewerName));
+            Assert.Equal(220, logScrollViewer.MinHeight);
+            Assert.Equal(360, logScrollViewer.MaxHeight);
+            Assert.Equal(ScrollBarVisibility.Disabled, logScrollViewer.HorizontalScrollBarVisibility);
+            Assert.Equal(ScrollBarVisibility.Auto, logScrollViewer.VerticalScrollBarVisibility);
+        }
+
+        var occupyLogScrollViewer = Assert.IsType<ScrollViewer>(
+            window.FindControl<ScrollViewer>("OccupyLogScrollViewer"));
+        Assert.Equal(ScrollBarVisibility.Auto, occupyLogScrollViewer.HorizontalScrollBarVisibility);
+        Assert.Equal(ScrollBarVisibility.Auto, occupyLogScrollViewer.VerticalScrollBarVisibility);
+
         var grabModal = Assert.IsType<Border>(window.FindControl<Border>("GrabSeatSelectionModal"));
         Assert.Equal(HorizontalAlignment.Stretch, grabModal.HorizontalAlignment);
         Assert.Equal(1180, grabModal.MaxWidth);
