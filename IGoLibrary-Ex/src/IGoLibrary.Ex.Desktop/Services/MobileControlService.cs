@@ -13,6 +13,8 @@ public sealed class MobileControlService(
     ILanAddressProvider addressProvider,
     INetworkExposureManager networkExposureManager,
     IMobileControlStatusSnapshotProvider statusSnapshotProvider,
+    IMobileControlTaskRecordsProvider taskRecordsProvider,
+    IMobileControlTaskStartService taskStartService,
     IMobileControlActionService actionService,
     ILogger<MobileControlService> logger) : IMobileControlService, IAsyncDisposable
 {
@@ -84,7 +86,9 @@ public sealed class MobileControlService(
             app.MapGet("/", context => WriteLandingPageAsync(context, token));
             app.MapGet(healthCheckPath, WriteHealthCheckAsync);
             app.MapGet("/api/status", context => WriteStatusAsync(context, token));
+            app.MapGet("/api/task-records", context => WriteTaskRecordsAsync(context, token));
             app.MapGet("/api/session/auth-qrcode", context => WriteAuthQrCodeAsync(context, token));
+            app.MapPost("/api/tasks/{kind}/start", context => WriteStartTaskAsync(context, token));
             app.MapPost("/api/tasks/{kind}/cancel", context => WriteCancelTaskAsync(context, token));
             app.MapPost("/api/reservation/cancel", context => WriteCancelReservationAsync(context, token));
             app.MapPost("/api/session/cookie/refresh", context => WriteRefreshCookieAsync(context, token));
@@ -198,6 +202,118 @@ public sealed class MobileControlService(
         await context.Response.Body.WriteAsync(pngBytes, context.RequestAborted);
     }
 
+    private async Task WriteTaskRecordsAsync(HttpContext context, string token)
+    {
+        if (!IsValidToken(context, token))
+        {
+            await WriteForbiddenAsync(context);
+            return;
+        }
+
+        TrackConnectedDevice(context);
+        SetNoStore(context);
+        MobileControlTaskRecordsSnapshot snapshot;
+        try
+        {
+            snapshot = await taskRecordsProvider.CreateSnapshotAsync(context.RequestAborted);
+        }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to read mobile-control task records.");
+            await WriteJsonAsync(
+                context,
+                StatusCodes.Status500InternalServerError,
+                new { success = false, message = "读取任务记录失败，请稍后重试" });
+            return;
+        }
+
+        context.Response.ContentType = "application/json; charset=utf-8";
+        await JsonSerializer.SerializeAsync(
+            context.Response.Body,
+            snapshot,
+            JsonOptions,
+            context.RequestAborted);
+    }
+
+    private async Task WriteStartTaskAsync(HttpContext context, string token)
+    {
+        if (!IsValidToken(context, token))
+        {
+            await WriteForbiddenAsync(context);
+            return;
+        }
+
+        TrackConnectedDevice(context);
+        var taskKind = context.Request.RouteValues["kind"]?.ToString();
+        if (string.IsNullOrWhiteSpace(taskKind))
+        {
+            await WriteActionResponseAsync(
+                context,
+                new MobileControlActionResult(false, "未知任务类型", StatusCodes.Status400BadRequest));
+            return;
+        }
+
+        string? recordId = null;
+        if (taskKind is "grab" or "globalLeak")
+        {
+            try
+            {
+                recordId = await MobileControlTaskStartRequestReader.ReadRecordIdAsync(context.Request);
+            }
+            catch (MobileControlTaskStartBodyTooLargeException)
+            {
+                await WriteActionResponseAsync(
+                    context,
+                    new MobileControlActionResult(false, "提交内容过大", StatusCodes.Status413PayloadTooLarge));
+                return;
+            }
+            catch (MobileControlTaskStartBodyException ex)
+            {
+                await WriteActionResponseAsync(
+                    context,
+                    new MobileControlActionResult(false, ex.Message, StatusCodes.Status400BadRequest));
+                return;
+            }
+            catch (JsonException)
+            {
+                await WriteActionResponseAsync(
+                    context,
+                    new MobileControlActionResult(false, "提交内容格式无效", StatusCodes.Status400BadRequest));
+                return;
+            }
+        }
+        else if (taskKind == "occupy")
+        {
+            try
+            {
+                await MobileControlTaskStartRequestReader.EnsureEmptyBodyAsync(context.Request);
+            }
+            catch (MobileControlTaskStartBodyTooLargeException)
+            {
+                await WriteActionResponseAsync(
+                    context,
+                    new MobileControlActionResult(false, "提交内容过大", StatusCodes.Status413PayloadTooLarge));
+                return;
+            }
+            catch (MobileControlTaskStartBodyException ex)
+            {
+                await WriteActionResponseAsync(
+                    context,
+                    new MobileControlActionResult(false, ex.Message, StatusCodes.Status400BadRequest));
+                return;
+            }
+        }
+
+        await WriteActionResultAsync(
+            context,
+            () => taskStartService.StartTaskAsync(taskKind, recordId, context.RequestAborted),
+            "Failed to start mobile-control task.");
+    }
+
     private async Task WriteCancelTaskAsync(HttpContext context, string token)
     {
         if (!IsValidToken(context, token))
@@ -297,7 +413,7 @@ public sealed class MobileControlService(
                 context,
                 new MobileControlActionResult(
                     false,
-                    $"操作失败：{ex.Message}",
+                    "操作失败，请稍后重试",
                     StatusCodes.Status500InternalServerError));
         }
     }

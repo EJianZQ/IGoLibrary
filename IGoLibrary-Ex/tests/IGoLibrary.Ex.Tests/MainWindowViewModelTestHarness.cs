@@ -49,6 +49,10 @@ internal static class MainWindowViewModelTestHarness
         windowSizePersistenceService ??= NoOpMainWindowSizePersistenceService.Instance;
         windowsUpdateProgressDialogService ??= new FakeWindowsUpdateProgressDialogService();
         var workflowState = new ShellWorkflowState();
+        var taskLaunchService = new FakeTaskLaunchService(
+            grabSeatCoordinator,
+            globalLeakCoordinator,
+            occupySeatCoordinator);
         var oauthCodeRegistry = new OAuthCodeConsumptionRegistry();
         var lanCookieRelayViewModel = new LanCookieRelayViewModel(
             lanCookieRelayService,
@@ -80,6 +84,7 @@ internal static class MainWindowViewModelTestHarness
                 seatLabelDialogService),
             new GrabPageViewModel(
                 grabSeatCoordinator,
+                taskLaunchService,
                 settingsWorkflowService,
                 activityLogService,
                 notificationService,
@@ -88,6 +93,7 @@ internal static class MainWindowViewModelTestHarness
                 timeProvider),
             new GlobalLeakPageViewModel(
                 globalLeakCoordinator,
+                taskLaunchService,
                 venueWorkflowService,
                 settingsWorkflowService,
                 activityLogService,
@@ -97,6 +103,7 @@ internal static class MainWindowViewModelTestHarness
                 new GlobalLeakLibrarySelectionViewModel()),
             new OccupyPageViewModel(
                 occupySeatCoordinator,
+                taskLaunchService,
                 reservationWorkflowService,
                 activityLogService,
                 notificationService,

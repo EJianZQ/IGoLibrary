@@ -1099,6 +1099,50 @@ internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
     public CoordinatorStatus GetStatus() => _status;
 }
 
+internal sealed class FakeTaskLaunchService(
+    IGrabSeatCoordinator? grabSeatCoordinator = null,
+    IGlobalLeakCoordinator? globalLeakCoordinator = null,
+    IOccupySeatCoordinator? occupySeatCoordinator = null) : ITaskLaunchService
+{
+    public GrabSeatPlan? LastGrabPlan { get; private set; }
+
+    public GlobalLeakPlan? LastGlobalLeakPlan { get; private set; }
+
+    public OccupySeatPlan? LastOccupyPlan { get; private set; }
+
+    public TaskLaunchSource? LastSource { get; private set; }
+
+    public Task StartGrabAsync(
+        GrabSeatPlan plan,
+        TaskLaunchSource source,
+        CancellationToken cancellationToken = default)
+    {
+        LastGrabPlan = plan;
+        LastSource = source;
+        return grabSeatCoordinator?.StartAsync(plan, cancellationToken) ?? Task.CompletedTask;
+    }
+
+    public Task StartGlobalLeakAsync(
+        GlobalLeakPlan plan,
+        TaskLaunchSource source,
+        CancellationToken cancellationToken = default)
+    {
+        LastGlobalLeakPlan = plan;
+        LastSource = source;
+        return globalLeakCoordinator?.StartAsync(plan, cancellationToken) ?? Task.CompletedTask;
+    }
+
+    public Task StartOccupyAsync(
+        OccupySeatPlan plan,
+        TaskLaunchSource source,
+        CancellationToken cancellationToken = default)
+    {
+        LastOccupyPlan = plan;
+        LastSource = source;
+        return occupySeatCoordinator?.StartAsync(plan, cancellationToken) ?? Task.CompletedTask;
+    }
+}
+
 internal sealed class FakeTomorrowReservationCoordinator : ITomorrowReservationCoordinator
 {
     private CoordinatorStatus _status = CoordinatorStatus.Idle("明日预约");

@@ -28,6 +28,8 @@ public static class DependencyInjection
         services.AddSingleton<IReservationWorkflowService, ReservationWorkflowService>();
         services.AddSingleton<ISettingsWorkflowService, SettingsWorkflowService>();
         services.AddSingleton<ILoggingSettingsWorkflowService, LoggingSettingsWorkflowService>();
+        services.AddSingleton<ITaskLaunchHistoryService, TaskLaunchHistoryService>();
+        services.AddSingleton<ITaskLaunchService, TaskLaunchService>();
         services.AddSingleton<IUpdateCheckService, UpdateCheckService>();
         services.AddSingleton<IUpdateInstallGuard, UpdateInstallGuard>();
         services.AddSingleton<IProtocolTemplateEditorService, ProtocolTemplateEditorService>();

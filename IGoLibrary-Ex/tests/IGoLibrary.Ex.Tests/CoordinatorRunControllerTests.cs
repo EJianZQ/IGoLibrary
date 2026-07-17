@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
@@ -20,7 +21,7 @@ public sealed class CoordinatorRunControllerTests
         });
         await WaitForStatusAsync(controller, CoordinatorTaskState.Running);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var ex = await Assert.ThrowsAsync<TaskLaunchConflictException>(() =>
             controller.StartAsync((_, _) => Task.CompletedTask));
         Assert.Contains("任务已在运行", ex.Message);
 

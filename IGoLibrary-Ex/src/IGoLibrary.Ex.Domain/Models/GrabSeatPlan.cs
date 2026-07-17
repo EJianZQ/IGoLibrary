@@ -8,4 +8,5 @@ public sealed record GrabSeatPlan(
     IReadOnlyList<SeatReference> Seats,
     GrabPollingMode PollingMode,
     GrabSeatPollingStrategy PollingStrategy,
-    TimeOnly? ScheduledStart);
+    TimeOnly? ScheduledStart,
+    GrabReservationStrategy ReservationStrategy);

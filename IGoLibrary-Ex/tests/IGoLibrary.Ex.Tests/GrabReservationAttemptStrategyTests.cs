@@ -168,7 +168,8 @@ public sealed class GrabReservationAttemptStrategyTests
                 seats,
                 GrabPollingMode.Aggressive,
                 GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
-                null),
+                null,
+                GrabReservationStrategy.QueryThenReserve),
             0,
             markRequestSent ?? (() => { }));
     }

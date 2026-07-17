@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 
@@ -30,7 +31,7 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
         {
             if (_cts is not null || _runningTask is { IsCompleted: false })
             {
-                throw new InvalidOperationException($"{title}任务已在运行");
+                throw new TaskLaunchConflictException($"{title}任务已在运行");
             }
 
             _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

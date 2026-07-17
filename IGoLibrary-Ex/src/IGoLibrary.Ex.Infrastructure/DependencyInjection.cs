@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
         services.AddSingleton<IFavoritesRepository, SqliteFavoritesRepository>();
         services.AddSingleton<ISeatLabelRepository, SqliteSeatLabelRepository>();
+        services.AddSingleton<ITaskLaunchHistoryRepository, SqliteTaskLaunchHistoryRepository>();
         services.AddSingleton<IProtocolTemplateStore, DefaultProtocolTemplateStore>();
         services.AddSingleton<ICredentialStore>(_ => PlatformCredentialStore.CreateDefault());
         services.AddSingleton<ISmtpTransportClientFactory, MailKitSmtpTransportClientFactory>();

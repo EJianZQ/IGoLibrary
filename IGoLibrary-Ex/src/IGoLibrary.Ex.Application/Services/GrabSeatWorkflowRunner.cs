@@ -6,7 +6,6 @@ using IGoLibrary.Ex.Domain.Models;
 namespace IGoLibrary.Ex.Application.Services;
 
 internal sealed class GrabSeatWorkflowRunner(
-    ISettingsService settingsService,
     GrabReservationStrategySelector strategySelector,
     ICoordinatorEventPublisher coordinatorEventPublisher,
     IActivityLogService activityLogService,
@@ -32,8 +31,7 @@ internal sealed class GrabSeatWorkflowRunner(
             var cycle = 0;
             var requestCount = 0;
             DateTimeOffset? lastRequestAt = null;
-            var settings = await settingsService.LoadAsync(cancellationToken);
-            var reservationStrategy = settings.Tasks.Grab.ReservationStrategy;
+            var reservationStrategy = plan.ReservationStrategy;
             var reservationAttemptStrategy = strategySelector.Select(reservationStrategy);
             var directReservationStartIndex = 0;
             activityLogService.Write(LogEntryKind.Info, "Grab", $"当前执行策略：{GetReservationStrategyText(reservationStrategy)}。");

@@ -28,7 +28,8 @@ public sealed class GrabSeatWorkflowRunnerTests
 
         await coordinator.StartAsync(CreatePlan(
             new GrabSeatPollingStrategy(TimeSpan.Zero, TimeSpan.Zero, 0, TimeSpan.Zero, TimeSpan.Zero),
-            scheduledStart: new TimeOnly(21, 30, 2)));
+            scheduledStart: new TimeOnly(21, 30, 2),
+            reservationStrategy: GrabReservationStrategy.ReserveDirectly));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Completed);
 
         Assert.Equal([TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)], runtime.DelayRequests.Take(2));
@@ -61,7 +62,8 @@ public sealed class GrabSeatWorkflowRunnerTests
                 TimeSpan.FromSeconds(1),
                 0,
                 TimeSpan.Zero,
-                TimeSpan.Zero)));
+                TimeSpan.Zero),
+            reservationStrategy: GrabReservationStrategy.ReserveDirectly));
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Completed);
 
         Assert.Contains(TimeSpan.FromSeconds(3), runtime.DelayRequests);
@@ -157,7 +159,6 @@ public sealed class GrabSeatWorkflowRunnerTests
                 new DirectReserveGrabReservationStrategy(apiClient, activityLogService, runtime)
             ]);
         var stateMachine = new GrabSeatWorkflowRunner(
-            new FakeSettingsService(settings),
             strategySelector,
             eventPublisher ?? new FakeCoordinatorEventPublisher(),
             activityLogService,
@@ -170,7 +171,8 @@ public sealed class GrabSeatWorkflowRunnerTests
 
     private static GrabSeatPlan CreatePlan(
         GrabSeatPollingStrategy pollingStrategy,
-        TimeOnly? scheduledStart = null)
+        TimeOnly? scheduledStart = null,
+        GrabReservationStrategy reservationStrategy = GrabReservationStrategy.QueryThenReserve)
     {
         return new GrabSeatPlan(
             1,
@@ -178,7 +180,8 @@ public sealed class GrabSeatWorkflowRunnerTests
             [new SeatReference("seat-1", "1号座")],
             GrabPollingMode.Aggressive,
             pollingStrategy,
-            scheduledStart);
+            scheduledStart,
+            reservationStrategy);
     }
 
     private static async Task WaitForStatusAsync(

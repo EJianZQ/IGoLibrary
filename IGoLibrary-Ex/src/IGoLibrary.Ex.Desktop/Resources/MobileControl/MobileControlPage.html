@@ -205,6 +205,24 @@
       gap: 10px;
     }
 
+    .help-icon-button {
+      width: 24px;
+      height: 24px;
+      flex-shrink: 0;
+      padding: 0;
+      border-radius: 50%;
+      background: rgba(0, 122, 255, 0.1);
+      color: var(--accent-blue);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .help-icon-button:focus-visible {
+      outline: 2px solid var(--accent-blue);
+      outline-offset: 2px;
+    }
+
     .head-icon {
       width: 34px;
       height: 34px;
@@ -307,6 +325,126 @@
       font-size: 32px;
       margin-bottom: 8px;
       opacity: 0.6;
+    }
+
+    /* ── Task launch records ── */
+    .launch-grid { display: grid; gap: 12px; }
+
+    .launch-group {
+      border-radius: var(--radius-inner);
+      padding: 14px;
+      background: var(--bg-field);
+    }
+
+    .launch-group-title {
+      margin: 0 0 10px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .launch-group-hint {
+      margin: -3px 0 12px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .record-picker {
+      display: grid;
+      gap: 10px;
+    }
+
+    .record-select-label {
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .record-select-wrap {
+      position: relative;
+    }
+
+    .record-select-wrap::after {
+      content: '';
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      width: 7px;
+      height: 7px;
+      border-right: 2px solid var(--text-secondary);
+      border-bottom: 2px solid var(--text-secondary);
+      transform: translateY(-70%) rotate(45deg);
+      pointer-events: none;
+    }
+
+    .record-select {
+      width: 100%;
+      min-height: 44px;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 1px solid rgba(128, 128, 128, 0.16);
+      outline: none;
+      border-radius: var(--radius-button);
+      padding: 10px 38px 10px 12px;
+      background: var(--bg-card-solid);
+      color: var(--text-primary);
+      font: 14px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    }
+
+    .record-select:focus {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
+    }
+
+    .record-select:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .record-summary {
+      border-radius: var(--radius-inner);
+      padding: 12px;
+      background: var(--bg-card-solid);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .record-summary-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .record-title {
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+
+    .record-meta,
+    .record-detail {
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+
+    .record-meta { margin-top: 3px; }
+    .record-detail { margin-top: 8px; }
+    .record-picker .actions button,
+    .launch-group > .actions button { width: 100%; }
+
+    .empty-records {
+      border-radius: var(--radius-inner);
+      padding: 18px 12px;
+      color: var(--text-tertiary);
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.55;
+      background: var(--bg-card-solid);
     }
 
     /* ── Cookie Hero Countdown ── */
@@ -786,6 +924,37 @@
       <div class="actions"><button class="danger" id="cancelReservationButton" type="button" hidden>取消当前预约</button></div>
     </div></section>
 
+    <!-- 启动任务 -->
+    <section><div class="card">
+      <div class="head">
+        <div class="head-title">
+          <div class="head-icon task">▶️</div>
+          <h2>启动任务</h2>
+          <button class="help-icon-button" id="launchHelpButton" type="button" aria-label="查看启动任务说明" title="查看启动任务说明">?</button>
+        </div>
+        <span class="state" id="launchState">等待记录</span>
+      </div>
+      <div class="launch-grid">
+        <div class="launch-group">
+          <h3 class="launch-group-title">抢座</h3>
+          <div class="record-list" id="grabRecordList">
+            <div class="empty-records">正在读取电脑端操作记录...</div>
+          </div>
+        </div>
+        <div class="launch-group">
+          <h3 class="launch-group-title">全域捡漏</h3>
+          <div class="record-list" id="globalLeakRecordList">
+            <div class="empty-records">正在读取电脑端操作记录...</div>
+          </div>
+        </div>
+        <div class="launch-group">
+          <h3 class="launch-group-title">占座</h3>
+          <p class="launch-group-hint">使用电脑端占座页面当前的重约延迟和检测间隔参数</p>
+          <div class="actions"><button id="startOccupyButton" type="button" data-task-start="occupy">开启占座</button></div>
+        </div>
+      </div>
+    </div></section>
+
     <!-- 当前任务 -->
     <section><div class="card">
       <div class="head">
@@ -810,6 +979,11 @@
     const display = value => value === null || value === undefined || value === '' ? '--' : value;
     const text = (id, value) => { $(id).textContent = display(value); };
     const escapeHtml = value => String(value ?? '--').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    let latestStatusData = null;
+    let latestTaskRecords = { grab: [], globalLeak: [] };
+    let taskRecordsLoadFailed = false;
+    const selectedTaskRecordIds = { grab: null, globalLeak: null };
+    const pendingTaskStarts = new Set();
     $('authQrCode').src = '/api/session/auth-qrcode?token=' + encodeURIComponent(token);
 
     const field = (label, value, wide = false) =>
@@ -827,6 +1001,95 @@
         <div class="grid">${task.items.join('')}${logField(task.logs)}</div>
         <div class="actions"><button class="danger" type="button" data-task-cancel="${escapeHtml(task.kind)}">取消任务</button></div>
       </div>`;
+
+    const emptyRecords = message => `<div class="empty-records">${escapeHtml(message)}</div>`;
+
+    function grabRecordOptionLabel(record) {
+      const seats = record.seatNames && record.seatNames.length ? record.seatNames.join('、') : '无座位';
+      return `${record.libraryName} · ${seats}`;
+    }
+
+    function grabRecordSummary(record) {
+      const seats = record.seatNames && record.seatNames.length ? record.seatNames.join('、') : '无座位';
+      return `
+        <div class="record-summary">
+          <div class="record-summary-head">
+            <div class="record-title">${escapeHtml(record.libraryName)}</div>
+            <div class="record-meta">${escapeHtml(record.recordedAtText)}</div>
+          </div>
+          <div class="record-detail">座位：${escapeHtml(seats)}<br>轮询：${escapeHtml(record.pollingModeText)}<br>预约：${escapeHtml(record.reservationStrategyText)}</div>
+        </div>`;
+    }
+
+    function globalLeakRecordOptionLabel(record) {
+      const firstLibrary = record.libraries && record.libraries.length ? record.libraries[0].libraryName : '全域捡漏';
+      const libraryCount = record.libraries && record.libraries.length ? record.libraries.length : 0;
+      return `${firstLibrary} 等 ${libraryCount} 个场馆 · ${record.scanIntervalSeconds} 秒`;
+    }
+
+    function globalLeakRecordSummary(record) {
+      const libraries = record.libraries && record.libraries.length
+        ? record.libraries.map((library, index) => `${index + 1}. ${library.libraryName}${library.floor ? ' · ' + library.floor : ''}`).join('；')
+        : '无场馆';
+      return `
+        <div class="record-summary">
+          <div class="record-summary-head">
+            <div class="record-title">${escapeHtml(record.libraries && record.libraries.length ? record.libraries[0].libraryName + ' 等 ' + record.libraries.length + ' 个场馆' : '全域捡漏')}</div>
+            <div class="record-meta">${escapeHtml(record.recordedAtText)}</div>
+          </div>
+          <div class="record-detail">优先级：${escapeHtml(libraries)}<br>扫描间隔：${escapeHtml(record.scanIntervalSeconds)} 秒</div>
+        </div>`;
+    }
+
+    function taskRecordPicker(kind, records, disabled, pending) {
+      const selectedId = selectedTaskRecordIds[kind];
+      const selectedRecord = records.find(record => record.recordId === selectedId) || records[0];
+      selectedTaskRecordIds[kind] = selectedRecord.recordId;
+      const optionLabel = kind === 'grab' ? grabRecordOptionLabel : globalLeakRecordOptionLabel;
+      const summary = kind === 'grab' ? grabRecordSummary(selectedRecord) : globalLeakRecordSummary(selectedRecord);
+      const options = records.map(record => `
+        <option value="${escapeHtml(record.recordId)}"${record.recordId === selectedRecord.recordId ? ' selected' : ''}>${escapeHtml(optionLabel(record))}</option>`).join('');
+      const selectId = kind === 'grab' ? 'grabRecordSelect' : 'globalLeakRecordSelect';
+      const buttonText = pending ? '正在提交...' : '使用所选记录启动';
+      return `
+        <div class="record-picker">
+          <label class="record-select-label" for="${selectId}">选择一条电脑端记录</label>
+          <div class="record-select-wrap">
+            <select class="record-select" id="${selectId}" data-task-record-select="${escapeHtml(kind)}"${disabled ? ' disabled' : ''}>${options}</select>
+          </div>
+          ${summary}
+          <div class="actions"><button type="button" data-task-start="${escapeHtml(kind)}" data-record-id="${escapeHtml(selectedRecord.recordId)}"${disabled ? ' disabled' : ''}>${buttonText}</button></div>
+        </div>`;
+    }
+
+    function renderTaskRecords() {
+      const status = latestStatusData;
+      const authorized = !!(status && status.cookie && status.cookie.isAuthorized);
+      const grabActive = !!(status && status.grab && status.grab.isActive);
+      const globalLeakActive = !!(status && status.globalLeak && status.globalLeak.isActive);
+      const occupyActive = !!(status && status.occupy && status.occupy.isActive);
+      const hasReservation = !!(status && status.reservation && status.reservation.hasReservation);
+      const grabPending = pendingTaskStarts.has('grab');
+      const globalLeakPending = pendingTaskStarts.has('globalLeak');
+      const occupyPending = pendingTaskStarts.has('occupy');
+
+      $('grabRecordList').innerHTML = taskRecordsLoadFailed
+        ? emptyRecords('抢座记录读取失败，请稍后重试')
+        : latestTaskRecords.grab && latestTaskRecords.grab.length
+          ? taskRecordPicker('grab', latestTaskRecords.grab, !authorized || grabActive || grabPending, grabPending)
+          : emptyRecords('暂无电脑端抢座记录，请先在电脑端成功启动一次抢座任务');
+      $('globalLeakRecordList').innerHTML = taskRecordsLoadFailed
+        ? emptyRecords('全域捡漏记录读取失败，请稍后重试')
+        : latestTaskRecords.globalLeak && latestTaskRecords.globalLeak.length
+          ? taskRecordPicker('globalLeak', latestTaskRecords.globalLeak, !authorized || globalLeakActive || globalLeakPending, globalLeakPending)
+          : emptyRecords('暂无电脑端全域捡漏记录，请先在电脑端成功启动一次全域捡漏任务');
+
+      const occupyButton = $('startOccupyButton');
+      occupyButton.disabled = !authorized || !hasReservation || occupyActive || occupyPending;
+      occupyButton.textContent = occupyPending ? '正在提交...' : occupyActive ? '占座运行中' : hasReservation ? '开启占座' : '当前无可续占预约';
+      const totalRecords = (latestTaskRecords.grab?.length || 0) + (latestTaskRecords.globalLeak?.length || 0);
+      $('launchState').textContent = taskRecordsLoadFailed ? '记录读取失败' : totalRecords ? `${totalRecords} 条记录` : '暂无记录';
+    }
 
     function setProgress(id, value, level) {
       const node = $(id);
@@ -905,6 +1168,7 @@
         const response = await fetch('/api/status?token=' + encodeURIComponent(token), { cache: 'no-store' });
         if (!response.ok) throw new Error('bad status');
         const data = await response.json();
+        latestStatusData = data;
 
         const connEl = $('connection');
         connEl.querySelector('span').textContent = '已连接';
@@ -924,6 +1188,7 @@
         setProgress('reservationProgress', data.reservation.progressValue, data.reservation.progressLevel);
         $('cancelReservationButton').hidden = !data.reservation.hasReservation;
         renderTasks(data);
+        renderTaskRecords();
       } catch {
         const connEl = $('connection');
         connEl.querySelector('span').textContent = '连接失败';
@@ -932,7 +1197,24 @@
       }
     }
 
+    async function refreshTaskRecords() {
+      try {
+        const response = await fetch('/api/task-records?token=' + encodeURIComponent(token), { cache: 'no-store' });
+        if (!response.ok) throw new Error('bad task records');
+        latestTaskRecords = await response.json();
+        taskRecordsLoadFailed = false;
+        renderTaskRecords();
+      } catch {
+        latestTaskRecords = { grab: [], globalLeak: [] };
+        selectedTaskRecordIds.grab = null;
+        selectedTaskRecordIds.globalLeak = null;
+        taskRecordsLoadFailed = true;
+        renderTaskRecords();
+      }
+    }
+
     let timer = 0;
+    let recordsTimer = 0;
     function schedule() {
       clearTimeout(timer);
       timer = setTimeout(async () => {
@@ -940,8 +1222,25 @@
         schedule();
       }, document.hidden ? 10000 : 3000);
     }
-    refresh().then(schedule);
-    document.addEventListener('visibilitychange', () => { refresh(); schedule(); });
+
+    function scheduleTaskRecords() {
+      clearTimeout(recordsTimer);
+      recordsTimer = setTimeout(async () => {
+        await refreshTaskRecords();
+        scheduleTaskRecords();
+      }, document.hidden ? 30000 : 10000);
+    }
+
+    Promise.all([refresh(), refreshTaskRecords()]).then(() => {
+      schedule();
+      scheduleTaskRecords();
+    });
+    document.addEventListener('visibilitychange', () => {
+      refresh();
+      refreshTaskRecords();
+      schedule();
+      scheduleTaskRecords();
+    });
 
     /* ── iOS-style confirm dialog ── */
     function iosConfirm(message) {
@@ -974,6 +1273,42 @@
       });
     }
 
+    function iosInfo(title, message) {
+      if (document.querySelector('.ios-dialog-overlay')) return;
+
+      const overlay = document.createElement('div');
+      const previouslyFocused = document.activeElement;
+      overlay.className = 'ios-dialog-overlay';
+      overlay.innerHTML = `
+        <div class="ios-dialog" role="dialog" aria-modal="true" aria-labelledby="iosInfoTitle">
+          <div class="ios-dialog-body">
+            <h3 id="iosInfoTitle">${escapeHtml(title)}</h3>
+            <p>${escapeHtml(message)}</p>
+          </div>
+          <div class="ios-dialog-actions">
+            <button type="button" data-action="dismiss">知道了</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      const close = () => {
+        overlay.style.animation = 'overlayIn 0.15s ease reverse';
+        overlay.querySelector('.ios-dialog').style.animation = 'dialogIn 0.15s ease reverse';
+        setTimeout(() => {
+          overlay.remove();
+          previouslyFocused?.focus();
+        }, 140);
+      };
+
+      overlay.addEventListener('click', event => {
+        if (event.target.closest('button[data-action="dismiss"]')) close();
+      });
+      overlay.addEventListener('keydown', event => {
+        if (event.key === 'Escape') close();
+      });
+      overlay.querySelector('button[data-action="dismiss"]').focus();
+    }
+
     /* ── iOS-style toast ── */
     let toastTimer = 0;
     function iosAlert(message) {
@@ -1001,6 +1336,34 @@
         iosAlert('操作失败，请确认手机网络和电脑端服务可用');
       } finally {
         button.disabled = false;
+      }
+    }
+
+    async function startTask(kind, recordId) {
+      if (pendingTaskStarts.has(kind)) return;
+
+      const taskName = kind === 'grab' ? '抢座' : kind === 'globalLeak' ? '全域捡漏' : '占座';
+      pendingTaskStarts.add(kind);
+      renderTaskRecords();
+      try {
+        const confirmed = await iosConfirm(`确定由电脑端开启${taskName}任务吗？`);
+        if (!confirmed) return;
+
+        const options = { method: 'POST', cache: 'no-store' };
+        if (recordId) {
+          options.headers = { 'Content-Type': 'application/json' };
+          options.body = JSON.stringify({ recordId });
+        }
+        const response = await fetch('/api/tasks/' + encodeURIComponent(kind) + '/start?token=' + encodeURIComponent(token), options);
+        let result = { success: false, message: '启动失败，请稍后重试' };
+        try { result = await response.json(); } catch {}
+        iosAlert(result.message || (response.ok && result.success ? '启动请求已被接受' : '启动失败，请稍后重试'));
+        await Promise.all([refresh(), refreshTaskRecords()]);
+      } catch {
+        iosAlert('启动失败，请确认手机网络和电脑端服务可用');
+      } finally {
+        pendingTaskStarts.delete(kind);
+        renderTaskRecords();
       }
     }
 
@@ -1037,6 +1400,18 @@
     }
 
     document.addEventListener('click', event => {
+      const launchHelpButton = event.target.closest('#launchHelpButton');
+      if (launchHelpButton) {
+        iosInfo(
+          '启动任务说明',
+          '抢座和全域捡漏需要先在电脑端成功启动过对应任务，生成操作记录后，才能在手机端选择记录并开始任务。手机端无法选择或修改场馆和座位');
+        return;
+      }
+      const startButton = event.target.closest('button[data-task-start]');
+      if (startButton) {
+        startTask(startButton.dataset.taskStart, startButton.dataset.recordId || null);
+        return;
+      }
       const taskButton = event.target.closest('button[data-task-cancel]');
       if (taskButton) {
         postAction('/api/tasks/' + encodeURIComponent(taskButton.dataset.taskCancel) + '/cancel', '确定取消这个任务吗？', taskButton);
@@ -1045,6 +1420,13 @@
       if (event.target.closest('#cancelReservationButton')) {
         postAction('/api/reservation/cancel', '确定取消当前预约吗？', $('cancelReservationButton'));
       }
+    });
+
+    document.addEventListener('change', event => {
+      const recordSelect = event.target.closest('select[data-task-record-select]');
+      if (!recordSelect) return;
+      selectedTaskRecordIds[recordSelect.dataset.taskRecordSelect] = recordSelect.value;
+      renderTaskRecords();
     });
 
     document.addEventListener('submit', event => {

@@ -40,6 +40,19 @@ public sealed class SqliteAppDataInitializer(SqliteConnectionFactory connectionF
                 Key TEXT PRIMARY KEY,
                 Value TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS MobileTaskLaunchHistory (
+                SequenceId INTEGER PRIMARY KEY AUTOINCREMENT,
+                RecordId TEXT NOT NULL UNIQUE,
+                TaskKind TEXT NOT NULL,
+                Fingerprint TEXT NOT NULL,
+                RecordedAtUtc TEXT NOT NULL,
+                PayloadJson TEXT NOT NULL,
+                UNIQUE(TaskKind, Fingerprint)
+            );
+
+            CREATE INDEX IF NOT EXISTS IX_MobileTaskLaunchHistory_TaskKind_SequenceId
+                ON MobileTaskLaunchHistory(TaskKind, SequenceId DESC);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }

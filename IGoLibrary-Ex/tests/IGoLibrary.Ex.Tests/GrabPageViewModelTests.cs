@@ -22,7 +22,7 @@ public sealed class GrabPageViewModelTests
         Assert.Equal(
             GrabReservationStrategy.QueryThenReserve,
             context.Settings.CurrentSettings.Tasks.Grab.ReservationStrategy);
-        Assert.NotNull(context.Coordinator.LastPlan);
+        Assert.Equal(GrabReservationStrategy.QueryThenReserve, context.Coordinator.LastPlan?.ReservationStrategy);
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class GrabPageViewModelTests
         Assert.Equal(
             GrabReservationStrategy.ReserveDirectly,
             context.Settings.CurrentSettings.Tasks.Grab.ReservationStrategy);
-        Assert.NotNull(context.Coordinator.LastPlan);
+        Assert.Equal(GrabReservationStrategy.ReserveDirectly, context.Coordinator.LastPlan?.ReservationStrategy);
     }
 
     [Theory]
@@ -190,6 +190,7 @@ public sealed class GrabPageViewModelTests
         var dialog = new FakeGrabStrategyReminderDialogService();
         var viewModel = new GrabPageViewModel(
             coordinator,
+            new FakeTaskLaunchService(grabSeatCoordinator: coordinator),
             new SettingsWorkflowService(settings),
             new ActivityLogService(),
             notifications,

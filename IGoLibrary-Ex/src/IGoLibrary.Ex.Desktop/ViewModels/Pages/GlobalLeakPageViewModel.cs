@@ -15,6 +15,7 @@ namespace IGoLibrary.Ex.Desktop.ViewModels;
 public sealed partial class GlobalLeakPageViewModel : ViewModelBase
 {
     private readonly IGlobalLeakCoordinator _globalLeakCoordinator;
+    private readonly ITaskLaunchService _taskLaunchService;
     private readonly IVenueWorkflowService _venueWorkflowService;
     private readonly ISettingsWorkflowService _settingsWorkflowService;
     private readonly IActivityLogService _activityLogService;
@@ -42,6 +43,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
 
     public GlobalLeakPageViewModel(
         IGlobalLeakCoordinator globalLeakCoordinator,
+        ITaskLaunchService taskLaunchService,
         IVenueWorkflowService venueWorkflowService,
         ISettingsWorkflowService settingsWorkflowService,
         IActivityLogService activityLogService,
@@ -51,6 +53,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
         GlobalLeakLibrarySelectionViewModel librarySelection)
     {
         _globalLeakCoordinator = globalLeakCoordinator;
+        _taskLaunchService = taskLaunchService;
         _venueWorkflowService = venueWorkflowService;
         _settingsWorkflowService = settingsWorkflowService;
         _activityLogService = activityLogService;
@@ -496,7 +499,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
             var plan = new GlobalLeakPlan(
                 selectedLibraries,
                 TimeSpan.FromSeconds(intervalSeconds));
-            await _globalLeakCoordinator.StartAsync(plan);
+            await _taskLaunchService.StartGlobalLeakAsync(plan, TaskLaunchSource.Desktop);
         }
         catch (Exception ex)
         {

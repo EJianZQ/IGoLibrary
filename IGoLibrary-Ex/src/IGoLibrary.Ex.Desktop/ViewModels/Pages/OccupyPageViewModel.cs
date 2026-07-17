@@ -13,6 +13,7 @@ namespace IGoLibrary.Ex.Desktop.ViewModels;
 public sealed partial class OccupyPageViewModel : ViewModelBase
 {
     private readonly IOccupySeatCoordinator _occupySeatCoordinator;
+    private readonly ITaskLaunchService _taskLaunchService;
     private readonly IReservationWorkflowService _reservationWorkflowService;
     private readonly IActivityLogService _activityLogService;
     private readonly INotificationService _notificationService;
@@ -33,12 +34,14 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
 
     public OccupyPageViewModel(
         IOccupySeatCoordinator occupySeatCoordinator,
+        ITaskLaunchService taskLaunchService,
         IReservationWorkflowService reservationWorkflowService,
         IActivityLogService activityLogService,
         INotificationService notificationService,
         TimeProvider timeProvider)
     {
         _occupySeatCoordinator = occupySeatCoordinator;
+        _taskLaunchService = taskLaunchService;
         _reservationWorkflowService = reservationWorkflowService;
         _activityLogService = activityLogService;
         _notificationService = notificationService;
@@ -153,7 +156,7 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
 
     public Task StartAsync(OccupySeatPlan plan, CancellationToken cancellationToken = default)
     {
-        return _occupySeatCoordinator.StartAsync(plan, cancellationToken);
+        return _taskLaunchService.StartOccupyAsync(plan, TaskLaunchSource.Desktop, cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken = default)
@@ -352,8 +355,8 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
     {
         try
         {
-            var plan = new OccupySeatPlan(
-                TimeSpan.FromSeconds(Math.Max(1, ReReserveDelaySeconds)),
+            var plan = OccupySeatPlanFactory.Create(
+                ReReserveDelaySeconds,
                 (OccupyCheckIntervalMode)SelectedOccupyCheckIntervalModeIndex);
             IsOccupyRunning = true;
             await StartAsync(plan);

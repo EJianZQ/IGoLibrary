@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using IGoLibrary.Ex.Desktop.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Tests;
@@ -105,6 +106,135 @@ public sealed class MobileControlServiceTests
         Assert.Equal((byte)'P', bytes[1]);
         Assert.Equal((byte)'N', bytes[2]);
         Assert.Equal((byte)'G', bytes[3]);
+    }
+
+    [Fact]
+    public async Task TaskRecordAndStartEndpoints_EnforceContractsAndAuthentication()
+    {
+        var recordId = Guid.NewGuid().ToString("N");
+        var recordsProvider = new FakeMobileControlTaskRecordsProvider
+        {
+            Snapshot = new MobileControlTaskRecordsSnapshot(
+                DateTimeOffset.UtcNow,
+                [new MobileControlGrabTaskRecordSnapshot(
+                    recordId,
+                    "2026-07-16 12:00:00",
+                    "电子阅览室A",
+                    ["27", "38"],
+                    "随机延迟",
+                    "直接发送预约请求")],
+                [])
+        };
+        var startService = new FakeMobileControlTaskStartService();
+        var port = GetFreeTcpPort();
+        await using var service = CreateService(
+            taskRecordsProvider: recordsProvider,
+            taskStartService: startService);
+        var session = await service.StartAsync(new MobileControlSettings(port, "token"));
+        using var client = new HttpClient();
+
+        using var recordsResponse = await client.GetAsync(new Uri(session.Url, "/api/task-records?token=token"));
+        Assert.Equal(HttpStatusCode.OK, recordsResponse.StatusCode);
+        Assert.True(recordsResponse.Headers.CacheControl?.NoStore);
+        using var recordsJson = JsonDocument.Parse(await recordsResponse.Content.ReadAsStringAsync());
+        Assert.Equal(recordId, recordsJson.RootElement.GetProperty("grab")[0].GetProperty("recordId").GetString());
+
+        using var grabContent = new StringContent(
+            JsonSerializer.Serialize(new { recordId }),
+            System.Text.Encoding.UTF8,
+            "application/json");
+        using var grabResponse = await client.PostAsync(
+            new Uri(session.Url, "/api/tasks/grab/start?token=token"),
+            grabContent);
+        using var occupyResponse = await client.PostAsync(
+            new Uri(session.Url, "/api/tasks/occupy/start?token=token"),
+            null);
+        Assert.Equal(HttpStatusCode.OK, grabResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, occupyResponse.StatusCode);
+        Assert.True(grabResponse.Headers.CacheControl?.NoStore);
+        Assert.True(occupyResponse.Headers.CacheControl?.NoStore);
+        Assert.Equal([("grab", recordId), ("occupy", null)], startService.Starts);
+
+        using var invalidRecordsResponse = await client.GetAsync(
+            new Uri(session.Url, "/api/task-records?token=bad"));
+        using var invalidTokenResponse = await client.PostAsync(
+            new Uri(session.Url, "/api/tasks/grab/start?token=bad"),
+            new StringContent("not-json"));
+        using var invalidContentResponse = await client.PostAsync(
+            new Uri(session.Url, "/api/tasks/grab/start?token=token"),
+            new StringContent(recordId));
+        using var oversizedResponse = await client.PostAsync(
+            new Uri(session.Url, "/api/tasks/grab/start?token=token"),
+            new StringContent(
+                JsonSerializer.Serialize(new { recordId = new string('a', 1100) }),
+                System.Text.Encoding.UTF8,
+                "application/json"));
+        using var unexpectedJsonResponse = await client.PostAsync(
+            new Uri(session.Url, "/api/tasks/grab/start?token=token"),
+            new StringContent(
+                JsonSerializer.Serialize(new { recordId, unexpected = true }),
+                System.Text.Encoding.UTF8,
+                "application/json"));
+        using var occupyBodyResponse = await client.PostAsync(
+            new Uri(session.Url, "/api/tasks/occupy/start?token=token"),
+            new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+        using var oversizedOccupyResponse = await client.PostAsync(
+            new Uri(session.Url, "/api/tasks/occupy/start?token=token"),
+            new StringContent(new string('a', 1025)));
+        Assert.Equal(HttpStatusCode.Forbidden, invalidRecordsResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, invalidTokenResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidContentResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversizedResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, unexpectedJsonResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, occupyBodyResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversizedOccupyResponse.StatusCode);
+        Assert.Equal(1, recordsProvider.Calls);
+        Assert.Equal(2, startService.Starts.Count);
+    }
+
+    [Fact]
+    public async Task TaskRecords_WhenProviderFails_ReturnsControlledErrorAndLogsException()
+    {
+        var expected = new InvalidOperationException("database path must not reach the client");
+        var recordsProvider = new FakeMobileControlTaskRecordsProvider { Error = expected };
+        var logger = new CapturingLogger<MobileControlService>();
+        var port = GetFreeTcpPort();
+        await using var service = CreateService(taskRecordsProvider: recordsProvider, logger: logger);
+        var session = await service.StartAsync(new MobileControlSettings(port, "token"));
+        using var client = new HttpClient();
+
+        using var response = await client.GetAsync(new Uri(session.Url, "/api/task-records?token=token"));
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.False(document.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal("读取任务记录失败，请稍后重试", document.RootElement.GetProperty("message").GetString());
+        Assert.DoesNotContain("database path", document.RootElement.GetRawText(), StringComparison.Ordinal);
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning && ReferenceEquals(entry.Exception, expected));
+    }
+
+    [Fact]
+    public async Task StartTask_WhenServiceFails_ReturnsGenericInternalErrorAndLogsException()
+    {
+        var expected = new InvalidOperationException("internal path must not reach the client");
+        var startService = new FakeMobileControlTaskStartService { Error = expected };
+        var logger = new CapturingLogger<MobileControlService>();
+        var port = GetFreeTcpPort();
+        await using var service = CreateService(taskStartService: startService, logger: logger);
+        var session = await service.StartAsync(new MobileControlSettings(port, "token"));
+        using var client = new HttpClient();
+
+        using var response = await client.PostAsync(
+            new Uri(session.Url, "/api/tasks/occupy/start?token=token"),
+            null);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.Equal("操作失败，请稍后重试", document.RootElement.GetProperty("message").GetString());
+        Assert.DoesNotContain("internal path", document.RootElement.GetRawText(), StringComparison.Ordinal);
+        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning && ReferenceEquals(entry.Exception, expected));
     }
 
     [Fact]
@@ -385,14 +515,19 @@ public sealed class MobileControlServiceTests
     private static MobileControlService CreateService(
         IMobileControlStatusSnapshotProvider? statusSnapshotProvider = null,
         IMobileControlActionService? actionService = null,
-        INetworkExposureManager? exposureManager = null)
+        INetworkExposureManager? exposureManager = null,
+        IMobileControlTaskRecordsProvider? taskRecordsProvider = null,
+        IMobileControlTaskStartService? taskStartService = null,
+        ILogger<MobileControlService>? logger = null)
     {
         return new MobileControlService(
             new FixedLanAddressProvider(IPAddress.Loopback),
             exposureManager ?? new FakeNetworkExposureManager(),
             statusSnapshotProvider ?? new FakeMobileControlStatusSnapshotProvider(),
+            taskRecordsProvider ?? new FakeMobileControlTaskRecordsProvider(),
+            taskStartService ?? new FakeMobileControlTaskStartService(),
             actionService ?? new FakeMobileControlActionService(),
-            NullLogger<MobileControlService>.Instance);
+            logger ?? NullLogger<MobileControlService>.Instance);
     }
 
     private static int GetFreeTcpPort()
@@ -469,6 +604,72 @@ public sealed class MobileControlServiceTests
         {
             RefreshedCookieLinks.Add(linkText);
             return Task.FromResult(RefreshCookieResult);
+        }
+    }
+
+    private sealed class FakeMobileControlTaskRecordsProvider : IMobileControlTaskRecordsProvider
+    {
+        public int Calls { get; private set; }
+
+        public MobileControlTaskRecordsSnapshot Snapshot { get; set; } =
+            new(DateTimeOffset.UtcNow, [], []);
+
+        public Exception? Error { get; init; }
+
+        public Task<MobileControlTaskRecordsSnapshot> CreateSnapshotAsync(CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            if (Error is not null)
+            {
+                return Task.FromException<MobileControlTaskRecordsSnapshot>(Error);
+            }
+
+            return Task.FromResult(Snapshot);
+        }
+    }
+
+    private sealed class FakeMobileControlTaskStartService : IMobileControlTaskStartService
+    {
+        public List<(string TaskKind, string? RecordId)> Starts { get; } = [];
+
+        public MobileControlActionResult Result { get; set; } = new(
+            true,
+            "任务启动请求已被接受",
+            StatusCodes.Status200OK);
+
+        public Exception? Error { get; init; }
+
+        public Task<MobileControlActionResult> StartTaskAsync(
+            string taskKind,
+            string? recordId,
+            CancellationToken cancellationToken = default)
+        {
+            Starts.Add((taskKind, recordId));
+            if (Error is not null)
+            {
+                return Task.FromException<MobileControlActionResult>(Error);
+            }
+
+            return Task.FromResult(Result);
+        }
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<(LogLevel Level, Exception? Exception)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add((logLevel, exception));
         }
     }
 }

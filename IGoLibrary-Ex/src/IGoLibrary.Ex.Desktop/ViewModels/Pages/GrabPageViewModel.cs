@@ -17,6 +17,7 @@ public sealed partial class GrabPageViewModel : ViewModelBase
     private static readonly TimeSpan DefaultScheduledStartTime = GrabTaskSettings.Default.DefaultScheduledStartTime;
 
     private readonly IGrabSeatCoordinator _grabSeatCoordinator;
+    private readonly ITaskLaunchService _taskLaunchService;
     private readonly ISettingsWorkflowService _settingsWorkflowService;
     private readonly IActivityLogService _activityLogService;
     private readonly INotificationService _notificationService;
@@ -57,6 +58,7 @@ public sealed partial class GrabPageViewModel : ViewModelBase
 
     public GrabPageViewModel(
         IGrabSeatCoordinator grabSeatCoordinator,
+        ITaskLaunchService taskLaunchService,
         ISettingsWorkflowService settingsWorkflowService,
         IActivityLogService activityLogService,
         INotificationService notificationService,
@@ -65,6 +67,7 @@ public sealed partial class GrabPageViewModel : ViewModelBase
         TimeProvider timeProvider)
     {
         _grabSeatCoordinator = grabSeatCoordinator;
+        _taskLaunchService = taskLaunchService;
         _settingsWorkflowService = settingsWorkflowService;
         _activityLogService = activityLogService;
         _notificationService = notificationService;
@@ -388,8 +391,9 @@ public sealed partial class GrabPageViewModel : ViewModelBase
                 selectedSeats,
                 mode,
                 GrabPollingStrategyFactory.FromMode(mode),
-                scheduledStart);
-            await _grabSeatCoordinator.StartAsync(plan);
+                scheduledStart,
+                reservationStrategy);
+            await _taskLaunchService.StartGrabAsync(plan, TaskLaunchSource.Desktop);
         }
         catch (Exception ex)
         {

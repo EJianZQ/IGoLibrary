@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  IGoLibrary-Ex 是基于 <code>Avalonia</code> 重构的新一代跨平台桌面端实现。可运行在 <code>Windows 10 22H2</code> 及以上与 <code>macOS 15 Sequoia</code> 及以上。已实现 <strong>扫码获取 Cookie</strong>、<strong>座位实时监控并抢座</strong>、<strong>跨场馆全域捡漏</strong>、<strong>明日预约</strong>、<strong>利用退座机制进行占座</strong>、<strong>远程蓝牙签到</strong> 和 <strong>自动事件提醒</strong> 等实用功能
+  IGoLibrary-Ex 是基于 <code>Avalonia</code> 重构的新一代跨平台桌面端实现。可运行在 <code>Windows 10 22H2</code> 及以上与 <code>macOS 15 Sequoia</code> 及以上。已实现 <strong>扫码获取 Cookie</strong>、<strong>座位实时监控并抢座</strong>、<strong>跨场馆全域捡漏</strong>、<strong>明日预约</strong>、<strong>利用退座机制进行占座</strong>、<strong>手机远程控制</strong>、<strong>远程蓝牙签到</strong> 和 <strong>自动事件提醒</strong> 等实用功能
 </p>
 
 <p align="center">
@@ -30,7 +30,7 @@
 - 📅 支持明日预约，可设置触发时间到点执行
 - ♻️ 支持占座流程，在预约即将到期时自动取消并重新预约
 - 📡 支持远程蓝牙签到，使用独立微信授权、场馆 Beacon 参数和坐标完成签到
-- 📱 支持通过局域网或 Cloudflare Tunnel 使用手机控制，远程查看 Cookie、预约和任务状态，并可刷新 Cookie、取消任务或取消预约
+- 📱 支持通过局域网或 Cloudflare Tunnel 使用手机控制，远程查看 Cookie、预约和任务状态，刷新 Cookie，启动抢座、全域捡漏或占座，以及取消任务或当前预约
 - ⭐ 支持收藏常用座位，并为每个场馆分别持久化座位收藏
 - 📊 首页面板展示当前场馆、预约状态、累计成功次数和守护时长
 - 🔔 支持 Cookie 到期前 10 分钟、Cookie 失效、抢座成功、全域捡漏成功、占座成功、明日预约成功、任务失败，以及手机控制 Cloudflare Tunnel 运行中断提醒，可通过右下角 Toast 弹窗、提示音、SMTP 邮件、Telegram Bot、Bark、Server酱和 WxPusher 通知用户
@@ -169,6 +169,7 @@ https://api.telegram.org/bot<BotToken>/getUpdates
 当监测到 Cookie 过期、抢座成功、全域捡漏成功、占座成功、明日预约成功、任务失败，或已经正常运行的手机控制 Cloudflare Tunnel 突发中断时，会在屏幕右下角弹出 Toast 提醒。如果打开了提示音，还会有相应的提示音。Tunnel 在启动阶段便不可用时只显示原有本地错误或回退提示，不会发送这项运行中断通知
 
 ### 9️⃣ 手机控制
+
 参见 [手机控制使用指南](docs/mobile-control-guide.md)
 
 ### 🍎 macOS 首次运行方法
@@ -272,7 +273,7 @@ APP_VERSION=1.0.1 ./build/publish-macos.sh Release osx-arm64
 
 ## 💾 本地数据说明
 
-应用会在本地使用 `SQLite` 保存配置、收藏座位、自定义API接口以及必要的会话信息
+应用会在本地使用 `SQLite` 保存配置、收藏座位、手机任务启动历史、自定义API接口以及必要的会话信息
 
 - Windows 默认数据目录：`%LOCALAPPDATA%\IGoLibrary-Ex`
 - macOS 默认数据目录：`~/Library/Application Support/IGoLibrary-Ex`

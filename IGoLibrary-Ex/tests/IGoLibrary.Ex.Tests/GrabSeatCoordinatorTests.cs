@@ -58,7 +58,8 @@ public sealed class GrabSeatCoordinatorTests
             ],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
-            null);
+            null,
+            GrabReservationStrategy.ReserveDirectly);
 
         await coordinator.StartAsync(plan);
         await reserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -102,7 +103,8 @@ public sealed class GrabSeatCoordinatorTests
             [new SeatReference("seat-1", "1号座")],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
-            null);
+            null,
+            GrabReservationStrategy.ReserveDirectly);
 
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Completed);
@@ -159,7 +161,8 @@ public sealed class GrabSeatCoordinatorTests
             ],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
-            null);
+            null,
+            GrabReservationStrategy.ReserveDirectly);
 
         await coordinator.StartAsync(plan);
         await reserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -216,7 +219,8 @@ public sealed class GrabSeatCoordinatorTests
             ],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
-            null);
+            null,
+            GrabReservationStrategy.ReserveDirectly);
 
         await coordinator.StartAsync(plan);
         await reserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -285,7 +289,8 @@ public sealed class GrabSeatCoordinatorTests
             ],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
-            null);
+            null,
+            GrabReservationStrategy.QueryThenReserve);
 
         await coordinator.StartAsync(plan);
         await reserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -325,7 +330,8 @@ public sealed class GrabSeatCoordinatorTests
             [new SeatReference("seat-1", "1号座")],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
-            null);
+            null,
+            GrabReservationStrategy.QueryThenReserve);
 
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
@@ -370,7 +376,8 @@ public sealed class GrabSeatCoordinatorTests
             [new SeatReference("seat-1", "1号座")],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
-            null);
+            null,
+            GrabReservationStrategy.QueryThenReserve);
 
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
@@ -409,7 +416,8 @@ public sealed class GrabSeatCoordinatorTests
             [new SeatReference("seat-1", "1号座")],
             GrabPollingMode.Aggressive,
             GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
-            null);
+            null,
+            GrabReservationStrategy.QueryThenReserve);
 
         await coordinator.StartAsync(plan);
         await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
@@ -473,7 +481,6 @@ public sealed class GrabSeatCoordinatorTests
             ]);
 
         var stateMachine = new GrabSeatWorkflowRunner(
-            new FakeSettingsService(settings),
             strategySelector,
             eventPublisher,
             activityLogService,
