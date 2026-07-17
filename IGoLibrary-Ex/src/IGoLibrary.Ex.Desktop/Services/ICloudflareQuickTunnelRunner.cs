@@ -2,9 +2,10 @@ namespace IGoLibrary.Ex.Desktop.Services;
 
 internal interface ICloudflareQuickTunnelRunner
 {
-    void ValidateConfiguration(
+    Task ValidateConfigurationAsync(
         CloudflareTunnelProxyOptions proxyOptions,
-        ClashMihomoCompatibilityOptions compatibilityOptions);
+        ClashMihomoCompatibilityOptions compatibilityOptions,
+        CancellationToken cancellationToken = default);
 
     Task<ICloudflareQuickTunnelSession> StartAsync(
         Uri originBaseUri,
@@ -18,7 +19,7 @@ internal sealed class CloudflaredUnavailableException : FileNotFoundException
 {
     internal const string UserMessage =
         "当前安装未包含 cloudflared，无法使用 Cloudflare Tunnel。" +
-        "请改用本机局域网，或安装同版本、同架构且文件名不带 -without-cloudflared 的默认完整包";
+        "请到“系统设置 → 网络与接口”重新选择 Cloudflare Tunnel，并按提示下载";
 
     public CloudflaredUnavailableException(string executablePath)
         : base(UserMessage, executablePath)

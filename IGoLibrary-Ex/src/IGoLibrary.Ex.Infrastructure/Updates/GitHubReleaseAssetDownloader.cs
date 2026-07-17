@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -76,10 +77,16 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
         string destinationPath,
         IProgress<ReleaseAssetDownloadProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        IReleaseAssetDownloadPauseSource? pauseSource = null)
+        IReleaseAssetDownloadPauseSource? pauseSource = null,
+        ReleaseAssetPartialRetentionPolicy partialRetentionPolicy =
+            ReleaseAssetPartialRetentionPolicy.DeleteOnCancellation)
     {
         ArgumentNullException.ThrowIfNull(asset);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        if (!Enum.IsDefined(partialRetentionPolicy))
+        {
+            throw new ArgumentOutOfRangeException(nameof(partialRetentionPolicy));
+        }
         ValidateAsset(asset);
 
         var destination = Path.GetFullPath(destinationPath);
@@ -88,6 +95,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
         Directory.CreateDirectory(destinationDirectory);
         var partialPath = destination + ".partial";
         var consecutiveFailures = 0;
+        var downloadStartedTimestamp = Stopwatch.GetTimestamp();
 
         try
         {
@@ -109,7 +117,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
                 if (offset > asset.Size)
                 {
                     _logger.LogWarning(
-                        "更新包片段超过声明大小，正在清理并重新下载。资源={AssetName}，片段大小={PartialSize}，声明大小={AssetSize}。",
+                        "GitHub Release 资产片段超过声明大小，正在清理并重新下载。资源={AssetName}，片段大小={PartialSize}，声明大小={AssetSize}。",
                         asset.Name,
                         offset,
                         asset.Size);
@@ -181,7 +189,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
                     {
                         _logger.LogWarning(
                             exception,
-                            "更新包自动续传次数已耗尽，等待用户继续。资源={AssetName}，保留字节={PreservedBytes}。",
+                            "GitHub Release 资产自动续传次数已耗尽，等待调用方处理。资源={AssetName}，保留字节={PreservedBytes}。",
                             asset.Name,
                             preservedBytes);
                         throw new ReleaseAssetDownloadInterruptedException(
@@ -195,7 +203,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
                         exception.RetryAfter);
                     _logger.LogWarning(
                         exception,
-                        "更新包下载中断，将自动续传。资源={AssetName}，保留字节={PreservedBytes}，重试={RetryAttempt}/{RetryLimit}，等待={RetryDelayMs}ms。",
+                        "GitHub Release 资产下载中断，将自动续传。资源={AssetName}，保留字节={PreservedBytes}，重试={RetryAttempt}/{RetryLimit}，等待={RetryDelayMs}ms。",
                         asset.Name,
                         preservedBytes,
                         consecutiveFailures,
@@ -234,13 +242,31 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            TryDelete(partialPath, "用户取消下载");
+            if (partialRetentionPolicy == ReleaseAssetPartialRetentionPolicy.DeleteOnCancellation)
+            {
+                TryDelete(partialPath, "用户取消下载");
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "GitHub Release 资产下载已取消，片段由调用方保留。资源={AssetName}，保留字节={PreservedBytes}。",
+                    asset.Name,
+                    GetPartialLength(partialPath));
+            }
+
             throw;
         }
         catch
         {
             TryDelete(partialPath, "下载无法安全续传");
             throw;
+        }
+        finally
+        {
+            _logger.LogInformation(
+                "GitHub Release 资产下载操作结束。资源={AssetName}，耗时={ElapsedMilliseconds:F0}ms。",
+                asset.Name,
+                Stopwatch.GetElapsedTime(downloadStartedTimestamp).TotalMilliseconds);
         }
     }
 
@@ -304,7 +330,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
                 }
 
                 _logger.LogWarning(
-                    "GitHub 拒绝更新包 Range 请求，正在清理片段并从零重试。资源={AssetName}，请求偏移={RequestedOffset}。",
+                    "GitHub 拒绝 Release 资产 Range 请求，正在清理片段并从零重试。资源={AssetName}，请求偏移={RequestedOffset}。",
                     asset.Name,
                     requestedOffset);
                 DeleteForRestart(partialPath);
@@ -325,7 +351,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
                     requestedOffset,
                     asset.Size);
                 _logger.LogInformation(
-                    "正在续传更新包。资源={AssetName}，偏移={ResumeOffset}，区间字节={SegmentBytes}。",
+                    "正在续传 GitHub Release 资产。资源={AssetName}，偏移={ResumeOffset}，区间字节={SegmentBytes}。",
                     asset.Name,
                     writeOffset,
                     expectedResponseBytes);
@@ -335,7 +361,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
                 if (requestedOffset > 0)
                 {
                     _logger.LogWarning(
-                        "GitHub 未接受更新包 Range 请求，正在丢弃旧片段并从零下载。资源={AssetName}，旧片段={PartialBytes}。",
+                        "GitHub 未接受 Release 资产 Range 请求，正在丢弃旧片段并从零下载。资源={AssetName}，旧片段={PartialBytes}。",
                         asset.Name,
                         requestedOffset);
                     progress?.Report(new ReleaseAssetDownloadProgress(
@@ -409,7 +435,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
             {
                 if (destination.Length != writeOffset)
                 {
-                    throw new InvalidDataException("更新包片段大小在续传前发生变化");
+                    throw new InvalidDataException("下载片段大小在续传前发生变化");
                 }
 
                 destination.Position = writeOffset;
@@ -443,7 +469,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
                     catch (OperationCanceledException exception)
                     {
                         throw new RecoverableDownloadException(
-                            $"下载更新包时连续 {_noProgressTimeout.TotalSeconds:F0} 秒没有收到数据",
+                            $"下载 GitHub Release 资产时连续 {_noProgressTimeout.TotalSeconds:F0} 秒没有收到数据",
                             innerException: new TimeoutException("下载无进度超时", exception));
                     }
                     catch (Exception exception) when (exception is IOException or HttpRequestException)
@@ -453,7 +479,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
 
                     if (count == 0)
                     {
-                        throw new RecoverableDownloadException("更新包下载响应提前结束");
+                        throw new RecoverableDownloadException("GitHub Release 资产下载响应提前结束");
                     }
 
                     responseBytes += count;
@@ -507,20 +533,20 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
         if (stream.Length != asset.Size)
         {
             throw new InvalidDataException(
-                $"更新包下载不完整：预期 {asset.Size} 字节，实际 {stream.Length} 字节");
+                $"GitHub Release 资产下载不完整：预期 {asset.Size} 字节，实际 {stream.Length} 字节");
         }
 
         var actualHash = Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken));
         var expectedHash = asset.Digest[7..];
         if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidDataException("更新包 SHA-256 与 GitHub Release 不一致");
+            throw new InvalidDataException("下载文件 SHA-256 与 GitHub Release 不一致");
         }
 
         await stream.DisposeAsync();
         File.Move(partialPath, destination, overwrite: true);
         _logger.LogInformation(
-            "更新包下载及 SHA-256 校验完成。资源={AssetName}，大小={AssetSize}。",
+            "GitHub Release 资产下载及 SHA-256 校验完成。资源={AssetName}，大小={AssetSize}。",
             asset.Name,
             asset.Size);
     }
@@ -572,7 +598,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
         CancellationToken cancellationToken)
     {
         _logger.LogInformation(
-            "更新包下载已暂停并保留进度。已下载={DownloadedBytes}，总大小={TotalBytes}。",
+            "GitHub Release 资产下载已暂停并保留进度。已下载={DownloadedBytes}，总大小={TotalBytes}。",
             downloadedBytes,
             totalBytes);
         progress?.Report(new ReleaseAssetDownloadProgress(
@@ -581,7 +607,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
             ReleaseAssetDownloadState.Paused));
         await pauseSource.WaitWhilePausedAsync(cancellationToken);
         _logger.LogInformation(
-            "正在继续更新包下载。续传偏移={ResumeOffset}，总大小={TotalBytes}。",
+            "正在继续 GitHub Release 资产下载。续传偏移={ResumeOffset}，总大小={TotalBytes}。",
             downloadedBytes,
             totalBytes);
     }
@@ -709,7 +735,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            throw new IOException("无法清理不可续传的更新包片段", exception);
+            throw new IOException("无法清理不可续传的下载片段", exception);
         }
     }
 
@@ -726,7 +752,7 @@ public sealed class GitHubReleaseAssetDownloader : IReleaseAssetDownloader
         {
             _logger.LogWarning(
                 exception,
-                "更新包片段暂时无法清理，将由更新工作区或下次启动重试。原因={CleanupReason}。",
+                "下载片段暂时无法清理，将由调用方工作区或下次启动重试。原因={CleanupReason}。",
                 reason);
         }
     }

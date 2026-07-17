@@ -38,12 +38,15 @@ internal static class MainWindowViewModelTestHarness
         ISeatLabelDialogService? seatLabelDialogService = null,
         IGrabStrategyReminderDialogService? grabStrategyReminderDialogService = null,
         IMainWindowSizePersistenceService? windowSizePersistenceService = null,
-        IWindowsUpdateProgressDialogService? windowsUpdateProgressDialogService = null)
+        IWindowsUpdateProgressDialogService? windowsUpdateProgressDialogService = null,
+        IMobileControlNetworkModeWorkflow? mobileControlNetworkModeWorkflow = null)
     {
         mobileControlService ??= new FakeMobileControlService();
         remoteCheckInWorkflowService ??= new FakeRemoteCheckInWorkflowService();
         remoteCheckInProfileService ??= new FakeRemoteCheckInProfileService();
         networkExposureManager ??= new FakeNetworkExposureManager();
+        mobileControlNetworkModeWorkflow ??=
+            new FakeMobileControlNetworkModeWorkflow(networkExposureManager);
         seatLabelDialogService ??= new FakeSeatLabelDialogService();
         grabStrategyReminderDialogService ??= new FakeGrabStrategyReminderDialogService();
         windowSizePersistenceService ??= NoOpMainWindowSizePersistenceService.Instance;
@@ -153,6 +156,7 @@ internal static class MainWindowViewModelTestHarness
                     activityLogService,
                     notificationService),
                 networkExposureManager,
+                mobileControlNetworkModeWorkflow,
                 windowSizePersistenceService,
                 timeProvider),
             new ProtocolTemplatesViewModel(

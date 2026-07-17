@@ -85,12 +85,25 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IClashMihomoConfigurationLocator, ClashMihomoConfigurationLocator>();
                 services.AddSingleton<IMihomoControllerClient, MihomoControllerClient>();
                 services.AddSingleton<IClashMihomoCompatibilityService, ClashMihomoCompatibilityService>();
+                services.AddSingleton<CloudflaredAssetCatalog>();
+                services.AddSingleton<ICloudflaredPathProvider, CloudflaredPathProvider>();
+                services.AddSingleton<ICloudflaredToolLocator, CloudflaredToolLocator>();
+                services.AddSingleton<ICloudflaredExtractor, CloudflaredExtractor>();
+                services.AddSingleton<ICloudflaredDownloadWorkspace, CloudflaredDownloadWorkspace>();
+                services.AddSingleton<ICloudflaredManagedInstaller, CloudflaredManagedInstaller>();
+                services.AddSingleton<CloudflaredInstallService>();
+                services.AddSingleton<ICloudflaredInstallService>(serviceProvider =>
+                    serviceProvider.GetRequiredService<CloudflaredInstallService>());
+                services.AddHostedService(serviceProvider =>
+                    serviceProvider.GetRequiredService<CloudflaredInstallService>());
+                services.AddSingleton<ICloudflaredDownloadDialogService, CloudflaredDownloadDialogService>();
                 services.AddSingleton<ICloudflareQuickTunnelRunner, CloudflareQuickTunnelRunner>();
                 services.AddSingleton<ICloudflareTunnelRuntimeAlertHandler, CloudflareTunnelRuntimeAlertHandler>();
                 services.AddSingleton<
                     ICloudflareTunnelRuntimeNotificationCoordinator,
                     CloudflareTunnelRuntimeNotificationCoordinator>();
                 services.AddSingleton<INetworkExposureManager, NetworkExposureManager>();
+                services.AddSingleton<IMobileControlNetworkModeWorkflow, MobileControlNetworkModeWorkflow>();
                 services.AddSingleton<ILanCookieRelayService, LanCookieRelayService>();
                 services.AddSingleton<IMobileControlTaskUiStateAccessor, MobileControlTaskUiStateAccessor>();
                 services.AddSingleton<IMobileControlStatusSnapshotProvider, MobileControlStatusSnapshotProvider>();

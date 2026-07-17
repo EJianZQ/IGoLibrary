@@ -449,6 +449,56 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
     }
 
     [Fact]
+    public async Task DownloadAsync_PreservePolicyKeepsCanceledPartialAndNextCallResumes()
+    {
+        var bytes = "cancel-resume-cloudflared"u8.ToArray();
+        const int prefixLength = 8;
+        var handler = new SequenceHttpMessageHandler(
+            (_, _) => Task.FromResult(StreamResponse(
+                new PrefixThenWaitStream(bytes[..prefixLength]),
+                bytes.Length)),
+            (request, _) =>
+            {
+                AssertRange(request, prefixLength);
+                return Task.FromResult(PartialResponse(
+                    bytes[prefixLength..],
+                    prefixLength,
+                    bytes.Length - 1,
+                    bytes.Length));
+            });
+        var downloader = CreateFastRetryDownloader(handler);
+        var destination = Path.Combine(_root, "cloudflared.bin");
+        var downloaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var progress = new InlineProgress<ReleaseAssetDownloadProgress>(value =>
+        {
+            if (value.State == ReleaseAssetDownloadState.Downloading &&
+                value.DownloadedBytes == prefixLength)
+            {
+                downloaded.TrySetResult();
+            }
+        });
+        using var cancellation = new CancellationTokenSource();
+        var firstAttempt = downloader.DownloadAsync(
+            Asset(bytes),
+            destination,
+            progress,
+            cancellation.Token,
+            partialRetentionPolicy: ReleaseAssetPartialRetentionPolicy.PreserveUntilCallerCleanup);
+        await downloaded.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => firstAttempt);
+        Assert.Equal(prefixLength, new FileInfo(destination + ".partial").Length);
+
+        await downloader.DownloadAsync(Asset(bytes), destination);
+
+        Assert.Equal(bytes, await File.ReadAllBytesAsync(destination));
+        Assert.False(File.Exists(destination + ".partial"));
+        Assert.Equal(2, handler.CallCount);
+    }
+
+    [Fact]
     public async Task DownloadAsync_NonHttpsFinalAddressDeletesPartialFile()
     {
         var bytes = "insecure-redirect"u8.ToArray();

@@ -7,7 +7,15 @@ public interface IReleaseAssetDownloader
         string destinationPath,
         IProgress<ReleaseAssetDownloadProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        IReleaseAssetDownloadPauseSource? pauseSource = null);
+        IReleaseAssetDownloadPauseSource? pauseSource = null,
+        ReleaseAssetPartialRetentionPolicy partialRetentionPolicy =
+            ReleaseAssetPartialRetentionPolicy.DeleteOnCancellation);
+}
+
+public enum ReleaseAssetPartialRetentionPolicy
+{
+    DeleteOnCancellation,
+    PreserveUntilCallerCleanup
 }
 
 public sealed record ReleaseAssetDownloadProgress(

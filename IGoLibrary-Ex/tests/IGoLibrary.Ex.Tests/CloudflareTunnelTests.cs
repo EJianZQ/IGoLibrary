@@ -69,9 +69,8 @@ public sealed class CloudflareTunnelTests
 
         Assert.Equal(CloudflaredUnavailableException.UserMessage, exception.Message);
         Assert.Equal(missingPath, exception.FileName);
-        Assert.Contains("同版本、同架构", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("不带 -without-cloudflared", exception.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("-with-cloudflared", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("系统设置 → 网络与接口", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("按提示下载", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -546,6 +545,7 @@ public sealed class CloudflareTunnelTests
         var runner = new FakeCloudflareQuickTunnelRunner();
         var notifications = new FakeNotificationService();
         var alerts = new CapturingCloudflareTunnelRuntimeAlertHandler();
+        var coordinatorLogger = new CapturingRuntimeNotificationCoordinatorLogger();
         var timeProvider = new FakeTimeProvider(
             new DateTimeOffset(2026, 7, 16, 12, 0, 0, TimeSpan.FromHours(8)));
         await using var manager = CreateManager(
@@ -553,7 +553,8 @@ public sealed class CloudflareTunnelTests
             settingsService,
             notificationService: notifications,
             runtimeAlertHandler: alerts,
-            timeProvider: timeProvider);
+            timeProvider: timeProvider,
+            runtimeNotificationLogger: coordinatorLogger);
         manager.Initialize(
             MobileControlNetworkMode.CloudflareTunnel,
             CloudflareTunnelProxyMode.Auto,
@@ -580,6 +581,8 @@ public sealed class CloudflareTunnelTests
             runner.Sessions[0].Fail("mobile tunnel failed");
             await WaitForAsync(() => alerts.Outcomes.Count == 1);
             runner.Sessions[1].Fail("relay tunnel failed");
+            await WaitForAsync(() => coordinatorLogger.Entries.Any(entry =>
+                entry.Message.Contains("Suppressed the legacy", StringComparison.Ordinal)));
         }
 
         await WaitForAsync(() => alerts.Outcomes.Count == 1 && runner.Sessions[1].Disposed);
@@ -1137,15 +1140,18 @@ public sealed class CloudflareTunnelTests
 
         public List<FakeCloudflareQuickTunnelSession> Sessions { get; } = [];
 
-        public void ValidateConfiguration(
+        public Task ValidateConfigurationAsync(
             CloudflareTunnelProxyOptions proxyOptions,
-            ClashMihomoCompatibilityOptions compatibilityOptions)
+            ClashMihomoCompatibilityOptions compatibilityOptions,
+            CancellationToken cancellationToken = default)
         {
             ValidationCallCount++;
             if (ValidationException is not null)
             {
-                throw ValidationException;
+                return Task.FromException(ValidationException);
             }
+
+            return Task.CompletedTask;
         }
 
         public Task<ICloudflareQuickTunnelSession> StartAsync(

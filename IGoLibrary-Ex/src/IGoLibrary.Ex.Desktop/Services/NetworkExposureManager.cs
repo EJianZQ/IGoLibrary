@@ -342,7 +342,10 @@ internal sealed class NetworkExposureManager(
             {
                 try
                 {
-                    tunnelRunner.ValidateConfiguration(_proxyOptions, _compatibilityOptions);
+                    await tunnelRunner.ValidateConfigurationAsync(
+                        _proxyOptions,
+                        _compatibilityOptions,
+                        cancellationToken);
                     var tunnel = await tunnelRunner.StartAsync(
                         lanUrl,
                         healthCheckPath,
@@ -427,7 +430,10 @@ internal sealed class NetworkExposureManager(
         ClashMihomoCompatibilityOptions compatibilityOptions,
         CancellationToken cancellationToken)
     {
-        tunnelRunner.ValidateConfiguration(options, compatibilityOptions);
+        await tunnelRunner.ValidateConfigurationAsync(
+            options,
+            compatibilityOptions,
+            cancellationToken);
         var tasks = _leases.Values
             .Select(async lease => (
                 lease.Id,

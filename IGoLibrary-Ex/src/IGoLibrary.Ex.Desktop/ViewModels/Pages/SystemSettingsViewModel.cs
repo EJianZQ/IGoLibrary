@@ -17,6 +17,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
     private readonly INotificationService _notificationService;
     private readonly IStartupEntryService _startupEntryService;
     private readonly INetworkExposureManager _networkExposureManager;
+    private readonly IMobileControlNetworkModeWorkflow _mobileControlNetworkModeWorkflow;
     private readonly IMainWindowSizePersistenceService _windowSizePersistenceService;
     private readonly DeferredAutoSaveController _systemSettingsAutoSave;
 
@@ -53,6 +54,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         IStartupEntryService startupEntryService,
         StorageSettingsViewModel storageSettings,
         INetworkExposureManager networkExposureManager,
+        IMobileControlNetworkModeWorkflow mobileControlNetworkModeWorkflow,
         IMainWindowSizePersistenceService windowSizePersistenceService,
         TimeProvider? timeProvider = null)
     {
@@ -63,6 +65,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         _notificationService = notificationService;
         _startupEntryService = startupEntryService;
         _networkExposureManager = networkExposureManager;
+        _mobileControlNetworkModeWorkflow = mobileControlNetworkModeWorkflow;
         _windowSizePersistenceService = windowSizePersistenceService;
         _networkExposureManager.ModeChanged += OnNetworkModeChanged;
         StorageSettings = storageSettings;
@@ -84,7 +87,11 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         ["自动检测（推荐）", "使用系统代理", "手动 HTTP 代理", "不使用显式代理"];
 
     [ObservableProperty]
-    private int selectedMobileControlNetworkModeIndex;
+    private int selectedMobileControlNetworkModeIndex =
+        (int)MobileControlNetworkMode.LocalNetwork;
+
+    [ObservableProperty]
+    private bool isChangingMobileControlNetworkMode;
 
     [ObservableProperty]
     private int selectedCloudflareTunnelProxyModeIndex;
@@ -198,9 +205,24 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         CancellationToken cancellationToken = default)
     {
         IsLoadingSettings = true;
-        var settings = await LoadSettingsAsync(cancellationToken);
+        AppSettings settings;
         try
         {
+            settings = await LoadSettingsAsync(cancellationToken);
+            var effectiveNetworkMode = await _mobileControlNetworkModeWorkflow.ReconcilePersistedModeAsync(
+                settings.MobileControl.NetworkMode,
+                cancellationToken);
+            if (effectiveNetworkMode != settings.MobileControl.NetworkMode)
+            {
+                settings = settings with
+                {
+                    MobileControl = settings.MobileControl with
+                    {
+                        NetworkMode = effectiveNetworkMode
+                    }
+                };
+            }
+
             ApplySettings(settings);
             applyLoadedSettings(settings);
         }
@@ -533,9 +555,16 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
 
     private async Task ApplyNetworkModeAsync(MobileControlNetworkMode requestedMode)
     {
+        if (IsChangingMobileControlNetworkMode)
+        {
+            ApplyNetworkModeSelection(_networkExposureManager.CurrentMode);
+            return;
+        }
+
+        IsChangingMobileControlNetworkMode = true;
         try
         {
-            var effectiveMode = await _networkExposureManager.SetModeAsync(requestedMode);
+            var effectiveMode = await _mobileControlNetworkModeWorkflow.ApplyAsync(requestedMode);
             ApplyNetworkModeSelection(effectiveMode);
         }
         catch (Exception ex)
@@ -543,6 +572,10 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
             ApplyNetworkModeSelection(_networkExposureManager.CurrentMode);
             _activityLogService.Write(LogEntryKind.Warning, "Network", $"切换手机控制网络方式失败：{ex.Message}");
             await _notificationService.ShowWarningAsync("切换网络方式失败", ex.Message);
+        }
+        finally
+        {
+            IsChangingMobileControlNetworkMode = false;
         }
     }
 

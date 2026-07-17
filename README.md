@@ -267,7 +267,12 @@ cd ./IGoLibrary-Ex
 APP_VERSION=1.0.1 ./build/publish-macos.sh Release osx-arm64
 ```
 
-轻量包仍保留 Cloudflare Tunnel 的 UI 入口，但选择 Tunnel 时会明确提示当前安装未包含 cloudflared。请改用本机局域网，或安装同版本、同架构且文件名不带 `-without-cloudflared` 的默认完整包。Windows 用户也可升级到提供新自动更新契约的版本，由后续自动更新安装并更新官方 cloudflared 文件；macOS 仍需手动安装完整包。
+轻量包仍保留 Cloudflare Tunnel 的 UI 入口。首次选择 Tunnel 时，如果没有找到有效的 cloudflared，应用会询问是否从 Cloudflare 官方 GitHub Release 下载当前固定版本，并在弹窗中显示实际安装目录；Windows x64、macOS Intel 和 Apple Silicon 均支持按需安装。下载窗口支持暂停、继续和取消；自动续传重试耗尽后也可以保留当前进度并由用户点击继续。同一次应用运行期间再次下载会尽力断点续传，退出应用后未完成片段会被清理。无后缀完整包已经自带组件，不会出现下载提示。应用每次启动都会重新验证已持久化 Tunnel 模式依赖的 cloudflared；文件被手动删除、损坏或不完整时，会自动回退并持久化为本机局域网。
+
+按需下载的 cloudflared 不会写入系统 `PATH`，而是按固定版本和当前架构安装到以下用户级目录：
+
+- Windows：`%LOCALAPPDATA%\IGoLibrary-Ex\tools\cloudflared\{version}\win-x64`
+- macOS：`~/Library/Application Support/IGoLibrary-Ex/tools/cloudflared/{version}/{rid}`，其中 `{rid}` 为 `osx-x64` 或 `osx-arm64`
 
 未签名、未公证的 macOS 包首次运行时，系统可能会拦截并提示“已损坏，无法打开”。zip 内已包含 `macOS首次运行说明.txt` 和 `首次运行.command`，用户可按说明解除隔离标记后再打开 `IGoLibrary-Ex.app`。
 

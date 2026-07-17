@@ -3,17 +3,26 @@
   "assets": {
     "win-x64": {
       "fileName": "cloudflared-windows-amd64.exe",
+      "size": 54168384,
       "sha256": "b11ee950a12b15604e6b0a0f30a226516adc7aec75de2e3c642b28e50ddef9ea",
+      "executableSize": 54168384,
+      "executableSha256": "b11ee950a12b15604e6b0a0f30a226516adc7aec75de2e3c642b28e50ddef9ea",
       "archiveType": "binary"
     },
     "osx-x64": {
       "fileName": "cloudflared-darwin-amd64.tgz",
+      "size": 20841929,
       "sha256": "dd1fb6a914a21dc52c64bad96987bbbc72d6c65553a2cfee1dd5bc886742ddfb",
+      "executableSize": 41181376,
+      "executableSha256": "c0c65579c6f11b1381cf5ffd1614f5094bf140e18938eae4ad16931da9f69499",
       "archiveType": "tgz"
     },
     "osx-arm64": {
       "fileName": "cloudflared-darwin-arm64.tgz",
+      "size": 18957597,
       "sha256": "276f4ae3119c88d1708b0f884a35a1c87d9ae459b0dab6313f2daddbddab2bec",
+      "executableSize": 38388400,
+      "executableSha256": "cd33944f6ce65e240942d986932bc96bde8641ecefcd52c1ae5dc21f0bcffb04",
       "archiveType": "tgz"
     }
   }

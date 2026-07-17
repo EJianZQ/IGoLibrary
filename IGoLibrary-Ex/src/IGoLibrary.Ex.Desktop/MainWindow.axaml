@@ -3579,6 +3579,7 @@
                       <ComboBox Grid.Column="1"
                                 ItemsSource="{Binding SystemSettings.MobileControlNetworkModes}"
                                 SelectedIndex="{Binding SystemSettings.SelectedMobileControlNetworkModeIndex}"
+                                IsEnabled="{Binding !SystemSettings.IsChangingMobileControlNetworkMode}"
                                 HorizontalAlignment="Stretch"
                                 VerticalAlignment="Center" />
                     </Grid>

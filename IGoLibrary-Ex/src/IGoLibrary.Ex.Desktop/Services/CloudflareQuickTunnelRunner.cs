@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace IGoLibrary.Ex.Desktop.Services;
 
 internal sealed partial class CloudflareQuickTunnelRunner(
+    ICloudflaredToolLocator cloudflaredLocator,
     ICloudflareTunnelProxyResolver proxyResolver,
     ICloudflareTunnelHealthProbeFactory healthProbeFactory,
     IClashMihomoCompatibilityService compatibilityService,
@@ -17,11 +18,13 @@ internal sealed partial class CloudflareQuickTunnelRunner(
     internal static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(5);
     internal const int ConsecutiveFailureThreshold = 3;
 
-    public void ValidateConfiguration(
+    public async Task ValidateConfigurationAsync(
         CloudflareTunnelProxyOptions proxyOptions,
-        ClashMihomoCompatibilityOptions compatibilityOptions)
+        ClashMihomoCompatibilityOptions compatibilityOptions,
+        CancellationToken cancellationToken = default)
     {
-        EnsureExecutableAvailable(ResolveExecutablePath());
+        var availability = await cloudflaredLocator.FindAsync(cancellationToken);
+        EnsureExecutableAvailable(availability.ExecutablePath);
         _ = ResolveAndValidateConfiguration(proxyOptions, compatibilityOptions);
     }
 
@@ -43,7 +46,8 @@ internal sealed partial class CloudflareQuickTunnelRunner(
             throw new ArgumentException("Tunnel 健康检查路径无效", nameof(healthCheckPath));
         }
 
-        var executablePath = ResolveExecutablePath();
+        var availability = await cloudflaredLocator.FindAsync(cancellationToken);
+        var executablePath = availability.ExecutablePath;
         EnsureExecutableAvailable(executablePath);
         var proxyResolution = ResolveAndValidateConfiguration(proxyOptions, compatibilityOptions);
 
@@ -59,7 +63,7 @@ internal sealed partial class CloudflareQuickTunnelRunner(
         Directory.CreateDirectory(isolatedHome);
         var metricsPort = ReserveLoopbackPort();
         var startInfo = BuildStartInfo(
-            executablePath,
+            executablePath!,
             originBaseUri,
             metricsPort,
             isolatedHome,
@@ -403,17 +407,11 @@ internal sealed partial class CloudflareQuickTunnelRunner(
         }
     }
 
-    private static string ResolveExecutablePath()
+    internal static void EnsureExecutableAvailable(string? executablePath)
     {
-        var executableName = OperatingSystem.IsWindows() ? "cloudflared.exe" : "cloudflared";
-        return Path.Combine(AppContext.BaseDirectory, "tools", "cloudflared", executableName);
-    }
-
-    internal static void EnsureExecutableAvailable(string executablePath)
-    {
-        if (!File.Exists(executablePath))
+        if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
         {
-            throw new CloudflaredUnavailableException(executablePath);
+            throw new CloudflaredUnavailableException(executablePath ?? string.Empty);
         }
     }
 

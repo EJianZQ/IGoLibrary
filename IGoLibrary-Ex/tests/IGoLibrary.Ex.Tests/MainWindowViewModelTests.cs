@@ -303,6 +303,58 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_MissingPersistedCloudflaredAppliesReconciledLocalMode()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            MobileControl = new MobileControlSettings(
+                9527,
+                "token",
+                NetworkMode: MobileControlNetworkMode.CloudflareTunnel)
+        });
+        var exposureManager = new FakeNetworkExposureManager();
+        var workflow = new FakeMobileControlNetworkModeWorkflow(exposureManager)
+        {
+            ReconciledMode = MobileControlNetworkMode.LocalNetwork
+        };
+        var viewModel = CreateViewModel(
+            settingsService: settingsService,
+            networkExposureManager: exposureManager,
+            mobileControlNetworkModeWorkflow: workflow);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal(1, workflow.ReconcileCalls);
+        Assert.Equal(
+            (int)MobileControlNetworkMode.LocalNetwork,
+            viewModel.SystemSettings.SelectedMobileControlNetworkModeIndex);
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, exposureManager.CurrentMode);
+        Assert.Equal("局域网快传", viewModel.SystemSettings.CookieQuickTransferButtonText);
+        Assert.Equal(0, workflow.ApplyCalls);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_DefaultsToLanWithoutApplyingNetworkMode()
+    {
+        var exposureManager = new FakeNetworkExposureManager();
+        var workflow = new FakeMobileControlNetworkModeWorkflow(exposureManager);
+        var viewModel = CreateViewModel(
+            networkExposureManager: exposureManager,
+            mobileControlNetworkModeWorkflow: workflow);
+
+        Assert.Equal(
+            (int)MobileControlNetworkMode.LocalNetwork,
+            viewModel.SystemSettings.SelectedMobileControlNetworkModeIndex);
+
+        await viewModel.InitializeAsync();
+
+        Assert.Equal(
+            (int)MobileControlNetworkMode.LocalNetwork,
+            viewModel.SystemSettings.SelectedMobileControlNetworkModeIndex);
+        Assert.Equal(0, workflow.ApplyCalls);
+    }
+
+    [Fact]
     public async Task SelectingCloudflareWithoutBundledExecutable_RestoresLanAndShowsExactMessage()
     {
         var exposureManager = new FakeNetworkExposureManager
@@ -3816,7 +3868,8 @@ public sealed class MainWindowViewModelTests
         TimeProvider? timeProvider = null,
         FakeNetworkExposureManager? networkExposureManager = null,
         IMainWindowSizePersistenceService? windowSizePersistenceService = null,
-        FakeWindowsUpdateProgressDialogService? windowsUpdateProgressDialogService = null)
+        FakeWindowsUpdateProgressDialogService? windowsUpdateProgressDialogService = null,
+        IMobileControlNetworkModeWorkflow? mobileControlNetworkModeWorkflow = null)
     {
         sessionService ??= new FakeSessionService();
         libraryService ??= new FakeLibraryService();
@@ -3856,7 +3909,8 @@ public sealed class MainWindowViewModelTests
             mobileControlService,
             networkExposureManager: networkExposureManager,
             windowSizePersistenceService: windowSizePersistenceService,
-            windowsUpdateProgressDialogService: windowsUpdateProgressDialogService);
+            windowsUpdateProgressDialogService: windowsUpdateProgressDialogService,
+            mobileControlNetworkModeWorkflow: mobileControlNetworkModeWorkflow);
     }
 
     private static ReleaseUpdateInfo CreateReleaseUpdateInfo(string tagName)

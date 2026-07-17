@@ -9,4 +9,5 @@ namespace IGoLibrary.Ex.Desktop.Services;
     WriteIndented = true,
     PropertyNameCaseInsensitive = true)]
 [JsonSerializable(typeof(VerifiedUpdateCache))]
+[JsonSerializable(typeof(CloudflaredAssetManifest))]
 internal sealed partial class DesktopUpdateJsonSerializerContext : JsonSerializerContext;

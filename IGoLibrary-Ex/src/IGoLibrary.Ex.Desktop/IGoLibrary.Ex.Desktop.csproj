@@ -13,6 +13,15 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\MobileControl\MobileControlPage.html" />
     <EmbeddedResource Include="Assets\qrcode.png" LogicalName="IGoLibrary.Ex.Desktop.Assets.qrcode.png" />
+    <EmbeddedResource Include="..\..\build\cloudflared-assets.json"
+                      Link="Resources\Cloudflared\cloudflared-assets.json"
+                      LogicalName="IGoLibrary.Ex.Desktop.Resources.Cloudflared.cloudflared-assets.json" />
+    <EmbeddedResource Include="..\..\build\third-party\cloudflared-LICENSE.txt"
+                      Link="Resources\Cloudflared\LICENSE.txt"
+                      LogicalName="IGoLibrary.Ex.Desktop.Resources.Cloudflared.LICENSE.txt" />
+    <EmbeddedResource Include="..\..\build\third-party\THIRD-PARTY-NOTICES.txt"
+                      Link="Resources\Cloudflared\THIRD-PARTY-NOTICES.txt"
+                      LogicalName="IGoLibrary.Ex.Desktop.Resources.Cloudflared.THIRD-PARTY-NOTICES.txt" />
   </ItemGroup>
 
   <ItemGroup>

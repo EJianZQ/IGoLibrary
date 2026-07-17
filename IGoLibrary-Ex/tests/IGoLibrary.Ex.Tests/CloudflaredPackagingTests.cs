@@ -1,4 +1,6 @@
 using System.Text.Json;
+using IGoLibrary.Ex.Desktop.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Tests;
 
@@ -18,8 +20,15 @@ public sealed class CloudflaredPackagingTests
         foreach (var asset in assets.EnumerateObject())
         {
             Assert.Matches("^[0-9a-f]{64}$", asset.Value.GetProperty("sha256").GetString());
+            Assert.Matches("^[0-9a-f]{64}$", asset.Value.GetProperty("executableSha256").GetString());
             Assert.False(string.IsNullOrWhiteSpace(asset.Value.GetProperty("fileName").GetString()));
+            Assert.True(asset.Value.GetProperty("size").GetInt64() > 0);
+            Assert.True(asset.Value.GetProperty("executableSize").GetInt64() > 0);
         }
+
+        Assert.Equal(54168384, assets.GetProperty("win-x64").GetProperty("size").GetInt64());
+        Assert.Equal(20841929, assets.GetProperty("osx-x64").GetProperty("size").GetInt64());
+        Assert.Equal(18957597, assets.GetProperty("osx-arm64").GetProperty("size").GetInt64());
     }
 
     [Fact]
@@ -39,6 +48,49 @@ public sealed class CloudflaredPackagingTests
         Assert.Contains("-Offline", project, StringComparison.Ordinal);
         Assert.Contains("[switch]$Offline", prepareScript, StringComparison.Ordinal);
         Assert.Contains("if ($Offline)", prepareScript, StringComparison.Ordinal);
+        Assert.Contains("$asset.size", prepareScript, StringComparison.Ordinal);
+        Assert.Contains("$asset.executableSize", prepareScript, StringComparison.Ordinal);
+        Assert.Contains("$asset.executableSha256", prepareScript, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DesktopBuild_EmbedsRuntimeManifestAndLegalResources()
+    {
+        var root = GetRepositoryRoot().FullName;
+        var project = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "IGoLibrary.Ex.Desktop",
+            "IGoLibrary.Ex.Desktop.csproj"));
+
+        Assert.Contains("cloudflared-assets.json", project, StringComparison.Ordinal);
+        Assert.Contains("cloudflared-LICENSE.txt", project, StringComparison.Ordinal);
+        Assert.Contains("THIRD-PARTY-NOTICES.txt", project, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EmbeddedRuntimeAssets_ExactlyMatchBuildSources()
+    {
+        var root = GetRepositoryRoot().FullName;
+        var catalog = new CloudflaredAssetCatalog(
+            File.ReadAllText(Path.Combine(root, "build", "cloudflared-assets.json")),
+            "win-x64",
+            NullLogger<CloudflaredAssetCatalog>.Instance);
+        using var embeddedManifest = typeof(CloudflaredAssetCatalog).Assembly.GetManifestResourceStream(
+            CloudflaredAssetCatalog.ManifestResourceName);
+        Assert.NotNull(embeddedManifest);
+        using var memory = new MemoryStream();
+        embeddedManifest!.CopyTo(memory);
+
+        Assert.Equal(
+            File.ReadAllBytes(Path.Combine(root, "build", "cloudflared-assets.json")),
+            memory.ToArray());
+        Assert.Equal(
+            File.ReadAllBytes(Path.Combine(root, "build", "third-party", "cloudflared-LICENSE.txt")),
+            catalog.LicenseBytes);
+        Assert.Equal(
+            File.ReadAllBytes(Path.Combine(root, "build", "third-party", "THIRD-PARTY-NOTICES.txt")),
+            catalog.NoticesBytes);
     }
 
     private static DirectoryInfo GetRepositoryRoot()

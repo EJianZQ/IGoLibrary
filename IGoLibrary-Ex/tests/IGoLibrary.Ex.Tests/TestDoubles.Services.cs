@@ -186,6 +186,36 @@ internal sealed class FakeNetworkExposureManager : INetworkExposureManager
     }
 }
 
+internal sealed class FakeMobileControlNetworkModeWorkflow(
+    INetworkExposureManager networkExposureManager) : IMobileControlNetworkModeWorkflow
+{
+    public int ReconcileCalls { get; private set; }
+
+    public int ApplyCalls { get; private set; }
+
+    public Exception? ApplyException { get; set; }
+
+    public MobileControlNetworkMode? ReconciledMode { get; set; }
+
+    public Task<MobileControlNetworkMode> ReconcilePersistedModeAsync(
+        MobileControlNetworkMode persistedMode,
+        CancellationToken cancellationToken = default)
+    {
+        ReconcileCalls++;
+        return Task.FromResult(ReconciledMode ?? persistedMode);
+    }
+
+    public Task<MobileControlNetworkMode> ApplyAsync(
+        MobileControlNetworkMode requestedMode,
+        CancellationToken cancellationToken = default)
+    {
+        ApplyCalls++;
+        return ApplyException is null
+            ? networkExposureManager.SetModeAsync(requestedMode, cancellationToken)
+            : Task.FromException<MobileControlNetworkMode>(ApplyException);
+    }
+}
+
 internal sealed class FakeLanCookieRelayService : ILanCookieRelayService
 {
     public event EventHandler<LanCookieRelayStoppedEventArgs>? Stopped;

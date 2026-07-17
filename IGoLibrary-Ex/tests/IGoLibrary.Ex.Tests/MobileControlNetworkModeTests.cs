@@ -7,6 +7,24 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class MobileControlNetworkModeTests
 {
     [Fact]
+    public void AppSettingsDefault_UsesLocalNetwork()
+    {
+        Assert.Equal(
+            MobileControlNetworkMode.LocalNetwork,
+            AppSettings.Default.MobileControl.NetworkMode);
+    }
+
+    [Fact]
+    public void SettingsWithoutMobileControl_MigrateToLocalNetwork()
+    {
+        var migrated = SqliteSettingsRepository.MigrateAppSettingsJson("{}");
+        var settings = Assert.IsType<AppSettings>(
+            JsonSerializer.Deserialize<AppSettings>(migrated, AppJson.Default));
+
+        Assert.Equal(MobileControlNetworkMode.LocalNetwork, settings.MobileControl.NetworkMode);
+    }
+
+    [Fact]
     public void LegacySettingsWithoutNetworkMode_MigrateToLocalNetwork()
     {
         const string json =

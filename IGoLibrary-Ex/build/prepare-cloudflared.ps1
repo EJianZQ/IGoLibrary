@@ -57,6 +57,11 @@ if (-not (Test-Path -LiteralPath $assetPath -PathType Leaf)) {
     }
 }
 
+$actualAssetSize = (Get-Item -LiteralPath $assetPath).Length
+if ($actualAssetSize -ne [long]$asset.size) {
+    throw "cloudflared 下载文件大小无效：$assetPath 的大小为 $actualAssetSize，预期为 $($asset.size)"
+}
+
 $actualHash = (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actualHash -ne $asset.sha256.ToLowerInvariant()) {
     throw "cloudflared 校验失败：$assetPath 的 SHA-256 为 $actualHash，预期为 $($asset.sha256)"
@@ -106,6 +111,16 @@ elseif ($asset.archiveType -eq 'tgz') {
 }
 else {
     throw "未知的 cloudflared 资产类型：$($asset.archiveType)"
+}
+
+$actualExecutableSize = (Get-Item -LiteralPath $destinationPath).Length
+if ($actualExecutableSize -ne [long]$asset.executableSize) {
+    throw "cloudflared 可执行文件大小无效：$destinationPath 的大小为 $actualExecutableSize，预期为 $($asset.executableSize)"
+}
+
+$actualExecutableHash = (Get-FileHash -LiteralPath $destinationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actualExecutableHash -ne $asset.executableSha256.ToLowerInvariant()) {
+    throw "cloudflared 可执行文件校验失败：$destinationPath 的 SHA-256 为 $actualExecutableHash，预期为 $($asset.executableSha256)"
 }
 
 $licenseSource = Join-Path $PSScriptRoot 'third-party\cloudflared-LICENSE.txt'

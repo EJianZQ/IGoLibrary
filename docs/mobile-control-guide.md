@@ -99,19 +99,31 @@ Cloudflare Tunnel：确认电脑可以访问 Cloudflare
 
 ## ☁️ 使用 Cloudflare Tunnel 模式
 
-Cloudflare Tunnel 模式会启动完整包中附带的 `cloudflared`，为本机手机控制服务创建一个临时 `trycloudflare.com` HTTPS 地址。该方式不要求手机和电脑处于同一局域网，也不要求用户准备 Cloudflare 账号。
+Cloudflare Tunnel 模式会启动应用完整包中附带、或由应用按需下载到当前用户目录的 `cloudflared`，为本机手机控制服务创建一个临时 `trycloudflare.com` HTTPS 地址。该方式不要求手机和电脑处于同一局域网，也不要求用户准备 Cloudflare 账号。
 
-发布页同时提供两种压缩包：无后缀文件名是包含 cloudflared 的默认完整包，文件名带 `-without-cloudflared` 的是额外轻量包。只有完整包能够直接使用 Tunnel。轻量包仍显示 Tunnel 入口，但选择或启动时会提示当前安装未包含 cloudflared；此时请改用本机局域网，或下载同版本、同系统架构且文件名不带 `-without-cloudflared` 的默认完整包。Windows 自动更新会随目标版本安装或更新官方 cloudflared 文件；macOS 仍需手动安装完整包。
+发布页同时提供两种压缩包：无后缀文件名是包含 cloudflared 的默认完整包，文件名带 `-without-cloudflared` 的是额外轻量包。完整包可以直接使用 Tunnel；轻量包第一次选择 Tunnel 时会询问是否从 Cloudflare 官方 GitHub Release 下载项目固定版本，支持 Windows x64、macOS Intel 和 Apple Silicon。组件安装在当前用户的应用数据目录，不需要管理员权限。
+
+按需安装位置为：
+
+- Windows：`%LOCALAPPDATA%\IGoLibrary-Ex\tools\cloudflared\{version}\win-x64`
+- macOS：`~/Library/Application Support/IGoLibrary-Ex/tools/cloudflared/{version}/{rid}`，其中 `{rid}` 为 `osx-x64` 或 `osx-arm64`
+
+该目录只保留当前固定版本的可执行文件、`LICENSE.txt` 和 `THIRD-PARTY-NOTICES.txt`；应用不会修改系统 `PATH`。
+
+确认弹窗会显示当前平台的实际安装目录。开始下载后会显示连接、下载、校验、解压和安装进度；下载阶段可以随时暂停、继续或取消。自动续传重试耗尽时会保留当前进度并等待用户点击“继续下载”。主动取消会保留本次应用运行期间的下载片段，再次确认时尽力断点续传；退出应用后未完成片段会被清理。下载成功后应用会自动继续原来的 Tunnel 切换；完整性校验失败或解压安装失败时会立即清理临时下载文件，详情可查看应用日志。
+
+应用每次启动都会重新验证已持久化 Tunnel 模式依赖的 cloudflared。用户手动删除组件、文件损坏或安装不完整时，本次启动会自动切换并持久化为本机局域网，不会在启动过程中弹出下载窗口；需要继续使用 Tunnel 时，请回到 `系统设置 → 网络与接口` 重新选择并按提示下载。
 
 ### 配置步骤
 
 1. 进入 `系统设置 → 网络与接口`
 2. 将 `手机控制网络方式` 选择为 `Cloudflare Tunnel`
-3. 第一次使用时先保留 `Cloudflare Tunnel 代理方式` 为 `自动检测（推荐）`
-4. 回到 `手机控制` 页面
-5. 点击 `启用手机控制`
-6. 等待软件创建临时公网地址并完成健康检查
-7. 启动成功后，用手机扫描新的公网二维码
+3. 如果当前安装没有有效的 cloudflared，按弹窗提示选择是否下载；暂不下载或取消时会继续保持原网络方式
+4. 第一次使用时先保留 `Cloudflare Tunnel 代理方式` 为 `自动检测（推荐）`
+5. 回到 `手机控制` 页面
+6. 点击 `启用手机控制`
+7. 等待软件创建临时公网地址并完成健康检查
+8. 启动成功后，用手机扫描新的公网二维码
 
 成功时地址类似：
 
@@ -360,7 +372,7 @@ Tunnel 在手机控制启动阶段便不可用、用户主动停止手机控制�
 
 先检查：
 
-1. 如果提示“当前安装未包含 cloudflared”，确认下载的是同版本、同架构且文件名不带 `-without-cloudflared` 的默认完整包；轻量包请改用本机局域网或重新安装完整包
+1. 如果提示“当前安装未包含 cloudflared”，回到 `系统设置 → 网络与接口`，先切换到本机局域网，再重新选择 `Cloudflare Tunnel` 并按提示下载；也可以改用同版本、同架构且文件名不带 `-without-cloudflared` 的默认完整包
 2. 电脑是否能够访问互联网
 3. 系统时间是否正确
 4. 代理软件是否正在运行
