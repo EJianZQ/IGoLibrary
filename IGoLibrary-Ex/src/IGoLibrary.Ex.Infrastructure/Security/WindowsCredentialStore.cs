@@ -7,32 +7,44 @@ using IGoLibrary.Ex.Infrastructure.Persistence;
 
 namespace IGoLibrary.Ex.Infrastructure.Security;
 
-public sealed class WindowsCredentialStore : ICredentialStore
+public sealed class WindowsCredentialStore(IPersistentDataChangeTracker? changeTracker = null) : ICredentialStore
 {
     private const int ErrorNotFound = 1168;
     private const string SessionTargetName = "IGoLibrary-Ex.Session";
     private const string RemoteCheckInTargetName = "IGoLibrary-Ex.RemoteCheckIn";
 
     public Task SaveSessionAsync(SessionCredentials credentials, CancellationToken cancellationToken = default)
-        => SaveAsync(SessionTargetName, credentials);
+        => SaveTrackedAsync(SessionTargetName, credentials);
 
     public Task<SessionCredentials?> LoadSessionAsync(CancellationToken cancellationToken = default)
         => LoadAsync<SessionCredentials>(SessionTargetName);
 
     public Task ClearSessionAsync(CancellationToken cancellationToken = default)
-        => ClearAsync(SessionTargetName);
+        => ClearTrackedAsync(SessionTargetName);
 
     public Task SaveRemoteCheckInSessionAsync(
         RemoteCheckInSessionCredentials credentials,
         CancellationToken cancellationToken = default)
-        => SaveAsync(RemoteCheckInTargetName, credentials);
+        => SaveTrackedAsync(RemoteCheckInTargetName, credentials);
 
     public Task<RemoteCheckInSessionCredentials?> LoadRemoteCheckInSessionAsync(
         CancellationToken cancellationToken = default)
         => LoadAsync<RemoteCheckInSessionCredentials>(RemoteCheckInTargetName);
 
     public Task ClearRemoteCheckInSessionAsync(CancellationToken cancellationToken = default)
-        => ClearAsync(RemoteCheckInTargetName);
+        => ClearTrackedAsync(RemoteCheckInTargetName);
+
+    private async Task SaveTrackedAsync<T>(string targetName, T value)
+    {
+        await SaveAsync(targetName, value);
+        changeTracker?.MarkChanged();
+    }
+
+    private async Task ClearTrackedAsync(string targetName)
+    {
+        await ClearAsync(targetName);
+        changeTracker?.MarkChanged();
+    }
 
     private static Task SaveAsync<T>(string targetName, T value)
     {

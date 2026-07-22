@@ -6,7 +6,8 @@ namespace IGoLibrary.Ex.Infrastructure.Protocol;
 
 public sealed class DefaultProtocolTemplateStore(
     SqliteConnectionFactory connectionFactory,
-    ISettingsService settingsService) : IProtocolTemplateStore
+    ISettingsService settingsService,
+    IPersistentDataChangeTracker? changeTracker = null) : IProtocolTemplateStore
 {
     private const string OverridesKey = "protocol-overrides";
 
@@ -61,6 +62,7 @@ public sealed class DefaultProtocolTemplateStore(
         command.Parameters.AddWithValue("$key", OverridesKey);
         command.Parameters.AddWithValue("$value", json);
         await command.ExecuteNonQueryAsync(cancellationToken);
+        changeTracker?.MarkChanged();
     }
 
     public async Task ResetOverridesAsync(CancellationToken cancellationToken = default)
@@ -72,6 +74,7 @@ public sealed class DefaultProtocolTemplateStore(
         command.CommandText = "DELETE FROM ProtocolOverrides WHERE Key = $key;";
         command.Parameters.AddWithValue("$key", OverridesKey);
         await command.ExecuteNonQueryAsync(cancellationToken);
+        changeTracker?.MarkChanged();
     }
 
     private static TraceIntProtocolTemplates Merge(

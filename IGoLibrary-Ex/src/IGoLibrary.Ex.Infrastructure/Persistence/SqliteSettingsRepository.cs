@@ -6,7 +6,8 @@ namespace IGoLibrary.Ex.Infrastructure.Persistence;
 
 public sealed class SqliteSettingsRepository(
     SqliteConnectionFactory connectionFactory,
-    IAppSettingsDefaults appSettingsDefaults) : ISettingsRepository
+    IAppSettingsDefaults appSettingsDefaults,
+    IPersistentDataChangeTracker? changeTracker = null) : ISettingsRepository
 {
     private const string SettingsKey = "app-settings";
 
@@ -48,6 +49,7 @@ public sealed class SqliteSettingsRepository(
         command.Parameters.AddWithValue("$key", SettingsKey);
         command.Parameters.AddWithValue("$value", json);
         await command.ExecuteNonQueryAsync(cancellationToken);
+        changeTracker?.MarkChanged();
     }
 
     internal static string MigrateAppSettingsJson(string json)
@@ -92,6 +94,7 @@ public sealed class SqliteSettingsRepository(
         var mobileControl = ReadObject(root, "mobileControl");
         var remoteCheckIn = ReadObject(root, "remoteCheckIn");
         var logging = ReadObject(root, "logging");
+        var backupSync = ReadObject(root, "backupSync");
 
         var legacyRetryCount = ReadInt(root, "retryCount")
             ?? ReadInt(legacyRequestPolicy, "retryCount");
@@ -401,6 +404,27 @@ public sealed class SqliteSettingsRepository(
                 .RetainedFileCount);
         writer.WriteEndObject();
 
+        var tlsVerifyModeValue = ReadInt(backupSync, "tlsVerifyMode");
+        var tlsVerifyMode = tlsVerifyModeValue is (int)WebDavTlsVerifyMode.Verify or (int)WebDavTlsVerifyMode.Skip
+            ? (WebDavTlsVerifyMode)tlsVerifyModeValue.Value
+            : defaults.BackupSync.TlsVerifyMode;
+        var normalizedBackupSync = BackupSyncSettings.Normalize(new BackupSyncSettings(
+            ReadString(backupSync, "endpoint") ?? defaults.BackupSync.Endpoint,
+            ReadString(backupSync, "remoteDirectory") ?? defaults.BackupSync.RemoteDirectory,
+            ReadString(backupSync, "username") ?? defaults.BackupSync.Username,
+            tlsVerifyMode,
+            ReadBool(backupSync, "allowInsecureHttp") ?? defaults.BackupSync.AllowInsecureHttp,
+            ReadBool(backupSync, "autoUploadEnabled") ?? defaults.BackupSync.AutoUploadEnabled));
+        writer.WritePropertyName("backupSync");
+        writer.WriteStartObject();
+        writer.WriteString("endpoint", normalizedBackupSync.Endpoint);
+        writer.WriteString("remoteDirectory", normalizedBackupSync.RemoteDirectory);
+        writer.WriteString("username", normalizedBackupSync.Username);
+        writer.WriteNumber("tlsVerifyMode", (int)normalizedBackupSync.TlsVerifyMode);
+        writer.WriteBoolean("allowInsecureHttp", normalizedBackupSync.AllowInsecureHttp);
+        writer.WriteBoolean("autoUploadEnabled", normalizedBackupSync.AutoUploadEnabled);
+        writer.WriteEndObject();
+
         writer.WriteEndObject();
         writer.Flush();
         return Encoding.UTF8.GetString(stream.ToArray());
@@ -503,7 +527,8 @@ public sealed class SqliteSettingsRepository(
             {
                 VenueProfiles = NormalizeRemoteCheckInVenueProfiles(remoteCheckIn.VenueProfiles)
             },
-            Logging = LogFileSettings.Normalize(settings.Logging)
+            Logging = LogFileSettings.Normalize(settings.Logging),
+            BackupSync = BackupSyncSettings.Normalize(settings.BackupSync)
         };
     }
 
@@ -520,6 +545,7 @@ public sealed class SqliteSettingsRepository(
         var ui = ReadObject(root, "ui");
         var windowSize = ReadObject(ui, "windowSize");
         var logging = ReadObject(root, "logging");
+        var backupSync = ReadObject(root, "backupSync");
         return ReadBool(taskEventAlertEvents, "cookieExpiring").HasValue &&
                windowSize.ValueKind == JsonValueKind.Object &&
                ReadBool(windowSize, "rememberSize").HasValue &&
@@ -538,7 +564,14 @@ public sealed class SqliteSettingsRepository(
                root.TryGetProperty("remoteCheckIn", out _) &&
                logging.ValueKind == JsonValueKind.Object &&
                ReadBool(logging, "enabled").HasValue &&
-               ReadInt(logging, "retainedFileCount").HasValue;
+               ReadInt(logging, "retainedFileCount").HasValue &&
+               backupSync.ValueKind == JsonValueKind.Object &&
+               backupSync.TryGetProperty("endpoint", out _) &&
+               backupSync.TryGetProperty("remoteDirectory", out _) &&
+               backupSync.TryGetProperty("username", out _) &&
+               ReadInt(backupSync, "tlsVerifyMode").HasValue &&
+               ReadBool(backupSync, "allowInsecureHttp").HasValue &&
+               ReadBool(backupSync, "autoUploadEnabled").HasValue;
     }
 
     private static bool HasCanonicalWindowSizeDimensions(JsonElement windowSize)

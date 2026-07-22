@@ -23,6 +23,12 @@ internal static class StorageDatabaseValidator
     }
 
     public static void Validate(string databasePath)
+        => Validate(databasePath, allowLegacyApplicationId: true);
+
+    public static void ValidateBackup(string databasePath)
+        => Validate(databasePath, allowLegacyApplicationId: false);
+
+    private static void Validate(string databasePath, bool allowLegacyApplicationId)
     {
         var builder = new SqliteConnectionStringBuilder
         {
@@ -39,10 +45,36 @@ internal static class StorageDatabaseValidator
             throw new InvalidDataException("数据库完整性检查失败");
         }
 
+        using var applicationIdCheck = connection.CreateCommand();
+        applicationIdCheck.CommandText = "PRAGMA application_id;";
+        var applicationId = Convert.ToInt32(applicationIdCheck.ExecuteScalar());
+        if (applicationId != AppDatabaseSchema.ApplicationId &&
+            (!allowLegacyApplicationId || applicationId != 0))
+        {
+            throw new InvalidDataException("数据库不属于 IGoLibrary-Ex");
+        }
+
+        using var versionCheck = connection.CreateCommand();
+        versionCheck.CommandText = "PRAGMA user_version;";
+        var schemaVersion = Convert.ToInt32(versionCheck.ExecuteScalar());
+        if (schemaVersion > AppDatabaseSchema.CurrentVersion)
+        {
+            throw new InvalidDataException(
+                $"数据库版本 {schemaVersion} 高于当前支持的版本 {AppDatabaseSchema.CurrentVersion}");
+        }
+
         using var schemaCheck = connection.CreateCommand();
+        var tableParameters = AppDatabaseSchema.RequiredTables
+            .Select((_, index) => $"$table{index}")
+            .ToArray();
         schemaCheck.CommandText =
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('Settings', 'Favorites', 'ProtocolOverrides');";
-        if (Convert.ToInt32(schemaCheck.ExecuteScalar()) != 3)
+            $"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ({string.Join(',', tableParameters)});";
+        for (var index = 0; index < AppDatabaseSchema.RequiredTables.Length; index++)
+        {
+            schemaCheck.Parameters.AddWithValue(tableParameters[index], AppDatabaseSchema.RequiredTables[index]);
+        }
+
+        if (Convert.ToInt32(schemaCheck.ExecuteScalar()) != AppDatabaseSchema.RequiredTables.Length)
         {
             throw new InvalidDataException("数据库缺少必要的数据表");
         }

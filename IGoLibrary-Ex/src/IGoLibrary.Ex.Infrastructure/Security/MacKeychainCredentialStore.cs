@@ -6,7 +6,7 @@ using IGoLibrary.Ex.Infrastructure.Persistence;
 
 namespace IGoLibrary.Ex.Infrastructure.Security;
 
-public sealed class MacKeychainCredentialStore : ICredentialStore
+public sealed class MacKeychainCredentialStore(IPersistentDataChangeTracker? changeTracker = null) : ICredentialStore
 {
     private const int ItemNotFoundExitCode = 44;
     private const string ServiceName = "IGoLibrary-Ex";
@@ -14,25 +14,40 @@ public sealed class MacKeychainCredentialStore : ICredentialStore
     private const string RemoteCheckInAccountName = "remote-check-in";
 
     public async Task SaveSessionAsync(SessionCredentials credentials, CancellationToken cancellationToken = default)
-        => await SaveAsync(SessionAccountName, credentials, cancellationToken);
+        => await SaveTrackedAsync(SessionAccountName, credentials, cancellationToken);
 
     public Task<SessionCredentials?> LoadSessionAsync(CancellationToken cancellationToken = default)
         => LoadAsync<SessionCredentials>(SessionAccountName, cancellationToken);
 
     public Task ClearSessionAsync(CancellationToken cancellationToken = default)
-        => ClearAsync(SessionAccountName, cancellationToken);
+        => ClearTrackedAsync(SessionAccountName, cancellationToken);
 
     public async Task SaveRemoteCheckInSessionAsync(
         RemoteCheckInSessionCredentials credentials,
         CancellationToken cancellationToken = default)
-        => await SaveAsync(RemoteCheckInAccountName, credentials, cancellationToken);
+        => await SaveTrackedAsync(RemoteCheckInAccountName, credentials, cancellationToken);
 
     public Task<RemoteCheckInSessionCredentials?> LoadRemoteCheckInSessionAsync(
         CancellationToken cancellationToken = default)
         => LoadAsync<RemoteCheckInSessionCredentials>(RemoteCheckInAccountName, cancellationToken);
 
     public Task ClearRemoteCheckInSessionAsync(CancellationToken cancellationToken = default)
-        => ClearAsync(RemoteCheckInAccountName, cancellationToken);
+        => ClearTrackedAsync(RemoteCheckInAccountName, cancellationToken);
+
+    private async Task SaveTrackedAsync<T>(
+        string accountName,
+        T value,
+        CancellationToken cancellationToken)
+    {
+        await SaveAsync(accountName, value, cancellationToken);
+        changeTracker?.MarkChanged();
+    }
+
+    private async Task ClearTrackedAsync(string accountName, CancellationToken cancellationToken)
+    {
+        await ClearAsync(accountName, cancellationToken);
+        changeTracker?.MarkChanged();
+    }
 
     private static async Task SaveAsync<T>(
         string accountName,

@@ -4,7 +4,9 @@ using Microsoft.Data.Sqlite;
 
 namespace IGoLibrary.Ex.Infrastructure.Persistence;
 
-public sealed class SqliteSeatLabelRepository(SqliteConnectionFactory connectionFactory) : ISeatLabelRepository
+public sealed class SqliteSeatLabelRepository(
+    SqliteConnectionFactory connectionFactory,
+    IPersistentDataChangeTracker? changeTracker = null) : ISeatLabelRepository
 {
     public async Task<IReadOnlyList<SeatLabel>> GetLabelsAsync(
         int libraryId,
@@ -62,6 +64,7 @@ public sealed class SqliteSeatLabelRepository(SqliteConnectionFactory connection
         }
 
         await transaction.CommitAsync(cancellationToken);
+        changeTracker?.MarkChanged();
     }
 
     public async Task DeleteLabelsAsync(
@@ -90,5 +93,6 @@ public sealed class SqliteSeatLabelRepository(SqliteConnectionFactory connection
         }
 
         await transaction.CommitAsync(cancellationToken);
+        changeTracker?.MarkChanged();
     }
 }

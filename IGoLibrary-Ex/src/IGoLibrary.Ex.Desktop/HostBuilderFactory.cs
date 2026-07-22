@@ -72,7 +72,13 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IExternalLinkService, ExternalLinkService>();
                 services.AddSingleton<IStartupEntryService, StartupEntryService>();
                 services.AddSingleton<IApplicationRestartService, ApplicationRestartService>();
+                services.AddSingleton<IDataRestoreRestartService, DataRestoreRestartService>();
                 services.AddSingleton<IFolderPickerService, FolderPickerService>();
+                services.AddSingleton<IBackupFilePickerService, BackupFilePickerService>();
+                services.AddSingleton<IBackupDialogService, BackupDialogService>();
+                services.AddSingleton<IBackupDataFlushService, BackupDataFlushService>();
+                services.AddSingleton<IActiveBackupTaskService, ActiveBackupTaskService>();
+                services.AddSingleton<IBackupWorkflowService, BackupWorkflowService>();
                 services.AddSingleton<IStorageChangeDialogService, StorageChangeDialogService>();
                 services.AddSingleton<ISeatLabelDialogService, SeatLabelDialogService>();
                 services.AddSingleton<IGrabStrategyReminderDialogService, GrabStrategyReminderDialogService>();
@@ -140,7 +146,10 @@ internal static class HostBuilderFactory
                 services.AddSingleton<MobileControlPageViewModel>();
                 services.AddSingleton<NotificationSettingsViewModel>();
                 services.AddSingleton<SystemSettingsViewModel>();
+                services.AddSingleton<LocalBackupViewModel>();
+                services.AddSingleton<WebDavSyncViewModel>();
                 services.AddSingleton<StorageSettingsViewModel>();
+                services.AddHostedService<WebDavAutoUploadHostedService>();
                 services.AddSingleton<ProtocolTemplatesViewModel>();
                 services.AddSingleton<ShellNavigationViewModel>();
                 services.AddSingleton<ActivityLogPanelViewModel>();

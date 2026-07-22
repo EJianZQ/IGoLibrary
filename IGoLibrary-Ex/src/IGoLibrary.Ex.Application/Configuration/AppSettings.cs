@@ -24,5 +24,7 @@ public sealed record AppSettings
 
     public LogFileSettings Logging { get; init; } = LogFileSettings.Default;
 
+    public BackupSyncSettings BackupSync { get; init; } = BackupSyncSettings.Default;
+
     public static AppSettings Default { get; } = new();
 }

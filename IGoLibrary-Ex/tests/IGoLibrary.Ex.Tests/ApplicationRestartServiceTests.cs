@@ -34,6 +34,33 @@ public sealed class ApplicationRestartServiceTests
         Assert.Equal(["--user-option"], parsed.ApplicationArguments);
     }
 
+    [Fact]
+    public void RestartArguments_Parse_RemovesAndReturnsDataRestoreTransaction()
+    {
+        var transactionId = Guid.NewGuid().ToString("N");
+
+        var parsed = RestartArguments.Parse([
+            "--user-option",
+            RestartArguments.RestoreTransactionOption,
+            transactionId
+        ]);
+
+        Assert.Equal(transactionId, parsed.RestoreTransactionId);
+        Assert.Equal(["--user-option"], parsed.ApplicationArguments);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not-a-guid")]
+    [InlineData("00000000-0000-0000-0000-000000000000")]
+    public void RestartArguments_Parse_RejectsInvalidDataRestoreTransaction(string value)
+    {
+        Assert.Throws<ArgumentException>(() => RestartArguments.Parse([
+            RestartArguments.RestoreTransactionOption,
+            value
+        ]));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("not-a-guid")]

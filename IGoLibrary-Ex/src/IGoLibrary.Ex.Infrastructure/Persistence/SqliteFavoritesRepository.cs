@@ -4,7 +4,9 @@ using Microsoft.Data.Sqlite;
 
 namespace IGoLibrary.Ex.Infrastructure.Persistence;
 
-public sealed class SqliteFavoritesRepository(SqliteConnectionFactory connectionFactory) : IFavoritesRepository
+public sealed class SqliteFavoritesRepository(
+    SqliteConnectionFactory connectionFactory,
+    IPersistentDataChangeTracker? changeTracker = null) : IFavoritesRepository
 {
     public async Task<IReadOnlyList<SeatReference>> GetFavoritesAsync(int libraryId, CancellationToken cancellationToken = default)
     {
@@ -56,5 +58,6 @@ public sealed class SqliteFavoritesRepository(SqliteConnectionFactory connection
         }
 
         await transaction.CommitAsync(cancellationToken);
+        changeTracker?.MarkChanged();
     }
 }

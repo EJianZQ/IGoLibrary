@@ -6,6 +6,7 @@ using IGoLibrary.Ex.Infrastructure.Notifications;
 using IGoLibrary.Ex.Infrastructure.Persistence;
 using IGoLibrary.Ex.Infrastructure.Protocol;
 using IGoLibrary.Ex.Infrastructure.Security;
+using IGoLibrary.Ex.Infrastructure.DataTransfer;
 using IGoLibrary.Ex.Infrastructure.Updates;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -22,6 +23,9 @@ public static class DependencyInjection
         services.TryAddSingleton(serviceProvider =>
             serviceProvider.GetRequiredService<StorageLocationManager>().Current);
         services.AddSingleton<SqliteConnectionFactory>();
+        services.AddSingleton<PersistentDataChangeTracker>();
+        services.AddSingleton<IPersistentDataChangeTracker>(serviceProvider =>
+            serviceProvider.GetRequiredService<PersistentDataChangeTracker>());
         services.AddSingleton<IAppDataInitializer, SqliteAppDataInitializer>();
         services.TryAddSingleton<IAppLogWriter, AppLogFileWriter>();
         services.TryAddSingleton<IAppLogRuntimeController>(serviceProvider =>
@@ -33,7 +37,17 @@ public static class DependencyInjection
         services.AddSingleton<ISeatLabelRepository, SqliteSeatLabelRepository>();
         services.AddSingleton<ITaskLaunchHistoryRepository, SqliteTaskLaunchHistoryRepository>();
         services.AddSingleton<IProtocolTemplateStore, DefaultProtocolTemplateStore>();
-        services.AddSingleton<ICredentialStore>(_ => PlatformCredentialStore.CreateDefault());
+        services.AddSingleton<ICredentialStore>(serviceProvider =>
+            PlatformCredentialStore.CreateDefault(
+                serviceProvider.GetRequiredService<IPersistentDataChangeTracker>()));
+        services.AddSingleton<IBackupSecretStore>(serviceProvider =>
+            new PlatformBackupSecretStore(
+                serviceProvider.GetRequiredService<IPersistentDataChangeTracker>()));
+        services.AddSingleton<IDataBackupService, DataBackupService>();
+        services.AddSingleton<IPersistentDataFingerprintProvider, PersistentDataFingerprintProvider>();
+        services.AddSingleton<IBackupRestoreStartupService, BackupRestoreStartupService>();
+        services.AddSingleton<WebDavClient>();
+        services.AddSingleton<IWebDavSyncService, WebDavSyncService>();
         services.AddSingleton<ISmtpTransportClientFactory, MailKitSmtpTransportClientFactory>();
         services.AddSingleton<IEmailAlertSender, SmtpEmailAlertSender>();
         services.AddHttpClient<IBarkAlertSender, BarkAlertSender>(client =>

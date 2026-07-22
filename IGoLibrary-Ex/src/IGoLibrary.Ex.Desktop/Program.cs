@@ -65,6 +65,7 @@ internal static class Program
         using var sharedLogWriter = new AppLogFileWriter(storageLocations, startUnconfigured: true);
         RegisterGlobalExceptionLogging(sharedLogWriter);
         var logWriterConfigured = false;
+        var restoreAwaitingCommit = false;
 
         try
         {
@@ -74,6 +75,21 @@ internal static class Program
                     storageLocationManager,
                     storageLocations)
                 .Build();
+
+            var restoreStartupService = Host.Services.GetRequiredService<IBackupRestoreStartupService>();
+            if (restartArguments.RestoreTransactionId is { } restoreTransactionId)
+            {
+                restoreAwaitingCommit = restoreStartupService.ApplyAsync(restoreTransactionId)
+                    .GetAwaiter()
+                    .GetResult()
+                    .Succeeded;
+            }
+            else
+            {
+                restoreStartupService.RecoverIncompleteAsync()
+                    .GetAwaiter()
+                    .GetResult();
+            }
 
             Host.Services.GetRequiredService<IAppDataInitializer>()
                 .InitializeAsync()
@@ -115,11 +131,38 @@ internal static class Program
 
             WriteUpdateMaintenanceResult(sharedLogWriter, updateMaintenanceResult);
             Host.Start();
+            if (restoreAwaitingCommit && restartArguments.RestoreTransactionId is { } completedRestoreId)
+            {
+                restoreStartupService.CompleteAsync(completedRestoreId)
+                    .GetAwaiter()
+                    .GetResult();
+                restoreAwaitingCommit = false;
+            }
             Host.Services.GetRequiredService<TraceListenerRegistrar>().Attach();
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(restartArguments.ApplicationArguments);
         }
         catch (Exception ex)
         {
+            if (restoreAwaitingCommit && Host is not null)
+            {
+                try
+                {
+                    Host.Services.GetRequiredService<IBackupRestoreStartupService>()
+                        .RecoverIncompleteAsync()
+                        .GetAwaiter()
+                        .GetResult();
+                    restoreAwaitingCommit = false;
+                }
+                catch (Exception rollbackException)
+                {
+                    sharedLogWriter.Write(
+                        LogLevel.Critical,
+                        "Backup",
+                        "恢复后的应用初始化失败，且立即回滚未能完成；下次启动会继续恢复事务。",
+                        rollbackException);
+                }
+            }
+
             if (!logWriterConfigured)
             {
                 sharedLogWriter.ApplyAsync(LogFileSettings.Default).GetAwaiter().GetResult();

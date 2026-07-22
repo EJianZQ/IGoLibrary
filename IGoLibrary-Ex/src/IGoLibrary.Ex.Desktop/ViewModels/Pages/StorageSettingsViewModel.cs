@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Configuration;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
 
@@ -12,7 +13,10 @@ public sealed partial class StorageSettingsViewModel(
     IStorageChangeWorkflowService changeWorkflowService,
     ILoggingSettingsWorkflowService loggingSettingsWorkflowService,
     IActivityLogService activityLogService,
-    INotificationService notificationService) : ViewModelBase
+    INotificationService notificationService,
+    LocalBackupViewModel? localBackupViewModel = null,
+    WebDavSyncViewModel? webDavSyncViewModel = null,
+    IBackupRestoreStartupService? backupRestoreStartupService = null) : ViewModelBase
 {
     private readonly object _loggingSettingsSaveGate = new();
     private LogFileSettings _lastPersistedLoggingSettings = LogFileSettings.Default;
@@ -22,6 +26,10 @@ public sealed partial class StorageSettingsViewModel(
     private long _processedLoggingSettingsVersion;
     private bool _loggingSettingsSaveLoopRunning;
     private bool _isLoadingLoggingSettings;
+
+    public LocalBackupViewModel? LocalBackup { get; } = localBackupViewModel;
+
+    public WebDavSyncViewModel? WebDavSync { get; } = webDavSyncViewModel;
 
     [ObservableProperty]
     private string currentDataDirectory = storageLocationService.Current.DataDirectory;
@@ -56,6 +64,7 @@ public sealed partial class StorageSettingsViewModel(
 
     public async Task InitializeAsync(
         LogFileSettings loggingSettings,
+        BackupSyncSettings? backupSyncSettings = null,
         CancellationToken cancellationToken = default)
     {
         var normalizedLoggingSettings = LogFileSettings.Normalize(loggingSettings);
@@ -77,30 +86,60 @@ public sealed partial class StorageSettingsViewModel(
         PendingDataDirectory = CurrentDataDirectory;
         PendingLogDirectory = CurrentLogDirectory;
 
-        var result = await storageLocationService.ConsumeStartupResultAsync(cancellationToken);
-        if (result is null)
+        if (LocalBackup is not null)
         {
-            return;
+            await LocalBackup.InitializeAsync(cancellationToken);
         }
 
-        activityLogService.Write(
-            result.Succeeded ? LogEntryKind.Success : LogEntryKind.Error,
-            "Storage",
-            result.Message);
-        try
+        if (WebDavSync is not null)
         {
-            if (result.Succeeded)
+            await WebDavSync.InitializeAsync(
+                backupSyncSettings ?? BackupSyncSettings.Default,
+                cancellationToken);
+        }
+
+        var result = await storageLocationService.ConsumeStartupResultAsync(cancellationToken);
+        if (result is not null)
+        {
+            activityLogService.Write(
+                result.Succeeded ? LogEntryKind.Success : LogEntryKind.Error,
+                "Storage",
+                result.Message);
+            try
             {
-                await notificationService.ShowSuccessAsync("存储位置已更新", result.Message, cancellationToken);
+                if (result.Succeeded)
+                {
+                    await notificationService.ShowSuccessAsync("存储位置已更新", result.Message, cancellationToken);
+                }
+                else
+                {
+                    await notificationService.ShowWarningAsync("存储位置更改失败", result.Message, cancellationToken);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                await notificationService.ShowWarningAsync("存储位置更改失败", result.Message, cancellationToken);
+                activityLogService.Write(LogEntryKind.Warning, "Storage", $"显示存储位置启动结果失败：{ex.Message}");
             }
         }
-        catch (Exception ex)
+
+        if (backupRestoreStartupService is not null)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Storage", $"显示存储位置启动结果失败：{ex.Message}");
+            var restoreResult = await backupRestoreStartupService.ConsumeStartupResultAsync(cancellationToken);
+            if (restoreResult is not null)
+            {
+                activityLogService.Write(
+                    restoreResult.Succeeded ? LogEntryKind.Success : LogEntryKind.Error,
+                    "Backup",
+                    restoreResult.Message);
+                if (restoreResult.Succeeded)
+                {
+                    await notificationService.ShowSuccessAsync("数据恢复完成", restoreResult.Message, cancellationToken);
+                }
+                else
+                {
+                    await notificationService.ShowWarningAsync("数据恢复失败", restoreResult.Message, cancellationToken);
+                }
+            }
         }
     }
 

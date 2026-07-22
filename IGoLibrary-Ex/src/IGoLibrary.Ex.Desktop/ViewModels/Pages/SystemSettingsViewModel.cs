@@ -232,7 +232,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         }
 
         await SyncStartupEntryAfterLoadAsync();
-        await StorageSettings.InitializeAsync(settings.Logging, cancellationToken);
+        await StorageSettings.InitializeAsync(settings.Logging, settings.BackupSync, cancellationToken);
     }
 
     public void ApplySettings(AppSettings settings)

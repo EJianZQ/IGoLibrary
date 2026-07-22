@@ -8,7 +8,8 @@ namespace IGoLibrary.Ex.Infrastructure.Persistence;
 
 public sealed class SqliteTaskLaunchHistoryRepository(
     SqliteConnectionFactory connectionFactory,
-    ILogger<SqliteTaskLaunchHistoryRepository> logger) : ITaskLaunchHistoryRepository
+    ILogger<SqliteTaskLaunchHistoryRepository> logger,
+    IPersistentDataChangeTracker? changeTracker = null) : ITaskLaunchHistoryRepository
 {
     private const int MaximumRecordsPerKind = 5;
     private const string GrabKind = "grab";
@@ -126,6 +127,7 @@ public sealed class SqliteTaskLaunchHistoryRepository(
             cancellationToken);
         var prunedCount = await PruneAsync(connection, transaction, taskKind, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        changeTracker?.MarkChanged();
 
         logger.LogInformation(
             "Saved mobile task launch history. TaskKind={TaskKind}, RecordId={RecordId}, Refreshed={Refreshed}, PrunedCount={PrunedCount}.",

@@ -3,7 +3,7 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Infrastructure.Security;
 
-public sealed class InMemoryCredentialStore : ICredentialStore
+public sealed class InMemoryCredentialStore(IPersistentDataChangeTracker? changeTracker = null) : ICredentialStore
 {
     private SessionCredentials? _session;
     private RemoteCheckInSessionCredentials? _remoteCheckInSession;
@@ -11,6 +11,7 @@ public sealed class InMemoryCredentialStore : ICredentialStore
     public Task SaveSessionAsync(SessionCredentials credentials, CancellationToken cancellationToken = default)
     {
         _session = credentials;
+        changeTracker?.MarkChanged();
         return Task.CompletedTask;
     }
 
@@ -22,6 +23,7 @@ public sealed class InMemoryCredentialStore : ICredentialStore
     public Task ClearSessionAsync(CancellationToken cancellationToken = default)
     {
         _session = null;
+        changeTracker?.MarkChanged();
         return Task.CompletedTask;
     }
 
@@ -30,6 +32,7 @@ public sealed class InMemoryCredentialStore : ICredentialStore
         CancellationToken cancellationToken = default)
     {
         _remoteCheckInSession = credentials;
+        changeTracker?.MarkChanged();
         return Task.CompletedTask;
     }
 
@@ -42,6 +45,7 @@ public sealed class InMemoryCredentialStore : ICredentialStore
     public Task ClearRemoteCheckInSessionAsync(CancellationToken cancellationToken = default)
     {
         _remoteCheckInSession = null;
+        changeTracker?.MarkChanged();
         return Task.CompletedTask;
     }
 }

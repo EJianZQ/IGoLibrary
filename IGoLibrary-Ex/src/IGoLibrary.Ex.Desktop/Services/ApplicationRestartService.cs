@@ -40,6 +40,10 @@ public sealed class ApplicationRestartService(AppWindowService appWindowService)
             if (string.Equals(
                     commandLineArguments[index],
                     RestartArguments.ParentProcessIdOption,
+                    StringComparison.Ordinal) ||
+                string.Equals(
+                    commandLineArguments[index],
+                    RestartArguments.RestoreTransactionOption,
                     StringComparison.Ordinal))
             {
                 index++;

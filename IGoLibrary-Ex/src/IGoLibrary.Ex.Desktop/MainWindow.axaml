@@ -3860,6 +3860,162 @@
                       <StackPanel Spacing="6">
                         <TextBlock FontSize="15"
                                    FontWeight="SemiBold"
+                                   Text="本地备份与恢复" />
+                        <TextBlock Classes="helper-text"
+                                   Text="加密导出除日志外的全部程序数据；导入前会显示与本地数据的分类对比" />
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal"
+                                  Spacing="10">
+                        <Button Content="导出全部数据"
+                                Command="{Binding SystemSettings.StorageSettings.LocalBackup.ExportCommand}"
+                                MinWidth="132" />
+                        <Button Content="从备份文件导入"
+                                Command="{Binding SystemSettings.StorageSettings.LocalBackup.ImportCommand}"
+                                MinWidth="150" />
+                        <Button Content="设置/更改备份密码"
+                                Command="{Binding SystemSettings.StorageSettings.LocalBackup.ChangePasswordCommand}"
+                                MinWidth="164" />
+                      </StackPanel>
+                      <Grid ColumnDefinitions="Auto,*"
+                            ColumnSpacing="12">
+                        <TextBlock Classes="field-label"
+                                   Text="密码状态" />
+                        <TextBlock Grid.Column="1"
+                                   Classes="helper-text"
+                                   Text="{Binding SystemSettings.StorageSettings.LocalBackup.BackupPasswordStatusText}" />
+                      </Grid>
+                      <TextBlock Classes="helper-text"
+                                 Text="{Binding SystemSettings.StorageSettings.LocalBackup.StatusText}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="card">
+                    <StackPanel Spacing="16">
+                      <StackPanel Spacing="6">
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Text="WebDAV 云同步" />
+                        <TextBlock Classes="helper-text"
+                                   Text="远端只维护一个固定加密备份；自动上传遇到未知远端版本会暂停并提示冲突" />
+                      </StackPanel>
+
+                      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+                            ColumnDefinitions="140,*"
+                            RowSpacing="12"
+                            ColumnSpacing="12">
+                        <TextBlock Classes="field-label"
+                                   Text="Endpoint"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding SystemSettings.StorageSettings.WebDavSync.Endpoint}"
+                                 Watermark="https://dav.example.com/dav/" />
+
+                        <TextBlock Grid.Row="1"
+                                   Classes="field-label"
+                                   Text="同步目录"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Row="1"
+                                 Grid.Column="1"
+                                 Text="{Binding SystemSettings.StorageSettings.WebDavSync.RemoteDirectory}"
+                                 Watermark="IGoLibrary-Ex（留空表示 Endpoint 根目录）" />
+
+                        <TextBlock Grid.Row="2"
+                                   Classes="field-label"
+                                   Text="用户名"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Row="2"
+                                 Grid.Column="1"
+                                 Text="{Binding SystemSettings.StorageSettings.WebDavSync.Username}"
+                                 Watermark="留空表示匿名访问" />
+
+                        <TextBlock Grid.Row="3"
+                                   Classes="field-label"
+                                   Text="密码"
+                                   VerticalAlignment="Center" />
+                        <TextBox Grid.Row="3"
+                                 Grid.Column="1"
+                                 Text="{Binding SystemSettings.StorageSettings.WebDavSync.Password}"
+                                 PasswordChar="●"
+                                 Watermark="留空则保留已安全存储的密码" />
+
+                        <TextBlock Grid.Row="4"
+                                   Classes="field-label"
+                                   Text="TLS Verify"
+                                   VerticalAlignment="Center" />
+                        <ComboBox Grid.Row="4"
+                                  Grid.Column="1"
+                                  ItemsSource="{Binding SystemSettings.StorageSettings.WebDavSync.TlsVerifyModes}"
+                                  SelectedIndex="{Binding SystemSettings.StorageSettings.WebDavSync.SelectedTlsVerifyModeIndex}"
+                                  IsEnabled="{Binding SystemSettings.StorageSettings.WebDavSync.IsTlsVerifyApplicable}"
+                                  HorizontalAlignment="Stretch" />
+
+                        <ToggleSwitch Grid.Row="5"
+                                      Grid.Column="1"
+                                      IsChecked="{Binding SystemSettings.StorageSettings.WebDavSync.AutoUploadEnabled}"
+                                      OnContent="自动上传：开"
+                                      OffContent="自动上传：关" />
+                      </Grid>
+
+                      <Border Background="#30E57373"
+                              CornerRadius="6"
+                              Padding="10"
+                              IsVisible="{Binding SystemSettings.StorageSettings.WebDavSync.ShowsInsecureHttpWarning}">
+                        <TextBlock Text="警告：当前允许 HTTP 明文连接，WebDAV 登录凭据可能被网络中的其他人截获"
+                                   TextWrapping="Wrap" />
+                      </Border>
+
+                      <Border Background="#30E57373"
+                              CornerRadius="6"
+                              Padding="10"
+                              IsVisible="{Binding SystemSettings.StorageSettings.WebDavSync.ShowsTlsSkipWarning}">
+                        <TextBlock Text="警告：当前已跳过 TLS 证书校验，无法确认 WebDAV 服务器身份，登录凭据可能被中间人截获"
+                                   TextWrapping="Wrap" />
+                      </Border>
+
+                      <StackPanel Orientation="Horizontal"
+                                  Spacing="10">
+                        <Button Content="保存设置"
+                                Command="{Binding SystemSettings.StorageSettings.WebDavSync.SaveCommand}"
+                                MinWidth="104" />
+                        <Button Content="测试连接"
+                                Command="{Binding SystemSettings.StorageSettings.WebDavSync.TestConnectionCommand}"
+                                MinWidth="104" />
+                        <Button Content="手动上传"
+                                Command="{Binding SystemSettings.StorageSettings.WebDavSync.UploadCommand}"
+                                MinWidth="104" />
+                        <Button Content="下载并覆盖"
+                                Command="{Binding SystemSettings.StorageSettings.WebDavSync.DownloadAndRestoreCommand}"
+                                MinWidth="116"
+                                Background="{DynamicResource SemiAccentBrush}"
+                                Foreground="{DynamicResource AppAccentForegroundBrush}" />
+                      </StackPanel>
+
+                      <Grid RowDefinitions="Auto,Auto,Auto"
+                            ColumnDefinitions="140,*"
+                            RowSpacing="6"
+                            ColumnSpacing="12">
+                        <TextBlock Classes="field-label" Text="同步状态" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding SystemSettings.StorageSettings.WebDavSync.StatusText}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Grid.Row="1" Classes="field-label" Text="最后成功" />
+                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                   Classes="helper-text"
+                                   Text="{Binding SystemSettings.StorageSettings.WebDavSync.LastSuccessfulSyncText}" />
+                        <TextBlock Grid.Row="2" Classes="field-label" Text="远端修改时间" />
+                        <TextBlock Grid.Row="2" Grid.Column="1"
+                                   Classes="helper-text"
+                                   Text="{Binding SystemSettings.StorageSettings.WebDavSync.RemoteModifiedText}" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
+                  <Border Classes="card">
+                    <StackPanel Spacing="16">
+                      <StackPanel Spacing="6">
+                        <TextBlock FontSize="15"
+                                   FontWeight="SemiBold"
                                    Text="日志管理" />
                         <TextBlock Classes="helper-text"
                                    Text="每次运行使用一份独立日志" />

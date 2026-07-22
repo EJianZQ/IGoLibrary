@@ -3,15 +3,18 @@ namespace IGoLibrary.Ex.Desktop;
 internal sealed record RestartArguments(
     int? ParentProcessId,
     string[] ApplicationArguments,
-    string? UpdateTransactionId = null)
+    string? UpdateTransactionId = null,
+    string? RestoreTransactionId = null)
 {
     public const string ParentProcessIdOption = "--storage-restart-parent-pid";
     public const string UpdateTransactionOption = "--update-transaction";
+    public const string RestoreTransactionOption = "--data-restore-transaction";
 
     public static RestartArguments Parse(IReadOnlyList<string> arguments)
     {
         int? parentProcessId = null;
         string? updateTransactionId = null;
+        string? restoreTransactionId = null;
         var forwarded = new List<string>(arguments.Count);
         for (var index = 0; index < arguments.Count; index++)
         {
@@ -24,6 +27,18 @@ internal sealed record RestartArguments(
                 }
 
                 updateTransactionId = transactionId.ToString("N");
+                continue;
+            }
+
+            if (string.Equals(arguments[index], RestoreTransactionOption, StringComparison.Ordinal))
+            {
+                if (index + 1 >= arguments.Count ||
+                    !Guid.TryParseExact(arguments[++index], "N", out var transactionId))
+                {
+                    throw new ArgumentException("数据恢复事务参数无效", nameof(arguments));
+                }
+
+                restoreTransactionId = transactionId.ToString("N");
                 continue;
             }
 
@@ -47,6 +62,10 @@ internal sealed record RestartArguments(
             parentProcessId = parsed;
         }
 
-        return new RestartArguments(parentProcessId, forwarded.ToArray(), updateTransactionId);
+        return new RestartArguments(
+            parentProcessId,
+            forwarded.ToArray(),
+            updateTransactionId,
+            restoreTransactionId);
     }
 }

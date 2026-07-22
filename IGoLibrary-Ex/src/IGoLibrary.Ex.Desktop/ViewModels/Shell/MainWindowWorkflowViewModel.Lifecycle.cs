@@ -123,6 +123,19 @@ public partial class MainWindowWorkflowViewModel
             _activityLogService.Write(LogEntryKind.Warning, "MobileControl", $"退出前停止手机控制失败：{ex.Message}");
         }
 
+        await FlushPersistentDataAsync(cancellationToken);
+    }
+
+    public Task FlushPersistentDataAsync(CancellationToken cancellationToken = default)
+        => FlushPersistentDataCoreAsync(suppressErrors: true, cancellationToken);
+
+    public Task FlushPersistentDataForBackupAsync(CancellationToken cancellationToken = default)
+        => FlushPersistentDataCoreAsync(suppressErrors: false, cancellationToken);
+
+    private async Task FlushPersistentDataCoreAsync(
+        bool suppressErrors,
+        CancellationToken cancellationToken)
+    {
         var hasPendingProtocolTemplates = HasPendingProtocolTemplateAutoSave;
 
         CancelPendingProtocolTemplateAutoSave();
@@ -131,7 +144,7 @@ public partial class MainWindowWorkflowViewModel
         {
             await FlushPendingSystemSettingsAsync(cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (suppressErrors)
         {
             _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存系统设置失败：{ex.Message}");
         }
@@ -140,7 +153,7 @@ public partial class MainWindowWorkflowViewModel
         {
             await SystemSettings.StorageSettings.FlushPendingLoggingSettingsSaveAsync();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (suppressErrors)
         {
             _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存日志设置失败：{ex.Message}");
         }
@@ -151,7 +164,7 @@ public partial class MainWindowWorkflowViewModel
             {
                 await PersistProtocolOverridesAsync(cancellationToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (suppressErrors)
             {
                 _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存接口模板失败：{ex.Message}");
             }
@@ -161,7 +174,7 @@ public partial class MainWindowWorkflowViewModel
         {
             await GrabPage.FlushPendingScheduledStartDefaultAsync(cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (suppressErrors)
         {
             _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存抢座定时时间默认值失败：{ex.Message}");
         }
@@ -170,7 +183,7 @@ public partial class MainWindowWorkflowViewModel
         {
             await TomorrowReservationPage.FlushPendingScheduledStartDefaultAsync(cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (suppressErrors)
         {
             _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存明日预约触发时间默认值失败：{ex.Message}");
         }

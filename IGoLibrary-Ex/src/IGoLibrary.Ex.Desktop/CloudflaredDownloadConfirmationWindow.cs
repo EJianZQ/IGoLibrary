@@ -29,7 +29,7 @@ internal sealed class CloudflaredDownloadConfirmationWindow : Window
             $"版本：{asset.Version}\n" +
             $"平台：{asset.RuntimeIdentifier}\n" +
             $"下载大小：{FormatBytes(asset.DownloadSize)}\n\n" +
-            $"组件会安装在：{installDirectory}";
+            $"组件会安装：{installDirectory}";
 
         Content = new Border
         {
