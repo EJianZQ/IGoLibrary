@@ -87,7 +87,7 @@
       z-index: 1;
       width: min(100%, 500px);
       margin: 0 auto;
-      padding: 16px 16px calc(24px + var(--safe-bottom));
+      padding: 16px 16px calc(68px + var(--safe-bottom));
     }
 
     /* ── Header ── */
@@ -179,9 +179,7 @@
       transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.3s ease;
       animation: cardIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
     }
-    section:nth-child(2) { animation-delay: 0.05s; }
-    section:nth-child(3) { animation-delay: 0.1s; }
-    section:nth-child(4) { animation-delay: 0.15s; }
+    .page > section:nth-child(2) { animation-delay: 0.05s; }
 
     @keyframes cardIn {
       from { opacity: 0; transform: translateY(20px) scale(0.97); }
@@ -327,20 +325,58 @@
       opacity: 0.6;
     }
 
-    /* ── Task launch records ── */
-    .launch-grid { display: grid; gap: 12px; }
-
-    .launch-group {
-      border-radius: var(--radius-inner);
-      padding: 14px;
+    /* ── Task launch segmented control ── */
+    .launch-segments {
+      position: relative;
+      display: flex;
       background: var(--bg-field);
+      border-radius: var(--radius-pill);
+      padding: 2px;
+      margin-bottom: 14px;
     }
-
-    .launch-group-title {
-      margin: 0 0 10px;
-      font-size: 16px;
-      font-weight: 700;
+    .seg-indicator {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: calc((100% - 4px) / 3);
+      height: calc(100% - 4px);
+      background: var(--bg-card-solid);
+      border-radius: var(--radius-pill);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 0;
+    }
+    .seg {
+      flex: 1;
+      appearance: none;
+      border: 0;
+      border-radius: var(--radius-pill);
+      background: transparent;
+      padding: 7px 0;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0;
+      color: var(--text-secondary);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.2s ease;
+      position: relative;
+      z-index: 1;
+      overflow: visible;
+    }
+    .seg::after, .seg:active::after { display: none; }
+    .seg:active { transform: none; opacity: 0.7; }
+    .seg.active {
       color: var(--text-primary);
+    }
+    .launch-content { display: none; }
+    .launch-content.active {
+      display: block;
+      animation: segIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes segIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .launch-group-hint {
@@ -435,7 +471,7 @@
     .record-meta { margin-top: 3px; }
     .record-detail { margin-top: 8px; }
     .record-picker .actions button,
-    .launch-group > .actions button { width: 100%; }
+    .launch-content > .actions button { width: 100%; }
 
     .empty-records {
       border-radius: var(--radius-inner);
@@ -839,6 +875,127 @@
       }
     }
 
+    /* ── Page containers (tab switching) ── */
+    .page {
+      display: none;
+    }
+    .page.active {
+      display: block;
+      animation: pageIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes pageIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Bottom Tab Bar (iOS style) ── */
+    .tab-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-top: 0.5px solid var(--separator);
+      padding-bottom: var(--safe-bottom);
+      box-shadow: 0 -1px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    .tab-btn {
+      flex: 1;
+      appearance: none;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      padding: 8px 0 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      color: var(--text-tertiary);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.1px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.2s ease;
+      position: relative;
+      overflow: visible;
+    }
+    .tab-btn::after { display: none; }
+    .tab-btn:active::after { display: none; }
+    .tab-btn svg {
+      width: 26px;
+      height: 26px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: all 0.2s ease;
+    }
+    .tab-btn.active {
+      color: var(--accent-blue);
+    }
+    .tab-btn:active {
+      opacity: 0.6;
+      transform: none;
+    }
+
+    /* ── Pull-to-refresh ── */
+    main {
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    main.ptr-pulling {
+      transition: none;
+    }
+    main.ptr-refreshing {
+      transform: translateY(50px);
+    }
+    .ptr-indicator {
+      position: fixed;
+      top: var(--safe-top);
+      left: 0;
+      right: 0;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .ptr-indicator.ptr-pulling {
+      transition: none;
+    }
+    .ptr-indicator.ptr-refreshing {
+      opacity: 1;
+    }
+    .ptr-spinner {
+      width: 24px;
+      height: 24px;
+      border: 2.5px solid var(--separator);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: ptrSpin 0.7s linear infinite;
+      animation-play-state: paused;
+    }
+    .ptr-indicator.ptr-pulling .ptr-spinner,
+    .ptr-indicator.ptr-refreshing .ptr-spinner {
+      animation-play-state: running;
+    }
+    .ptr-indicator.ptr-ready .ptr-spinner {
+      border-color: rgba(0, 122, 255, 0.25);
+      border-top-color: var(--accent-blue);
+    }
+    @keyframes ptrSpin {
+      to { transform: rotate(360deg); }
+    }
+
     /* Reduced motion */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -849,6 +1006,7 @@
   </style>
 </head>
 <body>
+  <div class="ptr-indicator" id="ptrIndicator"><div class="ptr-spinner"></div></div>
   <main>
     <header>
       <div>
@@ -860,6 +1018,8 @@
       </div>
     </header>
 
+    <!-- ═══ 状态页 ═══ -->
+    <div class="page active" data-page="status">
     <!-- Cookie 状态 -->
     <section><div class="card">
       <div class="head">
@@ -923,7 +1083,10 @@
       <div class="progress idle" id="reservationProgress"><span></span></div>
       <div class="actions"><button class="danger" id="cancelReservationButton" type="button" hidden>取消当前预约</button></div>
     </div></section>
+    </div>
 
+    <!-- ═══ 任务页 ═══ -->
+    <div class="page" data-page="task">
     <!-- 启动任务 -->
     <section><div class="card">
       <div class="head">
@@ -934,24 +1097,25 @@
         </div>
         <span class="state" id="launchState">等待记录</span>
       </div>
-      <div class="launch-grid">
-        <div class="launch-group">
-          <h3 class="launch-group-title">抢座</h3>
-          <div class="record-list" id="grabRecordList">
-            <div class="empty-records">正在读取电脑端操作记录...</div>
-          </div>
+      <div class="launch-segments">
+        <div class="seg-indicator" id="segIndicator"></div>
+        <button class="seg active" type="button" data-seg="grab">抢座</button>
+        <button class="seg" type="button" data-seg="globalLeak">全域捡漏</button>
+        <button class="seg" type="button" data-seg="occupy">占座</button>
+      </div>
+      <div class="launch-content active" data-seg-content="grab">
+        <div class="record-list" id="grabRecordList">
+          <div class="empty-records">正在读取电脑端操作记录...</div>
         </div>
-        <div class="launch-group">
-          <h3 class="launch-group-title">全域捡漏</h3>
-          <div class="record-list" id="globalLeakRecordList">
-            <div class="empty-records">正在读取电脑端操作记录...</div>
-          </div>
+      </div>
+      <div class="launch-content" data-seg-content="globalLeak">
+        <div class="record-list" id="globalLeakRecordList">
+          <div class="empty-records">正在读取电脑端操作记录...</div>
         </div>
-        <div class="launch-group">
-          <h3 class="launch-group-title">占座</h3>
-          <p class="launch-group-hint">使用电脑端占座页面当前的重约延迟和检测间隔参数</p>
-          <div class="actions"><button id="startOccupyButton" type="button" data-task-start="occupy">开启占座</button></div>
-        </div>
+      </div>
+      <div class="launch-content" data-seg-content="occupy">
+        <p class="launch-group-hint">使用电脑端占座页面当前的重约延迟和检测间隔参数</p>
+        <div class="actions"><button id="startOccupyButton" type="button" data-task-start="occupy">开启占座</button></div>
       </div>
     </div></section>
 
@@ -968,7 +1132,27 @@
         <div class="empty-task">当前无任务</div>
       </div>
     </div></section>
+    </div>
   </main>
+
+  <!-- ═══ 底部 Tab 导航栏 ═══ -->
+  <nav class="tab-bar">
+    <button class="tab-btn active" type="button" data-tab="status">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M12 7v5l3 2"/>
+      </svg>
+      <span>状态</span>
+    </button>
+    <button class="tab-btn" type="button" data-tab="task">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="5" y="4" width="14" height="17" rx="2"/>
+        <path d="M9 4V2.5h6V4"/>
+        <path d="M9 13l2 2 4-4"/>
+      </svg>
+      <span>任务</span>
+    </button>
+  </nav>
 
   <!-- iOS Toast element -->
   <div class="ios-toast" id="iosToast"></div>
@@ -984,6 +1168,7 @@
     let taskRecordsLoadFailed = false;
     const selectedTaskRecordIds = { grab: null, globalLeak: null };
     const pendingTaskStarts = new Set();
+    let renderedRecordsSignature = '';
     $('authQrCode').src = '/api/session/auth-qrcode?token=' + encodeURIComponent(token);
 
     const field = (label, value, wide = false) =>
@@ -1062,6 +1247,17 @@
         </div>`;
     }
 
+    function updateRecordPickerDynamicState(kind, disabled, pending) {
+      const selectId = kind === 'grab' ? 'grabRecordSelect' : 'globalLeakRecordSelect';
+      const select = $(selectId);
+      if (select) select.disabled = disabled;
+      const button = document.querySelector('button[data-task-start="' + CSS.escape(kind) + '"]');
+      if (button) {
+        button.disabled = disabled;
+        button.textContent = pending ? '正在提交...' : '使用所选记录启动';
+      }
+    }
+
     function renderTaskRecords() {
       const status = latestStatusData;
       const authorized = !!(status && status.cookie && status.cookie.isAuthorized);
@@ -1073,16 +1269,37 @@
       const globalLeakPending = pendingTaskStarts.has('globalLeak');
       const occupyPending = pendingTaskStarts.has('occupy');
 
-      $('grabRecordList').innerHTML = taskRecordsLoadFailed
-        ? emptyRecords('抢座记录读取失败，请稍后重试')
-        : latestTaskRecords.grab && latestTaskRecords.grab.length
-          ? taskRecordPicker('grab', latestTaskRecords.grab, !authorized || grabActive || grabPending, grabPending)
-          : emptyRecords('暂无电脑端抢座记录，请先在电脑端成功启动一次抢座任务');
-      $('globalLeakRecordList').innerHTML = taskRecordsLoadFailed
-        ? emptyRecords('全域捡漏记录读取失败，请稍后重试')
-        : latestTaskRecords.globalLeak && latestTaskRecords.globalLeak.length
-          ? taskRecordPicker('globalLeak', latestTaskRecords.globalLeak, !authorized || globalLeakActive || globalLeakPending, globalLeakPending)
-          : emptyRecords('暂无电脑端全域捡漏记录，请先在电脑端成功启动一次全域捡漏任务');
+      const newSignature = JSON.stringify({
+        grab: latestTaskRecords.grab,
+        globalLeak: latestTaskRecords.globalLeak,
+        selectedGrab: selectedTaskRecordIds.grab,
+        selectedGlobalLeak: selectedTaskRecordIds.globalLeak,
+        failed: taskRecordsLoadFailed
+      });
+
+      if (newSignature !== renderedRecordsSignature) {
+        renderedRecordsSignature = newSignature;
+        $('grabRecordList').innerHTML = taskRecordsLoadFailed
+          ? emptyRecords('抢座记录读取失败，请稍后重试')
+          : latestTaskRecords.grab && latestTaskRecords.grab.length
+            ? taskRecordPicker('grab', latestTaskRecords.grab, !authorized || grabActive || grabPending, grabPending)
+            : emptyRecords('暂无电脑端抢座记录，请先在电脑端成功启动一次抢座任务');
+        $('globalLeakRecordList').innerHTML = taskRecordsLoadFailed
+          ? emptyRecords('全域捡漏记录读取失败，请稍后重试')
+          : latestTaskRecords.globalLeak && latestTaskRecords.globalLeak.length
+            ? taskRecordPicker('globalLeak', latestTaskRecords.globalLeak, !authorized || globalLeakActive || globalLeakPending, globalLeakPending)
+            : emptyRecords('暂无电脑端全域捡漏记录，请先在电脑端成功启动一次全域捡漏任务');
+        renderedRecordsSignature = JSON.stringify({
+          grab: latestTaskRecords.grab,
+          globalLeak: latestTaskRecords.globalLeak,
+          selectedGrab: selectedTaskRecordIds.grab,
+          selectedGlobalLeak: selectedTaskRecordIds.globalLeak,
+          failed: taskRecordsLoadFailed
+        });
+      } else {
+        updateRecordPickerDynamicState('grab', !authorized || grabActive || grabPending, grabPending);
+        updateRecordPickerDynamicState('globalLeak', !authorized || globalLeakActive || globalLeakPending, globalLeakPending);
+      }
 
       const occupyButton = $('startOccupyButton');
       occupyButton.disabled = !authorized || !hasReservation || occupyActive || occupyPending;
@@ -1158,9 +1375,34 @@
       }
 
       $('taskState').textContent = tasks.length ? `${tasks.length} 个运行中` : '无任务';
+
+      const scrollStates = {};
+      $('taskPanels').querySelectorAll('.task-panel').forEach(el => {
+        const btn = el.querySelector('button[data-task-cancel]');
+        const pre = el.querySelector('pre');
+        if (btn && pre) {
+          scrollStates[btn.dataset.taskCancel] = {
+            atBottom: pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 5,
+            scrollTop: pre.scrollTop
+          };
+        }
+      });
+
       $('taskPanels').innerHTML = tasks.length
         ? tasks.map(panel).join('')
         : '<div class="empty-task">当前无任务</div>';
+
+      $('taskPanels').querySelectorAll('.task-panel').forEach(el => {
+        const btn = el.querySelector('button[data-task-cancel]');
+        const pre = el.querySelector('pre');
+        if (!btn || !pre) return;
+        const state = scrollStates[btn.dataset.taskCancel];
+        if (!state || state.atBottom) {
+          pre.scrollTop = pre.scrollHeight;
+        } else {
+          pre.scrollTop = state.scrollTop;
+        }
+      });
     }
 
     async function refresh() {
@@ -1435,6 +1677,103 @@
         refreshCookieFromLink($('refreshCookieButton'));
       }
     });
+
+    /* ── Tab switching ── */
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.page === tab));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+
+    /* ── Launch segment switching ── */
+    const segs = document.querySelectorAll('.seg');
+    segs.forEach(seg => {
+      seg.addEventListener('click', () => {
+        const target = seg.dataset.seg;
+        segs.forEach(s => s.classList.toggle('active', s === seg));
+        document.querySelectorAll('.launch-content').forEach(c => c.classList.toggle('active', c.dataset.segContent === target));
+        $('segIndicator').style.transform = 'translateX(' + Array.from(segs).indexOf(seg) * 100 + '%)';
+      });
+    });
+
+    /* ── Pull-to-refresh ── */
+    let ptrStartY = 0, ptrPulling = false, ptrRefreshing = false, ptrPull = 0;
+    const PTR_THRESHOLD = 60;
+    const ptrEl = $('ptrIndicator');
+    const ptrMain = document.querySelector('main');
+
+    document.addEventListener('touchstart', e => {
+      if (ptrRefreshing) return;
+      const scrollable = e.target.closest('pre, textarea');
+      if (scrollable && scrollable.scrollTop > 0) { ptrPulling = false; return; }
+      if (window.scrollY <= 0) { ptrStartY = e.touches[0].clientY; ptrPulling = true; }
+      else ptrPulling = false;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', e => {
+      if (!ptrPulling || ptrRefreshing) return;
+      const delta = e.touches[0].clientY - ptrStartY;
+      if (delta <= 0) {
+        ptrPull = 0;
+        ptrMain.style.transform = '';
+        ptrMain.classList.remove('ptr-pulling');
+        ptrEl.style.opacity = '';
+        ptrEl.classList.remove('ptr-pulling', 'ptr-ready');
+        return;
+      }
+      e.preventDefault();
+      ptrPull = delta * 0.5;
+      ptrMain.style.transform = 'translateY(' + ptrPull + 'px)';
+      ptrMain.classList.add('ptr-pulling');
+      ptrEl.style.opacity = Math.min(ptrPull / PTR_THRESHOLD, 1);
+      ptrEl.classList.add('ptr-pulling');
+      if (ptrPull >= PTR_THRESHOLD) {
+        if (!ptrEl.classList.contains('ptr-ready')) {
+          ptrEl.classList.add('ptr-ready');
+          if (navigator.vibrate) navigator.vibrate(10);
+        }
+      } else {
+        ptrEl.classList.remove('ptr-ready');
+      }
+    }, { passive: false });
+
+    document.addEventListener('touchend', async () => {
+      if (!ptrPulling || ptrRefreshing) return;
+      ptrPulling = false;
+      ptrEl.classList.remove('ptr-pulling', 'ptr-ready');
+      ptrMain.classList.remove('ptr-pulling');
+      ptrMain.style.transform = '';
+      if (ptrPull >= PTR_THRESHOLD) {
+        ptrRefreshing = true;
+        ptrEl.style.opacity = '';
+        ptrEl.classList.add('ptr-refreshing');
+        ptrMain.classList.add('ptr-refreshing');
+        try {
+          await Promise.all([refresh(), refreshTaskRecords()]);
+        } finally {
+          ptrEl.classList.remove('ptr-refreshing');
+          ptrMain.classList.remove('ptr-refreshing');
+          ptrRefreshing = false;
+        }
+      } else {
+        ptrEl.style.opacity = '';
+      }
+      ptrPull = 0;
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', () => {
+      ptrPulling = false;
+      ptrPull = 0;
+      ptrEl.classList.remove('ptr-pulling', 'ptr-ready');
+      ptrMain.classList.remove('ptr-pulling');
+      ptrMain.style.transform = '';
+      if (!ptrRefreshing) {
+        ptrEl.style.opacity = '';
+      }
+    }, { passive: true });
   </script>
 </body>
 </html>
