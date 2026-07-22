@@ -199,6 +199,7 @@ public sealed class WorkflowServiceTests
 
         await service.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
             MinimizeToTray: false,
+            PreventSystemSleepWhileTasksActive: false,
             LaunchOnStartup: false,
             RememberMainViewSize: false,
             TraceIntGraphQlOverridesEnabled: true,
@@ -223,6 +224,7 @@ public sealed class WorkflowServiceTests
         Assert.Equal(3, settingsService.CurrentSettings.Network.TimeoutSeconds);
         Assert.Equal(0, settingsService.CurrentSettings.Network.MaxRetries);
         Assert.False(settingsService.CurrentSettings.Updates.CheckOnStartup);
+        Assert.False(settingsService.CurrentSettings.Ui.PreventSystemSleepWhileTasksActive);
         Assert.Equal(
             HomeReservationProgressTimingMode.SoftwareRuntimeDuration,
             settingsService.CurrentSettings.Ui.HomeReservationProgress?.Mode);
@@ -273,6 +275,7 @@ public sealed class WorkflowServiceTests
         var service = new SettingsWorkflowService(settingsService);
         var snapshot = new SystemSettingsSnapshot(
             MinimizeToTray: true,
+            PreventSystemSleepWhileTasksActive: true,
             LaunchOnStartup: false,
             RememberMainViewSize: true,
             TraceIntGraphQlOverridesEnabled: false,
@@ -310,6 +313,7 @@ public sealed class WorkflowServiceTests
 
         await service.SaveSystemSettingsAsync(new SystemSettingsSnapshot(
             MinimizeToTray: true,
+            PreventSystemSleepWhileTasksActive: true,
             LaunchOnStartup: false,
             RememberMainViewSize: false,
             TraceIntGraphQlOverridesEnabled: false,

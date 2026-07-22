@@ -1,5 +1,4 @@
 using IGoLibrary.Ex.Application.Abstractions;
-using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Application.Services;
@@ -25,9 +24,7 @@ public sealed class UpdateInstallGuard(
         string displayName,
         CoordinatorStatus status)
     {
-        if (status.State is CoordinatorTaskState.Starting
-            or CoordinatorTaskState.Running
-            or CoordinatorTaskState.Stopping)
+        if (status.IsActive)
         {
             names.Add(displayName);
         }

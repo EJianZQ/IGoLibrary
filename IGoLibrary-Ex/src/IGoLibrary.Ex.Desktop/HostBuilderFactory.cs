@@ -2,6 +2,7 @@ using IGoLibrary.Ex.Application;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Desktop.Services;
+using IGoLibrary.Ex.Desktop.Platform.Power;
 using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Infrastructure;
 using IGoLibrary.Ex.Infrastructure.Logging;
@@ -71,6 +72,12 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IWindowsUpdateProgressDialogService, WindowsUpdateProgressDialogService>();
                 services.AddSingleton<IExternalLinkService, ExternalLinkService>();
                 services.AddSingleton<IStartupEntryService, StartupEntryService>();
+                services.AddSingleton<ISystemIdleSleepInhibitor>(_ => SystemIdleSleepInhibitorFactory.Create());
+                services.AddSingleton<TaskSleepPreventionService>();
+                services.AddSingleton<ITaskSleepPreventionService>(serviceProvider =>
+                    serviceProvider.GetRequiredService<TaskSleepPreventionService>());
+                services.AddHostedService(serviceProvider =>
+                    serviceProvider.GetRequiredService<TaskSleepPreventionService>());
                 services.AddSingleton<IApplicationRestartService, ApplicationRestartService>();
                 services.AddSingleton<IDataRestoreRestartService, DataRestoreRestartService>();
                 services.AddSingleton<IFolderPickerService, FolderPickerService>();

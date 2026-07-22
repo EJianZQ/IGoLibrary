@@ -41,6 +41,16 @@ public partial class MainWindowWorkflowViewModel
         }
     }
 
+    public bool PreventSystemSleepWhileTasksActive
+    {
+        get => SystemSettings.PreventSystemSleepWhileTasksActive;
+        set
+        {
+            EnsureSystemSettingsConfigured();
+            SystemSettings.PreventSystemSleepWhileTasksActive = value;
+        }
+    }
+
     public bool LaunchOnStartupEnabled
     {
         get => SystemSettings.LaunchOnStartupEnabled;
@@ -125,6 +135,7 @@ public partial class MainWindowWorkflowViewModel
             nameof(SystemSettings.IsSystemSettingsStorageActive),
             nameof(SystemSettings.IsSystemSettingsAboutActive),
             nameof(SystemSettings.MinimizeToTrayEnabled),
+            nameof(SystemSettings.PreventSystemSleepWhileTasksActive),
             nameof(SystemSettings.LaunchOnStartupEnabled),
             nameof(SystemSettings.CheckUpdatesOnStartup),
             nameof(SystemSettings.RequestTimeoutSeconds),

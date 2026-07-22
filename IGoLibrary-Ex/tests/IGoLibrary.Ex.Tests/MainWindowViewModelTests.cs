@@ -3869,7 +3869,8 @@ public sealed class MainWindowViewModelTests
         FakeNetworkExposureManager? networkExposureManager = null,
         IMainWindowSizePersistenceService? windowSizePersistenceService = null,
         FakeWindowsUpdateProgressDialogService? windowsUpdateProgressDialogService = null,
-        IMobileControlNetworkModeWorkflow? mobileControlNetworkModeWorkflow = null)
+        IMobileControlNetworkModeWorkflow? mobileControlNetworkModeWorkflow = null,
+        ITaskSleepPreventionService? taskSleepPreventionService = null)
     {
         sessionService ??= new FakeSessionService();
         libraryService ??= new FakeLibraryService();
@@ -3910,7 +3911,8 @@ public sealed class MainWindowViewModelTests
             networkExposureManager: networkExposureManager,
             windowSizePersistenceService: windowSizePersistenceService,
             windowsUpdateProgressDialogService: windowsUpdateProgressDialogService,
-            mobileControlNetworkModeWorkflow: mobileControlNetworkModeWorkflow);
+            mobileControlNetworkModeWorkflow: mobileControlNetworkModeWorkflow,
+            taskSleepPreventionService: taskSleepPreventionService);
     }
 
     private static ReleaseUpdateInfo CreateReleaseUpdateInfo(string tagName)

@@ -19,6 +19,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
     private readonly INetworkExposureManager _networkExposureManager;
     private readonly IMobileControlNetworkModeWorkflow _mobileControlNetworkModeWorkflow;
     private readonly IMainWindowSizePersistenceService _windowSizePersistenceService;
+    private readonly ITaskSleepPreventionService _taskSleepPreventionService;
     private readonly DeferredAutoSaveController _systemSettingsAutoSave;
 
     private Func<bool> _isInitialized = static () => false;
@@ -56,6 +57,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         INetworkExposureManager networkExposureManager,
         IMobileControlNetworkModeWorkflow mobileControlNetworkModeWorkflow,
         IMainWindowSizePersistenceService windowSizePersistenceService,
+        ITaskSleepPreventionService taskSleepPreventionService,
         TimeProvider? timeProvider = null)
     {
         _settingsWorkflowService = settingsWorkflowService;
@@ -67,6 +69,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         _networkExposureManager = networkExposureManager;
         _mobileControlNetworkModeWorkflow = mobileControlNetworkModeWorkflow;
         _windowSizePersistenceService = windowSizePersistenceService;
+        _taskSleepPreventionService = taskSleepPreventionService;
         _networkExposureManager.ModeChanged += OnNetworkModeChanged;
         StorageSettings = storageSettings;
         _systemSettingsAutoSave = new DeferredAutoSaveController(
@@ -145,6 +148,9 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool minimizeToTrayEnabled = true;
+
+    [ObservableProperty]
+    private bool preventSystemSleepWhileTasksActive = true;
 
     [ObservableProperty]
     private bool launchOnStartupEnabled;
@@ -241,6 +247,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         var theme = ui.Theme ?? ThemePreferences.Default;
 
         MinimizeToTrayEnabled = ui.MinimizeToTray;
+        PreventSystemSleepWhileTasksActive = ui.PreventSystemSleepWhileTasksActive;
         LaunchOnStartupEnabled = ui.LaunchOnStartup;
         RememberWindowSizeEnabled = MainViewSizePreferences.Normalize(ui.MainViewSize).RememberSize;
         CheckUpdatesOnStartup = settings.Updates.CheckOnStartup;
@@ -374,6 +381,12 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
     }
 
     partial void OnMinimizeToTrayEnabledChanged(bool value) => ScheduleAutoSave();
+
+    partial void OnPreventSystemSleepWhileTasksActiveChanged(bool value)
+    {
+        _taskSleepPreventionService.SetEnabled(value);
+        ScheduleAutoSave();
+    }
 
     partial void OnRememberWindowSizeEnabledChanged(bool value)
     {
@@ -701,6 +714,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
 
         await SaveSystemSettingsAsync(new SystemSettingsSnapshot(
             MinimizeToTrayEnabled,
+            PreventSystemSleepWhileTasksActive,
             LaunchOnStartupEnabled,
             RememberWindowSizeEnabled,
             _traceIntGraphQlOverridesEnabled(),

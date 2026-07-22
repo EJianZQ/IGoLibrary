@@ -115,6 +115,10 @@ public sealed class SqliteSettingsRepository(
             ?? ReadBool(root, "minimizeToTray")
             ?? defaults.Ui.MinimizeToTray);
         writer.WriteBoolean(
+            "preventSystemSleepWhileTasksActive",
+            ReadBool(ui, "preventSystemSleepWhileTasksActive")
+            ?? defaults.Ui.PreventSystemSleepWhileTasksActive);
+        writer.WriteBoolean(
             "launchOnStartup",
             ReadBool(ui, "launchOnStartup")
             ?? defaults.Ui.LaunchOnStartup);
@@ -547,6 +551,7 @@ public sealed class SqliteSettingsRepository(
         var logging = ReadObject(root, "logging");
         var backupSync = ReadObject(root, "backupSync");
         return ReadBool(taskEventAlertEvents, "cookieExpiring").HasValue &&
+               ReadBool(ui, "preventSystemSleepWhileTasksActive").HasValue &&
                windowSize.ValueKind == JsonValueKind.Object &&
                ReadBool(windowSize, "rememberSize").HasValue &&
                HasCanonicalWindowSizeDimensions(windowSize) &&

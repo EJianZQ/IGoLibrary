@@ -389,7 +389,7 @@ internal static class BackupInventoryReader
         return category.Count == 1 ? "已配置" : $"{category.Count} 项";
     }
 
-    private static string? BuildSafeSettingsSummary(string category, JsonElement value)
+    internal static string? BuildSafeSettingsSummary(string category, JsonElement value)
     {
         if (value.ValueKind != JsonValueKind.Object)
         {
@@ -398,7 +398,7 @@ internal static class BackupInventoryReader
 
         var allowed = category switch
         {
-            "ui" => new[] { "minimizeToTray", "launchOnStartup" },
+            "ui" => new[] { "minimizeToTray", "preventSystemSleepWhileTasksActive", "launchOnStartup" },
             "network" => new[] { "timeoutSeconds", "maxRetries" },
             "dashboard" => new[] { "successfulReservationCount", "totalGuardDurationSeconds" },
             "venue" => new[] { "lastLibraryId", "lastLibraryName" },

@@ -615,6 +615,15 @@ internal sealed class FakeAppThemeService : IAppThemeService
     }
 }
 
+internal sealed class FakeTaskSleepPreventionService : ITaskSleepPreventionService
+{
+    public List<bool> EnabledValues { get; } = [];
+
+    public bool? IsEnabled => EnabledValues.Count == 0 ? null : EnabledValues[^1];
+
+    public void SetEnabled(bool enabled) => EnabledValues.Add(enabled);
+}
+
 internal sealed class FakeSettingsService : ISettingsService
 {
     private readonly SemaphoreSlim _settingsGate = new(1, 1);
@@ -997,6 +1006,8 @@ internal sealed class FakeGrabSeatCoordinator : IGrabSeatCoordinator
 
     public event EventHandler<CoordinatorStatus>? StatusChanged;
 
+    public int StatusChangedSubscriberCount => StatusChanged?.GetInvocationList().Length ?? 0;
+
     public GrabSeatPlan? LastPlan { get; private set; }
 
     public int StopCalls { get; private set; }
@@ -1044,6 +1055,8 @@ internal sealed class FakeGlobalLeakCoordinator : IGlobalLeakCoordinator
 
     public event EventHandler<CoordinatorStatus>? StatusChanged;
 
+    public int StatusChangedSubscriberCount => StatusChanged?.GetInvocationList().Length ?? 0;
+
     public GlobalLeakPlan? LastPlan { get; private set; }
 
     public int StopCalls { get; private set; }
@@ -1090,6 +1103,8 @@ internal sealed class FakeOccupySeatCoordinator : IOccupySeatCoordinator
     private CoordinatorStatus _status = CoordinatorStatus.Idle("占座");
 
     public event EventHandler<CoordinatorStatus>? StatusChanged;
+
+    public int StatusChangedSubscriberCount => StatusChanged?.GetInvocationList().Length ?? 0;
 
     public int StopCalls { get; private set; }
 
@@ -1178,6 +1193,8 @@ internal sealed class FakeTomorrowReservationCoordinator : ITomorrowReservationC
     private CoordinatorStatus _status = CoordinatorStatus.Idle("明日预约");
 
     public event EventHandler<CoordinatorStatus>? StatusChanged;
+
+    public int StatusChangedSubscriberCount => StatusChanged?.GetInvocationList().Length ?? 0;
 
     public TomorrowReservationPlan? LastPlan { get; private set; }
 

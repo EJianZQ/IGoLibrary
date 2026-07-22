@@ -13,6 +13,10 @@ public sealed record CoordinatorStatus(
     DateTimeOffset? LastRequestAt = null,
     CoordinatorStatusReason Reason = CoordinatorStatusReason.None)
 {
+    public bool IsActive => State is CoordinatorTaskState.Starting
+        or CoordinatorTaskState.Running
+        or CoordinatorTaskState.Stopping;
+
     public static CoordinatorStatus Idle(string title) => new(
         CoordinatorTaskState.Idle,
         title,

@@ -31,6 +31,7 @@ public sealed class SettingsSerializationTests
             """);
 
         Assert.False(settings.Ui.MinimizeToTray);
+        Assert.True(settings.Ui.PreventSystemSleepWhileTasksActive);
         Assert.Equal(AppThemeMode.Dark, settings.Ui.Theme?.Mode);
         Assert.False(settings.Ui.Theme?.UseSystemAccent);
         Assert.Equal(HomeReservationProgressTimingMode.FixedReservationDuration, settings.Ui.HomeReservationProgress?.Mode);
@@ -319,6 +320,7 @@ public sealed class SettingsSerializationTests
 
         Assert.Equal(TaskEventAlertSettings.Default, settings.Notifications.TaskEventAlerts);
         Assert.True(settings.Ui.MinimizeToTray);
+        Assert.True(settings.Ui.PreventSystemSleepWhileTasksActive);
         Assert.Equal(AppThemeMode.FollowSystem, settings.Ui.Theme?.Mode);
         Assert.Equal(ThemePreferences.Default.UseSystemAccent, settings.Ui.Theme?.UseSystemAccent);
         Assert.Equal(HomeReservationProgressTimingMode.FixedReservationDuration, settings.Ui.HomeReservationProgress?.Mode);
@@ -356,6 +358,7 @@ public sealed class SettingsSerializationTests
         Assert.Contains("\"notifications\":", json);
         Assert.Contains("\"ui\":", json);
         Assert.Contains("\"windowSize\":", json);
+        Assert.Contains("\"preventSystemSleepWhileTasksActive\": true", json);
         Assert.Contains("\"rememberSize\": false", json);
         Assert.Contains("\"homeReservationProgress\":", json);
         Assert.Contains("\"fixedDurationMinutes\": 30", json);
@@ -397,6 +400,45 @@ public sealed class SettingsSerializationTests
         Assert.DoesNotContain("appBannerNotificationsEnabled", json);
         Assert.Contains("\"graphQlOverridesEnabled\": true", json);
         Assert.Contains("\"autoStart\": false", json);
+    }
+
+    [Fact]
+    public void TaskSleepPreventionSetting_RoundTripsExplicitFalse()
+    {
+        var json = JsonSerializer.Serialize(AppSettings.Default with
+        {
+            Ui = AppSettings.Default.Ui with
+            {
+                PreventSystemSleepWhileTasksActive = false
+            }
+        }, AppJson.Default);
+
+        var settings = Assert.IsType<AppSettings>(
+            JsonSerializer.Deserialize<AppSettings>(json, AppJson.Default));
+
+        Assert.False(settings.Ui.PreventSystemSleepWhileTasksActive);
+        Assert.Contains("\"preventSystemSleepWhileTasksActive\": false", json);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"ui\":{}}")]
+    [InlineData("{\"ui\":{\"preventSystemSleepWhileTasksActive\":null}}")]
+    [InlineData("{\"ui\":{\"preventSystemSleepWhileTasksActive\":\"invalid\"}}")]
+    public void TaskSleepPreventionSetting_MissingNullOrInvalid_MigratesToEnabled(string json)
+    {
+        var settings = MigrateAndDeserialize(json);
+
+        Assert.True(settings.Ui.PreventSystemSleepWhileTasksActive);
+    }
+
+    [Fact]
+    public void TaskSleepPreventionSetting_MigrationPreservesExplicitFalse()
+    {
+        var settings = MigrateAndDeserialize(
+            "{\"ui\":{\"preventSystemSleepWhileTasksActive\":false}}");
+
+        Assert.False(settings.Ui.PreventSystemSleepWhileTasksActive);
     }
 
     [Fact]

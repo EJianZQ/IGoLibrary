@@ -25,6 +25,7 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
             Ui = current.Ui with
             {
                 MinimizeToTray = snapshot.MinimizeToTray,
+                PreventSystemSleepWhileTasksActive = snapshot.PreventSystemSleepWhileTasksActive,
                 LaunchOnStartup = snapshot.LaunchOnStartup,
                 MainViewSize = MainViewSizePreferences.Normalize(current.Ui.MainViewSize) with
                 {

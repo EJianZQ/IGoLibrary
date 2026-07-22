@@ -15,6 +15,66 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class MainWindowViewModelUiTests
 {
     [AvaloniaFact]
+    public async Task TaskSleepPreventionSetting_RendersBelowTraySettingAndBindsImmediately()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default with
+        {
+            Ui = AppSettings.Default.Ui with
+            {
+                PreventSystemSleepWhileTasksActive = false
+            }
+        });
+        var runtimeService = new FakeTaskSleepPreventionService();
+        var timeProvider = new FakeTimeProvider();
+        var viewModel = MainWindowViewModelTests.CreateViewModel(
+            settingsService: settingsService,
+            timeProvider: timeProvider,
+            taskSleepPreventionService: runtimeService);
+        await viewModel.InitializeAsync();
+        viewModel.SelectedTabIndex = 9;
+        var window = new MainWindow { DataContext = viewModel };
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var trayToggle = Assert.IsType<ToggleSwitch>(window.FindControl<ToggleSwitch>("MinimizeToTrayToggle"));
+            var sleepToggle = Assert.IsType<ToggleSwitch>(
+                window.FindControl<ToggleSwitch>("PreventSystemSleepWhileTasksActiveToggle"));
+            var title = Assert.IsType<TextBlock>(
+                window.FindControl<TextBlock>("PreventSystemSleepWhileTasksActiveTitle"));
+            var description = Assert.IsType<TextBlock>(
+                window.FindControl<TextBlock>("PreventSystemSleepWhileTasksActiveDescription"));
+            var trayCard = Assert.IsType<Border>(Assert.IsType<Grid>(trayToggle.Parent).Parent);
+            var sleepCard = Assert.IsType<Border>(Assert.IsType<Grid>(sleepToggle.Parent).Parent);
+            var cards = Assert.IsType<StackPanel>(trayCard.Parent).Children;
+
+            Assert.Equal(cards.IndexOf(trayCard) + 1, cards.IndexOf(sleepCard));
+            Assert.Equal("任务进行时阻止系统自动休眠", title.Text);
+            Assert.Equal(
+                "启用后，抢座、占座、明日预约或全域捡漏任务进行时阻止系统因空闲自动休眠；屏幕仍可按系统设置关闭",
+                description.Text);
+            Assert.False(sleepToggle.IsChecked);
+            Assert.Equal(false, runtimeService.IsEnabled);
+
+            sleepToggle.IsChecked = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(viewModel.PreventSystemSleepWhileTasksActive);
+            Assert.Equal(true, runtimeService.IsEnabled);
+
+            timeProvider.Advance(TimeSpan.FromMilliseconds(300));
+            await WaitForAsync(() =>
+                settingsService.CurrentSettings.Ui.PreventSystemSleepWhileTasksActive);
+        }
+        finally
+        {
+            window.DataContext = null;
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task WorkflowLogPanels_AutoScrollToNewestEntry()
     {
         var activityLogService = new ActivityLogService();

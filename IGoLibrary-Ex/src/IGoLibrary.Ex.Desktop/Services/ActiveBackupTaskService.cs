@@ -1,5 +1,4 @@
 using IGoLibrary.Ex.Application.Abstractions;
-using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Desktop.Services;
@@ -35,9 +34,7 @@ public sealed class ActiveBackupTaskService(
         CoordinatorStatus status,
         Func<CancellationToken, Task> stop)
     {
-        if (status.State is CoordinatorTaskState.Starting
-            or CoordinatorTaskState.Running
-            or CoordinatorTaskState.Stopping)
+        if (status.IsActive)
         {
             tasks.Add(new ActiveTask(name, stop));
         }

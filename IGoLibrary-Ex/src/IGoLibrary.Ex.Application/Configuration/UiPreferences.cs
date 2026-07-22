@@ -6,6 +6,9 @@ public sealed record UiPreferences
 {
     public bool MinimizeToTray { get; init; } = true;
 
+    [JsonPropertyName("preventSystemSleepWhileTasksActive")]
+    public bool PreventSystemSleepWhileTasksActive { get; init; } = true;
+
     public bool LaunchOnStartup { get; init; }
 
     [JsonPropertyName("windowSize")]

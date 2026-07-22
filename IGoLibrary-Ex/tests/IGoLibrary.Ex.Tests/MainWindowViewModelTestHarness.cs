@@ -39,7 +39,8 @@ internal static class MainWindowViewModelTestHarness
         IGrabStrategyReminderDialogService? grabStrategyReminderDialogService = null,
         IMainWindowSizePersistenceService? windowSizePersistenceService = null,
         IWindowsUpdateProgressDialogService? windowsUpdateProgressDialogService = null,
-        IMobileControlNetworkModeWorkflow? mobileControlNetworkModeWorkflow = null)
+        IMobileControlNetworkModeWorkflow? mobileControlNetworkModeWorkflow = null,
+        ITaskSleepPreventionService? taskSleepPreventionService = null)
     {
         mobileControlService ??= new FakeMobileControlService();
         remoteCheckInWorkflowService ??= new FakeRemoteCheckInWorkflowService();
@@ -51,6 +52,7 @@ internal static class MainWindowViewModelTestHarness
         grabStrategyReminderDialogService ??= new FakeGrabStrategyReminderDialogService();
         windowSizePersistenceService ??= NoOpMainWindowSizePersistenceService.Instance;
         windowsUpdateProgressDialogService ??= new FakeWindowsUpdateProgressDialogService();
+        taskSleepPreventionService ??= new FakeTaskSleepPreventionService();
         var workflowState = new ShellWorkflowState();
         var taskLaunchService = new FakeTaskLaunchService(
             grabSeatCoordinator,
@@ -158,6 +160,7 @@ internal static class MainWindowViewModelTestHarness
                 networkExposureManager,
                 mobileControlNetworkModeWorkflow,
                 windowSizePersistenceService,
+                taskSleepPreventionService,
                 timeProvider),
             new ProtocolTemplatesViewModel(
                 protocolTemplateEditorService,

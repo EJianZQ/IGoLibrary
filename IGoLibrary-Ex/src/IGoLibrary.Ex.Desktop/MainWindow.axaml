@@ -3333,10 +3333,32 @@
                                    FontWeight="SemiBold"
                                    Text="任务进行时关闭窗口最小化到托盘" />
                         <TextBlock Classes="helper-text"
-                                   Text="有抢座、占座、明日预约或全域捡漏任务运行时，点击右下角关闭按钮后保持后台运行" />
+                                   Text="启用后，有任务运行时，点击右下角关闭按钮后保持后台运行" />
                       </StackPanel>
-                      <ToggleSwitch Grid.Column="1"
+                      <ToggleSwitch x:Name="MinimizeToTrayToggle"
+                                    Grid.Column="1"
                                     IsChecked="{Binding MinimizeToTrayEnabled}"
+                                    OnContent="开"
+                                    OffContent="关"
+                                    VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+
+                  <Border Classes="card">
+                    <Grid ColumnDefinitions="*,Auto"
+                          ColumnSpacing="16">
+                      <StackPanel Spacing="6">
+                        <TextBlock x:Name="PreventSystemSleepWhileTasksActiveTitle"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Text="任务进行时阻止系统自动休眠" />
+                        <TextBlock x:Name="PreventSystemSleepWhileTasksActiveDescription"
+                                   Classes="helper-text"
+                                   Text="启用后，有任务运行时阻止系统因空闲自动休眠" />
+                      </StackPanel>
+                      <ToggleSwitch x:Name="PreventSystemSleepWhileTasksActiveToggle"
+                                    Grid.Column="1"
+                                    IsChecked="{Binding PreventSystemSleepWhileTasksActive}"
                                     OnContent="开"
                                     OffContent="关"
                                     VerticalAlignment="Center" />
