@@ -582,7 +582,7 @@ public sealed class CloudflareTunnelTests
             await WaitForAsync(() => alerts.Outcomes.Count == 1);
             runner.Sessions[1].Fail("relay tunnel failed");
             await WaitForAsync(() => coordinatorLogger.Entries.Any(entry =>
-                entry.Message.Contains("Suppressed the legacy", StringComparison.Ordinal)));
+                entry.Message.Contains("已抑制旧版授权链接中继", StringComparison.Ordinal)));
         }
 
         await WaitForAsync(() => alerts.Outcomes.Count == 1 && runner.Sessions[1].Disposed);
@@ -629,7 +629,7 @@ public sealed class CloudflareTunnelTests
 
         runner.Sessions[1].Fail("relay tunnel failed");
         await WaitForAsync(() => coordinatorLogger.Entries.Any(entry =>
-            entry.Message.Contains("Delayed the authorization-relay", StringComparison.Ordinal)));
+            entry.Message.Contains("已延迟授权链接中继", StringComparison.Ordinal)));
         Assert.Empty(notifications.Warnings);
 
         timeProvider.Advance(CloudflareTunnelRuntimeNotificationCoordinator.CoalescingWindow);
@@ -745,7 +745,7 @@ public sealed class CloudflareTunnelTests
         runner.Sessions[0].Fail("mobile tunnel failed");
         await WaitForAsync(() => logger.Entries.Any(entry =>
             entry.Level == LogLevel.Error &&
-            entry.Message.Contains("Unhandled failure while observing", StringComparison.Ordinal)));
+            entry.Message.Contains("观察 Cloudflare Tunnel 运行时会话时发生未处理的故障", StringComparison.Ordinal)));
 
         Assert.True(runner.Sessions[0].Disposed);
         Assert.Equal(MobileControlNetworkMode.CloudflareTunnel, manager.CurrentMode);
@@ -823,7 +823,7 @@ public sealed class CloudflareTunnelTests
             logger.Entries,
             entry => entry.Level == LogLevel.Warning &&
                      ReferenceEquals(entry.Exception, runner.StartException) &&
-                     entry.Message.Contains("publishing a service", StringComparison.Ordinal));
+                     entry.Message.Contains("发布服务时启动 Cloudflare Tunnel 失败", StringComparison.Ordinal));
         var warning = Assert.Single(notifications.Warnings);
         Assert.Equal("Cloudflare Tunnel 已回退", warning.Title);
         Assert.Equal(

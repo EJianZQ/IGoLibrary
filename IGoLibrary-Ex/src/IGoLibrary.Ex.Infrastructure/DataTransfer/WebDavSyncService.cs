@@ -81,7 +81,7 @@ internal sealed class WebDavSyncService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to reconcile local semantic fingerprint; existing dirty state was retained.");
+            logger.LogWarning(ex, "协调本地语义指纹失败；已保留现有未同步状态。");
         }
     }
 
@@ -152,7 +152,7 @@ internal sealed class WebDavSyncService(
         await _operationGate.WaitAsync(cancellationToken);
         try
         {
-            logger.LogInformation("WebDAV connection test started. OperationId={OperationId}.", operationId);
+            logger.LogInformation("WebDAV 连接测试已开始。操作 ID={OperationId}。", operationId);
             activityLogService.Write(LogEntryKind.Info, "Backup", "正在测试 WebDAV 连接与读写权限");
             SetStatus(_status with { IsBusy = true, Message = "正在测试 WebDAV 连接" });
             var context = await CreateContextAsync(requireBackupPassword: false, cancellationToken);
@@ -174,13 +174,13 @@ internal sealed class WebDavSyncService(
                 _status.LastSuccessfulSync,
                 metadata));
             activityLogService.Write(LogEntryKind.Success, "Backup", "WebDAV 连接及读写权限测试成功");
-            logger.LogInformation("WebDAV connection test completed. OperationId={OperationId}.", operationId);
+            logger.LogInformation("WebDAV 连接测试已完成。操作 ID={OperationId}。", operationId);
             return metadata;
         }
         catch (Exception ex)
         {
             SetStatus(_status with { IsBusy = false, Message = $"WebDAV 连接测试失败：{ex.Message}" });
-            logger.LogError(ex, "WebDAV connection test failed. OperationId={OperationId}.", operationId);
+            logger.LogError(ex, "WebDAV 连接测试失败。操作 ID={OperationId}。", operationId);
             activityLogService.Write(LogEntryKind.Error, "Backup", $"WebDAV 连接测试失败：{ex.Message}");
             throw;
         }
@@ -255,7 +255,7 @@ internal sealed class WebDavSyncService(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "WebDAV upload succeeded, but the previous backup password recovery copy could not be removed.");
+                logger.LogWarning(ex, "WebDAV 上传成功，但无法删除先前的备份密码恢复副本。");
             }
 
             var result = new WebDavUploadResult(after, export.Manifest, operationId);
@@ -267,7 +267,7 @@ internal sealed class WebDavSyncService(
                 after));
             activityLogService.Write(LogEntryKind.Success, "Backup", "全部应用数据已上传到 WebDAV");
             logger.LogInformation(
-                "WebDAV upload completed. OperationId={OperationId}, Endpoint={Endpoint}, Bytes={Bytes}, ETag={ETag}.",
+                "WebDAV 上传已完成。操作 ID={OperationId}，端点={Endpoint}，字节数={Bytes}，ETag={ETag}。",
                 operationId,
                 context.SafeEndpoint,
                 after.ContentLength,
@@ -283,13 +283,13 @@ internal sealed class WebDavSyncService(
                 Message = ex.Message
             });
             activityLogService.Write(LogEntryKind.Warning, "Backup", ex.Message);
-            logger.LogWarning(ex, "WebDAV upload conflict. OperationId={OperationId}.", operationId);
+            logger.LogWarning(ex, "WebDAV 上传发生冲突。操作 ID={OperationId}。", operationId);
             throw;
         }
         catch (Exception ex)
         {
             SetStatus(_status with { IsBusy = false, Message = $"WebDAV 上传失败：{ex.Message}" });
-            logger.LogError(ex, "WebDAV upload failed. OperationId={OperationId}.", operationId);
+            logger.LogError(ex, "WebDAV 上传失败。操作 ID={OperationId}。", operationId);
             activityLogService.Write(LogEntryKind.Error, "Backup", $"WebDAV 上传失败：{ex.Message}");
             throw;
         }
@@ -337,7 +337,7 @@ internal sealed class WebDavSyncService(
                 RemoteMetadata = metadata
             });
             logger.LogInformation(
-                "WebDAV download completed. OperationId={OperationId}, Endpoint={Endpoint}, Bytes={Bytes}, ETag={ETag}.",
+                "WebDAV 下载已完成。操作 ID={OperationId}，端点={Endpoint}，字节数={Bytes}，ETag={ETag}。",
                 operationId,
                 context.SafeEndpoint,
                 new FileInfo(localFile).Length,
@@ -353,7 +353,7 @@ internal sealed class WebDavSyncService(
         catch (Exception ex)
         {
             SetStatus(_status with { IsBusy = false, Message = $"WebDAV 下载失败：{ex.Message}" });
-            logger.LogError(ex, "WebDAV download failed. OperationId={OperationId}.", operationId);
+            logger.LogError(ex, "WebDAV 下载失败。操作 ID={OperationId}。", operationId);
             activityLogService.Write(LogEntryKind.Error, "Backup", $"WebDAV 下载失败：{ex.Message}");
             TryDeleteWorkspace(workspace);
             throw;
@@ -526,7 +526,7 @@ internal sealed class WebDavSyncService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to clean WebDAV workspace.");
+            logger.LogWarning(ex, "清理 WebDAV 工作区失败。");
         }
     }
 

@@ -105,8 +105,8 @@ public sealed class ToastNotificationService(
                     CleanupToastState(toast);
                 }
 
-                logWriter?.Write(LogLevel.Warning, nameof(ToastNotificationService), "Toast notification failed to show.", ex);
-                Debug.WriteLine($"Toast notification failed to show: {ex}");
+                logWriter?.Write(LogLevel.Warning, nameof(ToastNotificationService), "显示 Toast 通知失败。", ex);
+                Debug.WriteLine($"显示 Toast 通知失败：{ex}");
             }
         });
     }

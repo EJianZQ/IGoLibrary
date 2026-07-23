@@ -133,7 +133,7 @@ internal sealed class WebDavClient(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "WebDAV connection probe cleanup failed.");
+            logger.LogWarning(ex, "清理 WebDAV 连接探测资源失败。");
             if (!suppressFailure)
             {
                 throw;
@@ -271,7 +271,7 @@ internal sealed class WebDavClient(
                 {
                     var delay = GetRetryDelay(response, attempt);
                     logger.LogWarning(
-                        "Retrying WebDAV PUT after HTTP {StatusCode}. Attempt={Attempt}, DelayMs={DelayMs}.",
+                        "HTTP {StatusCode} 响应后正在重试 WebDAV PUT。重试次数={Attempt}，延迟毫秒={DelayMs}。",
                         (int)response.StatusCode,
                         attempt,
                         delay.TotalMilliseconds);
@@ -288,7 +288,7 @@ internal sealed class WebDavClient(
                 attempt < MaximumAttempts)
             {
                 lastFailure = ex;
-                logger.LogWarning(ex, "Retrying WebDAV PUT. Attempt={Attempt}.", attempt);
+                logger.LogWarning(ex, "正在重试 WebDAV PUT。重试次数={Attempt}。", attempt);
                 await Task.Delay(TimeSpan.FromSeconds(1 << (attempt - 1)), timeProvider, cancellationToken);
             }
         }
@@ -616,7 +616,7 @@ internal sealed class WebDavClient(
                 var delay = GetRetryDelay(response, attempt);
                 response.Dispose();
                 logger.LogWarning(
-                    "Retrying WebDAV {Method} after a recoverable response. Attempt={Attempt}, DelayMs={DelayMs}.",
+                    "收到可恢复响应后正在重试 WebDAV {Method}。重试次数={Attempt}，延迟毫秒={DelayMs}。",
                     methodName,
                     attempt,
                     delay.TotalMilliseconds);
@@ -631,7 +631,7 @@ internal sealed class WebDavClient(
                 var delay = TimeSpan.FromSeconds(1 << (attempt - 1));
                 logger.LogWarning(
                     ex,
-                    "Retrying WebDAV {Method} after a network failure. Attempt={Attempt}, DelayMs={DelayMs}.",
+                    "发生网络故障后正在重试 WebDAV {Method}。重试次数={Attempt}，延迟毫秒={DelayMs}。",
                     methodName,
                     attempt,
                     delay.TotalMilliseconds);

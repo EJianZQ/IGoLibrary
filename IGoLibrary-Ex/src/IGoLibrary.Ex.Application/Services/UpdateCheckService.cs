@@ -66,12 +66,12 @@ public sealed class UpdateCheckService(
         }
         catch (TimeoutException ex)
         {
-            logger.LogWarning(ex, "GitHub release check timed out.");
+            logger.LogWarning(ex, "GitHub 发布版本检查超时。");
             return UpdateCheckResult.Failed("检查更新超时，请稍后重试");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(ex, "Failed to check GitHub releases.");
+            logger.LogWarning(ex, "检查 GitHub 发布版本失败。");
             return UpdateCheckResult.Failed($"检查更新失败：{ex.Message}");
         }
 

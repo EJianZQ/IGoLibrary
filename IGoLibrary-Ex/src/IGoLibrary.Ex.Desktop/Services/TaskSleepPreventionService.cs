@@ -81,7 +81,7 @@ internal sealed class TaskSleepPreventionService(
             }
 
             logger.LogInformation(
-                "Task sleep prevention service started. Platform={Platform}; Enabled={Enabled}.",
+                "任务期间阻止系统自动休眠服务已启动。平台={Platform}；是否启用={Enabled}。",
                 sleepInhibitor.PlatformName,
                 _enabled);
             WriteActivity(
@@ -98,7 +98,7 @@ internal sealed class TaskSleepPreventionService(
         {
             logger.LogWarning(
                 ex,
-                "Loading the task sleep prevention setting failed; the default enabled state will be used. Platform={Platform}.",
+                "加载任务期间阻止系统自动休眠设置失败；将使用默认启用状态。平台={Platform}。",
                 sleepInhibitor.PlatformName);
             WriteActivity(
                 LogEntryKind.Warning,
@@ -108,7 +108,7 @@ internal sealed class TaskSleepPreventionService(
         if (!sleepInhibitor.IsSupported)
         {
             logger.LogWarning(
-                "Task sleep prevention is not supported on platform {Platform}; tasks will continue normally.",
+                "平台 {Platform} 不支持任务期间阻止系统自动休眠；任务将继续正常运行。",
                 sleepInhibitor.PlatformName);
             WriteActivity(
                 LogEntryKind.Warning,
@@ -172,7 +172,7 @@ internal sealed class TaskSleepPreventionService(
                     {
                         _hadReconciliationFailure = false;
                         logger.LogInformation(
-                            "Task sleep prevention recovered after a previous native power-management failure. Platform={Platform}.",
+                            "任务期间阻止系统自动休眠功能已从先前的原生电源管理故障中恢复。平台={Platform}。",
                             sleepInhibitor.PlatformName);
                         WriteActivity(LogEntryKind.Success, "任务防休眠已从系统调用失败中恢复");
                     }
@@ -190,7 +190,7 @@ internal sealed class TaskSleepPreventionService(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Notifying the task sleep prevention retry observer failed.");
+                    logger.LogWarning(ex, "通知任务休眠阻止重试观察器失败。");
                 }
             }
         }
@@ -224,7 +224,7 @@ internal sealed class TaskSleepPreventionService(
                 sleepInhibitor.Activate(PowerRequestReason);
                 var names = string.Join("、", activeTaskNames);
                 logger.LogInformation(
-                    "System idle sleep is now prevented. Platform={Platform}; ActiveTasks={ActiveTasks}.",
+                    "已阻止系统因空闲自动休眠。平台={Platform}；活动任务={ActiveTasks}。",
                     sleepInhibitor.PlatformName,
                     names);
                 WriteActivity(
@@ -237,7 +237,7 @@ internal sealed class TaskSleepPreventionService(
                 sleepInhibitor.Deactivate();
                 var releaseReason = enabled ? "所有任务均已结束" : "用户已关闭任务防休眠";
                 logger.LogInformation(
-                    "System idle sleep prevention was released. Platform={Platform}; Reason={Reason}.",
+                    "已释放系统空闲休眠阻止。平台={Platform}；原因={Reason}。",
                     sleepInhibitor.PlatformName,
                     releaseReason);
                 WriteActivity(
@@ -292,7 +292,7 @@ internal sealed class TaskSleepPreventionService(
         }
 
         _lastProcessedEnabled = enabled;
-        logger.LogInformation("Task sleep prevention setting changed. Enabled={Enabled}.", enabled);
+        logger.LogInformation("任务期间阻止系统自动休眠设置已变更。是否启用={Enabled}。", enabled);
         WriteActivity(
             LogEntryKind.Info,
             enabled ? "已开启任务进行时阻止系统自动休眠" : "已关闭任务进行时阻止系统自动休眠");
@@ -306,7 +306,7 @@ internal sealed class TaskSleepPreventionService(
         var nativeException = result.Exception as SystemSleepInhibitorException;
         logger.LogError(
             result.Exception,
-            "Task sleep prevention native operation failed. Platform={Platform}; Operation={Operation}; NativeOperation={NativeOperation}; NativeErrorCode={NativeErrorCode}; ActiveTasks={ActiveTasks}; RetryAttempt={RetryAttempt}; RetryDelaySeconds={RetryDelaySeconds}.",
+            "任务休眠阻止的原生操作失败。平台={Platform}；操作={Operation}；原生操作={NativeOperation}；原生错误码={NativeErrorCode}；活动任务={ActiveTasks}；重试次数={RetryAttempt}；重试延迟秒数={RetryDelaySeconds}。",
             sleepInhibitor.PlatformName,
             result.Operation,
             nativeException?.Operation ?? "unknown",
@@ -390,7 +390,7 @@ internal sealed class TaskSleepPreventionService(
             {
                 sleepInhibitor.Deactivate();
                 logger.LogInformation(
-                    "System idle sleep prevention was released during application shutdown. Platform={Platform}.",
+                    "应用退出期间已释放系统空闲休眠阻止。平台={Platform}。",
                     sleepInhibitor.PlatformName);
                 WriteActivity(
                     LogEntryKind.Info,
@@ -402,7 +402,7 @@ internal sealed class TaskSleepPreventionService(
             var nativeException = ex as SystemSleepInhibitorException;
             logger.LogError(
                 ex,
-                "Releasing task sleep prevention during shutdown failed. Platform={Platform}; NativeOperation={NativeOperation}; NativeErrorCode={NativeErrorCode}.",
+                "应用退出期间释放任务休眠阻止失败。平台={Platform}；原生操作={NativeOperation}；原生错误码={NativeErrorCode}。",
                 sleepInhibitor.PlatformName,
                 nativeException?.Operation ?? "unknown",
                 nativeException?.NativeErrorCode);
@@ -421,7 +421,7 @@ internal sealed class TaskSleepPreventionService(
                 var nativeException = ex as SystemSleepInhibitorException;
                 logger.LogError(
                     ex,
-                    "Disposing task sleep prevention during shutdown failed. Platform={Platform}; NativeOperation={NativeOperation}; NativeErrorCode={NativeErrorCode}.",
+                    "应用退出期间释放任务休眠阻止资源失败。平台={Platform}；原生操作={NativeOperation}；原生错误码={NativeErrorCode}。",
                     sleepInhibitor.PlatformName,
                     nativeException?.Operation ?? "unknown",
                     nativeException?.NativeErrorCode);
@@ -438,7 +438,7 @@ internal sealed class TaskSleepPreventionService(
     {
         logger.LogError(
             exception,
-            "Cleaning up the task sleep prevention native resource failed. Platform={Platform}; NativeOperation={NativeOperation}; NativeErrorCode={NativeErrorCode}.",
+            "清理任务休眠阻止的原生资源失败。平台={Platform}；原生操作={NativeOperation}；原生错误码={NativeErrorCode}。",
             exception.PlatformName,
             exception.Operation,
             exception.NativeErrorCode);
@@ -458,7 +458,7 @@ internal sealed class TaskSleepPreventionService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Writing a task sleep prevention activity entry failed.");
+            logger.LogWarning(ex, "写入任务休眠阻止活动记录失败。");
         }
     }
 

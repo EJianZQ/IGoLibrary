@@ -192,7 +192,7 @@ public sealed class LanCookieRelayService(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "LAN cookie relay submission failed.");
+                logger.LogWarning(ex, "局域网 Cookie 中继提交失败。");
                 result = LanCookieRelaySubmitResult.Failed($"电脑端处理失败：{ex.Message}");
             }
 
@@ -425,11 +425,11 @@ public sealed class LanCookieRelayService(
         }
         catch (OperationCanceledException)
         {
-            logger.LogInformation("LAN cookie relay client disconnected before receiving the response.");
+            logger.LogInformation("局域网 Cookie 中继客户端在收到响应前已断开连接。");
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to write LAN cookie relay response.");
+            logger.LogWarning(ex, "写入局域网 Cookie 中继响应失败。");
         }
     }
 
@@ -444,7 +444,7 @@ public sealed class LanCookieRelayService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to stop unpublished LAN cookie relay app.");
+            logger.LogWarning(ex, "停止尚未发布的局域网 Cookie 中继应用失败。");
         }
         finally
         {

@@ -15,7 +15,7 @@ public sealed class MobileControlTaskRecordsProvider(
         var grab = await historyService.GetRecentGrabAsync(cancellationToken);
         var globalLeak = await historyService.GetRecentGlobalLeakAsync(cancellationToken);
         logger.LogDebug(
-            "Created mobile task records snapshot. GrabCount={GrabCount}, GlobalLeakCount={GlobalLeakCount}.",
+            "已创建手机端任务记录快照。抢座数量={GrabCount}，全馆捡漏数量={GlobalLeakCount}。",
             grab.Count,
             globalLeak.Count);
 

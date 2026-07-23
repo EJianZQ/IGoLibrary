@@ -128,7 +128,7 @@ public sealed class PersistentDataChangeTracker : IPersistentDataChangeTracker
         catch (Exception ex)
         {
             _isDirty = true;
-            _logger.LogWarning(ex, "Persistent backup change state is invalid; data will be considered dirty.");
+            _logger.LogWarning(ex, "持久化的备份变更状态无效；将把数据视为存在未同步变更。");
         }
     }
 
@@ -151,7 +151,7 @@ public sealed class PersistentDataChangeTracker : IPersistentDataChangeTracker
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to persist backup change state.");
+            _logger.LogWarning(ex, "持久化备份变更状态失败。");
         }
     }
 

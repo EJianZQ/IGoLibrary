@@ -33,7 +33,7 @@ internal sealed class CloudflareTunnelRuntimeAlertHandler(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to dispatch the mobile-control Cloudflare Tunnel interruption alert.");
+            logger.LogWarning(ex, "分发手机控制 Cloudflare Tunnel 中断警报失败。");
             activityLogService.Write(
                 LogEntryKind.Warning,
                 "Alert",

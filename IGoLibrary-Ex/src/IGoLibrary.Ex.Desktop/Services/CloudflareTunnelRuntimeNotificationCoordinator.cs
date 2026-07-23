@@ -81,8 +81,8 @@ internal sealed class CloudflareTunnelRuntimeNotificationCoordinator(
         if (suppressed)
         {
             logger.LogInformation(
-                "Suppressed the legacy authorization-relay Tunnel warning because mobile control " +
-                "was affected in the same runtime incident. LeaseId={LeaseId}.",
+                "因同一运行时故障已影响手机控制，已抑制旧版授权链接中继 Tunnel 警告。" +
+                "租约 ID={LeaseId}。",
                 leaseId);
             return;
         }
@@ -97,8 +97,8 @@ internal sealed class CloudflareTunnelRuntimeNotificationCoordinator(
         {
             _ = ShowDelayedLegacyWarningSafelyAsync(pendingToStart);
             logger.LogInformation(
-                "Delayed the authorization-relay Tunnel warning for runtime incident coalescing. " +
-                "LeaseId={LeaseId}, DelaySeconds={DelaySeconds}.",
+                "为合并运行时故障，已延迟授权链接中继 Tunnel 警告。" +
+                "租约 ID={LeaseId}，延迟秒数={DelaySeconds}。",
                 leaseId,
                 CoalescingWindow.TotalSeconds);
         }
@@ -159,8 +159,8 @@ internal sealed class CloudflareTunnelRuntimeNotificationCoordinator(
         {
             logger.LogWarning(
                 ex,
-                "Failed while coalescing the authorization-relay Cloudflare Tunnel runtime warning. " +
-                "LeaseId={LeaseId}.",
+                "合并授权链接中继的 Cloudflare Tunnel 运行时警告时失败。" +
+                "租约 ID={LeaseId}。",
                 pending.LeaseId);
         }
         finally
@@ -192,7 +192,7 @@ internal sealed class CloudflareTunnelRuntimeNotificationCoordinator(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to show the legacy Cloudflare Tunnel runtime warning.");
+            logger.LogWarning(ex, "显示旧版 Cloudflare Tunnel 运行时警告失败。");
         }
     }
 

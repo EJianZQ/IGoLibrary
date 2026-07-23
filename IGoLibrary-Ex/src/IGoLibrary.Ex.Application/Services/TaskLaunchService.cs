@@ -104,7 +104,7 @@ public sealed class TaskLaunchService(
         {
             logger.LogWarning(
                 ex,
-                "Task launch history persistence failed after an accepted {TaskKind} request from {LaunchSource}.",
+                "已接受 {TaskKind} 请求（来源：{LaunchSource}），但任务启动历史记录持久化失败。",
                 displayName,
                 source);
             activityLogService.Write(

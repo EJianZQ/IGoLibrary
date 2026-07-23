@@ -117,7 +117,7 @@ internal sealed partial class ClashMihomoCompatibilityService(
                 catch (Exception ex)
                 {
                     TryDeleteTemporaryFile(temporaryPath);
-                    logger.LogWarning(ex, "Failed to activate {ClientName} compatibility rules.", configuration.ClientName);
+                    logger.LogWarning(ex, "激活 {ClientName} 兼容规则失败。", configuration.ClientName);
                     failures.Add($"{configuration.ClientName}：{ex.Message}");
                 }
             }
@@ -212,7 +212,7 @@ internal sealed partial class ClashMihomoCompatibilityService(
 
     private void LogRestoreFailure(ActiveConfiguration active, Exception exception)
     {
-        logger.LogWarning(exception, "Failed to restore original Mihomo configuration.");
+        logger.LogWarning(exception, "恢复原始 Mihomo 配置失败。");
         activityLogService.Write(
             LogEntryKind.Warning,
             "Network",

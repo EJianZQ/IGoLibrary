@@ -51,7 +51,7 @@ internal sealed class PersistentDataFingerprintProvider(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Failed to clean semantic fingerprint workspace.");
+                logger.LogWarning(ex, "清理语义指纹工作区失败。");
             }
         }
     }

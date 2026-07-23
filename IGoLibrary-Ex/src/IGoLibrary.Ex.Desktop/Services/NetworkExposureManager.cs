@@ -113,7 +113,7 @@ internal sealed class NetworkExposureManager(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Cloudflare Tunnel startup failed while switching network mode.");
+                logger.LogWarning(ex, "切换网络方式时启动 Cloudflare Tunnel 失败。");
                 if (_fallbackToLocalNetworkOnTunnelFailure)
                 {
                     await FallbackToLocalNetworkUnderGateAsync($"Cloudflare Tunnel 启动失败：{ex.Message}");
@@ -364,7 +364,7 @@ internal sealed class NetworkExposureManager(
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
-                    logger.LogWarning(ex, "Cloudflare Tunnel startup failed while publishing a service.");
+                    logger.LogWarning(ex, "发布服务时启动 Cloudflare Tunnel 失败。");
                     var message = $"Cloudflare Tunnel 启动失败：{ex.Message}";
                     if (_fallbackToLocalNetworkOnTunnelFailure)
                     {
@@ -467,7 +467,7 @@ internal sealed class NetworkExposureManager(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to dispose a Cloudflare Tunnel session.");
+            logger.LogWarning(ex, "释放 Cloudflare Tunnel 会话失败。");
         }
     }
 
@@ -521,7 +521,7 @@ internal sealed class NetworkExposureManager(
         {
             logger.LogError(
                 ex,
-                "Unhandled failure while observing a Cloudflare Tunnel runtime session. LeaseId={LeaseId}.",
+                "观察 Cloudflare Tunnel 运行时会话时发生未处理的故障。租约 ID={LeaseId}。",
                 leaseId);
             activityLogService.Write(
                 LogEntryKind.Warning,
@@ -561,8 +561,8 @@ internal sealed class NetworkExposureManager(
                 ? hasActiveMobileControlTunnel
                 : lease.Purpose == NetworkExposurePurpose.MobileControl;
             logger.LogWarning(
-                "Cloudflare Tunnel runtime fault observed. ExposurePurpose={ExposurePurpose}, " +
-                "AffectsMobileControl={AffectsMobileControl}, FallbackEnabled={FallbackEnabled}.",
+                "观察到 Cloudflare Tunnel 运行时故障。公开用途={ExposurePurpose}，" +
+                "是否影响手机控制={AffectsMobileControl}，是否启用回退={FallbackEnabled}。",
                 lease.Purpose,
                 affectsMobileControl,
                 _fallbackToLocalNetworkOnTunnelFailure);
@@ -642,7 +642,7 @@ internal sealed class NetworkExposureManager(
         catch (Exception ex)
         {
             persistenceFailed = true;
-            logger.LogWarning(ex, "Failed to persist Cloudflare Tunnel fallback.");
+            logger.LogWarning(ex, "持久化 Cloudflare Tunnel 回退状态失败。");
         }
 
         var userMessage = persistenceFailed
@@ -677,7 +677,7 @@ internal sealed class NetworkExposureManager(
 
     private void LogTunnelDiagnostic(string diagnostic)
     {
-        logger.LogWarning("Cloudflare Tunnel diagnostic: {Diagnostic}", diagnostic);
+        logger.LogWarning("Cloudflare Tunnel 诊断信息：{Diagnostic}", diagnostic);
     }
 
     private async Task CommitLocalNetworkUnderGateAsync(string message)
@@ -726,7 +726,7 @@ internal sealed class NetworkExposureManager(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to show Cloudflare Tunnel fallback notification.");
+            logger.LogWarning(ex, "显示 Cloudflare Tunnel 回退通知失败。");
         }
     }
 
@@ -747,7 +747,7 @@ internal sealed class NetworkExposureManager(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "A network-mode change subscriber failed. Mode={NetworkMode}.", mode);
+                logger.LogWarning(ex, "网络方式变更订阅者执行失败。网络方式={NetworkMode}。", mode);
             }
         }
     }
@@ -772,8 +772,8 @@ internal sealed class NetworkExposureManager(
             {
                 logger.LogWarning(
                     ex,
-                    "A network-exposure endpoint subscriber failed. LeaseId={LeaseId}, " +
-                    "ExposurePurpose={ExposurePurpose}, EffectiveMode={EffectiveMode}.",
+                    "网络公开端点订阅者执行失败。租约 ID={LeaseId}，" +
+                    "公开用途={ExposurePurpose}，生效方式={EffectiveMode}。",
                     lease.Id,
                     lease.Purpose,
                     args.EffectiveMode);

@@ -52,9 +52,7 @@ public sealed class MainWindowViewModelUiTests
 
             Assert.Equal(cards.IndexOf(trayCard) + 1, cards.IndexOf(sleepCard));
             Assert.Equal("任务进行时阻止系统自动休眠", title.Text);
-            Assert.Equal(
-                "启用后，抢座、占座、明日预约或全域捡漏任务进行时阻止系统因空闲自动休眠；屏幕仍可按系统设置关闭",
-                description.Text);
+            Assert.Equal("启用后，有任务运行时阻止系统因空闲自动休眠", description.Text);
             Assert.False(sleepToggle.IsChecked);
             Assert.Equal(false, runtimeService.IsEnabled);
 

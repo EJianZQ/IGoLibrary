@@ -36,7 +36,7 @@ internal static class WorkerRunner
                 GetWorkerLogDirectory(request),
                 request.TransactionId,
                 "worker");
-            log.Info("Worker started.");
+            log.Info("更新工作进程已启动。");
 
             WriteStatus(request, UpdateWorkerPhase.Starting, "正在复核更新请求…");
             EnsureCoordinatorAlive(request);
@@ -77,7 +77,7 @@ internal static class WorkerRunner
                 }
                 catch (Exception cleanupException)
                 {
-                    log.Error("Update succeeded, but backup cleanup failed.", cleanupException);
+                    log.Error("更新成功，但备份清理失败。", cleanupException);
                 }
                 WriteStatus(request, UpdateWorkerPhase.Committed, "更新已完成");
                 RecoveryRunner.ScheduleSecureCleanup(
@@ -85,7 +85,7 @@ internal static class WorkerRunner
                     requestPath,
                     [Environment.ProcessId]);
 
-                log.Info("Worker committed the update.");
+                log.Info("更新工作进程已提交更新。");
                 return 0;
             }
 
@@ -99,12 +99,12 @@ internal static class WorkerRunner
                 request,
                 requestPath,
                 [Environment.ProcessId]);
-            log.Info("Worker rolled back the update.");
+            log.Info("更新工作进程已回滚更新。");
             return 0;
         }
         catch (Exception exception)
         {
-            log?.Error("Worker failed.", exception);
+            log?.Error("更新工作进程运行失败。", exception);
             if (request is not null &&
                 (applied || Directory.Exists(request.BackupDirectory)))
             {
@@ -123,7 +123,7 @@ internal static class WorkerRunner
                 }
                 catch (Exception rollbackException)
                 {
-                    log?.Error("Rollback failed.", rollbackException);
+                    log?.Error("回滚失败。", rollbackException);
                     exception = new AggregateException(exception, rollbackException);
                 }
             }
@@ -309,7 +309,7 @@ internal static class WorkerRunner
         }
         catch (Exception exception)
         {
-            log?.Error("Unable to stop the failed new process.", exception);
+            log?.Error("无法停止启动失败的新版本进程。", exception);
         }
     }
 
@@ -361,7 +361,7 @@ internal static class WorkerRunner
         }
         catch (Exception exception)
         {
-            log?.Error("Unable to clean rollback artifacts.", exception);
+            log?.Error("无法清理回滚产物。", exception);
         }
     }
 
@@ -380,7 +380,7 @@ internal static class WorkerRunner
             catch (Exception exception)
             {
                 lastException = exception;
-                log?.Error($"Rollback attempt {attempt} failed.", exception);
+                log?.Error($"第 {attempt} 次回滚尝试失败。", exception);
                 if (attempt < 10)
                 {
                     await Task.Delay(TimeSpan.FromMilliseconds(500));

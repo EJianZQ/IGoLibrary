@@ -44,7 +44,7 @@ internal sealed class CoordinatorRunner
             UpdateTransaction.ValidateRequestFile(_requestPath, _request);
             UpdateTransaction.ValidateRequest(_request);
             _log = new UpdaterLog(_request.LogDirectory, _request.TransactionId, "coordinator");
-            _log.Info("Coordinator started.");
+            _log.Info("更新协调器已启动。");
             heartbeatTask = RunHeartbeatAsync(_request, heartbeatCancellation.Token);
 
             _reportStatus(_externalWorker
@@ -109,7 +109,7 @@ internal sealed class CoordinatorRunner
                 await TryDeleteSuccessfulPayloadAsync(_request, cancellationToken);
                 RecoveryRunner.AuthorizeSecureCleanup(_request);
                 UpdateRecoveryRegistration.Unregister(_request.TransactionId);
-                _log.Info("Coordinator committed the update.");
+                _log.Info("更新协调器已提交更新。");
                 return new CoordinatorResult(true, "更新成功，新版本已经启动", false);
             }
 
@@ -125,12 +125,12 @@ internal sealed class CoordinatorRunner
             RecoveryRunner.AuthorizeSecureCleanup(_request);
             UpdateRecoveryRegistration.Unregister(_request.TransactionId);
             StartApplication(_request, isHealthCheck: false);
-            _log.Info("Coordinator requested rollback and restarted the old version.");
+            _log.Info("更新协调器已请求回滚并重新启动旧版本。");
             return new CoordinatorResult(false, "新版本启动验证失败，已恢复并重新启动旧版本", true);
         }
         catch (Exception exception)
         {
-            _log?.Error("Coordinator failed.", exception);
+            _log?.Error("更新协调器运行失败。", exception);
             if (_request is not null && _applicationWasReleased)
             {
                 await TryRollbackAndRestartAsync(cancellationToken);
@@ -377,7 +377,7 @@ internal sealed class CoordinatorRunner
         }
         catch (Exception exception)
         {
-            _log?.Error("Emergency rollback orchestration failed.", exception);
+            _log?.Error("紧急回滚编排失败。", exception);
         }
     }
 
@@ -408,11 +408,11 @@ internal sealed class CoordinatorRunner
                 UpdateProcessStartInfoFactory.CreateRecoveryCoordinator(
                     updaterPath,
                     requestPath));
-            _log?.Info("Started persistent recovery coordinator.");
+            _log?.Info("持久恢复协调器已启动。");
         }
         catch (Exception exception)
         {
-            _log?.Error("Unable to start persistent recovery coordinator.", exception);
+            _log?.Error("无法启动持久恢复协调器。", exception);
         }
     }
 
@@ -428,7 +428,7 @@ internal sealed class CoordinatorRunner
         }
         catch (Exception exception)
         {
-            _log?.Error("Unable to stop the new process.", exception);
+            _log?.Error("无法停止新版本进程。", exception);
         }
     }
 
@@ -453,7 +453,7 @@ internal sealed class CoordinatorRunner
         }
         catch (Exception exception)
         {
-            _log?.Error("Unable to write coordinator signal.", exception);
+            _log?.Error("无法写入协调器信号。", exception);
         }
     }
 
@@ -521,7 +521,7 @@ internal sealed class CoordinatorRunner
             {
                 if (attempt == 20)
                 {
-                    _log?.Error("Unable to clean the successful update payload.", exception);
+                    _log?.Error("无法清理成功更新的载荷。", exception);
                     return;
                 }
 

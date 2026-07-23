@@ -223,7 +223,7 @@ public sealed class MobileControlService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to read mobile-control task records.");
+            logger.LogWarning(ex, "读取手机控制任务记录失败。");
             await WriteJsonAsync(
                 context,
                 StatusCodes.Status500InternalServerError,
@@ -311,7 +311,7 @@ public sealed class MobileControlService(
         await WriteActionResultAsync(
             context,
             () => taskStartService.StartTaskAsync(taskKind, recordId, context.RequestAborted),
-            "Failed to start mobile-control task.");
+            "启动手机控制任务失败。");
     }
 
     private async Task WriteCancelTaskAsync(HttpContext context, string token)
@@ -335,7 +335,7 @@ public sealed class MobileControlService(
         await WriteActionResultAsync(
             context,
             () => actionService.CancelTaskAsync(taskKind, context.RequestAborted),
-            "Failed to cancel mobile-control task.");
+            "取消手机控制任务失败。");
     }
 
     private async Task WriteCancelReservationAsync(HttpContext context, string token)
@@ -350,7 +350,7 @@ public sealed class MobileControlService(
         await WriteActionResultAsync(
             context,
             () => actionService.CancelCurrentReservationAsync(context.RequestAborted),
-            "Failed to cancel mobile-control reservation.");
+            "取消手机控制预约失败。");
     }
 
     private async Task WriteRefreshCookieAsync(HttpContext context, string token)
@@ -391,7 +391,7 @@ public sealed class MobileControlService(
         await WriteActionResultAsync(
             context,
             () => actionService.RefreshCookieFromLinkAsync(linkText, context.RequestAborted),
-            "Failed to refresh mobile-control cookie.");
+            "刷新手机控制 Cookie 失败。");
     }
 
     private async Task WriteActionResultAsync(
@@ -604,7 +604,7 @@ public sealed class MobileControlService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to stop unpublished mobile-control app.");
+            logger.LogWarning(ex, "停止尚未发布的手机控制应用失败。");
         }
         finally
         {

@@ -43,7 +43,7 @@ public sealed class DataBackupService(
         try
         {
             activityLogService.Write(LogEntryKind.Info, "Backup", "正在导出全部应用数据");
-            logger.LogInformation("Backup export started. OperationId={OperationId}.", operationId);
+        logger.LogInformation("备份导出已开始。操作 ID={OperationId}。", operationId);
             workspace = _workspaceManager.Create("export", operationId);
             var snapshotPath = Path.Combine(workspace, EncryptedBackupArchiveCodec.DatabaseEntryName);
             await CreateDatabaseSnapshotAsync(snapshotPath, cancellationToken);
@@ -100,7 +100,7 @@ public sealed class DataBackupService(
 
             var fileSize = new FileInfo(fullDestination).Length;
             logger.LogInformation(
-                "Backup export completed. OperationId={OperationId}, Bytes={Bytes}, DurationMs={DurationMs}, Favorites={Favorites}, Labels={Labels}, History={History}.",
+                "备份导出已完成。操作 ID={OperationId}，字节数={Bytes}，耗时毫秒={DurationMs}，收藏数={Favorites}，标签数={Labels}，历史记录数={History}。",
                 operationId,
                 fileSize,
                 (timeProvider.GetUtcNow() - startedAt).TotalMilliseconds,
@@ -112,12 +112,12 @@ public sealed class DataBackupService(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            logger.LogInformation("Backup export canceled. OperationId={OperationId}.", operationId);
+            logger.LogInformation("备份导出已取消。操作 ID={OperationId}。", operationId);
             throw;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Backup export failed. OperationId={OperationId}.", operationId);
+            logger.LogError(ex, "备份导出失败。操作 ID={OperationId}。", operationId);
             activityLogService.Write(LogEntryKind.Error, "Backup", $"导出应用数据失败：{ex.Message}");
             throw;
         }
@@ -157,7 +157,7 @@ public sealed class DataBackupService(
             var preparedArchiveSha256 = await ComputeFileHashAsync(preparedArchive, cancellationToken);
             var importedDatabase = Path.Combine(workspace, "imported.db");
             logger.LogInformation(
-                "Backup import preparation started. OperationId={OperationId}, PreparationId={PreparationId}.",
+            "备份导入准备已开始。操作 ID={OperationId}，准备 ID={PreparationId}。",
                 operationId,
                 preparationId);
             var contents = await _codec.ReadAsync(
@@ -206,7 +206,7 @@ public sealed class DataBackupService(
 
             workspace = null;
             logger.LogInformation(
-                "Backup import preparation completed. OperationId={OperationId}, Added={Added}, Removed={Removed}, Changed={Changed}, Unchanged={Unchanged}.",
+                "备份导入准备已完成。操作 ID={OperationId}，新增数={Added}，删除数={Removed}，变更数={Changed}，未变更数={Unchanged}。",
                 operationId,
                 comparison.AddedCount,
                 comparison.RemovedCount,
@@ -223,7 +223,7 @@ public sealed class DataBackupService(
         {
             logger.LogError(
                 ex,
-                "Backup import preparation failed. OperationId={OperationId}, PreparationId={PreparationId}.",
+                "备份导入准备失败。操作 ID={OperationId}，准备 ID={PreparationId}。",
                 operationId,
                 preparationId);
             TryDeleteWorkspace(workspace);
@@ -305,7 +305,7 @@ public sealed class DataBackupService(
             TryDeleteWorkspace(prepared.Workspace);
             TryDeleteWorkspace(prepared.SourceWorkspace);
             logger.LogInformation(
-                "Backup restore staged. TransactionId={TransactionId}, Source={Source}.",
+            "备份恢复已暂存。事务 ID={TransactionId}，来源={Source}。",
                 transactionId,
                 request.Source);
             return transactionId;
@@ -320,7 +320,7 @@ public sealed class DataBackupService(
             {
                 logger.LogWarning(
                     cleanupException,
-                    "Restore staging failed and its secret could not be cleaned; the transaction directory was retained. TransactionId={TransactionId}.",
+                    "恢复暂存失败且无法清理其密钥；已保留事务目录。事务 ID={TransactionId}。",
                     transactionId);
                 throw new AggregateException(
                     "恢复事务创建失败，并且无法清理临时安全凭据；已保留事务目录供下次启动重试",
@@ -525,7 +525,7 @@ public sealed class DataBackupService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to clean backup workspace. PathHash={PathHash}.", HashPath(workspace));
+            logger.LogWarning(ex, "清理备份工作区失败。路径哈希={PathHash}。", HashPath(workspace));
         }
     }
 

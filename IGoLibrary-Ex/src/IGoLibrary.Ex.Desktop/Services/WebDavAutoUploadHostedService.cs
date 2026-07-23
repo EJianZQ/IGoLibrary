@@ -133,7 +133,7 @@ internal sealed class WebDavAutoUploadHostedService(
         }
         catch (OperationCanceledException) when (budget.IsCancellationRequested)
         {
-            logger.LogWarning("Automatic WebDAV upload did not finish within the exit budget; dirty state was retained.");
+            logger.LogWarning("应用退出等待期限内，WebDAV 自动上传未完成；已保留未同步状态。");
         }
     }
 
@@ -160,7 +160,7 @@ internal sealed class WebDavAutoUploadHostedService(
             changeTracker.MarkChanged(
                 pauseAutomaticUpload: true,
                 pauseReason: ex.Message);
-            logger.LogWarning("Automatic WebDAV upload paused because the remote baseline changed.");
+            logger.LogWarning("因远端基线发生变化，WebDAV 自动上传已暂停。");
             return AutoUploadAttemptResult.Completed;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -169,7 +169,7 @@ internal sealed class WebDavAutoUploadHostedService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Automatic WebDAV upload failed; retrying while dirty state is retained.");
+            logger.LogWarning(ex, "WebDAV 自动上传失败；将保留未同步状态并重试。");
             return AutoUploadAttemptResult.Retry;
         }
     }

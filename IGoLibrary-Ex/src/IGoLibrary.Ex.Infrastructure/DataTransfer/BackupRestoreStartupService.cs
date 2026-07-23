@@ -40,7 +40,7 @@ public sealed class BackupRestoreStartupService(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Failed to clean an abandoned backup workspace during startup.");
+                    logger.LogWarning(ex, "启动期间清理废弃的备份工作区失败。");
                 }
             }
 
@@ -55,7 +55,7 @@ public sealed class BackupRestoreStartupService(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Invalid backup restore transaction was detected in the protected workspace.");
+                    logger.LogWarning(ex, "在受保护工作区中检测到无效的备份恢复事务。");
                     var invalidId = Path.GetFileName(directory);
                     if (Guid.TryParseExact(invalidId, "N", out _))
                     {
@@ -67,7 +67,7 @@ public sealed class BackupRestoreStartupService(
                         {
                             logger.LogWarning(
                                 cleanupException,
-                                "Failed to clean invalid restore transaction secret. TransactionId={TransactionId}.",
+                                "清理无效恢复事务的密钥失败。事务 ID={TransactionId}。",
                                 invalidId);
                             continue;
                         }
@@ -126,7 +126,7 @@ public sealed class BackupRestoreStartupService(
                 {
                     logger.LogCritical(
                         ex,
-                        "Backup restore recovery failed. TransactionId={TransactionId}.",
+                        "备份恢复的故障恢复失败。事务 ID={TransactionId}。",
                         transaction.TransactionId);
                     throw new InvalidOperationException("未完成的数据恢复无法自动回滚，请保留数据目录并联系维护者", ex);
                 }
@@ -218,7 +218,7 @@ public sealed class BackupRestoreStartupService(
                     "备份数据已安装并通过校验，等待应用初始化后提交",
                     transactionId);
                 logger.LogInformation(
-                    "Backup restore installed and awaiting startup commit. TransactionId={TransactionId}, Source={Source}, DatabaseBytes={DatabaseBytes}.",
+                    "备份恢复已安装，正在等待启动提交。事务 ID={TransactionId}，来源={Source}，数据库字节数={DatabaseBytes}。",
                     transactionId,
                     transaction.Source,
                     manifest.DatabaseLength);
@@ -231,7 +231,7 @@ public sealed class BackupRestoreStartupService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Backup restore failed. TransactionId={TransactionId}.", transactionId);
+            logger.LogError(ex, "备份恢复失败。事务 ID={TransactionId}。", transactionId);
             if (transaction is not null && transaction.Phase >= BackupRestoreTransactionPhase.DatabaseInstalled)
             {
                 try
@@ -242,7 +242,7 @@ public sealed class BackupRestoreStartupService(
                 {
                     logger.LogCritical(
                         rollbackException,
-                        "Backup restore rollback failed. TransactionId={TransactionId}.",
+                        "备份恢复回滚失败。事务 ID={TransactionId}。",
                         transactionId);
                     throw new InvalidOperationException("数据恢复失败且自动回滚失败，请保留数据目录并联系维护者", new AggregateException(ex, rollbackException));
                 }
@@ -301,10 +301,10 @@ public sealed class BackupRestoreStartupService(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Failed to persist the completed restore result. TransactionId={TransactionId}.", transactionId);
+                logger.LogWarning(ex, "持久化已完成的恢复结果失败。事务 ID={TransactionId}。", transactionId);
             }
             logger.LogInformation(
-                "Backup restore committed after successful application startup. TransactionId={TransactionId}, Source={Source}.",
+                "应用成功启动后，备份恢复已提交。事务 ID={TransactionId}，来源={Source}。",
                 transactionId,
                 transaction.Source);
             activityLogService.Write(LogEntryKind.Success, "Backup", result.Message);
@@ -435,7 +435,7 @@ public sealed class BackupRestoreStartupService(
 
             transaction = transaction with { Phase = BackupRestoreTransactionPhase.RolledBack };
             await DataBackupService.WriteTransactionAsync(directory, transaction, cancellationToken);
-            logger.LogWarning("Backup restore rolled back. TransactionId={TransactionId}.", transaction.TransactionId);
+            logger.LogWarning("备份恢复已回滚。事务 ID={TransactionId}。", transaction.TransactionId);
         }
         finally
         {
@@ -472,7 +472,7 @@ public sealed class BackupRestoreStartupService(
                     "云恢复已完成，但同步基线保存失败；请手动确认下一次上传");
                 logger.LogWarning(
                     ex,
-                    "Failed to establish WebDAV baseline after restore. TransactionId={TransactionId}.",
+                    "恢复后建立 WebDAV 基线失败。事务 ID={TransactionId}。",
                     transaction.TransactionId);
                 return;
             }
@@ -623,9 +623,9 @@ public sealed class BackupRestoreStartupService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to clean restore transaction secret. TransactionId={TransactionId}.", transactionId);
+            logger.LogWarning(ex, "清理恢复事务密钥失败。事务 ID={TransactionId}。", transactionId);
             logger.LogWarning(
-                "Restore transaction directory was retained so secret cleanup can be retried. TransactionId={TransactionId}.",
+                "已保留恢复事务目录，以便重试清理密钥。事务 ID={TransactionId}。",
                 transactionId);
             return;
         }
@@ -636,7 +636,7 @@ public sealed class BackupRestoreStartupService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to clean restore transaction. TransactionId={TransactionId}.", transactionId);
+            logger.LogWarning(ex, "清理恢复事务失败。事务 ID={TransactionId}。", transactionId);
         }
     }
 

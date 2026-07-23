@@ -40,7 +40,7 @@ internal sealed class WebDavSyncStateStore(
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
-            logger.LogWarning(ex, "WebDAV sync state is invalid; automatic overwrite protection will require manual resolution.");
+            logger.LogWarning(ex, "WebDAV 同步状态无效；自动覆盖保护将要求手动处理。");
             return null;
         }
         finally

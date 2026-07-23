@@ -52,7 +52,7 @@ internal sealed partial class CloudflareQuickTunnelRunner(
         var proxyResolution = ResolveAndValidateConfiguration(proxyOptions, compatibilityOptions);
 
         logger.LogInformation(
-            "Starting Cloudflare Quick Tunnel with proxy mode {ProxyMode} and HTTP/2 transport.",
+            "正在以代理模式 {ProxyMode} 和 HTTP/2 传输协议启动 Cloudflare Quick Tunnel。",
             proxyResolution.EffectiveMode);
         var healthProbe = healthProbeFactory.Create(proxyResolution.ProxyUri);
         var isolatedHome = Path.Combine(
@@ -607,7 +607,7 @@ internal sealed partial class CloudflareQuickTunnelRunner(
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Cloudflare Tunnel monitor failed.");
+                _logger.LogWarning(ex, "Cloudflare Tunnel 监视器运行失败。");
                 return new CloudflareTunnelFault("Cloudflare Tunnel 监控异常");
             }
         }

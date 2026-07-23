@@ -127,7 +127,7 @@ public sealed class TaskSleepPreventionServiceTests
         var firstError = Assert.Single(
             context.Logger.Entries,
             entry => entry.Level == LogLevel.Error &&
-                     entry.Message.Contains("native operation failed", StringComparison.Ordinal));
+                     entry.Message.Contains("任务休眠阻止的原生操作失败", StringComparison.Ordinal));
         Assert.Same(firstFailure, firstError.Exception);
         Assert.Equal("Test", firstError.Properties["Platform"]);
         Assert.Equal("申请阻止系统自动休眠", firstError.Properties["Operation"]);
@@ -153,7 +153,7 @@ public sealed class TaskSleepPreventionServiceTests
         Assert.Contains(
             context.Logger.Entries,
             entry => entry.Level == LogLevel.Information &&
-                     entry.Message.Contains("recovered", StringComparison.Ordinal));
+                     entry.Message.Contains("已从先前的原生电源管理故障中恢复", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -288,7 +288,7 @@ public sealed class TaskSleepPreventionServiceTests
 
         var log = await WaitForValueAsync(() => context.Logger.Entries.FirstOrDefault(
             entry => entry.Level == LogLevel.Error &&
-                     entry.Message.Contains("native resource failed", StringComparison.Ordinal)));
+                     entry.Message.Contains("清理任务休眠阻止的原生资源失败", StringComparison.Ordinal)));
         Assert.Same(failure, log.Exception);
         Assert.Equal("Windows", log.Properties["Platform"]);
         Assert.Equal("CloseHandle", log.Properties["NativeOperation"]);

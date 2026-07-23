@@ -130,7 +130,7 @@ public sealed class SqliteTaskLaunchHistoryRepository(
         changeTracker?.MarkChanged();
 
         logger.LogInformation(
-            "Saved mobile task launch history. TaskKind={TaskKind}, RecordId={RecordId}, Refreshed={Refreshed}, PrunedCount={PrunedCount}.",
+            "已保存手机端任务启动历史。任务类型={TaskKind}，记录 ID={RecordId}，是否刷新={Refreshed}，清理数量={PrunedCount}。",
             taskKind,
             recordId,
             existingRecordId is not null,
@@ -234,7 +234,7 @@ public sealed class SqliteTaskLaunchHistoryRepository(
                     out var recordedAtUtc))
             {
                 logger.LogWarning(
-                    "Skipped invalid mobile task launch history metadata. TaskKind={TaskKind}, RecordId={RecordId}.",
+                    "已跳过无效的手机端任务启动历史元数据。任务类型={TaskKind}，记录 ID={RecordId}。",
                     taskKind,
                     storedRecordId);
                 continue;
@@ -244,7 +244,7 @@ public sealed class SqliteTaskLaunchHistoryRepository(
         }
 
         logger.LogInformation(
-            "Loaded mobile task launch history. TaskKind={TaskKind}, RequestedRecordId={RequestedRecordId}, Count={Count}.",
+            "已加载手机端任务启动历史。任务类型={TaskKind}，请求的记录 ID={RequestedRecordId}，数量={Count}。",
             taskKind,
             recordId,
             rows.Count);
@@ -254,7 +254,7 @@ public sealed class SqliteTaskLaunchHistoryRepository(
     private void LogInvalidRow(HistoryRow row, string error)
     {
         logger.LogWarning(
-            "Skipped invalid mobile task launch history payload. TaskKind={TaskKind}, RecordId={RecordId}, Error={Error}.",
+            "已跳过无效的手机端任务启动历史载荷。任务类型={TaskKind}，记录 ID={RecordId}，错误={Error}。",
             row.TaskKind,
             row.RecordId,
             error);
