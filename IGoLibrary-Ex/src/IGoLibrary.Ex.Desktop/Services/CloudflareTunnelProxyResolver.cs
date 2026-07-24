@@ -1,5 +1,6 @@
 using System.Net;
 using IGoLibrary.Ex.Application.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
@@ -35,7 +36,8 @@ internal sealed class CloudflareSystemProxyProvider : ICloudflareSystemProxyProv
 }
 
 internal sealed class CloudflareTunnelProxyResolver(
-    ICloudflareSystemProxyProvider systemProxyProvider) : ICloudflareTunnelProxyResolver
+    ICloudflareSystemProxyProvider systemProxyProvider,
+    ILogger<CloudflareTunnelProxyResolver>? logger = null) : ICloudflareTunnelProxyResolver
 {
     internal static readonly Uri ProbeTarget = new("https://api.trycloudflare.com/tunnel");
 
@@ -86,12 +88,16 @@ internal sealed class CloudflareTunnelProxyResolver(
                 ValidateProxyUri(proxyUri, "系统代理"),
                 CloudflareTunnelProxyMode.SystemProxy);
         }
-        catch (InvalidOperationException) when (!required)
+        catch (InvalidOperationException ex) when (!required)
         {
+            logger?.LogInformation(
+                "自动代理模式未找到可用的系统 HTTP 代理，已使用直连。原因={Reason}",
+                ex.Message);
             return null;
         }
         catch (Exception ex) when (!required && ex is not OperationCanceledException)
         {
+            logger?.LogWarning(ex, "解析系统 HTTP 代理失败，自动代理模式已使用直连。");
             return null;
         }
     }

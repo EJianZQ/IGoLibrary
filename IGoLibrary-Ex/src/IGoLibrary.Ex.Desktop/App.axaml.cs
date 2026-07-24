@@ -47,7 +47,8 @@ public partial class App : Avalonia.Application
                     {
                         UpdateStartupHealthReporter.ReportReady(
                             transactionId,
-                            services.GetRequiredService<IAppVersionProvider>());
+                            services.GetRequiredService<IAppVersionProvider>(),
+                            services.GetRequiredService<IAppLogWriter>());
                     }
 
                     await viewModel.InitializeAsync();
@@ -56,13 +57,18 @@ public partial class App : Avalonia.Application
                         await UpdateStartupHealthReporter.ObserveCompletionAsync(
                             completedTransactionId,
                             services.GetRequiredService<IAppVersionProvider>(),
-                            services.GetRequiredService<INotificationService>());
+                            services.GetRequiredService<INotificationService>(),
+                            services.GetRequiredService<IAppLogWriter>());
                     }
                 }
                 catch (Exception ex)
                 {
                     services.GetRequiredService<IActivityLogService>()
-                        .Write(IGoLibrary.Ex.Domain.Enums.LogEntryKind.Error, "Bootstrap", $"启动初始化失败：{ex.Message}");
+                        .Write(
+                            IGoLibrary.Ex.Domain.Enums.LogEntryKind.Error,
+                            "Bootstrap",
+                            $"启动初始化失败：{ex.Message}",
+                            ex);
                 }
             });
         }

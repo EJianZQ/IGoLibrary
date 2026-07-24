@@ -37,7 +37,8 @@ internal sealed class CloudflareTunnelRuntimeAlertHandler(
             activityLogService.Write(
                 LogEntryKind.Warning,
                 "Alert",
-                $"发送手机控制 Cloudflare Tunnel 运行中断提醒失败：{ex.Message}");
+                $"发送手机控制 Cloudflare Tunnel 运行中断提醒失败：{ex.Message}",
+                ex);
         }
     }
 

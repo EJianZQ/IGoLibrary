@@ -34,6 +34,7 @@ internal static class NativeUpdaterDialog
 
     public static int RunCoordinator(string requestPath, bool externalWorker)
     {
+        var emergencyLog = UpdaterLog.TryCreateEmergency("native-dialog");
         var state = new ProgressDialogState(requestPath, externalWorker);
         var dialogResult = int.MinValue;
         Exception? dialogException = null;
@@ -44,6 +45,7 @@ internal static class NativeUpdaterDialog
         catch (Exception exception)
         {
             dialogException = exception;
+            emergencyLog?.Error("创建原生更新进度界面失败。", exception);
         }
 
         var operation = state.Operation;
@@ -59,6 +61,9 @@ internal static class NativeUpdaterDialog
                 ? $"无法创建原生更新界面，安装尚未开始。请返回应用后重试。{FormatNativeError(dialogException)}"
                 : "原生更新界面意外结束，请查看更新日志并确认程序状态。";
             ShowMessageBox(message, "我去图书馆 - 更新程序");
+            emergencyLog?.Error(
+                $"原生更新界面未产生协调结果。对话框结果={dialogResult}，已开始操作={(operation is not null ? "是" : "否")}。",
+                dialogException);
             return 1;
         }
 

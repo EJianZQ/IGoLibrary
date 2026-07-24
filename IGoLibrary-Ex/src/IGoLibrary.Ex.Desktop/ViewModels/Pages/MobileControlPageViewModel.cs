@@ -266,7 +266,7 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
         catch (Exception ex)
         {
             ApplyStopped("启动失败");
-            activityLogService.Write(LogEntryKind.Error, "MobileControl", $"启动手机控制失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "MobileControl", $"启动手机控制失败：{ex.Message}", ex);
             if (showNotification)
             {
                 await notificationService.ShowWarningAsync("启动手机控制失败", ex.Message);
@@ -296,7 +296,7 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Error, "MobileControl", $"停止手机控制失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "MobileControl", $"停止手机控制失败：{ex.Message}", ex);
             if (showNotification)
             {
                 await notificationService.ShowWarningAsync("停止手机控制失败", ex.Message);
@@ -401,7 +401,7 @@ public sealed partial class MobileControlPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "MobileControl", $"保存手机控制自动开启设置失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "MobileControl", $"保存手机控制自动开启设置失败：{ex.Message}", ex);
             _isApplyingSettings = true;
             try
             {

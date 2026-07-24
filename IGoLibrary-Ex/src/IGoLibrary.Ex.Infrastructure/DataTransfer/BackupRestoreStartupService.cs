@@ -337,8 +337,9 @@ public sealed class BackupRestoreStartupService(
             {
                 File.Delete(path);
             }
-            catch
+            catch (Exception ex)
             {
+                logger.LogWarning(ex, "删除已消费的备份恢复启动结果失败。");
             }
         }
     }
@@ -652,7 +653,7 @@ public sealed class BackupRestoreStartupService(
         return Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken));
     }
 
-    private static void TryDelete(string path)
+    private void TryDelete(string path)
     {
         try
         {
@@ -661,8 +662,9 @@ public sealed class BackupRestoreStartupService(
                 File.Delete(path);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "清理备份恢复临时文件失败。");
         }
     }
 }

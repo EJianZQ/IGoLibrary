@@ -76,14 +76,22 @@ public sealed partial class RemoteCheckInPageViewModel
         catch (RemoteCheckInOutcomeUnknownException ex)
         {
             LastResultText = ex.Message;
-            _activityLogService.Write(LogEntryKind.Warning, "RemoteCheckIn", "远程签到结果未知，已阻止自动重试。");
+            _activityLogService.Write(
+                LogEntryKind.Warning,
+                "RemoteCheckIn",
+                "远程签到结果未知，已阻止自动重试。",
+                ex);
             await _notificationService.ShowWarningAsync("签到结果未知", ex.Message);
         }
         catch (Exception ex)
         {
             HandleSessionFailure(ex);
             LastResultText = $"签到失败：{ex.Message}";
-            _activityLogService.Write(LogEntryKind.Error, "RemoteCheckIn", $"远程签到失败：{ex.Message}");
+            _activityLogService.Write(
+                LogEntryKind.Error,
+                "RemoteCheckIn",
+                $"远程签到失败：{ex.Message}",
+                ex);
             await _notificationService.ShowWarningAsync("远程签到失败", ex.Message);
         }
         finally
@@ -104,7 +112,11 @@ public sealed partial class RemoteCheckInPageViewModel
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "RemoteCheckIn", $"签到成功后刷新预约状态失败：{ex.Message}");
+            _activityLogService.Write(
+                LogEntryKind.Warning,
+                "RemoteCheckIn",
+                $"签到成功后刷新预约状态失败：{ex.Message}",
+                ex);
         }
     }
 

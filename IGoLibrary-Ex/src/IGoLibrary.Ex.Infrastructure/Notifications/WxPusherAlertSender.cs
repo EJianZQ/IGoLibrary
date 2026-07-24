@@ -2,15 +2,20 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using IGoLibrary.Ex.Application.Abstractions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Infrastructure.Notifications;
 
 internal sealed class WxPusherAlertSender(
     HttpClient httpClient,
     ISettingsService settingsService,
-    TimeProvider? timeProvider = null) : IWxPusherAlertSender
+    TimeProvider? timeProvider = null,
+    ILogger<WxPusherAlertSender>? logger = null) : IWxPusherAlertSender
 {
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+    private readonly ILogger<WxPusherAlertSender> _logger =
+        logger ?? NullLogger<WxPusherAlertSender>.Instance;
     private const int SuccessCode = 1000;
     private const int ContentTypeText = 1;
     private const int VerifyPayTypeDisabled = 0;
@@ -43,7 +48,8 @@ internal sealed class WxPusherAlertSender(
             "WxPusher",
             token => SendOnceAsync(normalized, content, summary, uids, topicIds, token),
             _timeProvider,
-            cancellationToken);
+            cancellationToken,
+            _logger);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         ThrowIfWxPusherResponseFailed(response, raw);
     }

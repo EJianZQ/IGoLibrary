@@ -1,12 +1,18 @@
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Domain.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Application.Services;
 
 public sealed class SessionWorkflowService(
     ITraceIntApiClient apiClient,
-    ISessionService sessionService) : ISessionWorkflowService
+    ISessionService sessionService,
+    ILogger<SessionWorkflowService>? logger = null) : ISessionWorkflowService
 {
+    private readonly ILogger<SessionWorkflowService> _logger =
+        logger ?? NullLogger<SessionWorkflowService>.Instance;
+
     public async Task<SessionWorkflowResult> AuthenticateFromCodeAsync(
         string code,
         bool remember,
@@ -20,8 +26,16 @@ public sealed class SessionWorkflowService(
             var session = await sessionService.AuthenticateFromCookieAsync(cookie, remember, cancellationToken);
             return BuildAuthenticatedResult(session, cookie, expirationTime);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
+            _logger.LogWarning(
+                ex,
+                "扫码授权已取得 Cookie，但自动会话验证失败。记住会话={RememberSession}。",
+                remember);
             return new SessionWorkflowResult(
                 Session: null,
                 Cookie: cookie,

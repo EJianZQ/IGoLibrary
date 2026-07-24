@@ -1,10 +1,12 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
-internal sealed partial class ClashMihomoConfigurationLocator : IClashMihomoConfigurationLocator
+internal sealed partial class ClashMihomoConfigurationLocator(
+    ILogger<ClashMihomoConfigurationLocator>? logger = null) : IClashMihomoConfigurationLocator
 {
     private const long MaxConfigurationBytes = 32L * 1024 * 1024;
 
@@ -35,6 +37,11 @@ internal sealed partial class ClashMihomoConfigurationLocator : IClashMihomoConf
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                logger?.LogWarning(
+                    ex,
+                    "读取 Clash/Mihomo 配置候选失败，已跳过。客户端={Client}，文件名={FileName}",
+                    candidate.ClientName,
+                    Path.GetFileName(candidate.Path));
                 continue;
             }
 

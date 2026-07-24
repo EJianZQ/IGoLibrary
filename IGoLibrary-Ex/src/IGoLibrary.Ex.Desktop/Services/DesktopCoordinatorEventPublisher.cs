@@ -55,7 +55,11 @@ public sealed class DesktopCoordinatorEventPublisher(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"处理任务事件提醒失败：{ex.Message}");
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "Alert",
+                $"处理任务事件提醒失败：{ex.Message}",
+                ex);
         }
     }
 }

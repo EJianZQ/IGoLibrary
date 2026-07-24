@@ -3,15 +3,19 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Domain.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Infrastructure.Notifications;
 
 internal sealed class BarkAlertSender(
     HttpClient httpClient,
     ISettingsService settingsService,
-    TimeProvider? timeProvider = null) : IBarkAlertSender
+    TimeProvider? timeProvider = null,
+    ILogger<BarkAlertSender>? logger = null) : IBarkAlertSender
 {
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+    private readonly ILogger<BarkAlertSender> _logger = logger ?? NullLogger<BarkAlertSender>.Instance;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -47,7 +51,8 @@ internal sealed class BarkAlertSender(
             "Bark",
             token => SendOnceAsync(normalized, title.Trim(), body.Trim(), token),
             _timeProvider,
-            cancellationToken);
+            cancellationToken,
+            _logger);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         ThrowIfBarkResponseFailed(response, raw);
     }

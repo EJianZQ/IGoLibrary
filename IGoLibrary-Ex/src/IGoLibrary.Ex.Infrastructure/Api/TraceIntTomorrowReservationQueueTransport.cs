@@ -2,6 +2,8 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using IGoLibrary.Ex.Domain.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Infrastructure.Api;
 
@@ -35,14 +37,17 @@ internal sealed class TraceIntTomorrowReservationQueueTransport
     private readonly TimeSpan _maxWait;
     private readonly TimeSpan _successSettleDelay;
     private readonly TimeSpan _cleanupTimeout;
+    private readonly ILogger<TraceIntTomorrowReservationQueueTransport> _logger;
 
-    public TraceIntTomorrowReservationQueueTransport()
+    public TraceIntTomorrowReservationQueueTransport(
+        ILogger<TraceIntTomorrowReservationQueueTransport>? logger = null)
         : this(
             static () => new ClientWebSocketAdapter(),
             DefaultSendInterval,
             DefaultMaxWait,
             DefaultSuccessSettleDelay,
-            DefaultCleanupTimeout)
+            DefaultCleanupTimeout,
+            logger)
     {
     }
 
@@ -51,13 +56,15 @@ internal sealed class TraceIntTomorrowReservationQueueTransport
         TimeSpan sendInterval,
         TimeSpan maxWait,
         TimeSpan successSettleDelay,
-        TimeSpan cleanupTimeout)
+        TimeSpan cleanupTimeout,
+        ILogger<TraceIntTomorrowReservationQueueTransport>? logger = null)
     {
         _socketFactory = socketFactory;
         _sendInterval = sendInterval;
         _maxWait = maxWait;
         _successSettleDelay = successSettleDelay;
         _cleanupTimeout = cleanupTimeout;
+        _logger = logger ?? NullLogger<TraceIntTomorrowReservationQueueTransport>.Instance;
     }
 
     public async Task<TomorrowReservationQueueResult> EnterAsync(
@@ -69,6 +76,7 @@ internal sealed class TraceIntTomorrowReservationQueueTransport
         if (!Uri.TryCreate(queueUrl, UriKind.Absolute, out var uri) ||
             uri.Scheme is not ("ws" or "wss"))
         {
+            _logger.LogWarning("明日预约排队地址无效，已降级为 HTTP 预约。");
             return TomorrowReservationQueueResult.Continue("明日预约排队地址无效，继续 HTTP 预约");
         }
 
@@ -114,6 +122,9 @@ internal sealed class TraceIntTomorrowReservationQueueTransport
                 throw new OperationCanceledException(cancellationToken);
             }
 
+            _logger.LogWarning(
+                "明日预约排队通道在等待窗口内没有明确结果，已降级为 HTTP 预约。等待秒数={WaitSeconds}。",
+                _maxWait.TotalSeconds);
             return TomorrowReservationQueueResult.Continue("明日预约排队通道 15 秒内未明确拦截，继续 HTTP 预约");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -122,6 +133,7 @@ internal sealed class TraceIntTomorrowReservationQueueTransport
         }
         catch (Exception ex)
         {
+            _logger.LogWarning(ex, "明日预约排队通道连接异常，已降级为 HTTP 预约。");
             return TomorrowReservationQueueResult.Continue($"明日预约排队通道连接异常，继续 HTTP 预约：{ex.Message}");
         }
     }

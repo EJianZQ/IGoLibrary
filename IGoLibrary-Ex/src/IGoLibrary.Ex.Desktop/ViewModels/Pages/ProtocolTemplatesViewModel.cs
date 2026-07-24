@@ -382,7 +382,7 @@ public sealed partial class ProtocolTemplatesViewModel(
         }
 
         AutoSave.Schedule(ex =>
-            activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存 TraceInt 协议失败：{ex.Message}"));
+            activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存 TraceInt 协议失败：{ex.Message}", ex));
     }
 
     private static string MapToViewModelProperty(string propertyName)

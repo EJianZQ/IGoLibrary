@@ -50,7 +50,7 @@ public sealed class ReservationWorkflowService(
             }
             catch (Exception ex)
             {
-                activityLogService.Write(LogEntryKind.Warning, "Occupy", $"取消预约前停止占座失败：{ex.Message}");
+                activityLogService.Write(LogEntryKind.Warning, "Occupy", $"取消预约前停止占座失败：{ex.Message}", ex);
             }
         }
 

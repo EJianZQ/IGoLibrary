@@ -10,10 +10,11 @@ internal sealed class TomorrowReservationCoordinator : ITomorrowReservationCoord
 
     public TomorrowReservationCoordinator(
         TomorrowReservationWorkflowRunner workflowRunner,
-        ICoordinatorRuntime runtime)
+        ICoordinatorRuntime runtime,
+        IAppLogWriter? logWriter = null)
     {
         _workflowRunner = workflowRunner;
-        _controller = new CoordinatorRunController("明日预约", runtime);
+        _controller = new CoordinatorRunController("明日预约", runtime, logWriter);
     }
 
     public event EventHandler<CoordinatorStatus>? StatusChanged

@@ -11,9 +11,12 @@ internal static class RecoveryRunner
     public static async Task<int> RunCoordinatorAsync(string requestPath)
     {
         UpdateTransactionRequest? request = null;
+        var log = UpdaterLog.TryCreateEmergency("recovery-coordinator");
         try
         {
             request = ReadAndValidateRecoveryRequest(requestPath);
+            log = new UpdaterLog(request.LogDirectory, request.TransactionId, "recovery-coordinator");
+            log.Info("开始执行更新恢复协调流程。");
             var processPath = ValidateRecoveryExecutable(request);
             var requiresElevation = UpdateInstallationPermissions.RequiresElevation(
                 request.InstallationDirectory);
@@ -31,32 +34,38 @@ internal static class RecoveryRunner
                 using var timeout = new CancellationTokenSource(RecoveryTimeout);
                 await worker.WaitForExitAsync(timeout.Token);
                 succeeded = worker.ExitCode == 0;
+                log.Info($"管理员恢复组件已退出。退出码={worker.ExitCode}。");
             }
             else
             {
-                succeeded = await RecoverAsync(request);
+                succeeded = await RecoverAsync(request, log);
                 if (succeeded)
                 {
                     ScheduleSecureCleanup(request, requestPath, [Environment.ProcessId]);
+                    log.Info("已安排受保护更新目录清理。");
                 }
             }
 
             if (!succeeded)
             {
+                log.Error("更新恢复流程返回失败结果。");
                 return 1;
             }
 
-            AuthorizeSecureCleanup(request);
+            AuthorizeSecureCleanup(request, log);
             UpdateRecoveryRegistration.Unregister(request.TransactionId);
             StartApplication(request);
+            log.Info("更新恢复完成，主应用已重新启动。");
             return 0;
         }
         catch (Win32Exception exception) when (exception.NativeErrorCode == 1223)
         {
+            log?.Error("用户取消了更新恢复提权。", exception);
             return 1;
         }
-        catch
+        catch (Exception ex)
         {
+            log?.Error("更新恢复协调流程发生未处理异常。", ex);
             return 1;
         }
     }
@@ -65,24 +74,30 @@ internal static class RecoveryRunner
         string requestPath,
         int recoveryCoordinatorProcessId)
     {
+        var log = UpdaterLog.TryCreateEmergency("recovery-worker");
         try
         {
             var request = ReadAndValidateRecoveryRequest(requestPath);
+            log = new UpdaterLog(request.LogDirectory, request.TransactionId, "recovery-worker");
+            log.Info("开始执行管理员更新恢复工作流程。");
             ValidateRecoveryExecutable(request);
-            if (!await RecoverAsync(request))
+            if (!await RecoverAsync(request, log))
             {
+                log.Error("管理员更新恢复工作流程返回失败结果。");
                 return 1;
             }
 
-            AuthorizeSecureCleanup(request);
+            AuthorizeSecureCleanup(request, log);
             ScheduleSecureCleanup(
                 request,
                 requestPath,
                 [Environment.ProcessId, recoveryCoordinatorProcessId]);
+            log.Info("管理员更新恢复完成，已安排安全清理。");
             return 0;
         }
-        catch
+        catch (Exception ex)
         {
+            log?.Error("管理员更新恢复工作流程发生未处理异常。", ex);
             return 1;
         }
     }
@@ -116,7 +131,9 @@ internal static class RecoveryRunner
                 processIdsToWaitFor));
     }
 
-    public static void AuthorizeSecureCleanup(UpdateTransactionRequest request)
+    public static void AuthorizeSecureCleanup(
+        UpdateTransactionRequest request,
+        UpdaterLog? log = null)
     {
         try
         {
@@ -129,9 +146,11 @@ internal static class RecoveryRunner
                     request.TransactionId,
                     DateTimeOffset.UtcNow),
                 UpdateJsonTypeInfo.CleanupAuthorization);
+            log?.Info("已授权清理受保护更新目录。");
         }
-        catch
+        catch (Exception ex)
         {
+            log?.Error("写入受保护更新目录清理授权失败。", ex);
         }
     }
 
@@ -178,24 +197,34 @@ internal static class RecoveryRunner
         }
     }
 
-    private static async Task<bool> RecoverAsync(UpdateTransactionRequest request)
+    private static async Task<bool> RecoverAsync(
+        UpdateTransactionRequest request,
+        UpdaterLog? log)
     {
-        StopRunningApplication(request);
+        log?.Info("开始停止仍在运行的主应用进程。");
+        StopRunningApplication(request, log);
         if (Directory.Exists(request.BackupDirectory))
         {
-            return await UpdateTransaction.RecoverInterruptedAsync(request);
+            log?.Info("检测到更新备份目录，开始恢复中断事务。");
+            var recovered = await UpdateTransaction.RecoverInterruptedAsync(request);
+            log?.Info($"中断事务恢复完成。成功={recovered}。");
+            return recovered;
         }
 
         if (!Directory.Exists(request.InstallationDirectory))
         {
+            log?.Error("安装目录不存在，无法执行更新恢复。");
             return false;
         }
 
         UpdateTransaction.CleanupRollbackArtifacts(request);
+        log?.Info("未检测到备份目录，已清理残留回滚工件。");
         return true;
     }
 
-    private static void StopRunningApplication(UpdateTransactionRequest request)
+    private static void StopRunningApplication(
+        UpdateTransactionRequest request,
+        UpdaterLog? log)
     {
         var expectedPath = Path.GetFullPath(
             Path.Combine(request.InstallationDirectory, request.EntryExecutable));
@@ -214,10 +243,12 @@ internal static class RecoveryRunner
                     {
                         process.Kill(entireProcessTree: true);
                         process.WaitForExit(10_000);
+                        log?.Info($"已停止主应用进程。进程标识={process.Id}。");
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    log?.Error($"检查或停止主应用进程失败。进程标识={process.Id}。", ex);
                 }
             }
         }

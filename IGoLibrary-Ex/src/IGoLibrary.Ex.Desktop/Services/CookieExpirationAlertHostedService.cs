@@ -59,6 +59,7 @@ internal sealed class CookieExpirationAlertHostedService(
         activityLogService.Write(
             LogEntryKind.Warning,
             "Alert",
-            $"Cookie 到期提醒后台监测失败，将自动重试：{exception.Message}");
+            $"Cookie 到期提醒后台监测失败，将自动重试：{exception.Message}",
+            exception);
     }
 }

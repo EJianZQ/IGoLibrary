@@ -3,22 +3,32 @@ using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Infrastructure.Logging;
 
-public sealed class AppFileLoggerProvider(IAppLogWriter logWriter) : ILoggerProvider
+public sealed class AppFileLoggerProvider(IAppLogWriter logWriter) : ILoggerProvider, ISupportExternalScope
 {
+    private IExternalScopeProvider _scopeProvider = new LoggerExternalScopeProvider();
+
     public ILogger CreateLogger(string categoryName)
     {
-        return new AppFileLogger(categoryName, logWriter);
+        return new AppFileLogger(categoryName, logWriter, () => _scopeProvider);
+    }
+
+    public void SetScopeProvider(IExternalScopeProvider scopeProvider)
+    {
+        _scopeProvider = scopeProvider;
     }
 
     public void Dispose()
     {
     }
 
-    private sealed class AppFileLogger(string categoryName, IAppLogWriter logWriter) : ILogger
+    private sealed class AppFileLogger(
+        string categoryName,
+        IAppLogWriter logWriter,
+        Func<IExternalScopeProvider> getScopeProvider) : ILogger
     {
         public IDisposable BeginScope<TState>(TState state) where TState : notnull
         {
-            return NullScope.Instance;
+            return getScopeProvider().Push(state);
         }
 
         public bool IsEnabled(LogLevel logLevel)
@@ -44,16 +54,23 @@ public sealed class AppFileLoggerProvider(IAppLogWriter logWriter) : ILoggerProv
                 message = exception?.Message ?? "(empty message)";
             }
 
+            var scopes = new List<string>();
+            getScopeProvider().ForEachScope(
+                static (scope, values) =>
+                {
+                    var rendered = scope?.ToString();
+                    if (!string.IsNullOrWhiteSpace(rendered))
+                    {
+                        values.Add(rendered);
+                    }
+                },
+                scopes);
+            if (scopes.Count > 0)
+            {
+                message = $"{message} | 作用域={string.Join(" => ", scopes)}";
+            }
+
             logWriter.Write(logLevel, categoryName, message, exception, eventId);
-        }
-    }
-
-    private sealed class NullScope : IDisposable
-    {
-        public static NullScope Instance { get; } = new();
-
-        public void Dispose()
-        {
         }
     }
 }

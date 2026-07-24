@@ -10,10 +10,11 @@ internal sealed class OccupySeatCoordinator : IOccupySeatCoordinator
 
     public OccupySeatCoordinator(
         OccupySeatWorkflowRunner stateMachine,
-        ICoordinatorRuntime runtime)
+        ICoordinatorRuntime runtime,
+        IAppLogWriter? logWriter = null)
     {
         _stateMachine = stateMachine;
-        _controller = new CoordinatorRunController("占座", runtime);
+        _controller = new CoordinatorRunController("占座", runtime, logWriter);
     }
 
     public event EventHandler<CoordinatorStatus>? StatusChanged

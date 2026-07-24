@@ -106,6 +106,28 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task InitializeAsync_WhenCredentialRestoreFails_LogsAndCompletesStartup()
+    {
+        var failure = new System.ComponentModel.Win32Exception(5, "credential manager access denied");
+        var sessionService = new FakeSessionService { RestoreException = failure };
+        var activityLogService = new ActivityLogService();
+        var viewModel = CreateViewModel(
+            sessionService: sessionService,
+            activityLogService: activityLogService);
+
+        await viewModel.InitializeAsync();
+
+        Assert.True(viewModel.IsInitializationComplete);
+        Assert.False(viewModel.IsAuthorized);
+        Assert.Equal(1, sessionService.RestoreCalls);
+        Assert.Contains(
+            activityLogService.Entries,
+            entry => entry.Kind == LogEntryKind.Warning &&
+                     entry.Category == "Bootstrap" &&
+                     entry.Message.Contains("恢复会话失败", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ValidateManualCookieAsync_WithMobileControlAutoStart_DoesNotStartMobileControlAgain()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default with

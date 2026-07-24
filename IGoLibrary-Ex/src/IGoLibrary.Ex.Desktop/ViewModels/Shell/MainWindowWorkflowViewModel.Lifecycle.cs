@@ -98,7 +98,7 @@ public partial class MainWindowWorkflowViewModel
             }
             catch (Exception ex)
             {
-                _activityLogService.Write(LogEntryKind.Warning, "Bootstrap", $"恢复会话失败：{ex.Message}");
+                _activityLogService.Write(LogEntryKind.Warning, "Bootstrap", $"恢复会话失败：{ex.Message}", ex);
             }
         }
         finally
@@ -120,7 +120,7 @@ public partial class MainWindowWorkflowViewModel
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "MobileControl", $"退出前停止手机控制失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "MobileControl", $"退出前停止手机控制失败：{ex.Message}", ex);
         }
 
         await FlushPersistentDataAsync(cancellationToken);
@@ -146,7 +146,7 @@ public partial class MainWindowWorkflowViewModel
         }
         catch (Exception ex) when (suppressErrors)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存系统设置失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存系统设置失败：{ex.Message}", ex);
         }
 
         try
@@ -155,7 +155,7 @@ public partial class MainWindowWorkflowViewModel
         }
         catch (Exception ex) when (suppressErrors)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存日志设置失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存日志设置失败：{ex.Message}", ex);
         }
 
         if (hasPendingProtocolTemplates)
@@ -166,7 +166,7 @@ public partial class MainWindowWorkflowViewModel
             }
             catch (Exception ex) when (suppressErrors)
             {
-                _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存接口模板失败：{ex.Message}");
+                _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存接口模板失败：{ex.Message}", ex);
             }
         }
 
@@ -176,7 +176,7 @@ public partial class MainWindowWorkflowViewModel
         }
         catch (Exception ex) when (suppressErrors)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存抢座定时时间默认值失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存抢座定时时间默认值失败：{ex.Message}", ex);
         }
 
         try
@@ -185,7 +185,7 @@ public partial class MainWindowWorkflowViewModel
         }
         catch (Exception ex) when (suppressErrors)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存明日预约触发时间默认值失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"退出前保存明日预约触发时间默认值失败：{ex.Message}", ex);
         }
     }
 }

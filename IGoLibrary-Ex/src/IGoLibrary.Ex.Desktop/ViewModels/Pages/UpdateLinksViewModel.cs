@@ -85,7 +85,7 @@ public sealed partial class UpdateLinksViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "About", $"打开项目 GitHub 地址失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "About", $"打开项目 GitHub 地址失败：{ex.Message}", ex);
             await notificationService.ShowWarningAsync("打开 GitHub 失败", ex.Message);
         }
     }
@@ -102,7 +102,7 @@ public sealed partial class UpdateLinksViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "About", $"打开作者赞赏页面失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "About", $"打开作者赞赏页面失败：{ex.Message}", ex);
             await notificationService.ShowWarningAsync("打开赞赏页面失败", ex.Message);
         }
     }
@@ -135,7 +135,7 @@ public sealed partial class UpdateLinksViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Update", $"检查更新失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Update", $"检查更新失败：{ex.Message}", ex);
             if (notifyWhenNoUpdate)
             {
                 await notificationService.ShowWarningAsync("检查更新失败", ex.Message);
@@ -243,7 +243,7 @@ public sealed partial class UpdateLinksViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Update", $"打开 Release 页面失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Update", $"打开 Release 页面失败：{ex.Message}", ex);
             await notificationService.ShowWarningAsync("打开 Release 页面失败", ex.Message);
         }
     }
@@ -278,7 +278,7 @@ public sealed partial class UpdateLinksViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "About", $"加载作者头像失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "About", $"加载作者头像失败：{ex.Message}", ex);
         }
     }
 }

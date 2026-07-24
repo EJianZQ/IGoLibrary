@@ -140,7 +140,7 @@ internal static class WorkerRunner
                         [Environment.ProcessId]);
                 }
 
-                TryWriteFailure(request, exception.Message);
+                TryWriteFailure(request, exception.Message, log);
             }
 
             return 1;
@@ -329,14 +329,18 @@ internal static class WorkerRunner
             UpdateJsonTypeInfo.WorkerStatus);
     }
 
-    private static void TryWriteFailure(UpdateTransactionRequest request, string message)
+    private static void TryWriteFailure(
+        UpdateTransactionRequest request,
+        string message,
+        UpdaterLog? log)
     {
         try
         {
             WriteStatus(request, UpdateWorkerPhase.Failed, message);
         }
-        catch
+        catch (Exception exception)
         {
+            log?.Error("写入更新工作进程的失败状态失败。", exception);
         }
     }
 

@@ -397,7 +397,7 @@ public sealed partial class GrabPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Grab", $"启动抢座失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Grab", $"启动抢座失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("启动抢座失败", ex.Message);
         }
     }
@@ -411,7 +411,7 @@ public sealed partial class GrabPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Grab", $"停止抢座失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Grab", $"停止抢座失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("停止抢座失败", ex.Message);
         }
     }
@@ -478,7 +478,7 @@ public sealed partial class GrabPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Grab", $"抢座成功后刷新预约状态失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Grab", $"抢座成功后刷新预约状态失败：{ex.Message}", ex);
         }
     }
 
@@ -618,7 +618,7 @@ public sealed partial class GrabPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存抢座定时时间默认值失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存抢座定时时间默认值失败：{ex.Message}", ex);
         }
     }
 

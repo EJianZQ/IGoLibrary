@@ -109,7 +109,7 @@ public sealed partial class ActivityLogPanelViewModel(
                 }
                 catch (Exception ex)
                 {
-                    activityLogService.Write(LogEntryKind.Warning, "Occupy", $"占座成功后刷新预约状态失败：{ex.Message}");
+                    activityLogService.Write(LogEntryKind.Warning, "Occupy", $"占座成功后刷新预约状态失败：{ex.Message}", ex);
                 }
             });
         }

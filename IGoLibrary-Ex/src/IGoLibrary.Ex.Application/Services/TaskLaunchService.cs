@@ -1,4 +1,5 @@
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 using Microsoft.Extensions.Logging;
@@ -78,9 +79,39 @@ public sealed class TaskLaunchService(
         {
             await startAsync(cancellationToken);
         }
+        catch (TaskLaunchConflictException ex)
+        {
+            logger.LogInformation(
+                "任务启动请求因运行冲突被拒绝。任务类型={TaskKind}，启动来源={LaunchSource}。",
+                displayName,
+                source);
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "TaskLaunch",
+                $"{sourceText}{displayName}启动请求被拒绝：{ex.Message}",
+                ex);
+            throw;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            logger.LogInformation(
+                "任务启动请求已取消。任务类型={TaskKind}，启动来源={LaunchSource}。",
+                displayName,
+                source);
+            throw;
+        }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "TaskLaunch", $"{sourceText}{displayName}启动请求被拒绝：{ex.Message}");
+            logger.LogError(
+                ex,
+                "任务启动请求发生意外故障。任务类型={TaskKind}，启动来源={LaunchSource}。",
+                displayName,
+                source);
+            activityLogService.Write(
+                LogEntryKind.Error,
+                "TaskLaunch",
+                $"{sourceText}{displayName}启动失败：{ex.Message}",
+                ex);
             throw;
         }
 
@@ -110,7 +141,8 @@ public sealed class TaskLaunchService(
             activityLogService.Write(
                 LogEntryKind.Warning,
                 "TaskLaunchHistory",
-                $"保存{displayName}手机控制记录失败，任务不受影响：{ex.Message}");
+                $"保存{displayName}手机控制记录失败，任务不受影响：{ex.Message}",
+                ex);
         }
     }
 }

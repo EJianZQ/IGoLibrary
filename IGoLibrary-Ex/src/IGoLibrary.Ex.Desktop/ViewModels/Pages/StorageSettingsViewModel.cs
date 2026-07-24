@@ -118,7 +118,7 @@ public sealed partial class StorageSettingsViewModel(
             }
             catch (Exception ex)
             {
-                activityLogService.Write(LogEntryKind.Warning, "Storage", $"显示存储位置启动结果失败：{ex.Message}");
+                activityLogService.Write(LogEntryKind.Warning, "Storage", $"显示存储位置启动结果失败：{ex.Message}", ex);
             }
         }
 
@@ -190,7 +190,7 @@ public sealed partial class StorageSettingsViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Error, "Storage", $"应用存储位置失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "Storage", $"应用存储位置失败：{ex.Message}", ex);
             await notificationService.ShowWarningAsync(
                 "无法更改存储位置",
                 ex.Message,
@@ -333,7 +333,7 @@ public sealed partial class StorageSettingsViewModel(
                         ApplyNormalizedLoggingSettings(persisted);
                     }
 
-                    activityLogService.Write(LogEntryKind.Warning, "Settings", $"保存日志设置失败：{ex.Message}");
+                    activityLogService.Write(LogEntryKind.Warning, "Settings", $"保存日志设置失败：{ex.Message}", ex);
                     await TryShowLoggingWarningAsync("无法保存日志设置", ex.Message);
                 }
             }
@@ -366,7 +366,7 @@ public sealed partial class StorageSettingsViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Settings", $"显示日志设置提示失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Settings", $"显示日志设置提示失败：{ex.Message}", ex);
         }
     }
 

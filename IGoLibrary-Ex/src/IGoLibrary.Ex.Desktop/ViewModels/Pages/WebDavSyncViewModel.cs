@@ -337,7 +337,7 @@ public sealed partial class WebDavSyncViewModel : ViewModelBase
         catch (Exception ex)
         {
             StatusText = $"操作失败：{ex.Message}";
-            _activityLogService.Write(LogEntryKind.Error, "Backup", StatusText);
+            _activityLogService.Write(LogEntryKind.Error, "Backup", StatusText, ex);
             await _notificationService.ShowWarningAsync("WebDAV 操作失败", ex.Message, CancellationToken.None);
         }
         finally

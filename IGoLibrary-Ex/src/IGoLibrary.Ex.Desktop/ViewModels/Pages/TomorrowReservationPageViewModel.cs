@@ -452,7 +452,7 @@ public sealed partial class TomorrowReservationPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Tomorrow", $"停止明日预约失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Tomorrow", $"停止明日预约失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("停止明日预约失败", ex.Message);
         }
     }
@@ -513,7 +513,7 @@ public sealed partial class TomorrowReservationPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Tomorrow", $"启动明日预约失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Tomorrow", $"启动明日预约失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("启动明日预约失败", ex.Message);
         }
     }
@@ -743,7 +743,7 @@ public sealed partial class TomorrowReservationPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存明日预约触发时间默认值失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存明日预约触发时间默认值失败：{ex.Message}", ex);
         }
     }
 

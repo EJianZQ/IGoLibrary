@@ -61,7 +61,11 @@ internal sealed class TomorrowReservationWorkflowRunner(
             }
             catch (Exception ex)
             {
-                activityLogService.Write(LogEntryKind.Warning, "Tomorrow", $"明日预约预热失败，继续提交预约：{ex.Message}");
+                activityLogService.Write(
+                    LogEntryKind.Warning,
+                    "Tomorrow",
+                    $"明日预约预热失败，继续提交预约：{ex.Message}",
+                    ex);
             }
 
             MarkRequestSent("正在提交明日预约");
@@ -87,7 +91,11 @@ internal sealed class TomorrowReservationWorkflowRunner(
             }
             catch (Exception ex)
             {
-                activityLogService.Write(LogEntryKind.Warning, "Tomorrow", $"明日预约结果验证失败：{ex.Message}");
+                activityLogService.Write(
+                    LogEntryKind.Warning,
+                    "Tomorrow",
+                    $"明日预约结果验证失败：{ex.Message}",
+                    ex);
             }
 
             var matchedVerification = verification is not null &&
@@ -119,7 +127,7 @@ internal sealed class TomorrowReservationWorkflowRunner(
             context.Fail(
                 $"明日预约任务失败：{ex.Message}",
                 isSessionInvalid ? CoordinatorStatusReason.SessionInvalid : CoordinatorStatusReason.TaskFailed);
-            activityLogService.Write(LogEntryKind.Error, "Tomorrow", ex.Message);
+            activityLogService.Write(LogEntryKind.Error, "Tomorrow", ex.Message, ex);
             if (isSessionInvalid)
             {
                 await PublishCoordinatorEventSafelyAsync(
@@ -140,6 +148,7 @@ internal sealed class TomorrowReservationWorkflowRunner(
         CancellationToken cancellationToken)
     {
         var targetStart = TomorrowReservationStateMachine.ResolveNextScheduledStart(scheduledStart, runtime.Now);
+        var logThrottle = new ScheduledWaitLogThrottle();
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -152,11 +161,15 @@ internal sealed class TomorrowReservationWorkflowRunner(
                 return;
             }
 
-            context.SetRunning($"明日预约等待中，目标触发时间 {targetStart:yyyy-MM-dd HH:mm:ss}");
-            activityLogService.Write(
-                LogEntryKind.Info,
-                "Tomorrow",
-                $"明日预约等待中，目标触发时间 {targetStart:yyyy-MM-dd HH:mm:ss}，还剩 {remaining:hh\\:mm\\:ss}");
+            if (logThrottle.ShouldLog(remaining))
+            {
+                context.SetRunning($"明日预约等待中，目标触发时间 {targetStart:yyyy-MM-dd HH:mm:ss}");
+                activityLogService.Write(
+                    LogEntryKind.Info,
+                    "Tomorrow",
+                    $"明日预约等待中，目标触发时间 {targetStart:yyyy-MM-dd HH:mm:ss}，还剩 {remaining:hh\\:mm\\:ss}");
+            }
+
             await runtime.DelayAsync(delay, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
         }
@@ -175,7 +188,7 @@ internal sealed class TomorrowReservationWorkflowRunner(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"{failureMessage}：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"{failureMessage}：{ex.Message}", ex);
         }
     }
 

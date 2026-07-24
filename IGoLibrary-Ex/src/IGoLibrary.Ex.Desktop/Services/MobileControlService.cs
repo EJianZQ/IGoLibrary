@@ -29,6 +29,7 @@ public sealed class MobileControlService(
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly object _devicesGate = new();
+    private readonly NetworkRequestSecurityAuditor _securityAuditor = new(logger, "手机控制");
     private readonly Dictionary<string, DateTimeOffset> _deviceLastSeenByKey = new(StringComparer.Ordinal);
     private WebApplication? _app;
     private MobileControlSession? _session;
@@ -64,6 +65,10 @@ public sealed class MobileControlService(
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            logger.LogInformation(
+                "开始启动手机控制服务。请求模式={RequestedMode}，端口={Port}。",
+                settings.NetworkMode,
+                settings.Port);
             await StopCurrentSessionAsync(MobileControlStopReason.Replaced, null, cancellationToken);
 
             var address = addressProvider.GetPrimaryLanAddress()
@@ -118,10 +123,20 @@ public sealed class MobileControlService(
                     null,
                     DevicePruneInterval,
                     DevicePruneInterval);
+                logger.LogInformation(
+                    "手机控制服务已启动。会话标识={SessionId}，生效模式={EffectiveMode}，端口={Port}。",
+                    session.SessionId,
+                    session.EffectiveMode,
+                    session.Port);
                 return session;
             }
-            catch
+            catch (Exception ex)
             {
+                logger.LogError(
+                    ex,
+                    "手机控制服务启动失败。请求模式={RequestedMode}，端口={Port}。",
+                    settings.NetworkMode,
+                    settings.Port);
                 await DisposeUnpublishedAppAsync(app, appStarted);
                 throw;
             }
@@ -139,7 +154,15 @@ public sealed class MobileControlService(
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            await StopCurrentSessionAsync(reason, null, cancellationToken);
+            try
+            {
+                await StopCurrentSessionAsync(reason, null, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "停止手机控制服务失败。原因={StopReason}。", reason);
+                throw;
+            }
         }
         finally
         {
@@ -155,7 +178,7 @@ public sealed class MobileControlService(
 
     private async Task WriteLandingPageAsync(HttpContext context, string token)
     {
-        if (!IsValidToken(context, token))
+        if (!_securityAuditor.IsValidToken(context, token))
         {
             await WriteForbiddenAsync(context);
             return;
@@ -169,7 +192,7 @@ public sealed class MobileControlService(
 
     private async Task WriteStatusAsync(HttpContext context, string token)
     {
-        if (!IsValidToken(context, token))
+        if (!_securityAuditor.IsValidToken(context, token))
         {
             await WriteForbiddenAsync(context);
             return;
@@ -187,7 +210,7 @@ public sealed class MobileControlService(
 
     private async Task WriteAuthQrCodeAsync(HttpContext context, string token)
     {
-        if (!IsValidToken(context, token))
+        if (!_securityAuditor.IsValidToken(context, token))
         {
             await WriteForbiddenAsync(context);
             return;
@@ -204,7 +227,7 @@ public sealed class MobileControlService(
 
     private async Task WriteTaskRecordsAsync(HttpContext context, string token)
     {
-        if (!IsValidToken(context, token))
+        if (!_securityAuditor.IsValidToken(context, token))
         {
             await WriteForbiddenAsync(context);
             return;
@@ -241,7 +264,7 @@ public sealed class MobileControlService(
 
     private async Task WriteStartTaskAsync(HttpContext context, string token)
     {
-        if (!IsValidToken(context, token))
+        if (!_securityAuditor.IsValidToken(context, token))
         {
             await WriteForbiddenAsync(context);
             return;
@@ -266,6 +289,7 @@ public sealed class MobileControlService(
             }
             catch (MobileControlTaskStartBodyTooLargeException)
             {
+                LogRejectedPayload(context, "task_start_body_too_large", StatusCodes.Status413PayloadTooLarge);
                 await WriteActionResponseAsync(
                     context,
                     new MobileControlActionResult(false, "提交内容过大", StatusCodes.Status413PayloadTooLarge));
@@ -273,6 +297,7 @@ public sealed class MobileControlService(
             }
             catch (MobileControlTaskStartBodyException ex)
             {
+                LogRejectedPayload(context, "task_start_body_invalid", StatusCodes.Status400BadRequest);
                 await WriteActionResponseAsync(
                     context,
                     new MobileControlActionResult(false, ex.Message, StatusCodes.Status400BadRequest));
@@ -280,6 +305,7 @@ public sealed class MobileControlService(
             }
             catch (JsonException)
             {
+                LogRejectedPayload(context, "task_start_json_invalid", StatusCodes.Status400BadRequest);
                 await WriteActionResponseAsync(
                     context,
                     new MobileControlActionResult(false, "提交内容格式无效", StatusCodes.Status400BadRequest));
@@ -294,6 +320,7 @@ public sealed class MobileControlService(
             }
             catch (MobileControlTaskStartBodyTooLargeException)
             {
+                LogRejectedPayload(context, "occupy_body_too_large", StatusCodes.Status413PayloadTooLarge);
                 await WriteActionResponseAsync(
                     context,
                     new MobileControlActionResult(false, "提交内容过大", StatusCodes.Status413PayloadTooLarge));
@@ -301,6 +328,7 @@ public sealed class MobileControlService(
             }
             catch (MobileControlTaskStartBodyException ex)
             {
+                LogRejectedPayload(context, "occupy_body_invalid", StatusCodes.Status400BadRequest);
                 await WriteActionResponseAsync(
                     context,
                     new MobileControlActionResult(false, ex.Message, StatusCodes.Status400BadRequest));
@@ -316,7 +344,7 @@ public sealed class MobileControlService(
 
     private async Task WriteCancelTaskAsync(HttpContext context, string token)
     {
-        if (!IsValidToken(context, token))
+        if (!_securityAuditor.IsValidToken(context, token))
         {
             await WriteForbiddenAsync(context);
             return;
@@ -340,7 +368,7 @@ public sealed class MobileControlService(
 
     private async Task WriteCancelReservationAsync(HttpContext context, string token)
     {
-        if (!IsValidToken(context, token))
+        if (!_securityAuditor.IsValidToken(context, token))
         {
             await WriteForbiddenAsync(context);
             return;
@@ -355,7 +383,7 @@ public sealed class MobileControlService(
 
     private async Task WriteRefreshCookieAsync(HttpContext context, string token)
     {
-        if (!IsValidToken(context, token))
+        if (!_securityAuditor.IsValidToken(context, token))
         {
             await WriteForbiddenAsync(context);
             return;
@@ -369,6 +397,7 @@ public sealed class MobileControlService(
         }
         catch (SubmittedLinkBodyTooLargeException)
         {
+            LogRejectedPayload(context, "cookie_refresh_body_too_large", StatusCodes.Status413PayloadTooLarge);
             await WriteActionResponseAsync(
                 context,
                 new MobileControlActionResult(
@@ -379,6 +408,7 @@ public sealed class MobileControlService(
         }
         catch (JsonException)
         {
+            LogRejectedPayload(context, "cookie_refresh_json_invalid", StatusCodes.Status400BadRequest);
             await WriteActionResponseAsync(
                 context,
                 new MobileControlActionResult(
@@ -401,7 +431,14 @@ public sealed class MobileControlService(
     {
         try
         {
-            await WriteActionResponseAsync(context, await action());
+            var result = await action();
+            logger.LogInformation(
+                "手机控制动作已处理。方法={Method}，路径={Path}，成功={Succeeded}，状态码={StatusCode}。",
+                context.Request.Method,
+                context.Request.Path.Value,
+                result.Success,
+                result.StatusCode);
+            await WriteActionResponseAsync(context, result);
         }
         catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
         {
@@ -465,7 +502,11 @@ public sealed class MobileControlService(
 
         if (session is not null)
         {
-            Stopped?.Invoke(this, new MobileControlStoppedEventArgs(session.SessionId, reason, message));
+            logger.LogInformation(
+                "手机控制服务已停止。会话标识={SessionId}，原因={StopReason}。",
+                session.SessionId,
+                reason);
+            PublishStopped(new MobileControlStoppedEventArgs(session.SessionId, reason, message));
         }
     }
 
@@ -532,7 +573,12 @@ public sealed class MobileControlService(
             return;
         }
 
-        DeviceCountChanged?.Invoke(this, new MobileControlDeviceCountChangedEventArgs(count));
+        SafeEventPublisher.Publish(
+            this,
+            DeviceCountChanged,
+            new MobileControlDeviceCountChangedEventArgs(count),
+            logger,
+            "手机控制设备数量事件订阅者处理失败。");
     }
 
     private static MobileControlSession BuildLanSession(
@@ -583,7 +629,11 @@ public sealed class MobileControlService(
             EffectiveMode = e.EffectiveMode
         };
         _session = session;
-        EndpointChanged?.Invoke(this, new MobileControlEndpointChangedEventArgs(session));
+        logger.LogInformation(
+            "手机控制发布端点已更新。会话标识={SessionId}，生效模式={EffectiveMode}。",
+            session.SessionId,
+            session.EffectiveMode);
+        PublishEndpointChanged(new MobileControlEndpointChangedEventArgs(session));
     }
 
     private static Task WriteHealthCheckAsync(HttpContext context)
@@ -612,20 +662,43 @@ public sealed class MobileControlService(
         }
     }
 
-    private static bool IsValidToken(HttpContext context, string expectedToken)
-    {
-        return string.Equals(
-            context.Request.Query["token"].ToString(),
-            expectedToken,
-            StringComparison.Ordinal);
-    }
-
     private static Task WriteForbiddenAsync(HttpContext context)
     {
         return WriteJsonAsync(
             context,
             StatusCodes.Status403Forbidden,
             new { success = false, message = "手机控制访问令牌无效，请从电脑端重新扫码进入" });
+    }
+
+    private void LogRejectedPayload(HttpContext context, string reason, int statusCode)
+    {
+        logger.LogWarning(
+            "手机控制拒绝无效请求内容。方法={Method}，路径={Path}，原因={Reason}，状态码={StatusCode}，内容长度={ContentLength}。",
+            context.Request.Method,
+            context.Request.Path.Value,
+            reason,
+            statusCode,
+            context.Request.ContentLength);
+    }
+
+    private void PublishStopped(MobileControlStoppedEventArgs args)
+    {
+        SafeEventPublisher.Publish(
+            this,
+            Stopped,
+            args,
+            logger,
+            "手机控制停止事件订阅者处理失败。");
+    }
+
+    private void PublishEndpointChanged(MobileControlEndpointChangedEventArgs args)
+    {
+        SafeEventPublisher.Publish(
+            this,
+            EndpointChanged,
+            args,
+            logger,
+            "手机控制端点变更事件订阅者处理失败。");
     }
 
     private static async Task WriteJsonAsync(

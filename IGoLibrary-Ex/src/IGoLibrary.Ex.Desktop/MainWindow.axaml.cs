@@ -15,6 +15,7 @@ using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Desktop.ViewModels;
 using IGoLibrary.Ex.Domain.Helpers;
 using IGoLibrary.Ex.Domain.Models;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Desktop;
 
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
     private readonly INotificationService _notificationService;
     private readonly IAlertSoundService _alertSoundService;
     private readonly IMainWindowSizePersistenceService _windowSizePersistenceService;
+    private readonly IAppLogWriter? _logWriter;
     private readonly DispatcherTimer _globalLeakPriorityAutoScrollTimer;
     private readonly DispatcherTimer _modalAttentionAnimationTimer;
     private MainWindowViewModel? _observedViewModel;
@@ -90,12 +92,14 @@ public partial class MainWindow : Window
         AppWindowService appWindowService,
         INotificationService notificationService,
         IAlertSoundService alertSoundService,
-        IMainWindowSizePersistenceService windowSizePersistenceService)
+        IMainWindowSizePersistenceService windowSizePersistenceService,
+        IAppLogWriter? logWriter = null)
     {
         _appWindowService = appWindowService;
         _notificationService = notificationService;
         _alertSoundService = alertSoundService;
         _windowSizePersistenceService = windowSizePersistenceService;
+        _logWriter = logWriter;
         _globalLeakPriorityAutoScrollTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(40)
@@ -155,13 +159,37 @@ public partial class MainWindow : Window
     {
         try
         {
-            await viewModel.FlushPendingScheduledStartDefaultsAsync();
+            try
+            {
+                await viewModel.FlushPendingScheduledStartDefaultsAsync();
+            }
+            catch (Exception ex)
+            {
+                _logWriter?.Write(
+                    LogLevel.Error,
+                    "UI.Shutdown",
+                    "关闭窗口前刷新定时任务默认值失败。",
+                    ex,
+                    new EventId(8101, "ShutdownDefaultsFlushFailed"));
+            }
         }
         finally
         {
             try
             {
-                await _windowSizePersistenceService.FlushAsync();
+                try
+                {
+                    await _windowSizePersistenceService.FlushAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logWriter?.Write(
+                        LogLevel.Error,
+                        "UI.Shutdown",
+                        "关闭窗口前保存窗口尺寸失败。",
+                        ex,
+                        new EventId(8102, "ShutdownWindowSizeFlushFailed"));
+                }
             }
             finally
             {
@@ -205,7 +233,8 @@ public partial class MainWindow : Window
             _ = RunUiEventHandlerAsync(
                 () => TryAutoParseClipboardAsync(viewModel, isWindowInteractionReady: true),
                 _notificationService,
-                "自动读取剪贴板失败");
+                "自动读取剪贴板失败",
+                _logWriter);
         }
     }
 
@@ -248,7 +277,8 @@ public partial class MainWindow : Window
             _ = RunUiEventHandlerAsync(
                 () => TryAutoParseClipboardAsync(viewModel, isWindowInteractionReady: true),
                 _notificationService,
-                "自动读取剪贴板失败");
+                "自动读取剪贴板失败",
+                _logWriter);
             return;
         }
 
@@ -258,7 +288,8 @@ public partial class MainWindow : Window
             _ = RunUiEventHandlerAsync(
                 () => TryAutoParseClipboardAsync(viewModel, isWindowInteractionReady: true),
                 _notificationService,
-                "自动读取剪贴板失败");
+                "自动读取剪贴板失败",
+                _logWriter);
         }
     }
 
@@ -273,7 +304,8 @@ public partial class MainWindow : Window
         _ = RunUiEventHandlerAsync(
             () => viewModel.HandleVenuePickerLibraryClickAsync(library),
             _notificationService,
-            "处理场馆选择失败");
+            "处理场馆选择失败",
+            _logWriter);
     }
 
     private void OnSidebarPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -500,6 +532,12 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            _logWriter?.Write(
+                LogLevel.Error,
+                "UI.DragDrop",
+                "调整全域捡漏扫描优先级失败。",
+                ex,
+                new EventId(8103, "GlobalLeakPriorityDragFailed"));
             await _notificationService.ShowWarningAsync("调整扫描优先级失败", ex.Message);
         }
         finally
@@ -853,7 +891,8 @@ public partial class MainWindow : Window
                     "已从剪贴板读取",
                     isRemoteCheckIn
                         ? "检测到新授权链接，正在获取远程签到授权"
-                        : "检测到授权链接，已自动填入并开始解析"));
+                        : "检测到授权链接，已自动填入并开始解析"),
+                _logWriter);
             if (isRemoteCheckIn)
             {
                 await viewModel.RemoteCheckInPage.TryAutoParseClipboardLinkAsync(clipboardText);
@@ -898,7 +937,8 @@ public partial class MainWindow : Window
     internal static async Task RunUiEventHandlerAsync(
         Func<Task> action,
         INotificationService notificationService,
-        string failureTitle)
+        string failureTitle,
+        IAppLogWriter? logWriter = null)
     {
         try
         {
@@ -909,21 +949,37 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            logWriter?.Write(
+                LogLevel.Error,
+                "UI.Event",
+                failureTitle,
+                ex,
+                new EventId(8104, "UiEventHandlerFailed"));
             var message = string.IsNullOrWhiteSpace(ex.Message)
                 ? "界面操作失败，请稍后重试"
                 : ex.Message;
-            await TryShowNotificationAsync(() => notificationService.ShowWarningAsync(failureTitle, message));
+            await TryShowNotificationAsync(
+                () => notificationService.ShowWarningAsync(failureTitle, message),
+                logWriter);
         }
     }
 
-    private static async Task TryShowNotificationAsync(Func<Task> showNotificationAsync)
+    private static async Task TryShowNotificationAsync(
+        Func<Task> showNotificationAsync,
+        IAppLogWriter? logWriter = null)
     {
         try
         {
             await showNotificationAsync();
         }
-        catch
+        catch (Exception ex)
         {
+            logWriter?.Write(
+                LogLevel.Warning,
+                "UI.Notification",
+                "显示界面通知失败。",
+                ex,
+                new EventId(8105, "UiNotificationFailed"));
         }
     }
 

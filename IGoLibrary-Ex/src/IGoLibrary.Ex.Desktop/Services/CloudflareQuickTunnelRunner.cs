@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using IGoLibrary.Ex.Application.Logging;
 using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Desktop.Services;
@@ -141,10 +142,10 @@ internal sealed partial class CloudflareQuickTunnelRunner(
         }
         catch
         {
-            await StopProcessAsync(process);
+            await StopProcessAsync(process, logger);
             process.Dispose();
             healthProbe.Dispose();
-            TryDeleteDirectory(isolatedHome);
+            TryDeleteDirectory(isolatedHome, logger);
             if (compatibilityLease is not null)
             {
                 await compatibilityLease.DisposeAsync();
@@ -282,9 +283,9 @@ internal sealed partial class CloudflareQuickTunnelRunner(
             var failureMessage = DescribeHealthCheckFailure(failure);
             logger.LogWarning(
                 failure,
-                "Cloudflare Tunnel 公网健康检查未能在启动超时前通过：{HealthCheckUri}。" +
+                "Cloudflare Tunnel 公网健康检查未能在启动超时前通过。主机={HealthCheckHost}。" +
                 "最后连接错误：{HealthCheckError}",
-                publicHealthUri,
+                publicHealthUri.Host,
                 failureMessage);
             throw new TimeoutException(
                 $"Cloudflare Tunnel 未能在 {StartupTimeout.TotalSeconds:0} 秒内就绪。" +
@@ -377,7 +378,8 @@ internal sealed partial class CloudflareQuickTunnelRunner(
 
     internal static string SanitizeDiagnosticLine(string line)
     {
-        var sanitized = SensitiveValueRegex().Replace(line, "${prefix}[redacted]");
+        var sanitized = AppLogSanitizer.Sanitize(
+            SensitiveValueRegex().Replace(line, "${prefix}<redacted>"));
         const int maxLength = 500;
         return sanitized.Length <= maxLength
             ? sanitized
@@ -415,7 +417,7 @@ internal sealed partial class CloudflareQuickTunnelRunner(
         }
     }
 
-    internal static async Task StopProcessAsync(Process process)
+    internal static async Task StopProcessAsync(Process process, ILogger? logger = null)
     {
         try
         {
@@ -424,8 +426,9 @@ internal sealed partial class CloudflareQuickTunnelRunner(
                 return;
             }
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
+            logger?.LogDebug(ex, "检查 cloudflared 进程退出状态失败，进程可能已释放。");
             return;
         }
 
@@ -433,8 +436,9 @@ internal sealed partial class CloudflareQuickTunnelRunner(
         {
             process.Kill(entireProcessTree: true);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
+            logger?.LogDebug(ex, "停止 cloudflared 进程时发现进程已退出。");
             return;
         }
 
@@ -442,12 +446,13 @@ internal sealed partial class CloudflareQuickTunnelRunner(
         {
             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
         }
-        catch (TimeoutException)
+        catch (TimeoutException ex)
         {
+            logger?.LogWarning(ex, "停止 cloudflared 进程后等待退出超时。");
         }
     }
 
-    internal static void TryDeleteDirectory(string path)
+    internal static void TryDeleteDirectory(string path, ILogger? logger = null)
     {
         try
         {
@@ -456,8 +461,9 @@ internal sealed partial class CloudflareQuickTunnelRunner(
                 Directory.Delete(path, recursive: true);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            logger?.LogWarning(ex, "清理 cloudflared 隔离运行目录失败。");
         }
     }
 
@@ -545,7 +551,7 @@ internal sealed partial class CloudflareQuickTunnelRunner(
             }
 
             _stopSource.Cancel();
-            await CloudflareQuickTunnelRunner.StopProcessAsync(_process);
+            await CloudflareQuickTunnelRunner.StopProcessAsync(_process, _logger);
             try
             {
                 await Completion;
@@ -558,7 +564,7 @@ internal sealed partial class CloudflareQuickTunnelRunner(
                 _process.Dispose();
                 _healthProbe.Dispose();
                 _stopSource.Dispose();
-                CloudflareQuickTunnelRunner.TryDeleteDirectory(_isolatedHome);
+                CloudflareQuickTunnelRunner.TryDeleteDirectory(_isolatedHome, _logger);
                 if (_compatibilityLease is not null)
                 {
                     await _compatibilityLease.DisposeAsync();

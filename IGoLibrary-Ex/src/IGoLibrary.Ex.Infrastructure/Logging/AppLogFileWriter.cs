@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading.Channels;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Logging;
 using IGoLibrary.Ex.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +13,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
     private const int DefaultQueueCapacity = 2048;
     private const int FlushBatchSize = 20;
     private static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan HealthFailureNotificationInterval = TimeSpan.FromMinutes(1);
 
     private readonly string _logDirectory;
     private readonly DateTimeOffset _runStartedAt;
@@ -24,8 +26,16 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
     private readonly Func<Task>? _beforeWriteAsync;
     private long _droppedEntryCount;
     private int _acceptingWrites = 1;
+    private int _consecutiveFailureCount;
+    private DateTimeOffset _lastHealthFailureNotificationAt = DateTimeOffset.MinValue;
     private bool _configured;
     private bool _disposed;
+
+    public event EventHandler<AppLogWriterHealthChangedEventArgs>? HealthChanged;
+
+    public bool IsHealthy => Volatile.Read(ref _consecutiveFailureCount) == 0;
+
+    public int ConsecutiveFailureCount => Volatile.Read(ref _consecutiveFailureCount);
 
     public AppLogFileWriter()
         : this(logDirectory: null)
@@ -203,8 +213,9 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
         {
             _processingTask.GetAwaiter().GetResult();
         }
-        catch
+        catch (Exception ex)
         {
+            ReportFailure("释放日志写入队列", ex);
         }
     }
 
@@ -263,7 +274,8 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
                                 var creationCleanup = AppLogFileCatalog.EnforceRetention(
                                     _logDirectory,
                                     currentSettings.RetainedFileCount,
-                                    activeFilePath);
+                                    activeFilePath,
+                                    ReportCatalogFailure);
                                 _ = creationCleanup;
                             }
 
@@ -284,17 +296,33 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
                                 flushStopwatch.Restart();
                             }
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            ReportFailure("写入日志文件", ex);
                             if (activeWriter is not null)
                             {
-                                await activeWriter.DisposeAsync();
+                                try
+                                {
+                                    await activeWriter.DisposeAsync();
+                                }
+                                catch (Exception disposeException)
+                                {
+                                    ReportFailure("释放失效的日志文件", disposeException);
+                                }
+
                                 activeWriter = null;
                                 activeFilePath = null;
                             }
 
                             pendingWriteCount = 0;
                             flushStopwatch.Restart();
+                        }
+                        finally
+                        {
+                            if (activeWriter is not null)
+                            {
+                                ReportRecovered("写入日志文件");
+                            }
                         }
 
                         break;
@@ -328,6 +356,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
                         }
                         catch (Exception ex)
                         {
+                            ReportFailure("应用日志设置", ex);
                             request.Completion.SetException(ex);
                         }
 
@@ -348,6 +377,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
                         }
                         catch (Exception ex)
                         {
+                            ReportFailure("刷新日志文件", ex);
                             flushRequest.Completion.SetException(ex);
                         }
 
@@ -394,18 +424,20 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
         {
             Directory.CreateDirectory(_logDirectory);
         }
-        catch
+        catch (Exception ex)
         {
+            ReportFailure("创建日志目录", ex);
             return new LogRuntimeApplyResult(1, 1);
         }
         var legacyFailures = deleteLegacyFiles
-            ? AppLogFileCatalog.DeleteLegacyDailyFiles(_logDirectory)
+            ? AppLogFileCatalog.DeleteLegacyDailyFiles(_logDirectory, ReportCatalogFailure)
             : 0;
         var retentionFailures = enforceRetention
             ? AppLogFileCatalog.EnforceRetention(
                 _logDirectory,
                 settings.RetainedFileCount,
-                activeFilePath)
+                activeFilePath,
+                ReportCatalogFailure)
             : 0;
         return new LogRuntimeApplyResult(legacyFailures, retentionFailures);
     }
@@ -429,27 +461,28 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
         builder.Append('[');
         builder.Append(GetLevelCode(level));
         builder.Append("] ");
-        builder.Append(NormalizeCategory(category));
+        builder.Append(NormalizeCategory(AppLogSanitizer.Sanitize(category)));
 
         if (eventId != default && (eventId.Id != 0 || !string.IsNullOrWhiteSpace(eventId.Name)))
         {
-            builder.Append(" (EventId=");
+            builder.Append(" (事件编号=");
             builder.Append(eventId.Id);
             if (!string.IsNullOrWhiteSpace(eventId.Name))
             {
                 builder.Append(':');
-                builder.Append(eventId.Name);
+                builder.Append(AppLogSanitizer.Sanitize(eventId.Name));
             }
 
             builder.Append(')');
         }
 
         builder.Append(" - ");
-        builder.AppendLine(NormalizeMessage(message));
+        builder.AppendLine(NormalizeMessage(AppLogSanitizer.Sanitize(message)));
 
         if (exception is not null)
         {
-            foreach (var line in exception.ToString().ReplaceLineEndings("\n").Split('\n'))
+            var sanitizedException = AppLogSanitizer.Sanitize(exception.ToString());
+            foreach (var line in sanitizedException.ReplaceLineEndings("\n").Split('\n'))
             {
                 builder.Append("    ");
                 builder.AppendLine(line);
@@ -506,6 +539,80 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
             LogLevel.Critical => "CRT",
             _ => "UNK"
         };
+    }
+
+    private void ReportFailure(string operation, Exception exception)
+    {
+        var failureCount = Interlocked.Increment(ref _consecutiveFailureCount);
+        var now = _clock();
+        bool shouldNotify;
+        lock (_stateGate)
+        {
+            shouldNotify = failureCount == 1 ||
+                           now - _lastHealthFailureNotificationAt >= HealthFailureNotificationInterval;
+            if (shouldNotify)
+            {
+                _lastHealthFailureNotificationAt = now;
+            }
+        }
+
+        if (!shouldNotify)
+        {
+            return;
+        }
+
+        PublishHealthChanged(new AppLogWriterHealthChangedEventArgs(
+            isHealthy: false,
+            failureCount,
+            now,
+            operation,
+            AppLogSanitizer.Sanitize($"{exception.GetType().Name}: {exception.Message}")));
+    }
+
+    private void ReportCatalogFailure(string operation, Exception exception)
+    {
+        ReportFailure(operation, exception);
+        Write(
+            LogLevel.Warning,
+            "Logging",
+            $"{operation}失败。",
+            exception,
+            new EventId(1002, "LogCatalogOperationFailed"));
+    }
+
+    private void ReportRecovered(string operation)
+    {
+        var previousFailureCount = Interlocked.Exchange(ref _consecutiveFailureCount, 0);
+        if (previousFailureCount == 0)
+        {
+            return;
+        }
+
+        PublishHealthChanged(new AppLogWriterHealthChangedEventArgs(
+            isHealthy: true,
+            consecutiveFailureCount: 0,
+            _clock(),
+            operation));
+    }
+
+    private void PublishHealthChanged(AppLogWriterHealthChangedEventArgs args)
+    {
+        var handlers = HealthChanged;
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (EventHandler<AppLogWriterHealthChangedEventArgs> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, args);
+            }
+            catch
+            {
+            }
+        }
     }
 
     private abstract record QueuedWorkItem;

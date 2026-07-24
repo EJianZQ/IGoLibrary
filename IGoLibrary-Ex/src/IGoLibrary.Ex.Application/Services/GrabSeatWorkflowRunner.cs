@@ -107,7 +107,7 @@ internal sealed class GrabSeatWorkflowRunner(
             context.Fail(
                 $"抢座任务失败：{ex.Message}",
                 isSessionInvalid ? CoordinatorStatusReason.SessionInvalid : CoordinatorStatusReason.TaskFailed);
-            activityLogService.Write(LogEntryKind.Error, "Grab", ex.Message);
+            activityLogService.Write(LogEntryKind.Error, "Grab", ex.Message, ex);
             if (isSessionInvalid)
             {
                 await PublishCoordinatorEventSafelyAsync(
@@ -125,6 +125,7 @@ internal sealed class GrabSeatWorkflowRunner(
     private async Task WaitUntilScheduledStartAsync(TimeOnly scheduledStart, CancellationToken cancellationToken)
     {
         var targetStart = GrabSeatStateMachine.ResolveNextScheduledStart(scheduledStart, runtime.Now);
+        var logThrottle = new ScheduledWaitLogThrottle();
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -136,10 +137,14 @@ internal sealed class GrabSeatWorkflowRunner(
                 return;
             }
 
-            activityLogService.Write(
-                LogEntryKind.Info,
-                "Grab",
-                $"定时抢座等待中，目标启动时间 {targetStart:yyyy-MM-dd HH:mm:ss}，还剩 {remaining:hh\\:mm\\:ss}。");
+            if (logThrottle.ShouldLog(remaining))
+            {
+                activityLogService.Write(
+                    LogEntryKind.Info,
+                    "Grab",
+                    $"定时抢座等待中，目标启动时间 {targetStart:yyyy-MM-dd HH:mm:ss}，还剩 {remaining:hh\\:mm\\:ss}。");
+            }
+
             await runtime.DelayAsync(remaining < TimeSpan.FromSeconds(1) ? remaining : TimeSpan.FromSeconds(1), cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
         }
@@ -158,7 +163,7 @@ internal sealed class GrabSeatWorkflowRunner(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"{failureMessage}：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"{failureMessage}：{ex.Message}", ex);
         }
     }
 

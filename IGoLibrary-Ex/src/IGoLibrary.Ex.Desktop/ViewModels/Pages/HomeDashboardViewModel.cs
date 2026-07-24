@@ -487,7 +487,7 @@ public sealed partial class HomeDashboardViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Dashboard", $"保存首页统计信息失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Dashboard", $"保存首页统计信息失败：{ex.Message}", ex);
         }
     }
 

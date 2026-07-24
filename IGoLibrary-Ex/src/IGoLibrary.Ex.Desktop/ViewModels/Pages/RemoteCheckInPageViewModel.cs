@@ -239,7 +239,8 @@ public sealed partial class RemoteCheckInPageViewModel : ViewModelBase
             _activityLogService.Write(
                 LogEntryKind.Warning,
                 "RemoteCheckIn",
-                $"加载当前场馆签到配置失败：{ex.Message}");
+                $"加载当前场馆签到配置失败：{ex.Message}",
+                ex);
         }
     }
 

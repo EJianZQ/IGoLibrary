@@ -55,9 +55,12 @@ public sealed class SessionService(
         {
             stored = await credentialStore.LoadSessionAsync(cancellationToken);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
-            await ClearStoredSessionSafelyAsync("本地持久化会话已损坏，已自动清理。", cancellationToken);
+            await ClearStoredSessionSafelyAsync(
+                "本地持久化会话已损坏，已自动清理。",
+                cancellationToken,
+                ex);
             return null;
         }
 
@@ -74,7 +77,10 @@ public sealed class SessionService(
         catch (InvalidOperationException ex)
         {
             sessionState.Session = null;
-            await ClearStoredSessionSafelyAsync($"本地会话已失效，已自动移除：{ex.Message}", cancellationToken);
+            await ClearStoredSessionSafelyAsync(
+                $"本地会话已失效，已自动移除：{ex.Message}",
+                cancellationToken,
+                ex);
             return null;
         }
 
@@ -100,6 +106,11 @@ public sealed class SessionService(
         catch (Exception ex)
         {
             clearFailure = ex;
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "Auth",
+                $"清理主会话安全凭据失败：{ex.Message}",
+                ex);
         }
 
         try
@@ -109,6 +120,11 @@ public sealed class SessionService(
         catch (Exception ex)
         {
             clearFailure ??= ex;
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "Auth",
+                $"清理远程签到安全凭据失败：{ex.Message}",
+                ex);
         }
 
         if (clearFailure is not null)
@@ -134,7 +150,10 @@ public sealed class SessionService(
         await apiClient.ValidateCookieAsync(cookie, cancellationToken);
     }
 
-    private async Task ClearStoredSessionSafelyAsync(string message, CancellationToken cancellationToken)
+    private async Task ClearStoredSessionSafelyAsync(
+        string message,
+        CancellationToken cancellationToken,
+        Exception? reason = null)
     {
         try
         {
@@ -142,10 +161,14 @@ public sealed class SessionService(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Auth", $"清理本地会话失败：{ex.Message}");
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "Auth",
+                $"清理本地会话失败：{ex.Message}",
+                ex);
             return;
         }
 
-        activityLogService.Write(LogEntryKind.Warning, "Auth", message);
+        activityLogService.Write(LogEntryKind.Warning, "Auth", message, reason);
     }
 }

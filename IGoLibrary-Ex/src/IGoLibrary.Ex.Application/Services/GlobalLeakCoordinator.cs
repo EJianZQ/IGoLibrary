@@ -10,10 +10,11 @@ internal sealed class GlobalLeakCoordinator : IGlobalLeakCoordinator
 
     public GlobalLeakCoordinator(
         GlobalLeakWorkflowRunner workflowRunner,
-        ICoordinatorRuntime runtime)
+        ICoordinatorRuntime runtime,
+        IAppLogWriter? logWriter = null)
     {
         _workflowRunner = workflowRunner;
-        _controller = new CoordinatorRunController("全域捡漏", runtime);
+        _controller = new CoordinatorRunController("全域捡漏", runtime, logWriter);
     }
 
     public event EventHandler<CoordinatorStatus>? StatusChanged

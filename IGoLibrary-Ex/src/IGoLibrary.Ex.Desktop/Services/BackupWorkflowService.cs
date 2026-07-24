@@ -197,7 +197,8 @@ public sealed class BackupWorkflowService(
                 activityLogService.Write(
                     LogEntryKind.Warning,
                     "Backup",
-                    "远端备份密码轮换结果无法确认；本机保留新密码及受保护的旧密码，等待下次成功上传确认");
+                    "远端备份密码轮换结果无法确认；本机保留新密码及受保护的旧密码，等待下次成功上传确认",
+                    ex);
                 throw new InvalidOperationException(
                     "远端是否已接收新密码加密的备份无法确认。本机已保留新密码和受保护的旧密码；请勿再次修改密码，并在网络恢复后手动上传一次。",
                     ex);
@@ -225,7 +226,8 @@ public sealed class BackupWorkflowService(
             activityLogService.Write(
                 LogEntryKind.Warning,
                 "Backup",
-                $"远端备份已更新，但清理旧备份密码恢复副本失败：{ex.Message}");
+                $"远端备份已更新，但清理旧备份密码恢复副本失败：{ex.Message}",
+                ex);
         }
     }
 

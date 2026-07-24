@@ -278,7 +278,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         }
 
         _systemSettingsAutoSave.Schedule(ex =>
-            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存系统设置失败：{ex.Message}"));
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"自动保存系统设置失败：{ex.Message}", ex));
     }
 
     public void CancelPendingAutoSave()
@@ -501,7 +501,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         catch (Exception ex)
         {
             ApplyTunnelFallbackSelection(_appliedFallbackToLocalNetworkOnTunnelFailure);
-            _activityLogService.Write(LogEntryKind.Warning, "Network", $"保存 Tunnel 故障回退设置失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Network", $"保存 Tunnel 故障回退设置失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("保存故障回退设置失败", ex.Message);
         }
     }
@@ -525,7 +525,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         catch (Exception ex)
         {
             ApplyTunnelProxySelection(_appliedTunnelProxyMode, _appliedTunnelManualProxyUrl);
-            _activityLogService.Write(LogEntryKind.Warning, "Network", $"应用 Cloudflare Tunnel 代理设置失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Network", $"应用 Cloudflare Tunnel 代理设置失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("代理设置应用失败", ex.Message);
         }
         finally
@@ -557,7 +557,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
                 _appliedClashMihomoCompatibilityEnabled,
                 _appliedClashMihomoConfigPath,
                 _appliedClashMihomoRoutePolicy);
-            _activityLogService.Write(LogEntryKind.Warning, "Network", $"应用 Clash/Mihomo 兼容模式失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Network", $"应用 Clash/Mihomo 兼容模式失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("兼容模式应用失败", ex.Message);
         }
         finally
@@ -583,7 +583,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         catch (Exception ex)
         {
             ApplyNetworkModeSelection(_networkExposureManager.CurrentMode);
-            _activityLogService.Write(LogEntryKind.Warning, "Network", $"切换手机控制网络方式失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Network", $"切换手机控制网络方式失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("切换网络方式失败", ex.Message);
         }
         finally
@@ -790,7 +790,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"更新开机启动项失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"更新开机启动项失败：{ex.Message}", ex);
 
             _isRollingBackStartupEntry = true;
             try
@@ -822,7 +822,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"同步开机启动项失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"同步开机启动项失败：{ex.Message}", ex);
         }
     }
 
@@ -836,7 +836,7 @@ public sealed partial class SystemSettingsViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"提示开机启动不可用失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Settings", $"提示开机启动不可用失败：{ex.Message}", ex);
         }
     }
 }

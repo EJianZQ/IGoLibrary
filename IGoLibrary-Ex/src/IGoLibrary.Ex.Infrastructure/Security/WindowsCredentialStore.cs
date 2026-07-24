@@ -72,7 +72,8 @@ public sealed class WindowsCredentialStore(IPersistentDataChangeTracker? changeT
         {
             if (!CredWrite(ref credential, 0))
             {
-                throw new InvalidOperationException("写入 Windows 凭据管理器失败");
+                var errorCode = Marshal.GetLastWin32Error();
+                throw new Win32Exception(errorCode, $"写入 Windows 凭据管理器失败（错误码 {errorCode}）");
             }
         }
         finally
@@ -90,7 +91,13 @@ public sealed class WindowsCredentialStore(IPersistentDataChangeTracker? changeT
     {
         if (!CredRead(targetName, 1, 0, out var credentialPtr))
         {
-            return Task.FromResult<T?>(default);
+            var errorCode = Marshal.GetLastWin32Error();
+            if (errorCode == ErrorNotFound)
+            {
+                return Task.FromResult<T?>(default);
+            }
+
+            throw new Win32Exception(errorCode, $"读取 Windows 凭据管理器失败（错误码 {errorCode}）");
         }
 
         try

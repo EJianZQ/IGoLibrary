@@ -210,6 +210,38 @@ public sealed class TomorrowReservationCoordinatorTests
     }
 
     [Fact]
+    public async Task RunAsync_ThrottlesScheduledWaitLogs_DuringHighPrecisionFinalWindow()
+    {
+        var activityLogService = new ActivityLogService();
+        var runtime = new FakeCoordinatorRuntime
+        {
+            Now = new DateTimeOffset(2026, 6, 8, 21, 47, 49, TimeSpan.FromHours(8)),
+            AdvanceOnDelay = true
+        };
+        var runner = new TomorrowReservationWorkflowRunner(
+            new FakeTraceIntApiClient
+            {
+                OnSaveTomorrowReservationAsync = (_, _, _, _) => Task.FromResult(true)
+            },
+            new FakeCoordinatorEventPublisher(),
+            activityLogService,
+            new AppRuntimeState
+            {
+                Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
+            },
+            runtime);
+        var context = new CoordinatorRunContext(new CoordinatorRunController("明日预约", runtime));
+
+        await runner.RunAsync(CreatePlan(executeImmediately: false), context, CancellationToken.None);
+
+        var waitEntries = activityLogService.Entries
+            .Where(entry => entry.Message.StartsWith("明日预约等待中", StringComparison.Ordinal))
+            .ToArray();
+        Assert.True(runtime.DelayRequests.Count > 100);
+        Assert.Equal(6, waitEntries.Length);
+    }
+
+    [Fact]
     public void ResolveNextScheduledStart_ReturnsTomorrow_WhenScheduledTimeEqualsNow()
     {
         var now = new DateTimeOffset(2026, 6, 8, 21, 48, 0, TimeSpan.FromHours(8));

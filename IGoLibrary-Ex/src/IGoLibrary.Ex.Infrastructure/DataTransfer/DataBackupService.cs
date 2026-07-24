@@ -118,7 +118,7 @@ public sealed class DataBackupService(
         catch (Exception ex)
         {
             logger.LogError(ex, "备份导出失败。操作 ID={OperationId}。", operationId);
-            activityLogService.Write(LogEntryKind.Error, "Backup", $"导出应用数据失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "Backup", $"导出应用数据失败：{ex.Message}", ex);
             throw;
         }
         finally
@@ -529,7 +529,7 @@ public sealed class DataBackupService(
         }
     }
 
-    private static void TryDeleteFile(string? path)
+    private void TryDeleteFile(string? path)
     {
         try
         {
@@ -538,8 +538,9 @@ public sealed class DataBackupService(
                 File.Delete(path);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "清理备份临时文件失败。");
         }
     }
 

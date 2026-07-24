@@ -253,7 +253,7 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Library", $"加载场馆列表失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Library", $"加载场馆列表失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("加载场馆失败", ex.Message);
         }
     }
@@ -290,7 +290,7 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Library", $"绑定场馆失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Library", $"绑定场馆失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("绑定场馆失败", ex.Message);
         }
     }
@@ -319,7 +319,7 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Library", $"刷新座位失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Library", $"刷新座位失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("刷新座位失败", ex.Message);
         }
     }
@@ -369,7 +369,7 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "Auth", $"清理上次场馆选择失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "Auth", $"清理上次场馆选择失败：{ex.Message}", ex);
         }
     }
 
@@ -454,7 +454,7 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Library", $"预览场馆失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Library", $"预览场馆失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("预览场馆失败", ex.Message);
         }
     }

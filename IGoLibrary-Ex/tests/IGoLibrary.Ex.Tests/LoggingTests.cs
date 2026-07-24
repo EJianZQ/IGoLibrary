@@ -41,6 +41,78 @@ public sealed class LoggingTests : IDisposable
     }
 
     [Fact]
+    public void ActivityLogService_Write_ForwardsExceptionAndEventId()
+    {
+        var writer = new CollectingLogWriter();
+        var service = new ActivityLogService(writer);
+        var exception = new InvalidOperationException("接口调用失败");
+        var eventId = new EventId(42, "ReservationFailed");
+
+        service.Write(LogEntryKind.Error, "Grab", "抢座失败。", exception, eventId);
+
+        var written = Assert.Single(writer.Entries);
+        Assert.Same(exception, written.Exception);
+        Assert.Equal(eventId, written.EventId);
+    }
+
+    [Fact]
+    public void ActivityLogService_Write_PublishesUiEntryBeforeForwardingToSharedWriter()
+    {
+        var writer = new CollectingLogWriter();
+        var service = new ActivityLogService(writer);
+        var writerEntryCountDuringNotification = -1;
+        service.EntryWritten += (_, _) => writerEntryCountDuringNotification = writer.Entries.Count;
+
+        service.Write(LogEntryKind.Info, "Grab", "任务状态已更新。");
+
+        Assert.Equal(0, writerEntryCountDuringNotification);
+        Assert.Single(writer.Entries);
+    }
+
+    [Fact]
+    public void ActivityLogService_Write_RedactsSensitiveValuesBeforePublishingUiEntry()
+    {
+        var writer = new CollectingLogWriter();
+        var service = new ActivityLogService(writer);
+
+        service.Write(
+            LogEntryKind.Error,
+            "Auth",
+            @"请求 https://example.test/callback?token=query-secret | {""token"":""json-secret with spaces""}");
+
+        var entry = Assert.Single(service.Entries);
+        Assert.DoesNotContain("query-secret", entry.Message);
+        Assert.DoesNotContain("json-secret", entry.Message);
+        Assert.Contains("<redacted>", entry.Message);
+
+        var written = Assert.Single(writer.Entries);
+        Assert.Equal(entry.Message, written.Message);
+    }
+
+    [Fact]
+    public void ActivityLogService_Write_IsolatesFailingSubscribers_AndNotifiesRemainingSubscribers()
+    {
+        var writer = new CollectingLogWriter();
+        var service = new ActivityLogService(writer);
+        var successfulSubscriberCalls = 0;
+        service.EntryWritten += (_, _) => throw new InvalidOperationException("订阅者失败");
+        service.EntryWritten += (_, _) => successfulSubscriberCalls++;
+
+        service.Write(LogEntryKind.Info, "Grab", "任务状态已更新。");
+
+        Assert.Equal(1, successfulSubscriberCalls);
+        Assert.Collection(
+            writer.Entries,
+            entry => Assert.Equal("Activity.Grab", entry.Category),
+            entry =>
+            {
+                Assert.Equal("ActivityLog", entry.Category);
+                Assert.IsType<InvalidOperationException>(entry.Exception);
+                Assert.Equal(1001, entry.EventId.Id);
+            });
+    }
+
+    [Fact]
     public void ActivityLogService_Write_KeepsOnlyLatest500Entries()
     {
         var service = new ActivityLogService();
@@ -92,6 +164,111 @@ public sealed class LoggingTests : IDisposable
 
         var line = Assert.Single(lines);
         Assert.Contains("第一行\\n第二行\\n第三行", line);
+    }
+
+    [Fact]
+    public void AppLogFileWriter_Write_RedactsSecretsUrlsAccountsAndUserPaths()
+    {
+        var timestamp = new DateTimeOffset(2026, 4, 20, 10, 5, 0, TimeSpan.FromHours(8));
+        using var writer = new AppLogFileWriter(_tempDirectory, clock: () => timestamp);
+
+        writer.Write(
+            LogLevel.Error,
+            "Security",
+            @"GET https://example.test/callback?token=query-secret | https://alice:uri-secret@example.test/file | Cookie: sid=cookie-secret | Authorization: Bearer auth-secret | Proxy-Authorization: Basic proxy-secret | Bearer loose-secret | token=named-secret | {""access_token"":""json-secret with spaces""} | alice@example.com | C:\Users\Alice Doe\config.json | /Users/alice/config.json",
+            new InvalidOperationException("password=hunter2 | /home/alice/config.json"));
+        writer.Flush();
+        writer.Dispose();
+
+        var logFile = Assert.Single(Directory.GetFiles(_tempDirectory, "app-*.log"));
+        var content = File.ReadAllText(logFile);
+        Assert.DoesNotContain("query-secret", content);
+        Assert.DoesNotContain("uri-secret", content);
+        Assert.DoesNotContain("cookie-secret", content);
+        Assert.DoesNotContain("auth-secret", content);
+        Assert.DoesNotContain("proxy-secret", content);
+        Assert.DoesNotContain("loose-secret", content);
+        Assert.DoesNotContain("named-secret", content);
+        Assert.DoesNotContain("json-secret", content);
+        Assert.DoesNotContain("hunter2", content);
+        Assert.DoesNotContain("alice@example.com", content);
+        Assert.DoesNotContain(@"\Alice Doe\", content);
+        Assert.DoesNotContain("/Users/alice/", content);
+        Assert.DoesNotContain("/home/alice/", content);
+        Assert.Contains("<redacted>", content);
+        Assert.Contains("***@example.com", content);
+        Assert.Contains(@"%USERPROFILE%\config.json", content);
+        Assert.Contains("/Users/<user>/config.json", content);
+        Assert.Contains("/home/<user>/config.json", content);
+    }
+
+    [Fact]
+    public void AppFileLoggerProvider_IncludesScopesAndEventId()
+    {
+        var writer = new CollectingLogWriter();
+        using var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.SetMinimumLevel(LogLevel.Trace);
+            builder.AddProvider(new AppFileLoggerProvider(writer));
+        });
+        var logger = loggerFactory.CreateLogger("Coordinator");
+
+        using (logger.BeginScope("RunId={RunId}", "run-42"))
+        {
+            logger.LogInformation(new EventId(2001, "RunStarted"), "任务已启动。");
+        }
+
+        var entry = Assert.Single(writer.Entries);
+        Assert.Contains("作用域=RunId=run-42", entry.Message);
+        Assert.Equal(2001, entry.EventId.Id);
+        Assert.Equal("RunStarted", entry.EventId.Name);
+    }
+
+    [Fact]
+    public void AppLogFileWriter_WriteFailure_ReportsUnhealthyThenRecovery()
+    {
+        var timestamp = new DateTimeOffset(2026, 4, 20, 10, 10, 0, TimeSpan.FromHours(8));
+        var writeAttempts = 0;
+        var healthChanges = new List<AppLogWriterHealthChangedEventArgs>();
+        using var writer = new AppLogFileWriter(
+            _tempDirectory,
+            retainedFileCount: 14,
+            clock: () => timestamp,
+            queueCapacity: 16,
+            beforeWriteAsync: () =>
+            {
+                if (Interlocked.Increment(ref writeAttempts) == 1)
+                {
+                    throw new IOException("模拟日志写入失败");
+                }
+
+                return Task.CompletedTask;
+            });
+        writer.HealthChanged += (_, args) => healthChanges.Add(args);
+
+        writer.Write(LogLevel.Error, "Logging", "第一次写入");
+        writer.Flush();
+        Assert.False(writer.IsHealthy);
+        Assert.Equal(1, writer.ConsecutiveFailureCount);
+
+        writer.Write(LogLevel.Error, "Logging", "第二次写入");
+        writer.Flush();
+
+        Assert.True(writer.IsHealthy);
+        Assert.Equal(0, writer.ConsecutiveFailureCount);
+        Assert.Collection(
+            healthChanges,
+            failed =>
+            {
+                Assert.False(failed.IsHealthy);
+                Assert.Equal("写入日志文件", failed.Operation);
+                Assert.Contains("模拟日志写入失败", failed.ErrorMessage);
+            },
+            recovered =>
+            {
+                Assert.True(recovered.IsHealthy);
+                Assert.Equal("写入日志文件", recovered.Operation);
+            });
     }
 
     [Fact]
@@ -358,7 +535,12 @@ public sealed class LoggingTests : IDisposable
     {
         private readonly object _gate = new();
 
-        public List<(LogLevel Level, string Category, string Message)> Entries { get; } = [];
+        public List<(
+            LogLevel Level,
+            string Category,
+            string Message,
+            Exception? Exception,
+            EventId EventId)> Entries { get; } = [];
 
         public int FlushCalls { get; private set; }
 
@@ -372,7 +554,7 @@ public sealed class LoggingTests : IDisposable
         {
             lock (_gate)
             {
-                Entries.Add((level, category, message));
+                Entries.Add((level, category, message, exception, eventId));
             }
         }
 

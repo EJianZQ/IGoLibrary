@@ -335,7 +335,7 @@ public sealed partial class SessionViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Auth", $"通过链接获取 Cookie 失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Auth", $"通过链接获取 Cookie 失败：{ex.Message}", ex);
             if (options.ShowDesktopNotifications)
             {
                 await _notificationService.ShowWarningAsync("获取 Cookie 失败", ex.Message);
@@ -532,7 +532,7 @@ public sealed partial class SessionViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Auth", $"手动验证 Cookie 失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Auth", $"手动验证 Cookie 失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("验证 Cookie 失败", ex.Message);
         }
     }
@@ -564,7 +564,7 @@ public sealed partial class SessionViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Auth", $"恢复会话失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Auth", $"恢复会话失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("恢复会话失败", ex.Message);
         }
     }
@@ -610,7 +610,8 @@ public sealed partial class SessionViewModel : ViewModelBase
             _activityLogService.Write(
                 LogEntryKind.Warning,
                 "Auth",
-                $"已退出当前会话，但清理本地安全凭据失败：{credentialClearFailure.Message}");
+                $"已退出当前会话，但清理本地安全凭据失败：{credentialClearFailure.Message}",
+                credentialClearFailure);
             await _notificationService.ShowWarningAsync(
                 "已退出，但凭据清理失败",
                 credentialClearFailure.Message);

@@ -10,6 +10,8 @@ internal static class BootstrapRunner
 
     public static async Task<int> RunAsync(string pipeName)
     {
+        var log = UpdaterLog.TryCreateEmergency("bootstrap");
+        log?.Info("开始连接更新引导命名管道。");
         using var timeout = new CancellationTokenSource(PipeTimeout);
         await using var pipe = new NamedPipeClientStream(
             ".",
@@ -34,6 +36,8 @@ internal static class BootstrapRunner
             var request = payload.Request;
             UpdateTransaction.ValidateRequestFile(payload.SourceRequestPath, request);
             UpdateTransaction.ValidateRequest(request);
+            log = new UpdaterLog(request.LogDirectory, request.TransactionId, "bootstrap");
+            log.Info("更新引导负载已验证，开始准备受保护工作目录。");
             var trustedUpdaterEntry = await ValidateTrustedBootstrapAsync(
                 request,
                 timeout.Token);
@@ -45,6 +49,7 @@ internal static class BootstrapRunner
             }
 
             Directory.CreateDirectory(secureDirectory);
+            log.Info("受保护更新工作目录已创建。");
             try
             {
                 UpdatePathSafety.RejectReparsePoint(secureDirectory);
@@ -88,6 +93,7 @@ internal static class BootstrapRunner
 
                 UpdateTransaction.ValidateRequestFile(protectedRequestPath, persistedRequest);
                 UpdateTransaction.ValidateRequest(persistedRequest);
+                log.Info("受保护 updater、更新包和事务请求均已完成复制与校验。");
 
                 using var worker = Process.Start(
                     UpdateProcessStartInfoFactory.CreateWorker(
@@ -100,15 +106,18 @@ internal static class BootstrapRunner
                     true,
                     "受保护的文件更新组件已启动",
                     worker.Id);
+                log.Info($"受保护的文件更新组件已启动。进程标识={worker.Id}。");
             }
-            catch
+            catch (Exception ex)
             {
-                TryDeleteSecureDirectory(request, secureDirectory);
+                log?.Error("准备或启动受保护文件更新组件失败。", ex);
+                TryDeleteSecureDirectory(request, secureDirectory, log);
                 throw;
             }
         }
         catch (Exception exception)
         {
+            log?.Error("更新引导流程失败。", exception);
             result = new UpdateBootstrapResult(
                 UpdateProtocol.SchemaVersion,
                 payload?.Request.TransactionId ?? string.Empty,
@@ -121,6 +130,7 @@ internal static class BootstrapRunner
             result,
             UpdateJsonTypeInfo.BootstrapResult,
             timeout.Token);
+        log?.Info($"更新引导结果已写回主进程。成功={result.Succeeded}。");
         return result.Succeeded ? 0 : 1;
     }
 
@@ -183,7 +193,8 @@ internal static class BootstrapRunner
 
     private static void TryDeleteSecureDirectory(
         UpdateTransactionRequest request,
-        string secureDirectory)
+        string secureDirectory,
+        UpdaterLog? log)
     {
         try
         {
@@ -199,10 +210,12 @@ internal static class BootstrapRunner
                     StringComparison.OrdinalIgnoreCase))
             {
                 Directory.Delete(secureDirectory, recursive: true);
+                log?.Info("失败后的受保护更新工作目录已清理。");
             }
         }
-        catch
+        catch (Exception ex)
         {
+            log?.Error("清理失败后的受保护更新工作目录失败。", ex);
         }
     }
 }

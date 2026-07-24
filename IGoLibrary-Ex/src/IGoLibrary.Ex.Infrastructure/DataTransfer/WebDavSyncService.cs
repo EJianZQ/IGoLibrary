@@ -181,7 +181,7 @@ internal sealed class WebDavSyncService(
         {
             SetStatus(_status with { IsBusy = false, Message = $"WebDAV 连接测试失败：{ex.Message}" });
             logger.LogError(ex, "WebDAV 连接测试失败。操作 ID={OperationId}。", operationId);
-            activityLogService.Write(LogEntryKind.Error, "Backup", $"WebDAV 连接测试失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "Backup", $"WebDAV 连接测试失败：{ex.Message}", ex);
             throw;
         }
         finally
@@ -282,7 +282,7 @@ internal sealed class WebDavSyncService(
                 HasConflict = true,
                 Message = ex.Message
             });
-            activityLogService.Write(LogEntryKind.Warning, "Backup", ex.Message);
+            activityLogService.Write(LogEntryKind.Warning, "Backup", ex.Message, ex);
             logger.LogWarning(ex, "WebDAV 上传发生冲突。操作 ID={OperationId}。", operationId);
             throw;
         }
@@ -290,7 +290,7 @@ internal sealed class WebDavSyncService(
         {
             SetStatus(_status with { IsBusy = false, Message = $"WebDAV 上传失败：{ex.Message}" });
             logger.LogError(ex, "WebDAV 上传失败。操作 ID={OperationId}。", operationId);
-            activityLogService.Write(LogEntryKind.Error, "Backup", $"WebDAV 上传失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "Backup", $"WebDAV 上传失败：{ex.Message}", ex);
             throw;
         }
         finally
@@ -354,7 +354,7 @@ internal sealed class WebDavSyncService(
         {
             SetStatus(_status with { IsBusy = false, Message = $"WebDAV 下载失败：{ex.Message}" });
             logger.LogError(ex, "WebDAV 下载失败。操作 ID={OperationId}。", operationId);
-            activityLogService.Write(LogEntryKind.Error, "Backup", $"WebDAV 下载失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "Backup", $"WebDAV 下载失败：{ex.Message}", ex);
             TryDeleteWorkspace(workspace);
             throw;
         }
@@ -510,7 +510,23 @@ internal sealed class WebDavSyncService(
     private void SetStatus(BackupSyncRuntimeStatus status)
     {
         _status = status;
-        StatusChanged?.Invoke(this, status);
+        var handlers = StatusChanged;
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (EventHandler<BackupSyncRuntimeStatus> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, status);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "WebDAV 状态订阅者处理失败，已隔离该订阅者。");
+            }
+        }
     }
 
     private void TryDeleteWorkspace(string? workspace)

@@ -20,11 +20,16 @@ public sealed class UpdateCheckService(
         var settings = await settingsService.LoadAsync(cancellationToken);
         var updateSettings = settings.Updates ?? UpdateCheckSettings.Default;
         var now = timeProvider.GetUtcNow();
+        logger.LogInformation(
+            "开始检查更新。检查模式={CheckMode}，当前版本={CurrentVersion}。",
+            mode,
+            appVersionProvider.CurrentVersionText);
 
         if (mode == UpdateCheckMode.Automatic)
         {
             if (!updateSettings.CheckOnStartup)
             {
+                logger.LogInformation("自动更新检查已跳过：启动检查已关闭。");
                 return UpdateCheckResult.Skipped(
                     UpdateCheckStatus.SkippedDisabled,
                     "启动时检查更新已关闭");
@@ -33,6 +38,9 @@ public sealed class UpdateCheckService(
             if (updateSettings.LastCheckedAtUtc is { } lastCheckedAt &&
                 now - lastCheckedAt < AutomaticCheckInterval)
             {
+                logger.LogInformation(
+                    "自动更新检查已跳过：仍在冷却时间内。上次检查时间（UTC）={LastCheckedAtUtc}。",
+                    lastCheckedAt);
                 return UpdateCheckResult.Skipped(
                     UpdateCheckStatus.SkippedCooldown,
                     "24 小时内已经检查过更新");
@@ -77,6 +85,7 @@ public sealed class UpdateCheckService(
 
         if (queryResult.NotModified)
         {
+            logger.LogInformation("更新检查完成：GitHub Release 列表未变化。");
             await SaveCheckStateAsync(
                 now,
                 queryResult.ETag,
@@ -90,8 +99,13 @@ public sealed class UpdateCheckService(
         var latestRelease = SelectLatestRelease(
             queryResult.Releases,
             currentVersion);
+        logger.LogInformation(
+            "更新检查已取得发布列表。发布数量={ReleaseCount}，找到候选版本={CandidateFound}。",
+            queryResult.Releases.Count,
+            latestRelease is not null);
         if (latestRelease is null)
         {
+            logger.LogInformation("更新检查完成：当前已是最新版本。");
             await SaveCheckStateAsync(
                 now,
                 queryResult.ETag,
@@ -103,6 +117,10 @@ public sealed class UpdateCheckService(
         if (ReleaseVersion.TryParse(updateSettings.SkippedVersion, out var skippedVersion) &&
             latestRelease.Version <= skippedVersion)
         {
+            logger.LogInformation(
+                "更新候选版本已按用户设置跳过。候选版本={CandidateVersion}，已跳过版本={SkippedVersion}。",
+                latestRelease.Version,
+                skippedVersion);
             await SaveCheckStateAsync(
                 now,
                 queryResult.ETag,
@@ -118,6 +136,11 @@ public sealed class UpdateCheckService(
             etag: null,
             etagVersion: null,
             cancellationToken);
+        logger.LogInformation(
+            "发现可用更新。当前版本={CurrentVersion}，目标版本={TargetVersion}，包含已验证的 Windows 更新包={HasVerifiedWindowsPackage}。",
+            currentVersion,
+            latestRelease.Version,
+            latestRelease.WindowsX64Package is not null);
         return UpdateCheckResult.UpdateAvailable(latestRelease);
     }
 
@@ -125,6 +148,7 @@ public sealed class UpdateCheckService(
         ReleaseVersion version,
         CancellationToken cancellationToken = default)
     {
+        logger.LogInformation("用户选择跳过更新版本。版本={Version}。", version);
         await settingsService.UpdateAsync(current => current with
         {
             Updates = (current.Updates ?? UpdateCheckSettings.Default) with

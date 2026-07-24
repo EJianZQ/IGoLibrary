@@ -23,10 +23,14 @@ public sealed class RemoteCheckInWorkflowService(
         {
             stored = await credentialStore.LoadRemoteCheckInSessionAsync(cancellationToken);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
             await ClearSessionAsync(cancellationToken);
-            activityLogService.Write(LogEntryKind.Warning, "RemoteCheckIn", "本地签到授权已损坏，已自动清理");
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "RemoteCheckIn",
+                "本地签到授权已损坏，已自动清理",
+                ex);
             return null;
         }
 
@@ -109,6 +113,11 @@ public sealed class RemoteCheckInWorkflowService(
         catch (Exception ex)
         {
             deviceRefreshWarning = ex.Message;
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "RemoteCheckIn",
+                $"签到授权已获取，但读取设备信息失败：{ex.Message}",
+                ex);
         }
 
         try

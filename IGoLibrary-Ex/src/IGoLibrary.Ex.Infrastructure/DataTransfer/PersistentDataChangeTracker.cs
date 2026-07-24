@@ -86,7 +86,7 @@ public sealed class PersistentDataChangeTracker : IPersistentDataChangeTracker
             TrySaveLocked();
         }
 
-        Changed?.Invoke(this, EventArgs.Empty);
+        PublishChanged();
     }
 
     public void MarkSynchronized(long synchronizedVersion)
@@ -152,6 +152,27 @@ public sealed class PersistentDataChangeTracker : IPersistentDataChangeTracker
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "持久化备份变更状态失败。");
+        }
+    }
+
+    private void PublishChanged()
+    {
+        var handlers = Changed;
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "备份变更状态订阅者处理失败，已隔离该订阅者。");
+            }
         }
     }
 

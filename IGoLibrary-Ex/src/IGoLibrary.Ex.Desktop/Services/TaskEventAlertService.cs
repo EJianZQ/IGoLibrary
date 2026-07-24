@@ -1,8 +1,10 @@
 using System.Net.Mail;
 using System.Text;
+using System.Diagnostics;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
@@ -16,7 +18,8 @@ public sealed class TaskEventAlertService(
     IToastNotificationService toastNotificationService,
     INotificationService notificationService,
     IAlertSoundService alertSoundService,
-    IActivityLogService activityLogService) : ITaskEventAlertDispatcher
+    IActivityLogService activityLogService,
+    IAppLogWriter? logWriter = null) : ITaskEventAlertDispatcher
 {
     private readonly object _gate = new();
     private string? _lastAlertKey;
@@ -237,15 +240,22 @@ public sealed class TaskEventAlertService(
         CancellationToken cancellationToken,
         bool enableShortTermSuppression = true)
     {
+        var stopwatch = Stopwatch.StartNew();
         var settings = await settingsService.LoadAsync(cancellationToken);
         var alertSettings = settings.Notifications.TaskEventAlerts ?? TaskEventAlertSettings.Default;
         if (!IsEventEnabled(alertSettings.Events ?? TaskEventAlertEventSettings.Default, eventKind))
         {
+            WriteDispatchLog(
+                $"通知事件已跳过：事件未启用。事件类型={eventKind}。",
+                new EventId(6001, "AlertDisabled"));
             return TaskEventAlertDispatchResult.Disabled;
         }
 
         if (enableShortTermSuppression && ShouldSuppress(suppressionKey))
         {
+            WriteDispatchLog(
+                $"通知事件已抑制：命中短期去重窗口。事件类型={eventKind}。",
+                new EventId(6002, "AlertSuppressed"));
             return TaskEventAlertDispatchResult.Suppressed;
         }
 
@@ -273,16 +283,25 @@ public sealed class TaskEventAlertService(
             }
             catch (Exception ex)
             {
-                activityLogService.Write(LogEntryKind.Warning, "Alert", $"展示{localLabel}屏幕提醒失败：{ex.Message}");
+                activityLogService.Write(
+                    LogEntryKind.Warning,
+                    "Alert",
+                    $"展示{localLabel}屏幕提醒失败：{ex.Message}",
+                    ex);
             }
         }
 
+        var inAppFallbackShown = false;
         if (enableInAppFallback && !localAlertShown)
         {
-            await ShowInAppFallbackAsync(toastKind, toastTitle, toastMessage, cancellationToken);
+            inAppFallbackShown = await ShowInAppFallbackAsync(
+                toastKind,
+                toastTitle,
+                toastMessage,
+                cancellationToken);
         }
 
-        var remoteAlertTasks = new List<Task>(capacity: 5);
+        var remoteAlertTasks = new List<Task<bool>>(capacity: 5);
         if (alertSettings.Email.Enabled)
         {
             remoteAlertTasks.Add(SendEmailAlertSafelyAsync(
@@ -332,15 +351,21 @@ public sealed class TaskEventAlertService(
                 cancellationToken));
         }
 
+        bool[] remoteResults = [];
         if (remoteAlertTasks.Count > 0)
         {
-            await Task.WhenAll(remoteAlertTasks);
+            remoteResults = await Task.WhenAll(remoteAlertTasks);
         }
 
+        WriteDispatchLog(
+            $"通知事件分发完成。事件类型={eventKind}，耗时毫秒={stopwatch.Elapsed.TotalMilliseconds:0}，" +
+            $"已显示本地通知={localAlertShown}，已显示应用内回退={inAppFallbackShown}，" +
+            $"已启用远程通道={remoteAlertTasks.Count}，远程发送成功={remoteResults.Count(static result => result)}。",
+            new EventId(6003, "AlertDispatched"));
         return TaskEventAlertDispatchResult.Dispatched;
     }
 
-    private async Task SendEmailAlertSafelyAsync(
+    private async Task<bool> SendEmailAlertSafelyAsync(
         EmailAlertChannelSettings settings,
         string emailLabel,
         string emailSubject,
@@ -355,6 +380,7 @@ public sealed class TaskEventAlertService(
                 subject: emailSubject,
                 body: emailBody,
                 cancellationToken);
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -362,11 +388,16 @@ public sealed class TaskEventAlertService(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{emailLabel}邮件失败：{ex.Message}");
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "Alert",
+                $"发送{emailLabel}邮件失败：{ex.Message}",
+                ex);
+            return false;
         }
     }
 
-    private async Task SendTelegramAlertSafelyAsync(
+    private async Task<bool> SendTelegramAlertSafelyAsync(
         TelegramAlertChannelSettings settings,
         string telegramLabel,
         string telegramMessage,
@@ -378,6 +409,7 @@ public sealed class TaskEventAlertService(
                 settings,
                 telegramMessage,
                 cancellationToken);
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -385,11 +417,16 @@ public sealed class TaskEventAlertService(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{telegramLabel}Telegram提醒失败：{ex.Message}");
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "Alert",
+                $"发送{telegramLabel}Telegram提醒失败：{ex.Message}",
+                ex);
+            return false;
         }
     }
 
-    private async Task SendBarkAlertSafelyAsync(
+    private async Task<bool> SendBarkAlertSafelyAsync(
         BarkAlertChannelSettings settings,
         string barkLabel,
         string barkTitle,
@@ -403,6 +440,7 @@ public sealed class TaskEventAlertService(
                 barkTitle,
                 barkBody,
                 cancellationToken);
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -410,11 +448,16 @@ public sealed class TaskEventAlertService(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{barkLabel}Bark提醒失败：{ex.Message}");
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "Alert",
+                $"发送{barkLabel}Bark提醒失败：{ex.Message}",
+                ex);
+            return false;
         }
     }
 
-    private async Task SendWxPusherAlertSafelyAsync(
+    private async Task<bool> SendWxPusherAlertSafelyAsync(
         WxPusherAlertChannelSettings settings,
         string wxPusherLabel,
         string wxPusherTitle,
@@ -428,6 +471,7 @@ public sealed class TaskEventAlertService(
                 wxPusherTitle,
                 wxPusherBody,
                 cancellationToken);
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -435,11 +479,16 @@ public sealed class TaskEventAlertService(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{wxPusherLabel}WxPusher提醒失败：{ex.Message}");
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "Alert",
+                $"发送{wxPusherLabel}WxPusher提醒失败：{ex.Message}",
+                ex);
+            return false;
         }
     }
 
-    private async Task SendServerChanAlertSafelyAsync(
+    private async Task<bool> SendServerChanAlertSafelyAsync(
         ServerChanAlertChannelSettings settings,
         string serverChanLabel,
         string serverChanTitle,
@@ -453,6 +502,7 @@ public sealed class TaskEventAlertService(
                 serverChanTitle,
                 serverChanBody,
                 cancellationToken);
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -460,7 +510,12 @@ public sealed class TaskEventAlertService(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送{serverChanLabel}Server酱提醒失败：{ex.Message}");
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "Alert",
+                $"发送{serverChanLabel}Server酱提醒失败：{ex.Message}",
+                ex);
+            return false;
         }
     }
 
@@ -773,7 +828,7 @@ public sealed class TaskEventAlertService(
         return $"{minutes} 分 {seconds} 秒";
     }
 
-    private async Task ShowInAppFallbackAsync(
+    private async Task<bool> ShowInAppFallbackAsync(
         ToastVisualKind kind,
         string title,
         string message,
@@ -793,6 +848,8 @@ public sealed class TaskEventAlertService(
                     await notificationService.ShowInfoAsync(title, message, cancellationToken);
                     break;
             }
+
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -800,7 +857,23 @@ public sealed class TaskEventAlertService(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"展示应用内提醒失败：{ex.Message}");
+            activityLogService.Write(
+                LogEntryKind.Warning,
+                "Alert",
+                $"展示应用内提醒失败：{ex.Message}",
+                ex);
+            return false;
+        }
+    }
+
+    private void WriteDispatchLog(string message, EventId eventId)
+    {
+        try
+        {
+            logWriter?.Write(LogLevel.Information, "Alert.Dispatch", message, eventId: eventId);
+        }
+        catch
+        {
         }
     }
 

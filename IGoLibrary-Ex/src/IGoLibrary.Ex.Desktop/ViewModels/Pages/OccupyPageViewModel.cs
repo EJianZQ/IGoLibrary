@@ -334,7 +334,7 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Occupy", $"刷新预约状态失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Occupy", $"刷新预约状态失败：{ex.Message}", ex);
             if (showNotificationOnError)
             {
                 await _notificationService.ShowWarningAsync("刷新预约状态失败", ex.Message);
@@ -364,7 +364,7 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
         catch (Exception ex)
         {
             ApplyOccupyStatus(_occupySeatCoordinator.GetStatus());
-            _activityLogService.Write(LogEntryKind.Error, "Occupy", $"启动占座失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Occupy", $"启动占座失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("启动占座失败", ex.Message);
         }
     }
@@ -378,7 +378,7 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "Occupy", $"停止占座失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "Occupy", $"停止占座失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("停止占座失败", ex.Message);
         }
     }
@@ -442,7 +442,7 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
                 }
                 catch (Exception ex)
                 {
-                    _activityLogService.Write(LogEntryKind.Warning, "AutoRelease", $"自动退座成功通知失败：{ex.Message}");
+                    _activityLogService.Write(LogEntryKind.Warning, "AutoRelease", $"自动退座成功通知失败：{ex.Message}", ex);
                 }
             }
             else
@@ -456,11 +456,11 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
             if (isAutomatic)
             {
                 RecordAutoReleaseFailure(reservation);
-                _activityLogService.Write(LogEntryKind.Warning, "AutoRelease", $"自动退座失败：{ex.Message}");
+                _activityLogService.Write(LogEntryKind.Warning, "AutoRelease", $"自动退座失败：{ex.Message}", ex);
             }
             else
             {
-                _activityLogService.Write(LogEntryKind.Error, "Occupy", $"取消预约失败：{ex.Message}");
+                _activityLogService.Write(LogEntryKind.Error, "Occupy", $"取消预约失败：{ex.Message}", ex);
                 await _notificationService.ShowWarningAsync("取消预约失败", ex.Message);
             }
         }
@@ -484,7 +484,7 @@ public sealed partial class OccupyPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "AutoRelease", $"自动退座刷新当前预约失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "AutoRelease", $"自动退座刷新当前预约失败：{ex.Message}", ex);
         }
         finally
         {

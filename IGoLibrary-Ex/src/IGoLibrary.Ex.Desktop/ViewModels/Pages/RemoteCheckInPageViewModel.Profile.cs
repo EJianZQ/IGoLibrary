@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.Input;
 using IGoLibrary.Ex.Application.Configuration;
 using IGoLibrary.Ex.Application.Services;
+using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Desktop.ViewModels;
@@ -42,6 +43,11 @@ public sealed partial class RemoteCheckInPageViewModel
         }
         catch (Exception ex)
         {
+            _activityLogService.Write(
+                LogEntryKind.Error,
+                "RemoteCheckIn",
+                $"保存场馆签到配置失败：{ex.Message}",
+                ex);
             await _notificationService.ShowWarningAsync("保存场馆配置失败", ex.Message);
         }
         finally

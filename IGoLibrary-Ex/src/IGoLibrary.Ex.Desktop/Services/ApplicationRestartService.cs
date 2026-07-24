@@ -1,9 +1,16 @@
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
-public sealed class ApplicationRestartService(AppWindowService appWindowService) : IApplicationRestartService
+public sealed class ApplicationRestartService(
+    AppWindowService appWindowService,
+    ILogger<ApplicationRestartService>? logger = null) : IApplicationRestartService
 {
+    private readonly ILogger<ApplicationRestartService> _logger =
+        logger ?? NullLogger<ApplicationRestartService>.Instance;
+
     public Task RestartAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -15,6 +22,10 @@ public sealed class ApplicationRestartService(AppWindowService appWindowService)
             Environment.ProcessId);
         var process = Process.Start(startInfo)
                       ?? throw new InvalidOperationException("无法启动新的应用进程");
+        _logger.LogInformation(
+            "应用重启子进程已启动。子进程标识={ChildProcessId}，父进程标识={ParentProcessId}。",
+            process.Id,
+            Environment.ProcessId);
         process.Dispose();
         appWindowService.QuitApplication();
         return Task.CompletedTask;

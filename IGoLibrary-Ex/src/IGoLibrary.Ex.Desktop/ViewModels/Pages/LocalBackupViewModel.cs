@@ -69,7 +69,7 @@ public sealed partial class LocalBackupViewModel(
         catch (Exception ex)
         {
             StatusText = $"操作失败：{ex.Message}";
-            activityLogService.Write(LogEntryKind.Error, "Backup", StatusText);
+            activityLogService.Write(LogEntryKind.Error, "Backup", StatusText, ex);
             await notificationService.ShowWarningAsync("备份操作失败", ex.Message, CancellationToken.None);
         }
         finally

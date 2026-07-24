@@ -22,12 +22,22 @@ internal static class Program
     public static void Main(string[] args)
     {
         var restartArguments = RestartArguments.Parse(args);
-        new SingleInstanceStartupCoordinator(
-                parentProcessId => RestartParentProcessWaiter.WaitForExitAsync(parentProcessId),
-                () => SingleInstanceLock.TryAcquire(),
-                ShowStartupNotice,
-                RunPrimaryApplication)
-            .Run(restartArguments);
+        BootstrapDiagnostics.Record(LogLevel.Information, "应用启动入口已执行。");
+        try
+        {
+            new SingleInstanceStartupCoordinator(
+                    parentProcessId => RestartParentProcessWaiter.WaitForExitAsync(parentProcessId),
+                    () => SingleInstanceLock.TryAcquire(),
+                    ShowStartupNotice,
+                    RunPrimaryApplication,
+                    BootstrapDiagnostics.Record)
+                .Run(restartArguments);
+        }
+        catch (Exception ex)
+        {
+            BootstrapDiagnostics.Record(LogLevel.Critical, "应用在日志系统初始化前发生未处理异常。", ex);
+            throw;
+        }
     }
 
     public static AppBuilder BuildAvaloniaApp()
@@ -57,12 +67,18 @@ internal static class Program
         {
             updateMaintenanceResult = UpdateStartupMaintenance.Run(UpdateTransactionId);
         }
-        var storageLocationManager = new StorageLocationManager();
+        var storageLocationManager = new StorageLocationManager
+        {
+            DiagnosticSink = BootstrapDiagnostics.Record
+        };
+        BootstrapDiagnostics.Record(LogLevel.Information, "开始解析并准备存储位置。");
         var storageLocations = storageLocationManager
             .InitializeAsync()
             .GetAwaiter()
             .GetResult();
         using var sharedLogWriter = new AppLogFileWriter(storageLocations, startUnconfigured: true);
+        BootstrapDiagnostics.Attach(sharedLogWriter);
+        BootstrapDiagnostics.Record(LogLevel.Information, "存储位置已准备完成，主日志写入器已接管启动日志。");
         RegisterGlobalExceptionLogging(sharedLogWriter);
         var logWriterConfigured = false;
         var restoreAwaitingCommit = false;
@@ -165,13 +181,27 @@ internal static class Program
 
             if (!logWriterConfigured)
             {
-                sharedLogWriter.ApplyAsync(LogFileSettings.Default).GetAwaiter().GetResult();
-                logWriterConfigured = true;
+                try
+                {
+                    sharedLogWriter.ApplyAsync(LogFileSettings.Default).GetAwaiter().GetResult();
+                    logWriterConfigured = true;
+                }
+                catch (Exception loggingConfigurationException)
+                {
+                    BootstrapDiagnostics.RecordEmergency(
+                        LogLevel.Critical,
+                        "应用启动失败时无法启用默认主日志。",
+                        loggingConfigurationException);
+                }
             }
 
             Interlocked.Exchange(ref _skipNextUnhandledExceptionLog, 1);
-            sharedLogWriter.Write(LogLevel.Critical, "Bootstrap", "应用启动失败。", ex);
-            sharedLogWriter.Flush();
+            WriteAndFlushSafely(
+                sharedLogWriter,
+                LogLevel.Critical,
+                "Bootstrap",
+                "应用启动失败。",
+                ex);
             throw;
         }
         finally
@@ -180,8 +210,9 @@ internal static class Program
             {
                 Trace.Flush();
             }
-            catch
+            catch (Exception ex)
             {
+                sharedLogWriter.Write(LogLevel.Warning, "Bootstrap", "刷新跟踪监听器失败。", ex);
             }
 
             if (Host is not null)
@@ -192,8 +223,12 @@ internal static class Program
                 }
                 catch (Exception ex)
                 {
-                    sharedLogWriter.Write(LogLevel.Error, "Bootstrap", "停止主机时发生异常。", ex);
-                    sharedLogWriter.Flush();
+                    WriteAndFlushSafely(
+                        sharedLogWriter,
+                        LogLevel.Error,
+                        "Bootstrap",
+                        "停止主机时发生异常。",
+                        ex);
                 }
                 finally
                 {
@@ -203,8 +238,12 @@ internal static class Program
                     }
                     catch (Exception ex)
                     {
-                        sharedLogWriter.Write(LogLevel.Error, "Bootstrap", "释放主机时发生异常。", ex);
-                        sharedLogWriter.Flush();
+                        WriteAndFlushSafely(
+                            sharedLogWriter,
+                            LogLevel.Error,
+                            "Bootstrap",
+                            "释放主机时发生异常。",
+                            ex);
                     }
                     finally
                     {
@@ -281,22 +320,52 @@ internal static class Program
 
             if (args.ExceptionObject is Exception exception)
             {
-                logWriter.Write(LogLevel.Critical, "Global", "捕获到未处理的应用程序异常。", exception);
-                logWriter.Flush();
+                WriteAndFlushSafely(
+                    logWriter,
+                    LogLevel.Critical,
+                    "Global",
+                    "捕获到未处理的应用程序异常。",
+                    exception);
                 return;
             }
 
-            logWriter.Write(
+            WriteAndFlushSafely(
+                logWriter,
                 LogLevel.Critical,
                 "Global",
                 $"捕获到未处理的应用程序异常：{args.ExceptionObject}");
-            logWriter.Flush();
         };
 
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
-            logWriter.Write(LogLevel.Error, "Global", "捕获到未观察的后台任务异常。", args.Exception);
-            logWriter.Flush();
+            WriteAndFlushSafely(
+                logWriter,
+                LogLevel.Error,
+                "Global",
+                "捕获到未观察的后台任务异常。",
+                args.Exception);
         };
+    }
+
+    private static void WriteAndFlushSafely(
+        IAppLogWriter logWriter,
+        LogLevel level,
+        string category,
+        string message,
+        Exception? exception = null)
+    {
+        try
+        {
+            logWriter.Write(level, category, message, exception);
+            logWriter.Flush();
+        }
+        catch (Exception loggingException)
+        {
+            BootstrapDiagnostics.RecordEmergency(
+                LogLevel.Critical,
+                "主日志紧急写入或刷新失败。",
+                loggingException);
+            BootstrapDiagnostics.RecordEmergency(level, message, exception);
+        }
     }
 }

@@ -61,6 +61,11 @@ public sealed partial class RemoteCheckInPageViewModel
             AuthorizationStatusText = HasRemoteCheckInSession
                 ? $"清除签到授权失败，原授权仍保留：{ex.Message}"
                 : $"清除本地签到授权时发生错误：{ex.Message}";
+            _activityLogService.Write(
+                LogEntryKind.Error,
+                "RemoteCheckIn",
+                $"清除签到授权失败：{ex.Message}",
+                ex);
             await _notificationService.ShowWarningAsync("清除签到授权失败", ex.Message);
         }
         finally
@@ -86,6 +91,11 @@ public sealed partial class RemoteCheckInPageViewModel
         catch (Exception ex)
         {
             HandleSessionFailure(ex);
+            _activityLogService.Write(
+                LogEntryKind.Error,
+                "RemoteCheckIn",
+                $"刷新签到信标失败：{ex.Message}",
+                ex);
             await _notificationService.ShowWarningAsync("刷新签到信标失败", ex.Message);
         }
         finally
@@ -179,6 +189,11 @@ public sealed partial class RemoteCheckInPageViewModel
                 await _notificationService.ShowWarningAsync("获取签到授权失败", ex.Message);
             }
 
+            _activityLogService.Write(
+                LogEntryKind.Warning,
+                "RemoteCheckIn",
+                $"获取签到授权失败：{ex.Message}",
+                ex);
             return new LanCookieRelayLinkSubmitResult(false, ex.Message);
         }
         catch (Exception ex)
@@ -198,6 +213,11 @@ public sealed partial class RemoteCheckInPageViewModel
                 await _notificationService.ShowWarningAsync("获取签到授权失败", ex.Message);
             }
 
+            _activityLogService.Write(
+                LogEntryKind.Error,
+                "RemoteCheckIn",
+                $"获取签到授权失败：{ex.Message}",
+                ex);
             return new LanCookieRelayLinkSubmitResult(false, ex.Message);
         }
         finally
@@ -250,7 +270,8 @@ public sealed partial class RemoteCheckInPageViewModel
             _activityLogService.Write(
                 LogEntryKind.Warning,
                 "RemoteCheckIn",
-                $"自动清理到期签到授权失败：{ex.Message}");
+                $"自动清理到期签到授权失败：{ex.Message}",
+                ex);
         }
         finally
         {

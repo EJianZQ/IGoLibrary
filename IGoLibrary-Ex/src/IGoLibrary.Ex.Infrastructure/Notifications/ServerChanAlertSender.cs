@@ -5,13 +5,16 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using IGoLibrary.Ex.Application.Abstractions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Infrastructure.Notifications;
 
 internal sealed class ServerChanAlertSender(
     HttpClient httpClient,
     ISettingsService settingsService,
-    TimeProvider? timeProvider = null) : IServerChanAlertSender
+    TimeProvider? timeProvider = null,
+    ILogger<ServerChanAlertSender>? logger = null) : IServerChanAlertSender
 {
     private const int SuccessCode = 0;
     private const int MaxTitleLength = 32;
@@ -22,6 +25,8 @@ internal sealed class ServerChanAlertSender(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+    private readonly ILogger<ServerChanAlertSender> _logger =
+        logger ?? NullLogger<ServerChanAlertSender>.Instance;
 
     public async Task SendAsync(
         ServerChanAlertChannelSettings settings,
@@ -38,7 +43,8 @@ internal sealed class ServerChanAlertSender(
             "Server酱",
             token => SendOnceAsync(normalized, normalizedTitle, normalizedBody, token),
             _timeProvider,
-            cancellationToken);
+            cancellationToken,
+            _logger);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         ThrowIfServerChanResponseFailed(response, raw);
     }

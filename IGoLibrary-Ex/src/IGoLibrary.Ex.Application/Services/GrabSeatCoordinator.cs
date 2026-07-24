@@ -10,10 +10,11 @@ internal sealed class GrabSeatCoordinator : IGrabSeatCoordinator
 
     public GrabSeatCoordinator(
         GrabSeatWorkflowRunner stateMachine,
-        ICoordinatorRuntime runtime)
+        ICoordinatorRuntime runtime,
+        IAppLogWriter? logWriter = null)
     {
         _stateMachine = stateMachine;
-        _controller = new CoordinatorRunController("抢座", runtime);
+        _controller = new CoordinatorRunController("抢座", runtime, logWriter);
     }
 
     public event EventHandler<CoordinatorStatus>? StatusChanged

@@ -242,7 +242,7 @@ internal sealed partial class ClashMihomoCompatibilityService(
         }
     }
 
-    private static void TryDeleteTemporaryFile(string path)
+    private void TryDeleteTemporaryFile(string path)
     {
         try
         {
@@ -251,8 +251,9 @@ internal sealed partial class ClashMihomoCompatibilityService(
                 File.Delete(path);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "清理 Clash/Mihomo 临时兼容配置失败。");
         }
     }
 

@@ -225,9 +225,9 @@ public sealed class CloudflareTunnelTests
         Assert.DoesNotContain("secret", sanitized, StringComparison.Ordinal);
         Assert.DoesNotContain("oauth-code", sanitized, StringComparison.Ordinal);
         Assert.DoesNotContain("bearer", sanitized, StringComparison.Ordinal);
-        Assert.Contains("token=[redacted]", sanitized, StringComparison.Ordinal);
-        Assert.Contains("code=[redacted]", sanitized, StringComparison.Ordinal);
-        Assert.Contains("authorization=[redacted]", sanitized, StringComparison.Ordinal);
+        Assert.Contains("token=<redacted>", sanitized, StringComparison.Ordinal);
+        Assert.Contains("code=<redacted>", sanitized, StringComparison.Ordinal);
+        Assert.Contains("authorization=<redacted>", sanitized, StringComparison.Ordinal);
         Assert.True(sanitized.Length <= 501);
     }
 

@@ -97,7 +97,9 @@ internal static class AppLogFileCatalog
                    out _);
     }
 
-    public static int DeleteLegacyDailyFiles(string directory)
+    public static int DeleteLegacyDailyFiles(
+        string directory,
+        Action<string, Exception>? onFailure = null)
     {
         try
         {
@@ -118,16 +120,18 @@ internal static class AppLogFileCatalog
                 {
                     File.Delete(path);
                 }
-                catch
+                catch (Exception ex)
                 {
                     failureCount++;
+                    NotifyFailure(onFailure, "删除旧版每日日志", ex);
                 }
             }
 
             return failureCount;
         }
-        catch
+        catch (Exception ex)
         {
+            NotifyFailure(onFailure, "枚举旧版每日日志", ex);
             return 1;
         }
     }
@@ -135,7 +139,8 @@ internal static class AppLogFileCatalog
     public static int EnforceRetention(
         string directory,
         int retainedFileCount,
-        string? protectedPath = null)
+        string? protectedPath = null,
+        Action<string, Exception>? onFailure = null)
     {
         try
         {
@@ -188,17 +193,33 @@ internal static class AppLogFileCatalog
                 {
                     item.File.Delete();
                 }
-                catch
+                catch (Exception ex)
                 {
                     failureCount++;
+                    NotifyFailure(onFailure, "删除超过保留数量的日志", ex);
                 }
             }
 
             return failureCount;
         }
+        catch (Exception ex)
+        {
+            NotifyFailure(onFailure, "枚举保留策略日志", ex);
+            return 1;
+        }
+    }
+
+    private static void NotifyFailure(
+        Action<string, Exception>? onFailure,
+        string operation,
+        Exception exception)
+    {
+        try
+        {
+            onFailure?.Invoke(operation, exception);
+        }
         catch
         {
-            return 1;
         }
     }
 

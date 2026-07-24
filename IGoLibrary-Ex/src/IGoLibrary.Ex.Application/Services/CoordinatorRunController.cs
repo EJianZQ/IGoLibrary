@@ -1,14 +1,20 @@
+using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Application.Services;
 
-internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime runtime)
+internal sealed class CoordinatorRunController(
+    string title,
+    ICoordinatorRuntime runtime,
+    IAppLogWriter? logWriter = null)
 {
     private readonly object _gate = new();
     private CancellationTokenSource? _cts;
     private Task? _runningTask;
+    private Guid? _runId;
     private CoordinatorStatus _status = CoordinatorStatus.Idle(title);
 
     public event EventHandler<CoordinatorStatus>? StatusChanged;
@@ -26,14 +32,21 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
         CancellationToken cancellationToken = default)
     {
         CoordinatorStatus startingStatus;
+        Guid runId;
         var startSignal = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (_gate)
         {
             if (_cts is not null || _runningTask is { IsCompleted: false })
             {
+                WriteLog(
+                    LogLevel.Warning,
+                    $"任务启动请求被拒绝：任务已在运行，运行标识={FormatRunId(_runId)}。",
+                    eventId: new EventId(2002, "CoordinatorStartConflict"));
                 throw new TaskLaunchConflictException($"{title}任务已在运行");
             }
 
+            runId = Guid.NewGuid();
+            _runId = runId;
             _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             startingStatus = new CoordinatorStatus(
                 CoordinatorTaskState.Starting,
@@ -45,12 +58,16 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
             SetStatusUnsafe(startingStatus);
 
             var context = new CoordinatorRunContext(this);
-            _runningTask = RunCoreAsync(runAsync, context, startSignal.Task, _cts.Token);
+            _runningTask = RunCoreAsync(runAsync, context, startSignal.Task, runId, _cts.Token);
         }
 
         try
         {
-            NotifyStatusChanged(startingStatus);
+            WriteLog(
+                LogLevel.Information,
+                $"任务开始启动，运行标识={FormatRunId(runId)}。",
+                eventId: new EventId(2001, "CoordinatorStarting"));
+            NotifyStatusChanged(startingStatus, runId);
         }
         finally
         {
@@ -65,6 +82,7 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
         Task? runningTask;
         CancellationTokenSource cts;
         CoordinatorStatus stoppingStatus;
+        Guid? stoppingRunId;
         lock (_gate)
         {
             if (_cts is null)
@@ -82,11 +100,16 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
             SetStatusUnsafe(stoppingStatus);
             cts = _cts;
             runningTask = _runningTask;
+            stoppingRunId = _runId;
         }
 
         try
         {
-            NotifyStatusChanged(stoppingStatus);
+            WriteLog(
+                LogLevel.Information,
+                $"收到任务停止请求，运行标识={FormatRunId(stoppingRunId)}。",
+                eventId: new EventId(2003, "CoordinatorStopping"));
+            NotifyStatusChanged(stoppingStatus, stoppingRunId);
         }
         finally
         {
@@ -109,6 +132,7 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
         Func<CoordinatorRunContext, CancellationToken, Task> runAsync,
         CoordinatorRunContext context,
         Task startSignal,
+        Guid runId,
         CancellationToken cancellationToken)
     {
         try
@@ -127,6 +151,11 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
         }
         catch (Exception ex)
         {
+            WriteLog(
+                LogLevel.Error,
+                $"任务执行发生未处理异常，运行标识={FormatRunId(runId)}。",
+                ex,
+                new EventId(2005, "CoordinatorUnhandledFailure"));
             context.Fail($"{title}任务失败：{ex.Message}", CoordinatorStatusReason.TaskFailed);
         }
     }
@@ -143,9 +172,29 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
         _status = status;
     }
 
-    private void NotifyStatusChanged(CoordinatorStatus status)
+    private void NotifyStatusChanged(CoordinatorStatus status, Guid? runId)
     {
-        StatusChanged?.Invoke(this, status);
+        var handlers = StatusChanged;
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (EventHandler<CoordinatorStatus> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, status);
+            }
+            catch (Exception ex)
+            {
+                WriteLog(
+                    LogLevel.Error,
+                    $"任务状态订阅者处理失败，运行标识={FormatRunId(runId)}，状态={status.State}。",
+                    ex,
+                    new EventId(2006, "CoordinatorStatusSubscriberFailed"));
+            }
+        }
     }
 
     private void ClearRunUnsafe()
@@ -170,6 +219,7 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
         CoordinatorStatusReason reason = CoordinatorStatusReason.Running)
     {
         CoordinatorStatus status;
+        Guid? runId;
         lock (_gate)
         {
             status = new CoordinatorStatus(
@@ -183,16 +233,19 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
                 lastRequestAt,
                 reason);
             SetStatusUnsafe(status);
+            runId = _runId;
         }
 
-        NotifyStatusChanged(status);
+        NotifyStatusChanged(status, runId);
     }
 
     internal void Complete(string message, CoordinatorStatusReason reason)
     {
         CoordinatorStatus status;
+        Guid? completedRunId;
         lock (_gate)
         {
+            completedRunId = _runId;
             status = new CoordinatorStatus(
                 CoordinatorTaskState.Completed,
                 title,
@@ -205,16 +258,20 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
                 reason);
             SetStatusUnsafe(status);
             ClearRunUnsafe();
+            _runId = null;
         }
 
-        NotifyStatusChanged(status);
+        NotifyStatusChanged(status, completedRunId);
+        WriteTerminalLog(LogLevel.Information, status, completedRunId, exception: null);
     }
 
     internal void Fail(string message, CoordinatorStatusReason reason)
     {
         CoordinatorStatus status;
+        Guid? failedRunId;
         lock (_gate)
         {
+            failedRunId = _runId;
             status = new CoordinatorStatus(
                 CoordinatorTaskState.Failed,
                 title,
@@ -227,9 +284,49 @@ internal sealed class CoordinatorRunController(string title, ICoordinatorRuntime
                 reason);
             SetStatusUnsafe(status);
             ClearRunUnsafe();
+            _runId = null;
         }
 
-        NotifyStatusChanged(status);
+        NotifyStatusChanged(status, failedRunId);
+        WriteTerminalLog(LogLevel.Error, status, failedRunId, exception: null);
+    }
+
+    private void WriteTerminalLog(
+        LogLevel level,
+        CoordinatorStatus status,
+        Guid? runId,
+        Exception? exception)
+    {
+        var duration = status.StartedAt is { } startedAt &&
+                       status.LastUpdatedAt is { } lastUpdatedAt
+            ? lastUpdatedAt - startedAt
+            : TimeSpan.Zero;
+        WriteLog(
+            level,
+            $"任务进入终态，运行标识={FormatRunId(runId)}，状态={status.State}，原因={status.Reason}，" +
+            $"耗时毫秒={Math.Max(0, duration.TotalMilliseconds):0}，轮询次数={status.PollCount}，请求次数={status.RequestCount}。",
+            exception,
+            new EventId(2004, "CoordinatorTerminal"));
+    }
+
+    private void WriteLog(
+        LogLevel level,
+        string message,
+        Exception? exception = null,
+        EventId eventId = default)
+    {
+        try
+        {
+            logWriter?.Write(level, $"Coordinator.{title}", message, exception, eventId);
+        }
+        catch
+        {
+        }
+    }
+
+    private static string FormatRunId(Guid? runId)
+    {
+        return runId?.ToString("N") ?? "无";
     }
 }
 

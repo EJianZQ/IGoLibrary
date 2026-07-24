@@ -309,11 +309,12 @@ public sealed partial class NotificationSettingsViewModel
             AutoSave.Cancel();
             await PersistSnapshotAsync();
             await SendTestEmailAsync(BuildTaskEventAlertSettingsSnapshot().Email);
+            activityLogService.Write(LogEntryKind.Success, "Alert", "测试邮件发送成功。");
             await notificationService.ShowSuccessAsync("测试邮件已发送", "请检查收件箱，确认当前 SMTP 配置可用");
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试邮件失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试邮件失败：{ex.Message}", ex);
             await errorDialogService.ShowErrorAsync("测试邮件发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
         }
     }
@@ -326,11 +327,12 @@ public sealed partial class NotificationSettingsViewModel
             AutoSave.Cancel();
             await PersistSnapshotAsync();
             await SendTestTelegramAsync(BuildTaskEventAlertSettingsSnapshot().Telegram);
+            activityLogService.Write(LogEntryKind.Success, "Alert", "测试 Telegram 提醒发送成功。");
             await notificationService.ShowSuccessAsync("测试 Telegram 已发送", "请检查 Telegram，确认当前 Bot 配置可用");
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Telegram 失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Telegram 失败：{ex.Message}", ex);
             await errorDialogService.ShowErrorAsync("测试 Telegram 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
         }
     }
@@ -343,11 +345,12 @@ public sealed partial class NotificationSettingsViewModel
             AutoSave.Cancel();
             await PersistSnapshotAsync();
             await SendTestBarkAsync(BuildTaskEventAlertSettingsSnapshot().Bark);
+            activityLogService.Write(LogEntryKind.Success, "Alert", "测试 Bark 提醒发送成功。");
             await notificationService.ShowSuccessAsync("测试 Bark 已发送", "请检查 Bark App，确认当前推送配置可用");
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Bark 失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Bark 失败：{ex.Message}", ex);
             await errorDialogService.ShowErrorAsync("测试 Bark 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
         }
     }
@@ -360,11 +363,12 @@ public sealed partial class NotificationSettingsViewModel
             AutoSave.Cancel();
             await PersistSnapshotAsync();
             await SendTestWxPusherAsync(BuildTaskEventAlertSettingsSnapshot().WxPusher);
+            activityLogService.Write(LogEntryKind.Success, "Alert", "测试 WxPusher 提醒发送成功。");
             await notificationService.ShowSuccessAsync("测试 WxPusher 已发送", "请检查 WxPusher 客户端，确认当前推送配置可用");
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 WxPusher 失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 WxPusher 失败：{ex.Message}", ex);
             await errorDialogService.ShowErrorAsync("测试 WxPusher 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
         }
     }
@@ -377,11 +381,12 @@ public sealed partial class NotificationSettingsViewModel
             AutoSave.Cancel();
             await PersistSnapshotAsync();
             await SendTestServerChanAsync(BuildTaskEventAlertSettingsSnapshot().ServerChan);
+            activityLogService.Write(LogEntryKind.Success, "Alert", "测试 Server酱 提醒发送成功。");
             await notificationService.ShowSuccessAsync("测试 Server酱 已发送", "请检查 Server酱 配置的通知通道，确认当前推送配置可用");
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Server酱 失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试 Server酱 失败：{ex.Message}", ex);
             await errorDialogService.ShowErrorAsync("测试 Server酱 发送失败", ex.GetType().Name, BuildExceptionDetails(ex));
         }
     }
@@ -394,10 +399,11 @@ public sealed partial class NotificationSettingsViewModel
             AutoSave.Cancel();
             await PersistSnapshotAsync();
             await SendTestLocalAlertAsync(BuildTaskEventAlertSettingsSnapshot().Local);
+            activityLogService.Write(LogEntryKind.Success, "Alert", "测试本地通知发送成功。");
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试通知失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"发送测试通知失败：{ex.Message}", ex);
             await notificationService.ShowWarningAsync("测试通知发送失败", ex.Message);
         }
     }
@@ -467,7 +473,7 @@ public sealed partial class NotificationSettingsViewModel
         }
 
         AutoSave.Schedule(ex =>
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"自动保存通知设置失败：{ex.Message}"));
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"自动保存通知设置失败：{ex.Message}", ex));
     }
 
     private static string NormalizeTelegramApiBaseUrlForSnapshot(string? value)

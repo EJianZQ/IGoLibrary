@@ -15,6 +15,7 @@ public sealed class LanCookieRelayService(
 {
     private static readonly TimeSpan DefaultSessionTimeout = TimeSpan.FromMinutes(10);
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly NetworkRequestSecurityAuditor _securityAuditor = new(logger, "局域网授权快传");
     private WebApplication? _app;
     private CancellationTokenSource? _timeoutCts;
     private LanCookieRelaySession? _session;
@@ -42,6 +43,7 @@ public sealed class LanCookieRelayService(
         await _gate.WaitAsync(cancellationToken);
         try
         {
+            logger.LogInformation("开始启动局域网授权快传。用途={Purpose}。", purpose);
             await StopCurrentSessionAsync(LanCookieRelayStopReason.Replaced, null, cancellationToken);
 
             var address = addressProvider.GetPrimaryLanAddress()
@@ -91,10 +93,17 @@ public sealed class LanCookieRelayService(
                 exposureLease.EndpointChanged += OnExposureEndpointChanged;
                 _timeoutCts = new CancellationTokenSource();
                 _ = StopAfterTimeoutAsync(session.SessionId, _timeoutCts.Token);
+                logger.LogInformation(
+                    "局域网授权快传已启动。会话标识={SessionId}，用途={Purpose}，生效模式={EffectiveMode}，端口={Port}。",
+                    session.SessionId,
+                    purpose,
+                    session.EffectiveMode,
+                    session.Port);
                 return session;
             }
-            catch
+            catch (Exception ex)
             {
+                logger.LogError(ex, "启动局域网授权快传失败。用途={Purpose}。", purpose);
                 await DisposeUnpublishedAppAsync(app, appStarted);
                 throw;
             }
@@ -112,7 +121,15 @@ public sealed class LanCookieRelayService(
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            await StopCurrentSessionAsync(reason, null, cancellationToken);
+            try
+            {
+                await StopCurrentSessionAsync(reason, null, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "停止局域网授权快传失败。原因={StopReason}。", reason);
+                throw;
+            }
         }
         finally
         {
@@ -132,7 +149,7 @@ public sealed class LanCookieRelayService(
         Func<string, CancellationToken, Task<LanCookieRelaySubmitResult>> submitHandler,
         SubmitGate submitGate)
     {
-        if (!IsValidToken(context, token))
+        if (!_securityAuditor.IsValidToken(context, token))
         {
             await WriteJsonAsync(
                 context,
@@ -144,6 +161,7 @@ public sealed class LanCookieRelayService(
         var beginResult = submitGate.TryBegin();
         if (beginResult == SubmitBeginResult.Completed)
         {
+            logger.LogInformation("局域网授权快传拒绝重复提交：会话已经完成。");
             await TryWriteJsonAsync(
                 context,
                 StatusCodes.Status409Conflict,
@@ -153,6 +171,7 @@ public sealed class LanCookieRelayService(
 
         if (beginResult == SubmitBeginResult.InProgress)
         {
+            logger.LogInformation("局域网授权快传拒绝并发提交：已有请求正在处理。");
             await TryWriteJsonAsync(
                 context,
                 StatusCodes.Status409Conflict,
@@ -170,6 +189,7 @@ public sealed class LanCookieRelayService(
                 var link = await SubmittedLinkReader.ReadLinkAsync(context);
                 if (string.IsNullOrWhiteSpace(link))
                 {
+                    logger.LogInformation("局域网授权快传收到空提交。");
                     result = LanCookieRelaySubmitResult.Failed("没有收到授权链接，请先粘贴链接");
                 }
                 else
@@ -183,6 +203,9 @@ public sealed class LanCookieRelayService(
             }
             catch (SubmittedLinkBodyTooLargeException)
             {
+                logger.LogWarning(
+                    "局域网授权快传拒绝超大请求。内容长度={ContentLength}。",
+                    context.Request.ContentLength);
                 statusCode = StatusCodes.Status413PayloadTooLarge;
                 result = LanCookieRelaySubmitResult.Failed("提交内容过大，请只粘贴授权链接");
             }
@@ -197,6 +220,10 @@ public sealed class LanCookieRelayService(
             }
 
             shouldStopSession = result.Success;
+            logger.LogInformation(
+                "局域网授权快传提交已处理。成功={Succeeded}，状态码={StatusCode}。",
+                result.Success,
+                statusCode);
             await TryWriteJsonAsync(context, statusCode, result);
         }
         finally
@@ -218,7 +245,7 @@ public sealed class LanCookieRelayService(
         string token,
         LanAuthLinkRelayPurpose purpose)
     {
-        if (!IsValidToken(context, token))
+        if (!_securityAuditor.IsValidToken(context, token))
         {
             await WriteJsonAsync(
                 context,
@@ -237,9 +264,9 @@ public sealed class LanCookieRelayService(
             context.RequestAborted);
     }
 
-    private static async Task WriteAuthQrCodeAsync(HttpContext context, string token)
+    private async Task WriteAuthQrCodeAsync(HttpContext context, string token)
     {
-        if (!IsValidToken(context, token))
+        if (!_securityAuditor.IsValidToken(context, token))
         {
             await WriteJsonAsync(
                 context,
@@ -326,7 +353,16 @@ public sealed class LanCookieRelayService(
 
         if (session is not null)
         {
-            Stopped?.Invoke(this, new LanCookieRelayStoppedEventArgs(session.SessionId, reason, message));
+            logger.LogInformation(
+                "局域网授权快传已停止。会话标识={SessionId}，原因={StopReason}。",
+                session.SessionId,
+                reason);
+            SafeEventPublisher.Publish(
+                this,
+                Stopped,
+                new LanCookieRelayStoppedEventArgs(session.SessionId, reason, message),
+                logger,
+                "局域网授权快传停止事件订阅者处理失败。");
         }
     }
 
@@ -382,7 +418,16 @@ public sealed class LanCookieRelayService(
             EffectiveMode = e.EffectiveMode
         };
         _session = session;
-        EndpointChanged?.Invoke(this, new LanCookieRelayEndpointChangedEventArgs(session));
+        logger.LogInformation(
+            "局域网授权快传发布端点已更新。会话标识={SessionId}，生效模式={EffectiveMode}。",
+            session.SessionId,
+            session.EffectiveMode);
+        SafeEventPublisher.Publish(
+            this,
+            EndpointChanged,
+            new LanCookieRelayEndpointChangedEventArgs(session),
+            logger,
+            "局域网授权快传端点变更事件订阅者处理失败。");
     }
 
     private static Task WriteHealthCheckAsync(HttpContext context)
@@ -390,14 +435,6 @@ public sealed class LanCookieRelayService(
         SetNoStore(context);
         context.Response.StatusCode = StatusCodes.Status204NoContent;
         return Task.CompletedTask;
-    }
-
-    private static bool IsValidToken(HttpContext context, string expectedToken)
-    {
-        return string.Equals(
-            context.Request.Query["token"].ToString(),
-            expectedToken,
-            StringComparison.Ordinal);
     }
 
     private static async Task WriteJsonAsync(

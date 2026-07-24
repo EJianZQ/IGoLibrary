@@ -3,16 +3,21 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Domain.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Infrastructure.Notifications;
 
 internal sealed class TelegramAlertSender(
     HttpClient httpClient,
     ISettingsService settingsService,
-    TimeProvider? timeProvider = null) : ITelegramAlertSender
+    TimeProvider? timeProvider = null,
+    ILogger<TelegramAlertSender>? logger = null) : ITelegramAlertSender
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+    private readonly ILogger<TelegramAlertSender> _logger =
+        logger ?? NullLogger<TelegramAlertSender>.Instance;
 
     public async Task SendAsync(
         TelegramAlertChannelSettings settings,
@@ -30,7 +35,8 @@ internal sealed class TelegramAlertSender(
             "Telegram",
             token => SendOnceAsync(normalized, message, token),
             _timeProvider,
-            cancellationToken);
+            cancellationToken,
+            _logger);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);
         ThrowIfTelegramResponseFailed(response, raw);
     }

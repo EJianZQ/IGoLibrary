@@ -234,7 +234,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
         catch (Exception ex)
         {
             _globalLeakSelectionRestoredForCurrentSession = false;
-            _activityLogService.Write(LogEntryKind.Warning, "GlobalLeak", $"恢复全域捡漏扫描场馆失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "GlobalLeak", $"恢复全域捡漏扫描场馆失败：{ex.Message}", ex);
         }
     }
 
@@ -503,7 +503,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "GlobalLeak", $"启动全域捡漏失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "GlobalLeak", $"启动全域捡漏失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("启动全域捡漏失败", ex.Message);
         }
     }
@@ -517,7 +517,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "GlobalLeak", $"停止全域捡漏失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "GlobalLeak", $"停止全域捡漏失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("停止全域捡漏失败", ex.Message);
         }
     }
@@ -532,7 +532,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Error, "GlobalLeak", $"加载全域捡漏场馆列表失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Error, "GlobalLeak", $"加载全域捡漏场馆列表失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("加载扫描场馆失败", ex.Message);
         }
     }
@@ -555,7 +555,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "GlobalLeak", $"保存全域捡漏扫描场馆失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "GlobalLeak", $"保存全域捡漏扫描场馆失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("保存扫描场馆失败", ex.Message, cancellationToken);
             return false;
         }
@@ -602,7 +602,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _activityLogService.Write(LogEntryKind.Warning, "GlobalLeak", $"全域捡漏成功后刷新预约状态失败：{ex.Message}");
+            _activityLogService.Write(LogEntryKind.Warning, "GlobalLeak", $"全域捡漏成功后刷新预约状态失败：{ex.Message}", ex);
         }
     }
 

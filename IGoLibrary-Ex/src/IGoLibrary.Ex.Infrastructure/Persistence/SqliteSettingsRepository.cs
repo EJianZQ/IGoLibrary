@@ -1,15 +1,18 @@
 using System.Text;
 using System.Text.Json;
 using IGoLibrary.Ex.Application.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Infrastructure.Persistence;
 
 public sealed class SqliteSettingsRepository(
     SqliteConnectionFactory connectionFactory,
     IAppSettingsDefaults appSettingsDefaults,
-    IPersistentDataChangeTracker? changeTracker = null) : ISettingsRepository
+    IPersistentDataChangeTracker? changeTracker = null,
+    ILogger<SqliteSettingsRepository>? logger = null) : ISettingsRepository
 {
     private const string SettingsKey = "app-settings";
+    private int _migrationLogged;
 
     public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -23,10 +26,24 @@ public sealed class SqliteSettingsRepository(
         var result = await command.ExecuteScalarAsync(cancellationToken);
         if (result is string json && !string.IsNullOrWhiteSpace(json))
         {
-            var migratedJson = MigrateAppSettingsJsonCore(json, appSettingsDefaults.CreateDefault());
-            var settings = JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default)
-                           ?? appSettingsDefaults.CreateDefault();
-            return Normalize(settings);
+            try
+            {
+                var migratedJson = MigrateAppSettingsJsonCore(json, appSettingsDefaults.CreateDefault());
+                if (!string.Equals(json, migratedJson, StringComparison.Ordinal) &&
+                    Interlocked.Exchange(ref _migrationLogged, 1) == 0)
+                {
+                    logger?.LogInformation("检测到旧版设置结构，已在内存中迁移到当前结构。");
+                }
+
+                var settings = JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default)
+                               ?? appSettingsDefaults.CreateDefault();
+                return Normalize(settings);
+            }
+            catch (Exception ex) when (ex is JsonException or NotSupportedException)
+            {
+                logger?.LogError(ex, "读取或迁移应用设置失败。");
+                throw;
+            }
         }
 
         return Normalize(appSettingsDefaults.CreateDefault());

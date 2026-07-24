@@ -119,7 +119,7 @@ public sealed partial class MultiSeatSelectionViewModel
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Error, "SeatLabel", $"保存座位标签失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "SeatLabel", $"保存座位标签失败：{ex.Message}", ex);
             await notificationService.ShowWarningAsync("保存座位标签失败", ex.Message);
         }
         finally
@@ -152,7 +152,7 @@ public sealed partial class MultiSeatSelectionViewModel
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Error, "SeatLabel", $"删除座位标签失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "SeatLabel", $"删除座位标签失败：{ex.Message}", ex);
             await notificationService.ShowWarningAsync("删除座位标签失败", ex.Message);
         }
         finally

@@ -294,7 +294,7 @@ public sealed partial class MultiSeatSelectionViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Error, "Favorite", $"保存收藏失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "Favorite", $"保存收藏失败：{ex.Message}", ex);
             await notificationService.ShowWarningAsync("保存收藏失败", ex.Message);
         }
     }
@@ -319,7 +319,7 @@ public sealed partial class MultiSeatSelectionViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Error, "Favorite", $"读取收藏失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "Favorite", $"读取收藏失败：{ex.Message}", ex);
             await notificationService.ShowWarningAsync("读取收藏失败", ex.Message);
         }
     }
@@ -482,7 +482,7 @@ public sealed partial class MultiSeatSelectionViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Error, "Library", $"筛选座位失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "Library", $"筛选座位失败：{ex.Message}", ex);
         }
         finally
         {

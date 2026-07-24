@@ -1,5 +1,7 @@
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Domain.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Application.Services;
 
@@ -8,8 +10,12 @@ public sealed class VenueWorkflowService(
     ISeatLabelService seatLabelService,
     ISessionService sessionService,
     ITraceIntApiClient apiClient,
-    ISettingsService settingsService) : IVenueWorkflowService
+    ISettingsService settingsService,
+    ILogger<VenueWorkflowService>? logger = null) : IVenueWorkflowService
 {
+    private readonly ILogger<VenueWorkflowService> _logger =
+        logger ?? NullLogger<VenueWorkflowService>.Instance;
+
     public async Task<VenueLibraryLoadResult> LoadLibrariesAsync(
         bool restorePreferredSelection,
         int? preferredLibraryId = null,
@@ -90,6 +96,10 @@ public sealed class VenueWorkflowService(
         }
         catch (Exception ex)
         {
+            _logger.LogWarning(
+                ex,
+                "加载场馆规则失败，场馆布局仍可继续使用。场馆标识={LibraryId}。",
+                libraryId);
             return new LibraryRuleLoadResult(null, ex.Message);
         }
     }

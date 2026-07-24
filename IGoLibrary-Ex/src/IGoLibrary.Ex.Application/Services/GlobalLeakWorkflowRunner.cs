@@ -94,7 +94,7 @@ internal sealed class GlobalLeakWorkflowRunner(
             context.Fail(
                 $"全域捡漏任务失败：{ex.Message}",
                 isSessionInvalid ? CoordinatorStatusReason.SessionInvalid : CoordinatorStatusReason.TaskFailed);
-            activityLogService.Write(LogEntryKind.Error, "GlobalLeak", ex.Message);
+            activityLogService.Write(LogEntryKind.Error, "GlobalLeak", ex.Message, ex);
             if (isSessionInvalid)
             {
                 await PublishCoordinatorEventSafelyAsync(
@@ -159,7 +159,7 @@ internal sealed class GlobalLeakWorkflowRunner(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Alert", $"{failureMessage}：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Alert", $"{failureMessage}：{ex.Message}", ex);
         }
     }
 

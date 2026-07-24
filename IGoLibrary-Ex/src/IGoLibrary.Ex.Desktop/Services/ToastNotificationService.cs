@@ -4,6 +4,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Logging;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
@@ -106,7 +107,7 @@ public sealed class ToastNotificationService(
                 }
 
                 logWriter?.Write(LogLevel.Warning, nameof(ToastNotificationService), "显示 Toast 通知失败。", ex);
-                Debug.WriteLine($"显示 Toast 通知失败：{ex}");
+                Debug.WriteLine(AppLogSanitizer.Sanitize($"显示 Toast 通知失败：{ex}"));
             }
         });
     }

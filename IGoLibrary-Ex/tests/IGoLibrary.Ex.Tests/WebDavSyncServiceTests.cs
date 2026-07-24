@@ -109,6 +109,7 @@ public sealed class WebDavSyncServiceTests : IDisposable
             NullLogger<WebDavSyncStateStore>.Instance,
             TimeProvider.System);
         BackupSyncRuntimeStatus? observedStatus = null;
+        service.StatusChanged += (_, _) => throw new InvalidOperationException("订阅者失败");
         service.StatusChanged += (_, status) => observedStatus = status;
 
         await service.ReconcileLocalStateAsync();

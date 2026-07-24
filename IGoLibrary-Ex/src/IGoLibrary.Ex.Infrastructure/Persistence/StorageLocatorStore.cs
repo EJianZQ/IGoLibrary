@@ -1,9 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Infrastructure.Persistence;
 
-internal sealed class StorageLocatorStore(string locatorFilePath, StorageLocations defaults)
+internal sealed class StorageLocatorStore(
+    string locatorFilePath,
+    StorageLocations defaults,
+    Action<LogLevel, string, Exception?>? diagnosticSink = null)
 {
     private const int SchemaVersion = 2;
     private readonly string _locatorFilePath = Path.GetFullPath(locatorFilePath);
@@ -40,6 +44,10 @@ internal sealed class StorageLocatorStore(string locatorFilePath, StorageLocatio
         {
             var corruptPath = _locatorFilePath + $".corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
             File.Move(_locatorFilePath, corruptPath, overwrite: false);
+            diagnosticSink?.Invoke(
+                LogLevel.Warning,
+                "存储位置配置已损坏，已恢复默认目录并备份原文件。",
+                ex);
             return new StorageLocatorDocument
             {
                 Active = defaults,
@@ -94,7 +102,7 @@ internal sealed class StorageLocatorStore(string locatorFilePath, StorageLocatio
         }
     }
 
-    public static bool RetryPendingCleanup(
+    public bool RetryPendingCleanup(
         StorageLocatorDocument document,
         IReadOnlyCollection<string> protectedDirectories)
     {
@@ -131,8 +139,12 @@ internal sealed class StorageLocatorStore(string locatorFilePath, StorageLocatio
 
                 changed = true;
             }
-            catch
+            catch (Exception ex)
             {
+                diagnosticSink?.Invoke(
+                    LogLevel.Warning,
+                    $"清理迁移遗留文件失败，将在下次启动重试。清理类型={cleanup.Kind}。",
+                    ex);
                 remaining.Add(cleanup);
             }
         }

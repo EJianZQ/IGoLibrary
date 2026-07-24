@@ -107,7 +107,7 @@ public sealed partial class LanCookieRelayViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Auth", $"停止快传失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Auth", $"停止快传失败：{ex.Message}", ex);
         }
         finally
         {
@@ -186,7 +186,7 @@ public sealed partial class LanCookieRelayViewModel(
             ShowLanCookieRelayStartedStatusIcon = false;
             _activeLanCookieRelaySessionId = null;
             LanCookieRelayStatusText = $"快传启动失败：{ex.Message}";
-            activityLogService.Write(LogEntryKind.Error, "Auth", $"快传启动失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Error, "Auth", $"快传启动失败：{ex.Message}", ex);
             await notificationService.ShowWarningAsync("快传启动失败", ex.Message);
         }
     }
@@ -245,7 +245,7 @@ public sealed partial class LanCookieRelayViewModel(
         }
         catch (Exception ex)
         {
-            activityLogService.Write(LogEntryKind.Warning, "Auth", $"显示快传失败通知失败：{ex.Message}");
+            activityLogService.Write(LogEntryKind.Warning, "Auth", $"显示快传失败通知失败：{ex.Message}", ex);
         }
 
         return LanCookieRelaySubmitResult.Failed(parseResult.Message);

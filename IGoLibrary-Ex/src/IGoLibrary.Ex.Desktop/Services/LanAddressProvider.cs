@@ -1,10 +1,11 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
-public sealed class LanAddressProvider : ILanAddressProvider
+public sealed class LanAddressProvider(ILogger<LanAddressProvider>? logger = null) : ILanAddressProvider
 {
     private static readonly string[] VirtualAdapterKeywords =
     [
@@ -25,12 +26,22 @@ public sealed class LanAddressProvider : ILanAddressProvider
 
     public IPAddress? GetPrimaryLanAddress()
     {
-        var candidates = NetworkInterface.GetAllNetworkInterfaces()
-            .Where(static adapter =>
-                adapter.OperationalStatus == OperationalStatus.Up &&
-                adapter.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
-                adapter.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
-            .SelectMany(CreateCandidates);
+        IEnumerable<LanAddressCandidate> candidates;
+        try
+        {
+            candidates = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(static adapter =>
+                    adapter.OperationalStatus == OperationalStatus.Up &&
+                    adapter.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                    adapter.NetworkInterfaceType != NetworkInterfaceType.Tunnel)
+                .SelectMany(CreateCandidates)
+                .ToArray();
+        }
+        catch (NetworkInformationException ex)
+        {
+            logger?.LogWarning(ex, "枚举本机局域网地址失败。");
+            return null;
+        }
 
         return SelectPrimaryLanAddress(candidates);
     }
@@ -49,15 +60,19 @@ public sealed class LanAddressProvider : ILanAddressProvider
             .FirstOrDefault();
     }
 
-    private static IEnumerable<LanAddressCandidate> CreateCandidates(NetworkInterface adapter)
+    private IEnumerable<LanAddressCandidate> CreateCandidates(NetworkInterface adapter)
     {
         IPInterfaceProperties properties;
         try
         {
             properties = adapter.GetIPProperties();
         }
-        catch (NetworkInformationException)
+        catch (NetworkInformationException ex)
         {
+            logger?.LogDebug(
+                ex,
+                "读取网络适配器属性失败，已跳过。接口类型={InterfaceType}",
+                adapter.NetworkInterfaceType);
             yield break;
         }
 

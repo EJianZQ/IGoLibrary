@@ -8,10 +8,13 @@ using AvaloniaApplication = Avalonia.Application;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
-public sealed class AppThemeService(ISettingsService settingsService) : IAppThemeService
+public sealed class AppThemeService(
+    ISettingsService settingsService,
+    ILogger<AppThemeService>? logger = null) : IAppThemeService
 {
     private static readonly Color DefaultAccentColor = Color.Parse("#0077FA");
     private static readonly string[] FluentAccentColorResourceKeys =
@@ -39,6 +42,7 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
     private TopLevel? _topLevel;
     private IPlatformSettings? _platformSettings;
     private ThemePreferences _lastAppliedTheme = ThemePreferences.Default;
+    private int _systemAccentReadFailureLogged;
 
     public event EventHandler<AppThemePalette>? PaletteChanged;
 
@@ -61,7 +65,7 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
         if (app is null)
         {
             CurrentPalette = CreatePalette(isDarkTheme: false, accentColor: DefaultAccentColor);
-            PaletteChanged?.Invoke(this, CurrentPalette);
+            PublishPaletteChanged(CurrentPalette);
             return Task.CompletedTask;
         }
 
@@ -156,7 +160,7 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
 
         var palette = CreatePalette(isDarkTheme, accentColor);
         CurrentPalette = palette;
-        PaletteChanged?.Invoke(this, palette);
+        PublishPaletteChanged(palette);
     }
 
     private bool ResolveIsDarkTheme(AvaloniaApplication app)
@@ -176,9 +180,35 @@ public sealed class AppThemeService(ISettingsService settingsService) : IAppThem
         {
             return _platformSettings.GetColorValues().AccentColor1;
         }
-        catch
+        catch (Exception ex)
         {
+            if (Interlocked.Exchange(ref _systemAccentReadFailureLogged, 1) == 0)
+            {
+                logger?.LogWarning(ex, "读取系统强调色失败，已使用应用默认强调色。");
+            }
+
             return DefaultAccentColor;
+        }
+    }
+
+    private void PublishPaletteChanged(AppThemePalette palette)
+    {
+        var handlers = PaletteChanged;
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (EventHandler<AppThemePalette> handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, palette);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "主题调色板订阅者处理失败，已隔离该订阅者。");
+            }
         }
     }
 

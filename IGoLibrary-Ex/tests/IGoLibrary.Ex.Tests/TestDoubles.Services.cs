@@ -824,6 +824,8 @@ internal sealed class FakeSessionService : ISessionService
 
     public SessionCredentials? RestoreResult { get; set; }
 
+    public Exception? RestoreException { get; set; }
+
     public Exception? AuthenticateFromCookieException { get; set; }
 
     public Exception? SignOutException { get; set; }
@@ -863,6 +865,11 @@ internal sealed class FakeSessionService : ISessionService
     public Task<SessionCredentials?> RestoreAsync(CancellationToken cancellationToken = default)
     {
         RestoreCalls++;
+        if (RestoreException is not null)
+        {
+            throw RestoreException;
+        }
+
         CurrentSession = RestoreResult;
         return Task.FromResult(RestoreResult);
     }

@@ -77,7 +77,8 @@ public sealed class MainWindowSizePersistenceService : IMainWindowSizePersistenc
             _activityLogService.Write(
                 LogEntryKind.Warning,
                 "Window",
-                $"恢复主窗口大小失败：{ex.Message}");
+                $"恢复主窗口大小失败：{ex.Message}",
+                ex);
         }
 
         if (window.WindowState == WindowState.Normal && TryNormalizeSize(window.ClientSize, out var currentSize))
@@ -265,7 +266,8 @@ public sealed class MainWindowSizePersistenceService : IMainWindowSizePersistenc
         _activityLogService.Write(
             LogEntryKind.Warning,
             "Window",
-            $"保存主窗口大小失败：{ex.Message}");
+            $"保存主窗口大小失败：{ex.Message}",
+            ex);
     }
 
     private void DetachWindow()

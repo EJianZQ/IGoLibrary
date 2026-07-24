@@ -17,6 +17,7 @@ internal sealed class TraceIntGraphQlTransport(
         TraceIntProtocolTemplates templates,
         string cookie,
         string payload,
+        string operationName,
         CancellationToken cancellationToken)
     {
         return SendAsync(
@@ -28,6 +29,7 @@ internal sealed class TraceIntGraphQlTransport(
                 templates.GraphQlDefaultRefererUrl,
                 templates.GraphQlDefaultOriginUrl,
                 AppVersion),
+            operationName,
             cancellationToken);
     }
 
@@ -35,6 +37,7 @@ internal sealed class TraceIntGraphQlTransport(
         TraceIntProtocolTemplates templates,
         string cookie,
         string payload,
+        string operationName,
         CancellationToken cancellationToken)
     {
         return SendAsync(
@@ -46,6 +49,7 @@ internal sealed class TraceIntGraphQlTransport(
                 templates.GraphQlTomorrowRefererUrl,
                 templates.GraphQlTomorrowOriginUrl,
                 "2.2.5"),
+            operationName,
             cancellationToken);
     }
 
@@ -54,6 +58,7 @@ internal sealed class TraceIntGraphQlTransport(
         string cookie,
         string payload,
         TraceIntGraphQlRequestProfile profile,
+        string operationName,
         CancellationToken cancellationToken)
     {
         return await requestPolicy.ExecuteAsync(async requestToken =>
@@ -84,7 +89,7 @@ internal sealed class TraceIntGraphQlTransport(
             var response = await httpClient.SendAsync(request, requestToken);
             response.EnsureSuccessStatusCode();
             return response;
-        }, "请求", cancellationToken);
+        }, operationName, cancellationToken);
     }
 }
 

@@ -41,9 +41,8 @@ internal sealed class WindowsUpdateHandoffService(
         {
             var prepared = await PrepareTransactionRequestAsync(package, cancellationToken);
             logger.LogInformation(
-                "更新事务准备完成。事务={TransactionId}，请求文件={RequestPath}。",
-                package.Workspace.TransactionId,
-                prepared.RequestPath);
+                "更新事务准备完成。事务={TransactionId}，请求文件已写入。",
+                package.Workspace.TransactionId);
 
             operationStage = "检查安装目录权限";
             var requiresElevation = UpdateInstallationPermissions.RequiresElevation(

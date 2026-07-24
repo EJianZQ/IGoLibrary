@@ -2,11 +2,71 @@ using System.Net;
 using IGoLibrary.Ex.Domain.Models;
 using IGoLibrary.Ex.Infrastructure.Api;
 using IGoLibrary.Ex.Infrastructure.Notifications;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Tests;
 
 public sealed class NotificationRequestPolicyCancellationTests
 {
+    [Fact]
+    public async Task RequestPolicy_WhenSettingsLoadIsCanceled_DoesNotInvokeRequest()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var operationCalls = 0;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            HttpNotificationRequestPolicy.ExecuteAsync(
+                settingsService,
+                "测试通道",
+                _ =>
+                {
+                    operationCalls++;
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+                },
+                TimeProvider.System,
+                cancellation.Token));
+
+        Assert.Equal(0, operationCalls);
+    }
+
+    [Fact]
+    public async Task RequestPolicy_ThrottlesRepeatedSettingsLoadFailureLogs()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        settingsService.LoadExceptions.Enqueue(new InvalidOperationException("settings unavailable 1"));
+        settingsService.LoadExceptions.Enqueue(new InvalidOperationException("settings unavailable 2"));
+        settingsService.LoadExceptions.Enqueue(new InvalidOperationException("settings unavailable 3"));
+        var timeProvider = new FakeTimeProvider(
+            new DateTimeOffset(2026, 7, 25, 8, 0, 0, TimeSpan.Zero));
+        var logger = new CapturingLogger();
+
+        for (var index = 0; index < 2; index++)
+        {
+            using var response = await HttpNotificationRequestPolicy.ExecuteAsync(
+                settingsService,
+                "测试通道",
+                _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)),
+                timeProvider,
+                CancellationToken.None,
+                logger);
+        }
+
+        Assert.Single(logger.SettingsFailureEntries);
+
+        timeProvider.Advance(TimeSpan.FromMinutes(1));
+        using var laterResponse = await HttpNotificationRequestPolicy.ExecuteAsync(
+            settingsService,
+            "测试通道",
+            _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)),
+            timeProvider,
+            CancellationToken.None,
+            logger);
+
+        Assert.Equal(2, logger.SettingsFailureEntries.Count);
+    }
+
     [Theory]
     [InlineData(NotificationSenderKind.Bark, "Bark")]
     [InlineData(NotificationSenderKind.Telegram, "Telegram")]
@@ -110,10 +170,57 @@ public sealed class NotificationRequestPolicyCancellationTests
         WxPusher,
         ServerChan
     }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        private readonly List<(LogLevel Level, string Message, Exception? Exception)> _entries = [];
+
+        public IReadOnlyList<(LogLevel Level, string Message, Exception? Exception)> SettingsFailureEntries
+            => _entries
+                .Where(entry => entry.Message.Contains("读取网络请求设置失败", StringComparison.Ordinal))
+                .ToArray();
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            _entries.Add((logLevel, formatter(state, exception), exception));
+        }
+    }
 }
 
 public sealed class TraceIntRequestPolicyCancellationTests
 {
+    [Fact]
+    public async Task RequestPolicy_WhenSettingsLoadIsCanceled_DoesNotInvokeRequest()
+    {
+        var settingsService = new FakeSettingsService(AppSettings.Default);
+        var policy = new TraceIntRequestPolicy(settingsService);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var operationCalls = 0;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            policy.ExecuteAsync(
+                _ =>
+                {
+                    operationCalls++;
+                    return Task.FromResult(0);
+                },
+                "TraceInt 测试请求",
+                cancellation.Token));
+
+        Assert.Equal(0, operationCalls);
+    }
+
     [Fact]
     public async Task RequestPolicy_DistinguishesInternalTimeoutFromCallerCancellation()
     {

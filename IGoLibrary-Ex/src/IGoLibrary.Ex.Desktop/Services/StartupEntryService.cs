@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
@@ -9,6 +11,12 @@ public sealed class StartupEntryService : IStartupEntryService
     private const string WindowsRunKey = @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run";
     private const string MacLaunchAgentPlist = "com.IGoLibrary-Ex.plist";
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromSeconds(10);
+    private readonly ILogger<StartupEntryService> _logger;
+
+    public StartupEntryService(ILogger<StartupEntryService>? logger = null)
+    {
+        _logger = logger ?? NullLogger<StartupEntryService>.Instance;
+    }
 
     public bool IsSupported => OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
 
@@ -18,12 +26,16 @@ public sealed class StartupEntryService : IStartupEntryService
 
         if (OperatingSystem.IsWindows())
         {
-            return Task.FromResult(IsWindowsStartupEntryEnabled());
+            var enabled = IsWindowsStartupEntryEnabled();
+            _logger.LogInformation("已查询开机启动状态。平台=Windows，已启用={Enabled}。", enabled);
+            return Task.FromResult(enabled);
         }
 
         if (OperatingSystem.IsMacOS())
         {
-            return Task.FromResult(IsMacLaunchAgentEnabled());
+            var enabled = IsMacLaunchAgentEnabled();
+            _logger.LogInformation("已查询开机启动状态。平台=macOS，已启用={Enabled}。", enabled);
+            return Task.FromResult(enabled);
         }
 
         return Task.FromResult(false);
@@ -36,12 +48,14 @@ public sealed class StartupEntryService : IStartupEntryService
         if (OperatingSystem.IsWindows())
         {
             EnableWindowsStartupEntry();
+            _logger.LogInformation("开机启动已启用。平台=Windows。");
             return Task.CompletedTask;
         }
 
         if (OperatingSystem.IsMacOS())
         {
             EnableMacLaunchAgent();
+            _logger.LogInformation("开机启动已启用。平台=macOS。");
             return Task.CompletedTask;
         }
 
@@ -55,12 +69,14 @@ public sealed class StartupEntryService : IStartupEntryService
         if (OperatingSystem.IsWindows())
         {
             DisableWindowsStartupEntry();
+            _logger.LogInformation("开机启动已禁用。平台=Windows。");
             return Task.CompletedTask;
         }
 
         if (OperatingSystem.IsMacOS())
         {
             DisableMacLaunchAgent();
+            _logger.LogInformation("开机启动已禁用。平台=macOS。");
             return Task.CompletedTask;
         }
 
@@ -74,12 +90,12 @@ public sealed class StartupEntryService : IStartupEntryService
 
     // ── Windows (registry via reg.exe) ──────────────────────────────────
 
-    private static bool IsWindowsStartupEntryEnabled()
+    private bool IsWindowsStartupEntryEnabled()
     {
         return TryQueryWindowsStartupEntry(out var exists, out _) && exists;
     }
 
-    private static void EnableWindowsStartupEntry()
+    private void EnableWindowsStartupEntry()
     {
         var exePath = GetExecutablePath()
             ?? throw new InvalidOperationException("无法确定当前可执行文件路径");
@@ -96,7 +112,7 @@ public sealed class StartupEntryService : IStartupEntryService
         }
     }
 
-    private static void DisableWindowsStartupEntry()
+    private void DisableWindowsStartupEntry()
     {
         var (exitCode, _, stderr) = RunRegProcess(
             $"delete \"{WindowsRunKey}\" /v {AppName} /f",
@@ -119,7 +135,7 @@ public sealed class StartupEntryService : IStartupEntryService
             $"移除开机启动注册表失败（退出码 {exitCode}）：{FormatProcessError(detail)}");
     }
 
-    private static bool TryQueryWindowsStartupEntry(out bool exists, out string error)
+    private bool TryQueryWindowsStartupEntry(out bool exists, out string error)
     {
         try
         {
@@ -132,6 +148,7 @@ public sealed class StartupEntryService : IStartupEntryService
         }
         catch (Exception ex)
         {
+            _logger.LogWarning(ex, "查询 Windows 开机启动注册表项失败。");
             exists = false;
             error = ex.Message;
             return false;
