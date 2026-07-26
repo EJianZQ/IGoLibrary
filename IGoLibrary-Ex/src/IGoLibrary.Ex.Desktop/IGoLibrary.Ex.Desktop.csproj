@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\MobileControl\MobileControlPage.html" />
+    <EmbeddedResource Include="Resources\MobileControl\MobileControlBluetoothScanner.js" />
     <EmbeddedResource Include="Assets\qrcode.png" LogicalName="IGoLibrary.Ex.Desktop.Assets.qrcode.png" />
     <EmbeddedResource Include="..\..\build\cloudflared-assets.json"
                       Link="Resources\Cloudflared\cloudflared-assets.json"

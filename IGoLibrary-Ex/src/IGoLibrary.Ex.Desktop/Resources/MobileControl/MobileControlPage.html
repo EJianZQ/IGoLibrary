@@ -234,6 +234,7 @@
     .head-icon.cookie { background: linear-gradient(135deg, #ff9500, #ff6723); }
     .head-icon.reservation { background: linear-gradient(135deg, #007aff, #5856d6); }
     .head-icon.task { background: linear-gradient(135deg, #34c759, #30d158); }
+    .head-icon.bluetooth { background: linear-gradient(135deg, #007aff, #5ac8fa); }
 
     h2 {
       font-size: 17px;
@@ -481,6 +482,264 @@
       font-size: 13px;
       line-height: 1.55;
       background: var(--bg-card-solid);
+    }
+
+    /* ── Bluetooth scanner ── */
+    .page[data-page="bluetooth"] > section[hidden] {
+      display: none;
+    }
+
+    .bluetooth-note {
+      margin: -2px 0 14px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .bluetooth-support-list,
+    .beacon-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .bluetooth-support-message {
+      border-radius: var(--radius-inner);
+      padding: 12px;
+      background: rgba(255, 149, 0, 0.09);
+      color: #9a5b00;
+      font-size: 13px;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+
+    .bluetooth-support-message::before {
+      content: '!';
+      display: inline-flex;
+      width: 18px;
+      height: 18px;
+      align-items: center;
+      justify-content: center;
+      margin-right: 7px;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--accent-orange);
+      font-size: 11px;
+      font-weight: 800;
+      vertical-align: 1px;
+    }
+
+    .bluetooth-support-message.blocking {
+      background: rgba(255, 59, 48, 0.08);
+      color: #a5221a;
+    }
+
+    .bluetooth-support-message.blocking::before {
+      background: var(--accent-red);
+    }
+
+    .bluetooth-support-ok {
+      border-radius: var(--radius-inner);
+      padding: 12px;
+      color: #187533;
+      background: rgba(52, 199, 89, 0.1);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .bluetooth-actions button {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .bluetooth-mode-row {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 12px;
+      padding: 13px 14px;
+      border-radius: var(--radius-inner);
+      background: var(--bg-field);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .bluetooth-mode-copy {
+      min-width: 0;
+    }
+
+    .bluetooth-mode-title {
+      display: block;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 650;
+      line-height: 1.4;
+    }
+
+    .bluetooth-mode-description {
+      display: block;
+      margin-top: 3px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .bluetooth-toggle {
+      appearance: none;
+      -webkit-appearance: none;
+      position: relative;
+      width: 48px;
+      height: 28px;
+      flex: 0 0 48px;
+      margin: 0;
+      border: 0;
+      border-radius: 14px;
+      background: rgba(120, 120, 128, 0.24);
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .bluetooth-toggle::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.22);
+      transition: transform 0.2s ease;
+    }
+
+    .bluetooth-toggle:checked {
+      background: var(--accent-blue);
+    }
+
+    .bluetooth-toggle:checked::after {
+      transform: translateX(20px);
+    }
+
+    .bluetooth-toggle:focus-visible {
+      outline: 3px solid rgba(0, 122, 255, 0.25);
+      outline-offset: 2px;
+    }
+
+    .bluetooth-toggle:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    .bluetooth-scan-summary {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      border-radius: var(--radius-inner);
+      padding: 14px;
+      background: var(--bg-field);
+    }
+
+    .bluetooth-scan-status {
+      color: var(--text-primary);
+      font-size: 15px;
+      font-weight: 650;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .bluetooth-countdown {
+      min-width: 64px;
+      color: var(--accent-blue);
+      font-size: 22px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .beacon-empty {
+      border-radius: var(--radius-inner);
+      padding: 28px 16px;
+      color: var(--text-tertiary);
+      background: var(--bg-field);
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .beacon-limit {
+      border-radius: var(--radius-inner);
+      padding: 10px 12px;
+      color: #9a5b00;
+      background: rgba(255, 149, 0, 0.09);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .beacon-card {
+      border-radius: var(--radius-inner);
+      padding: 14px;
+      background: var(--bg-field);
+    }
+
+    .beacon-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .beacon-uuid {
+      min-width: 0;
+      color: var(--text-primary);
+      font: 600 13px/1.45 "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .beacon-card-tags {
+      display: flex;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .beacon-rssi,
+    .beacon-source {
+      border-radius: var(--radius-pill);
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .beacon-rssi {
+      color: var(--accent-blue);
+      background: rgba(0, 122, 255, 0.1);
+    }
+
+    .beacon-source.standard {
+      color: #187533;
+      background: rgba(52, 199, 89, 0.1);
+    }
+
+    .beacon-source.compatible {
+      color: #9a5b00;
+      background: rgba(255, 149, 0, 0.12);
+    }
+
+    .beacon-meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .beacon-meta .item {
+      background: var(--bg-card-solid);
+      padding: 10px;
     }
 
     /* ── Cookie Hero Countdown ── */
@@ -848,6 +1107,9 @@
       .wide { grid-column: auto; }
       h1 { font-size: 28px; }
       .head-icon { width: 30px; height: 30px; font-size: 15px; }
+      .bluetooth-actions { flex-direction: column; }
+      .bluetooth-scan-summary { grid-template-columns: 1fr; }
+      .bluetooth-countdown { text-align: left; }
     }
 
     /* ── Loading shimmer for initial state ── */
@@ -1133,6 +1395,66 @@
       </div>
     </div></section>
     </div>
+
+    <!-- ═══ 蓝牙扫描页 ═══ -->
+    <div class="page" data-page="bluetooth">
+      <section id="bluetoothCompatibilitySection"><div class="card">
+        <div class="head">
+          <div class="head-title">
+            <div class="head-icon bluetooth" aria-hidden="true">ᛒ</div>
+            <h2>浏览器兼容性</h2>
+          </div>
+          <span class="state" id="bluetoothSupportState" aria-live="polite">待检测</span>
+        </div>
+        <p class="bluetooth-note">BLE 广播扫描属于实验性浏览器能力，目前仅支持安卓 + Chrome内核浏览器，iOS完全不支持</p>
+        <div class="bluetooth-support-list" id="bluetoothSupportIssues" aria-live="polite">
+          <div class="bluetooth-support-message">进入此页面后将自动检测浏览器能力</div>
+        </div>
+        <div class="actions bluetooth-actions">
+          <button id="recheckBluetoothButton" type="button">重新检测</button>
+        </div>
+      </div></section>
+
+      <section id="bluetoothScanSection" hidden><div class="card">
+        <div class="head">
+          <div class="head-title">
+            <div class="head-icon bluetooth" aria-hidden="true">⌁</div>
+            <h2>扫描控制</h2>
+          </div>
+          <span class="state" id="bluetoothScanState" aria-live="polite">尚未扫描</span>
+        </div>
+        <div class="bluetooth-scan-summary">
+          <div>
+            <span class="label">当前状态</span>
+            <div class="bluetooth-scan-status" id="bluetoothScanStatus" aria-live="polite">请先确认浏览器兼容性</div>
+          </div>
+          <div class="bluetooth-countdown" id="bluetoothScanCountdown" aria-label="扫描剩余时间">--</div>
+        </div>
+        <label class="bluetooth-mode-row" for="bluetoothCompatibilityMode">
+          <span class="bluetooth-mode-copy">
+            <span class="bluetooth-mode-title">兼容扫描模式</span>
+            <span class="bluetooth-mode-description" id="bluetoothCompatibilityDescription">接收全部 BLE 广播并在本机识别标准及疑似 iBeacon，在标准扫描模式扫描不到但确信附近有签到信标时启用</span>
+          </span>
+          <input class="bluetooth-toggle" id="bluetoothCompatibilityMode" type="checkbox" role="switch" aria-describedby="bluetoothCompatibilityDescription">
+        </label>
+        <div class="actions bluetooth-actions">
+          <button id="bluetoothScanButton" type="button" disabled>开始扫描</button>
+        </div>
+      </div></section>
+
+      <section id="bluetoothResultsSection" hidden><div class="card">
+        <div class="head">
+          <div class="head-title">
+            <div class="head-icon bluetooth" aria-hidden="true">◉</div>
+            <h2>扫描结果</h2>
+          </div>
+          <span class="state" id="bluetoothResultState" aria-live="polite">0 个</span>
+        </div>
+        <div class="beacon-list" id="bluetoothResultList">
+          <div class="beacon-empty">开始扫描后，附近合法的 iBeacon 会显示在这里</div>
+        </div>
+      </div></section>
+    </div>
   </main>
 
   <!-- ═══ 底部 Tab 导航栏 ═══ -->
@@ -1152,11 +1474,20 @@
       </svg>
       <span>任务</span>
     </button>
+    <button class="tab-btn" type="button" data-tab="bluetooth">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 7l10 10-5 4V3l5 4L7 17"/>
+      </svg>
+      <span>蓝牙扫描</span>
+    </button>
   </nav>
 
   <!-- iOS Toast element -->
   <div class="ios-toast" id="iosToast"></div>
 
+  <script>
+__MOBILE_CONTROL_BLUETOOTH_SCANNER_JS__
+  </script>
   <script>
     const token = __MOBILE_CONTROL_TOKEN_JSON__;
     const $ = id => document.getElementById(id);
@@ -1170,6 +1501,417 @@
     const pendingTaskStarts = new Set();
     let renderedRecordsSignature = '';
     $('authQrCode').src = '/api/session/auth-qrcode?token=' + encodeURIComponent(token);
+
+    const {
+      DEFAULT_MAX_RECORDS: BLUETOOTH_MAX_RECORDS,
+      mapBluetoothScanError,
+      parseIBeaconAdvertisement,
+      upsertIBeaconRecord,
+      sortIBeaconRecords
+    } = MobileControlBluetoothScanner;
+    const BLUETOOTH_SCAN_DURATION_MS = 30_000;
+    const BLUETOOTH_RESULT_RENDER_INTERVAL_MS = 250;
+    const bluetoothBeaconRecords = new Map();
+    let bluetoothSupportGeneration = 0;
+    let bluetoothSupportReady = false;
+    let bluetoothSupportChecking = false;
+    let bluetoothScanGeneration = 0;
+    let bluetoothScanRequestPending = false;
+    let bluetoothScan = null;
+    let bluetoothAdvertisementHandler = null;
+    let bluetoothAutoStopTimer = 0;
+    let bluetoothCountdownTimer = 0;
+    let bluetoothResultsRenderTimer = 0;
+    let bluetoothResultsDirty = false;
+    let bluetoothResultLimitReached = false;
+    let bluetoothScanEndsAt = 0;
+    let bluetoothActiveScanUsesCompatibilityMode = false;
+    let bluetoothCompatibilityPromptPending = false;
+    let bluetoothEmptyMessage = '开始扫描后，附近合法的 iBeacon 会显示在这里';
+
+    const isBluetoothPageActive = () =>
+      document.querySelector('.page[data-page="bluetooth"]')?.classList.contains('active') === true;
+
+    function updateBluetoothSectionVisibility() {
+      const supportPassed = bluetoothSupportReady && !bluetoothSupportChecking;
+      $('bluetoothCompatibilitySection').hidden = supportPassed;
+      $('bluetoothScanSection').hidden = !supportPassed;
+      $('bluetoothResultsSection').hidden = !supportPassed;
+    }
+
+    function updateBluetoothControls() {
+      const button = $('bluetoothScanButton');
+      const scanning = bluetoothScan !== null;
+      button.classList.toggle('danger', scanning);
+      button.textContent = bluetoothScanRequestPending
+        ? '正在请求蓝牙权限...'
+        : scanning
+          ? '停止扫描'
+          : $('bluetoothCompatibilityMode').checked
+            ? '开始兼容扫描'
+            : '开始扫描';
+      button.disabled = bluetoothCompatibilityPromptPending
+        || bluetoothScanRequestPending
+        || (!scanning && (!bluetoothSupportReady || bluetoothSupportChecking));
+      $('recheckBluetoothButton').disabled = bluetoothCompatibilityPromptPending
+        || bluetoothSupportChecking
+        || bluetoothScanRequestPending
+        || scanning;
+      $('bluetoothCompatibilityMode').disabled = bluetoothCompatibilityPromptPending
+        || bluetoothScanRequestPending
+        || scanning;
+    }
+
+    function renderBluetoothSupport(issues) {
+      const blockingIssues = issues.filter(issue => issue.blocking);
+      $('bluetoothSupportState').textContent = bluetoothSupportReady
+        ? issues.length ? '可尝试扫描' : '支持'
+        : '不支持';
+      $('bluetoothSupportIssues').innerHTML = issues.length
+        ? issues.map(issue =>
+            `<div class="bluetooth-support-message${issue.blocking ? ' blocking' : ''}">${escapeHtml(issue.message)}</div>`)
+          .join('')
+        : '<div class="bluetooth-support-ok">当前安全上下文、浏览器扫描接口和蓝牙适配器均可用</div>';
+
+      if (!bluetoothScan && !bluetoothScanRequestPending) {
+        $('bluetoothScanStatus').textContent = blockingIssues.length
+          ? '当前环境无法开始扫描，请查看上方全部原因'
+          : '兼容性检测通过，可以开始扫描';
+      }
+      updateBluetoothSectionVisibility();
+      updateBluetoothControls();
+    }
+
+    async function checkBluetoothSupport(preserveScanStatus = false) {
+      const generation = ++bluetoothSupportGeneration;
+      const issues = [];
+      const preservedScanStatus = preserveScanStatus ? $('bluetoothScanStatus').textContent : '';
+      const secureContextAvailable = window.isSecureContext === true;
+      const webBluetoothAvailable = Boolean(navigator.bluetooth);
+      const leScanAvailable = webBluetoothAvailable
+        && typeof navigator.bluetooth.requestLEScan === 'function';
+      let adapterExplicitlyUnavailable = false;
+
+      bluetoothSupportChecking = true;
+      bluetoothSupportReady = false;
+      $('bluetoothSupportState').textContent = '检测中';
+      $('bluetoothSupportIssues').innerHTML =
+        '<div class="bluetooth-support-message">正在检测浏览器兼容性...</div>';
+      updateBluetoothSectionVisibility();
+      if (!preserveScanStatus && !bluetoothScan && !bluetoothScanRequestPending) {
+        $('bluetoothScanStatus').textContent = '正在检测浏览器兼容性...';
+      }
+      updateBluetoothControls();
+
+      if (!secureContextAvailable) {
+        issues.push({
+          blocking: true,
+          message: '当前地址不是安全上下文；Web Bluetooth Scanning 需要 HTTPS。局域网 HTTP 页面不支持，请改用 Cloudflare Tunnel'
+        });
+      }
+
+      if (!webBluetoothAvailable) {
+        issues.push({
+          blocking: true,
+          message: '当前页面未提供 Web Bluetooth；可能是浏览器不支持，或接口被不安全上下文隐藏'
+        });
+      }
+
+      if (webBluetoothAvailable && !leScanAvailable) {
+        issues.push({
+          blocking: true,
+          message: '浏览器只支持部分 Web Bluetooth，不支持 BLE 广播扫描。该能力仍属实验性；如果你是Android Chrome ，访问 chrome://flags/#enable-experimental-web-platform-features 并启用'
+        });
+      }
+
+      if (webBluetoothAvailable && typeof navigator.bluetooth.getAvailability === 'function') {
+        try {
+          const available = await navigator.bluetooth.getAvailability();
+          if (generation !== bluetoothSupportGeneration) return;
+          if (available === false) {
+            adapterExplicitlyUnavailable = true;
+            issues.push({
+              blocking: true,
+              message: '蓝牙当前不可用；可能是系统蓝牙关闭、没有 BLE 适配器，或被浏览器/系统策略禁用'
+            });
+          }
+        } catch (error) {
+          if (generation !== bluetoothSupportGeneration) return;
+          const errorName = error && typeof error.name === 'string' ? error.name : '未知异常';
+          issues.push({
+            blocking: false,
+            message: `蓝牙可用性状态检测失败（${errorName}）；这不是硬性阻塞，将由实际扫描继续确认`
+          });
+        }
+      }
+
+      if (generation !== bluetoothSupportGeneration) return;
+      bluetoothSupportChecking = false;
+      bluetoothSupportReady = secureContextAvailable
+        && webBluetoothAvailable
+        && leScanAvailable
+        && !adapterExplicitlyUnavailable;
+      renderBluetoothSupport(issues);
+      if (preserveScanStatus && !bluetoothScan && !bluetoothScanRequestPending) {
+        $('bluetoothScanStatus').textContent = preservedScanStatus;
+        updateBluetoothControls();
+      }
+    }
+
+    function renderBluetoothResults() {
+      bluetoothResultsDirty = false;
+      const countLabel = bluetoothResultLimitReached
+        ? `${bluetoothBeaconRecords.size}+ 个`
+        : `${bluetoothBeaconRecords.size} 个`;
+      if ($('bluetoothResultState').textContent !== countLabel) {
+        $('bluetoothResultState').textContent = countLabel;
+      }
+      if (bluetoothBeaconRecords.size === 0) {
+        $('bluetoothResultList').innerHTML = `<div class="beacon-empty">${escapeHtml(bluetoothEmptyMessage)}</div>`;
+        return;
+      }
+
+      const records = sortIBeaconRecords(bluetoothBeaconRecords);
+      const limitNotice = bluetoothResultLimitReached
+        ? `<div class="beacon-limit">附近结果较多，最多显示 ${BLUETOOTH_MAX_RECORDS} 个不同广播来源</div>`
+        : '';
+
+      $('bluetoothResultList').innerHTML = limitNotice + records.map(record => {
+        const rssi = Number.isFinite(record.rssi) ? `${record.rssi} dBm` : '未知';
+        const lastSeen = new Date(record.lastSeen).toLocaleTimeString('zh-CN', { hour12: false });
+        const sourceClass = record.isStandardIBeacon ? 'standard' : 'compatible';
+        const sourceLabel = record.isStandardIBeacon ? '标准 iBeacon' : '兼容识别';
+        return `
+          <article class="beacon-card">
+            <div class="beacon-card-head">
+              <div>
+                <span class="label">UUID</span>
+                <div class="beacon-uuid">${escapeHtml(record.uuid)}</div>
+              </div>
+              <div class="beacon-card-tags">
+                <span class="beacon-source ${sourceClass}">${sourceLabel}</span>
+                <span class="beacon-rssi">RSSI ${escapeHtml(rssi)}</span>
+              </div>
+            </div>
+            <div class="beacon-meta">
+              <div class="item"><span class="label">Major</span><span class="value">${record.major}</span></div>
+              <div class="item"><span class="label">Minor</span><span class="value">${record.minor}</span></div>
+              <div class="item"><span class="label">Tx Power</span><span class="value">${record.txPower} dBm</span></div>
+              <div class="item"><span class="label">广播次数</span><span class="value">${record.seenCount}</span></div>
+              <div class="item wide"><span class="label">最后发现时间</span><span class="value">${escapeHtml(lastSeen)}</span></div>
+            </div>
+          </article>`;
+      }).join('');
+    }
+
+    function scheduleBluetoothResultsRender(immediate = false) {
+      bluetoothResultsDirty = true;
+      if (immediate) {
+        clearTimeout(bluetoothResultsRenderTimer);
+        bluetoothResultsRenderTimer = 0;
+        renderBluetoothResults();
+        return;
+      }
+      if (bluetoothResultsRenderTimer) return;
+      bluetoothResultsRenderTimer = setTimeout(() => {
+        bluetoothResultsRenderTimer = 0;
+        if (bluetoothResultsDirty) renderBluetoothResults();
+      }, BLUETOOTH_RESULT_RENDER_INTERVAL_MS);
+    }
+
+    function handleBluetoothAdvertisement(event, allowNonStandardCompany = false) {
+      const parsed = parseIBeaconAdvertisement(event, allowNonStandardCompany);
+      if (!parsed) return;
+      const result = upsertIBeaconRecord(
+        bluetoothBeaconRecords,
+        parsed,
+        BLUETOOTH_MAX_RECORDS);
+      bluetoothResultLimitReached ||= result.limitReached;
+      if (result.accepted || result.limitReached) {
+        scheduleBluetoothResultsRender();
+      }
+    }
+
+    function clearBluetoothScanResources() {
+      clearTimeout(bluetoothAutoStopTimer);
+      clearInterval(bluetoothCountdownTimer);
+      bluetoothAutoStopTimer = 0;
+      bluetoothCountdownTimer = 0;
+      bluetoothScanEndsAt = 0;
+
+      if (bluetoothAdvertisementHandler) {
+        navigator.bluetooth?.removeEventListener?.('advertisementreceived', bluetoothAdvertisementHandler);
+        bluetoothAdvertisementHandler = null;
+      }
+      if (bluetoothScan) {
+        try { bluetoothScan.stop(); } catch {}
+        bluetoothScan = null;
+      }
+    }
+
+    function updateBluetoothCountdown() {
+      if (!bluetoothScanEndsAt) return;
+      const seconds = Math.max(0, Math.ceil((bluetoothScanEndsAt - Date.now()) / 1000));
+      $('bluetoothScanCountdown').textContent = `${seconds} 秒`;
+    }
+
+    function stopBluetoothScan(reason = 'manual') {
+      const hadActiveRequest = bluetoothScanRequestPending || bluetoothScan !== null;
+      if (!hadActiveRequest) return;
+
+      const completedWithCompatibilityMode = bluetoothActiveScanUsesCompatibilityMode;
+      bluetoothScanGeneration++;
+      bluetoothScanRequestPending = false;
+      clearBluetoothScanResources();
+      bluetoothActiveScanUsesCompatibilityMode = false;
+
+      const count = bluetoothBeaconRecords.size;
+      const modeLabel = completedWithCompatibilityMode ? '兼容模式' : '标准模式';
+      const statuses = {
+        timeout: `${modeLabel}扫描完成，本轮发现 ${count} 个 iBeacon`,
+        manual: `已手动停止${modeLabel}扫描，本轮发现 ${count} 个 iBeacon`,
+        'tab-leave': `已停止扫描，本轮发现 ${count} 个 iBeacon`,
+        hidden: `页面进入后台，已停止扫描，本轮发现 ${count} 个 iBeacon`,
+        pagehide: `页面即将关闭，已停止扫描，本轮发现 ${count} 个 iBeacon`
+      };
+      $('bluetoothScanState').textContent = reason === 'timeout' ? '扫描完成' : '已停止';
+      $('bluetoothScanStatus').textContent = statuses[reason] || statuses.manual;
+      $('bluetoothScanCountdown').textContent = reason === 'timeout' ? '0 秒' : '--';
+      bluetoothEmptyMessage = completedWithCompatibilityMode
+        ? '兼容扫描仍未发现 iBeacon。请检查与信标的距离，以及信标是否正在广播'
+        : reason === 'timeout'
+          ? '标准扫描未发现 iBeacon。可以启用兼容扫描模式，接收全部 BLE 广播后再由网页识别'
+          : '本轮尚未发现 iBeacon。请检查蓝牙权限、与信标的距离，以及信标是否正在广播';
+      scheduleBluetoothResultsRender(true);
+      updateBluetoothControls();
+
+      if (count === 0
+        && !completedWithCompatibilityMode
+        && (reason === 'timeout' || reason === 'manual')) {
+        const completedGeneration = bluetoothScanGeneration;
+        void offerCompatibilityRescan(completedGeneration);
+      }
+    }
+
+    async function offerCompatibilityRescan(completedGeneration) {
+      if (bluetoothCompatibilityPromptPending
+        || !isBluetoothPageActive()
+        || document.hidden
+        || $('bluetoothCompatibilityMode').checked) {
+        return;
+      }
+
+      bluetoothCompatibilityPromptPending = true;
+      updateBluetoothControls();
+      const confirmed = await iosConfirm(
+        '标准扫描没有发现 iBeacon，是否启用兼容扫描模式并立即重新扫描？兼容模式会接收全部 BLE 广播，并在本机识别标准及疑似 iBeacon'
+      );
+      bluetoothCompatibilityPromptPending = false;
+
+      if (!confirmed
+        || completedGeneration !== bluetoothScanGeneration
+        || !isBluetoothPageActive()
+        || document.hidden
+        || bluetoothScanRequestPending
+        || bluetoothScan) {
+        updateBluetoothControls();
+        return;
+      }
+
+      $('bluetoothCompatibilityMode').checked = true;
+      updateBluetoothControls();
+      await startBluetoothScan();
+    }
+
+    async function startBluetoothScan() {
+      if (bluetoothScanRequestPending || bluetoothScan) return;
+      if (!bluetoothSupportReady) {
+        await checkBluetoothSupport();
+        if (!bluetoothSupportReady) return;
+      }
+      if (!isBluetoothPageActive() || document.hidden) return;
+
+      const compatibilityMode = $('bluetoothCompatibilityMode').checked;
+      bluetoothActiveScanUsesCompatibilityMode = compatibilityMode;
+      bluetoothBeaconRecords.clear();
+      bluetoothResultLimitReached = false;
+      bluetoothEmptyMessage = compatibilityMode
+        ? '正在兼容扫描全部 BLE 广播，暂未识别到 iBeacon'
+        : '正在标准扫描，暂未发现 iBeacon';
+      scheduleBluetoothResultsRender(true);
+      $('bluetoothScanState').textContent = '请求权限';
+      $('bluetoothScanStatus').textContent = compatibilityMode
+        ? '正在请求全部 BLE 广播扫描权限...'
+        : '正在请求蓝牙权限...';
+      $('bluetoothScanCountdown').textContent = '30 秒';
+      bluetoothScanRequestPending = true;
+      updateBluetoothControls();
+
+      const generation = ++bluetoothScanGeneration;
+      const advertisementHandler = event => {
+        if (generation === bluetoothScanGeneration) {
+          handleBluetoothAdvertisement(event, compatibilityMode);
+        }
+      };
+      bluetoothAdvertisementHandler = advertisementHandler;
+
+      try {
+        navigator.bluetooth.addEventListener('advertisementreceived', advertisementHandler);
+        const scan = compatibilityMode
+          ? await navigator.bluetooth.requestLEScan({
+              acceptAllAdvertisements: true,
+              keepRepeatedDevices: true
+            })
+          : await navigator.bluetooth.requestLEScan({
+              filters: [{
+                manufacturerData: [{
+                  companyIdentifier: 0x004C,
+                  dataPrefix: new Uint8Array([0x02, 0x15])
+                }]
+              }],
+              keepRepeatedDevices: true
+            });
+
+        if (generation !== bluetoothScanGeneration || !isBluetoothPageActive() || document.hidden) {
+          try { scan.stop(); } catch {}
+          if (bluetoothAdvertisementHandler === advertisementHandler) {
+            navigator.bluetooth?.removeEventListener?.('advertisementreceived', advertisementHandler);
+            bluetoothAdvertisementHandler = null;
+          }
+          return;
+        }
+
+        bluetoothScan = scan;
+        bluetoothScanRequestPending = false;
+        bluetoothScanEndsAt = Date.now() + BLUETOOTH_SCAN_DURATION_MS;
+        $('bluetoothScanState').textContent = '扫描中';
+        $('bluetoothScanStatus').textContent = compatibilityMode
+          ? '正在兼容扫描全部 BLE 广播并识别 iBeacon...'
+          : '正在扫描周围的标准 iBeacon...';
+        updateBluetoothCountdown();
+        bluetoothCountdownTimer = setInterval(updateBluetoothCountdown, 250);
+        bluetoothAutoStopTimer = setTimeout(() => {
+          if (generation === bluetoothScanGeneration) stopBluetoothScan('timeout');
+        }, BLUETOOTH_SCAN_DURATION_MS);
+        updateBluetoothControls();
+      } catch (error) {
+        if (generation !== bluetoothScanGeneration) return;
+        bluetoothScanRequestPending = false;
+        bluetoothActiveScanUsesCompatibilityMode = false;
+        if (bluetoothAdvertisementHandler === advertisementHandler) {
+          navigator.bluetooth?.removeEventListener?.('advertisementreceived', advertisementHandler);
+          bluetoothAdvertisementHandler = null;
+        }
+        const message = mapBluetoothScanError(error);
+        $('bluetoothScanState').textContent = '扫描失败';
+        $('bluetoothScanStatus').textContent = message;
+        $('bluetoothScanCountdown').textContent = '--';
+        bluetoothEmptyMessage = `扫描失败：${message}`;
+        scheduleBluetoothResultsRender(true);
+        updateBluetoothControls();
+        await checkBluetoothSupport(true);
+      }
+    }
 
     const field = (label, value, wide = false) =>
       `<div class="item${wide ? ' wide' : ''}"><span class="label">${escapeHtml(label)}</span><span class="value">${escapeHtml(display(value))}</span></div>`;
@@ -1478,11 +2220,17 @@
       scheduleTaskRecords();
     });
     document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopBluetoothScan('hidden');
+      } else if (isBluetoothPageActive()) {
+        checkBluetoothSupport();
+      }
       refresh();
       refreshTaskRecords();
       schedule();
       scheduleTaskRecords();
     });
+    window.addEventListener('pagehide', () => stopBluetoothScan('pagehide'));
 
     /* ── iOS-style confirm dialog ── */
     function iosConfirm(message) {
@@ -1678,12 +2426,29 @@
       }
     });
 
+    $('recheckBluetoothButton').addEventListener('click', () => checkBluetoothSupport());
+    $('bluetoothCompatibilityMode').addEventListener('change', updateBluetoothControls);
+    $('bluetoothScanButton').addEventListener('click', () => {
+      if (bluetoothScan) {
+        stopBluetoothScan('manual');
+      } else {
+        startBluetoothScan();
+      }
+    });
+
     /* ── Tab switching ── */
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const tab = btn.dataset.tab;
+        const currentPage = document.querySelector('.page.active')?.dataset.page;
+        if (currentPage === 'bluetooth' && tab !== 'bluetooth') {
+          stopBluetoothScan('tab-leave');
+        }
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
         document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.dataset.page === tab));
+        if (tab === 'bluetooth') {
+          checkBluetoothSupport();
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
