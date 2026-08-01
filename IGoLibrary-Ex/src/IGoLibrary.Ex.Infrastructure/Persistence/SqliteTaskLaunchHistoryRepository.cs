@@ -243,7 +243,7 @@ public sealed class SqliteTaskLaunchHistoryRepository(
             rows.Add(new HistoryRow(taskKind, storedRecordId, recordedAtUtc.ToUniversalTime(), reader.GetString(2)));
         }
 
-        logger.LogInformation(
+        logger.LogDebug(
             "已加载手机端任务启动历史。任务类型={TaskKind}，请求的记录 ID={RequestedRecordId}，数量={Count}。",
             taskKind,
             recordId,

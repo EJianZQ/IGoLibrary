@@ -28,13 +28,7 @@ internal static class HostBuilderFactory
                 config.SetBasePath(AppContext.BaseDirectory);
                 config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
             })
-            .ConfigureLogging(logging =>
-            {
-                logging.ClearProviders();
-                logging.SetMinimumLevel(LogLevel.Information);
-                logging.AddDebug();
-                logging.Services.AddSingleton<ILoggerProvider, AppFileLoggerProvider>();
-            })
+            .ConfigureLogging(ConfigureApplicationLogging)
             .ConfigureServices(services =>
             {
                 if (sharedLogWriter is not null)
@@ -165,5 +159,15 @@ internal static class HostBuilderFactory
                 services.AddSingleton<MainWindow>();
                 services.AddSingleton<MainWindowViewModel>();
             });
+    }
+
+    internal static void ConfigureApplicationLogging(ILoggingBuilder logging)
+    {
+        logging.ClearProviders();
+        logging.SetMinimumLevel(LogLevel.Information);
+
+        // 不要添加 DebugLoggerProvider。它通过 Debug.WriteLine 输出，而 AppTraceListener
+        // 会捕获该输出，导致同一个 ILogger 事件再次写入应用日志。
+        logging.Services.AddSingleton<ILoggerProvider, AppFileLoggerProvider>();
     }
 }

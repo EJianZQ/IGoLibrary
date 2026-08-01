@@ -1,7 +1,9 @@
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
+using IGoLibrary.Ex.Desktop;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Infrastructure.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Tests;
@@ -200,6 +202,24 @@ public sealed class LoggingTests : IDisposable
         Assert.Contains(@"%USERPROFILE%\config.json", content);
         Assert.Contains("/Users/<user>/config.json", content);
         Assert.Contains("/home/<user>/config.json", content);
+    }
+
+    [Fact]
+    public void HostLogging_RegistersOnlyAppFileProvider_AndWritesEachEventOnce()
+    {
+        var writer = new CollectingLogWriter();
+        var services = new ServiceCollection();
+        services.AddSingleton<IAppLogWriter>(writer);
+        services.AddLogging(HostBuilderFactory.ConfigureApplicationLogging);
+        using var serviceProvider = services.BuildServiceProvider();
+
+        var provider = Assert.Single(serviceProvider.GetServices<ILoggerProvider>());
+        Assert.IsType<AppFileLoggerProvider>(provider);
+
+        var logger = serviceProvider.GetRequiredService<ILogger<LoggingTests>>();
+        logger.LogInformation("日志管线回归测试。");
+
+        Assert.Single(writer.Entries);
     }
 
     [Fact]

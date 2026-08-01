@@ -142,6 +142,18 @@ public sealed class SqliteTaskLaunchHistoryRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task GetRecentAsync_LogsSuccessfulPollingAtDebugLevel()
+    {
+        var logger = new CapturingLogger<SqliteTaskLaunchHistoryRepository>();
+        var (repository, _, _) = await CreateAsync(logger);
+
+        await repository.GetRecentGrabAsync();
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Debug, entry.Level);
+    }
+
+    [Fact]
     public async Task GetRecentAsync_SkipsCorruptPayloadWithoutHidingValidRecords()
     {
         var logger = new CapturingLogger<SqliteTaskLaunchHistoryRepository>();
