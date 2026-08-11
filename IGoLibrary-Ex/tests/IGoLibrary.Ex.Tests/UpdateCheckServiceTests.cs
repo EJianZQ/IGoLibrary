@@ -355,6 +355,50 @@ public sealed class UpdateCheckServiceTests
         Assert.Equal("IGoLibrary-Ex-v1.0.1-windows-x64.zip", package.Name);
     }
 
+    [Fact]
+    public async Task CheckAsync_IgnoresPortableAssetsAndSelectsRawDefaultPackage()
+    {
+        var defaultPackage = WindowsAsset("1.0.1");
+        var portable = AssetWithName(
+            defaultPackage,
+            "IGoLibrary-Ex-v1.0.1-windows-x64-portable.zip");
+        var portableWithoutCloudflared = AssetWithName(
+            defaultPackage,
+            "IGoLibrary-Ex-v1.0.1-windows-x64-portable-without-cloudflared.zip");
+        var release = Release("v1.0.1") with
+        {
+            Assets = [portable, portableWithoutCloudflared, defaultPackage]
+        };
+        var service = CreateService(Parse("1.0.0"), new FakeGitHubReleaseClient(release));
+
+        var result = await service.CheckAsync(UpdateCheckMode.Manual);
+
+        var package = Assert.IsType<ReleaseAssetInfo>(result.Release?.WindowsX64Package);
+        Assert.Equal("IGoLibrary-Ex-v1.0.1-windows-x64.zip", package.Name);
+    }
+
+    [Fact]
+    public async Task CheckAsync_DoesNotTreatPortableOnlyReleaseAsAutomaticUpdatePackage()
+    {
+        var asset = WindowsAsset("1.0.1");
+        var release = Release("v1.0.1") with
+        {
+            Assets =
+            [
+                AssetWithName(asset, "IGoLibrary-Ex-v1.0.1-windows-x64-portable.zip"),
+                AssetWithName(
+                    asset,
+                    "IGoLibrary-Ex-v1.0.1-windows-x64-portable-without-cloudflared.zip")
+            ]
+        };
+        var service = CreateService(Parse("1.0.0"), new FakeGitHubReleaseClient(release));
+
+        var result = await service.CheckAsync(UpdateCheckMode.Manual);
+
+        Assert.True(result.HasUpdate);
+        Assert.Null(result.Release?.WindowsX64Package);
+    }
+
     [Theory]
     [InlineData("IGoLibrary-Ex-v1.0.1-windows-arm64.zip", "uploaded", "https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/file.zip", 123456, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
     [InlineData("IGoLibrary-Ex-v1.0.1-windows-x64.zip", "new", "https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/file.zip", 123456, "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
@@ -453,6 +497,18 @@ public sealed class UpdateCheckServiceTests
             "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
             "uploaded",
             "application/zip");
+    }
+
+    private static GitHubReleaseAssetItem AssetWithName(
+        GitHubReleaseAssetItem asset,
+        string name)
+    {
+        return asset with
+        {
+            Name = name,
+            BrowserDownloadUrl = new Uri(
+                $"https://github.com/EJianZQ/IGoLibrary/releases/download/v1.0.1/{name}")
+        };
     }
 
     private sealed class FakeGitHubReleaseClient(params GitHubReleaseItem[] releases) : IGitHubReleaseClient

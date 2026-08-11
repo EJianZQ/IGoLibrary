@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>IGoLibrary-Ex</AssemblyName>
+    <RootNamespace>IGoLibrary.Ex.Launcher</RootNamespace>
+    <Product>我去图书馆</Product>
+    <AssemblyTitle>我去图书馆启动器</AssemblyTitle>
+    <Description>我去图书馆启动器</Description>
+    <FileDescription>我去图书馆启动器</FileDescription>
+    <PublishAot>true</PublishAot>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <VerifyReferenceAotCompatibility>true</VerifyReferenceAotCompatibility>
+    <ILLinkTreatWarningsAsErrors>true</ILLinkTreatWarningsAsErrors>
+    <IlcTreatWarningsAsErrors>true</IlcTreatWarningsAsErrors>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\IGoLibrary.Ex.Desktop\Assets\main.ico</ApplicationIcon>
+  </PropertyGroup>
+</Project>

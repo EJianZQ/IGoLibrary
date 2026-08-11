@@ -67,6 +67,39 @@ public sealed class UpdatePackageValidatorTests : IDisposable
         Assert.False(File.Exists(Path.Combine(_root, "escape.dll")));
     }
 
+    [Theory]
+    [InlineData("/")]
+    [InlineData("////")]
+    [InlineData("\\")]
+    public async Task ExtractAndValidateAsync_RejectsSeparatorOnlyZipPaths(string entryPath)
+    {
+        var package = Path.Combine(_root, "valid-package");
+        WritePackage(package, "1.0.1", new Dictionary<string, string>
+        {
+            [UpdateProtocol.EntryExecutableName] = "desktop",
+            [UpdateProtocol.UpdaterExecutableName] = "updater",
+            [UpdateProtocol.ManagedCloudflaredExecutablePath] = "release-cloudflared",
+            [UpdateProtocol.ManagedCloudflaredLicensePath] = "release-license",
+            [UpdateProtocol.ManagedCloudflaredNoticesPath] = "release-notices"
+        });
+        var archivePath = Path.Combine(_root, "separator-only.zip");
+        ZipFile.CreateFromDirectory(package, archivePath);
+        using (var archive = ZipFile.Open(archivePath, ZipArchiveMode.Update))
+        {
+            var entry = archive.CreateEntry(entryPath);
+            await using var stream = entry.Open();
+            await stream.WriteAsync("hidden-root-entry-data"u8.ToArray());
+        }
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            UpdatePackageValidator.ExtractAndValidateAsync(
+                archivePath,
+                Path.Combine(_root, "staging"),
+                "1.0.1"));
+
+        Assert.Contains("空路径条目", exception.Message);
+    }
+
     [Fact]
     public async Task ExtractAndValidateAsync_RejectsCaseInsensitiveDuplicates()
     {

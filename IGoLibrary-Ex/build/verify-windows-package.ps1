@@ -178,9 +178,7 @@ function Test-WindowsPackage {
 
     $archive = [System.IO.Compression.ZipFile]::OpenRead($resolvedPackage)
     try {
-        $archiveEntries = @($archive.Entries | Where-Object {
-            $_.FullName.TrimEnd('/', '\').Length -gt 0
-        })
+        $archiveEntries = @($archive.Entries)
         $fileEntries = @($archiveEntries | Where-Object {
             -not ($_.FullName.EndsWith('/') -or $_.FullName.EndsWith('\'))
         })
@@ -194,11 +192,12 @@ function Test-WindowsPackage {
 
         foreach ($entry in $archiveEntries) {
             $path = $entry.FullName.TrimEnd('/', '\')
-            if ($entry.FullName.Contains('\') -or
+            if ([string]::IsNullOrWhiteSpace($path) -or
+                $entry.FullName.Contains('\') -or
                 $path.StartsWith('/', [System.StringComparison]::Ordinal) -or
                 $path -match '^[A-Za-z]:' -or
                 $path.Split('/') -contains '..') {
-                throw "ZIP 包含非法路径：$path"
+                throw "ZIP 包含非法路径：$($entry.FullName)"
             }
             if (-not $pathSet.Add($path)) {
                 throw "ZIP 包含大小写重复路径：$path"

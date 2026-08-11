@@ -18,6 +18,8 @@ internal static class Program
             {
                 ["wait-for-release", var readyPath, var releasePath] =>
                     WaitForRelease(readyPath, releasePath),
+                ["record-launch", var recordPath, var readyPath, var releasePath, .. var forwardedArguments] =>
+                    RecordLaunch(recordPath, readyPath, releasePath, forwardedArguments),
                 ["hold-mutex", var mutexName, var readyPath, var releasePath] =>
                     HoldMutex(mutexName, readyPath, releasePath),
                 ["--update-transaction", var transactionId] =>
@@ -30,6 +32,40 @@ internal static class Program
             Console.Error.WriteLine(ex);
             return 1;
         }
+    }
+
+    private static int RecordLaunch(
+        string recordPath,
+        string readyPath,
+        string releasePath,
+        string[] forwardedArguments)
+    {
+        var recordDirectory = Path.GetDirectoryName(Path.GetFullPath(recordPath));
+        if (string.IsNullOrWhiteSpace(recordDirectory))
+        {
+            return 2;
+        }
+
+        Directory.CreateDirectory(recordDirectory);
+        var record = new
+        {
+            processPath = Environment.ProcessPath,
+            currentDirectory = Environment.CurrentDirectory,
+            arguments = forwardedArguments,
+            processId = Environment.ProcessId
+        };
+        var json = JsonSerializer.Serialize(
+            record,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                WriteIndented = true
+            });
+        File.WriteAllText(
+            recordPath,
+            json,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+
+        return WaitForRelease(readyPath, releasePath);
     }
 
     private static int HoldMutex(string mutexName, string readyPath, string releasePath)

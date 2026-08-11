@@ -152,9 +152,10 @@ public static class UpdatePackageValidator
         {
             cancellationToken.ThrowIfCancellationRequested();
             var trimmedName = entry.FullName.TrimEnd('/', '\\');
-            if (trimmedName.Length == 0)
+            if (string.IsNullOrWhiteSpace(trimmedName))
             {
-                continue;
+                throw new InvalidDataException(
+                    $"更新压缩包包含空路径条目：{entry.FullName}");
             }
 
             var relativePath = UpdatePathSafety.NormalizeRelativePath(trimmedName);

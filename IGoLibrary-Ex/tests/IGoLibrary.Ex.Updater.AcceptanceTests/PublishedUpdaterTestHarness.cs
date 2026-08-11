@@ -55,7 +55,7 @@ internal static class PublishedUpdaterEnvironment
 
 internal sealed class AcceptanceDirectory : IAsyncDisposable
 {
-    public AcceptanceDirectory(string scenarioName)
+    public AcceptanceDirectory(string scenarioName, bool nestedPortableLayout = false)
     {
         Root = Path.Combine(
             Path.GetTempPath(),
@@ -65,12 +65,17 @@ internal sealed class AcceptanceDirectory : IAsyncDisposable
             Root,
             "包含 空格与中文",
             new string('长', 20));
-        InstallationDirectory = Path.Combine(longUnicodeRoot, "安装 目录", "IGoLibrary-Ex");
+        PortableRootDirectory = Path.Combine(longUnicodeRoot, "安装 目录", "IGoLibrary-Ex");
+        InstallationDirectory = nestedPortableLayout
+            ? Path.Combine(PortableRootDirectory, "app")
+            : PortableRootDirectory;
         UpdatesDirectory = Path.Combine(longUnicodeRoot, "更新 事务");
         Directory.CreateDirectory(Root);
     }
 
     public string Root { get; }
+
+    public string PortableRootDirectory { get; }
 
     public string InstallationDirectory { get; }
 

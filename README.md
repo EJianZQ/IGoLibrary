@@ -224,14 +224,27 @@ cd .\IGoLibrary-Ex
 .\build\publish-windows.ps1 -Configuration Release -AppVersion 1.0.1
 ```
 
-Windows 脚本会从同一次发布生成两个 ZIP：
+Windows 脚本会从同一次发布生成四个 ZIP：
 
 ```text
+artifacts\windows\win-x64\IGoLibrary-Ex-v1.0.1-windows-x64-portable.zip
+artifacts\windows\win-x64\IGoLibrary-Ex-v1.0.1-windows-x64-portable-without-cloudflared.zip
 artifacts\windows\win-x64\IGoLibrary-Ex-v1.0.1-windows-x64.zip
 artifacts\windows\win-x64\IGoLibrary-Ex-v1.0.1-windows-x64-without-cloudflared.zip
 ```
 
-无后缀包是带 Cloudflare Tunnel 组件、许可证和第三方声明的默认完整包，也是应用内自动更新唯一会选择的资产；`-without-cloudflared` 是完全不含 `tools` 的额外轻量包。Windows 自动更新会安装或更新官方 cloudflared 三文件，同时保留 `tools` 下用户添加的其它文件。
+普通 Windows 用户应下载 `-windows-x64-portable.zip`。完整解压后进入 `IGoLibrary-Ex` 文件夹，直接运行外层 `IGoLibrary-Ex.exe`；不要只从 ZIP 中拖出启动器，也不需要进入 `app` 文件夹寻找主程序。解压后的第一层固定只有启动器和 `app`：
+
+```text
+IGoLibrary-Ex\
+├─ IGoLibrary-Ex.exe
+└─ app\
+   └─ IGoLibrary.Ex.Desktop.exe 及运行时文件
+```
+
+`-portable-without-cloudflared.zip` 是普通用户可选的轻量包，首次解压不包含 `tools`。应用内自动更新仍使用默认完整载荷，因此轻量安装在后续自动更新后会取得官方 cloudflared 文件。
+
+无 `portable` 后缀的 `-windows-x64.zip` 是应用内自动更新唯一会选择的扁平载荷，普通用户无需手动下载
 
 macOS
 

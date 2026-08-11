@@ -6,14 +6,21 @@ namespace IGoLibrary.Ex.Updater.AcceptanceTests;
 public sealed class PublishedUpdaterAcceptanceTests
 {
     [Fact]
-    public async Task PublishedAotWorker_CommitsAndPreservesTools_InUnicodeLongPath()
+    public async Task PublishedAotWorker_CommitsAndPreservesOuterLauncher_InUnicodeLongPath()
     {
-        await using var scenario = new AcceptanceDirectory("worker-commit");
+        await using var scenario = new AcceptanceDirectory(
+            "worker-commit",
+            nestedPortableLayout: true);
         var aotUpdater = PublishedUpdaterEnvironment.AotUpdaterPath;
         await PublishedUpdaterTestHarness.CreateInstallationAsync(
             scenario,
             "1.0.0",
             aotUpdater);
+        var outerLauncherPath = Path.Combine(
+            scenario.PortableRootDirectory,
+            "IGoLibrary-Ex.exe");
+        var outerLauncherBytes = "stable-outer-launcher"u8.ToArray();
+        await File.WriteAllBytesAsync(outerLauncherPath, outerLauncherBytes);
 
         await PublishedUpdaterTestHarness.RunWorkerTransactionAsync(
             scenario,
@@ -22,6 +29,10 @@ public sealed class PublishedUpdaterAcceptanceTests
             aotUpdater,
             aotUpdater,
             UpdateDecisionKind.Commit);
+
+        Assert.Equal(
+            outerLauncherBytes,
+            await File.ReadAllBytesAsync(outerLauncherPath));
     }
 
     [Fact]
@@ -102,12 +113,19 @@ public sealed class PublishedUpdaterAcceptanceTests
     [Fact]
     public async Task PublishedAotWorker_RollsBackAfterExplicitDecision()
     {
-        await using var scenario = new AcceptanceDirectory("worker-rollback");
+        await using var scenario = new AcceptanceDirectory(
+            "worker-rollback",
+            nestedPortableLayout: true);
         var aotUpdater = PublishedUpdaterEnvironment.AotUpdaterPath;
         await PublishedUpdaterTestHarness.CreateInstallationAsync(
             scenario,
             "1.0.0",
             aotUpdater);
+        var outerLauncherPath = Path.Combine(
+            scenario.PortableRootDirectory,
+            "IGoLibrary-Ex.exe");
+        var outerLauncherBytes = "stable-outer-launcher-before-rollback"u8.ToArray();
+        await File.WriteAllBytesAsync(outerLauncherPath, outerLauncherBytes);
 
         await PublishedUpdaterTestHarness.RunWorkerTransactionAsync(
             scenario,
@@ -116,6 +134,10 @@ public sealed class PublishedUpdaterAcceptanceTests
             aotUpdater,
             aotUpdater,
             UpdateDecisionKind.Rollback);
+
+        Assert.Equal(
+            outerLauncherBytes,
+            await File.ReadAllBytesAsync(outerLauncherPath));
     }
 
     [Fact]

@@ -13,6 +13,8 @@ Set-StrictMode -Version Latest
 
 $maximumUpdaterBytes = 20MB
 $maximumUpdaterCompressedBytes = 10MB
+$maximumLauncherBytes = 10MB
+$maximumLauncherCompressedBytes = 5MB
 
 $versionPattern = '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
 if ([string]::IsNullOrWhiteSpace($AppVersion)) {
@@ -38,6 +40,8 @@ else {
 }
 $desktopProject = Join-Path $root 'src\IGoLibrary.Ex.Desktop\IGoLibrary.Ex.Desktop.csproj'
 $updaterProject = Join-Path $root 'src\IGoLibrary.Ex.Updater\IGoLibrary.Ex.Updater.csproj'
+$launcherProject = Join-Path $root 'src\IGoLibrary.Ex.Launcher\IGoLibrary.Ex.Launcher.csproj'
+$launcherTestsProject = Join-Path $root 'tests\IGoLibrary.Ex.Launcher.Tests\IGoLibrary.Ex.Launcher.Tests.csproj'
 $updaterAcceptanceProject = Join-Path $root 'tests\IGoLibrary.Ex.Updater.AcceptanceTests\IGoLibrary.Ex.Updater.AcceptanceTests.csproj'
 if ([string]::IsNullOrWhiteSpace($ManagedUpdaterBaselinePath)) {
     $ManagedUpdaterBaselinePath = Join-Path $root 'artifacts\validation\managed-updater-baseline\IGoLibrary.Ex.Updater.exe'
@@ -48,12 +52,16 @@ if (-not (Test-Path -LiteralPath $ManagedUpdaterBaselinePath -PathType Leaf)) {
 }
 $output = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "publish\$Runtime"))
 $updaterOutput = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "publish\updater-$Runtime"))
+$launcherOutput = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "publish\launcher-$Runtime"))
 $symbolsOutput = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "symbols\$Runtime\v$AppVersion"))
 $packageOutput = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "windows\$Runtime"))
 $lightweightStaging = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "staging\windows\$Runtime\no-tools"))
+$portableStaging = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "staging\windows\$Runtime\portable"))
 $packageStaging = [System.IO.Path]::GetFullPath((Join-Path $artifactsRoot "staging\windows\$Runtime\packages"))
 $expectedPackageName = "IGoLibrary-Ex-v$AppVersion-windows-x64-without-cloudflared.zip"
 $expectedBundledPackageName = "IGoLibrary-Ex-v$AppVersion-windows-x64.zip"
+$portablePackageName = "IGoLibrary-Ex-v$AppVersion-windows-x64-portable-without-cloudflared.zip"
+$portableBundledPackageName = "IGoLibrary-Ex-v$AppVersion-windows-x64-portable.zip"
 $legacyBundledPackageName = "IGoLibrary-Ex-v$AppVersion-windows-x64-with-cloudflared.zip"
 if ([string]::IsNullOrWhiteSpace($PackageName)) {
     $PackageName = $expectedPackageName
@@ -73,9 +81,15 @@ if ($PackageName -ieq $BundledPackageName) {
 
 $zipPath = Join-Path $packageOutput $PackageName
 $bundledZipPath = Join-Path $packageOutput $BundledPackageName
+$portableZipPath = Join-Path $packageOutput $portablePackageName
+$portableBundledZipPath = Join-Path $packageOutput $portableBundledPackageName
 $legacyBundledZipPath = Join-Path $packageOutput $legacyBundledPackageName
 $stagedZipPath = Join-Path $packageStaging $PackageName
 $stagedBundledZipPath = Join-Path $packageStaging $BundledPackageName
+$stagedPortableZipPath = Join-Path $packageStaging $portablePackageName
+$stagedPortableBundledZipPath = Join-Path $packageStaging $portableBundledPackageName
+$portableLightweightStaging = Join-Path $portableStaging 'lightweight'
+$portableBundledStaging = Join-Path $portableStaging 'default'
 $stagedSymbolsOutput = Join-Path $packageStaging 'symbols'
 
 function Remove-SafeBuildDirectory {
@@ -342,6 +356,323 @@ function Assert-UpdaterTaskDialogSmoke {
     Write-Host 'Native AOT updater TaskDialog smoke test passed.'
 }
 
+function Assert-LauncherUnitTests {
+    param(
+        [Parameter(Mandatory)][string]$TestProjectPath,
+        [Parameter(Mandatory)][string]$BuildConfiguration
+    )
+
+    $testArguments = @(
+        'test'
+        $TestProjectPath
+        '--configuration'
+        $BuildConfiguration
+        '--nologo'
+        '--verbosity'
+        'minimal'
+        '-m:1'
+        '-p:UseSharedCompilation=false'
+    )
+    & dotnet @testArguments
+    $testExitCode = $LASTEXITCODE
+    if ($testExitCode -ne 0) {
+        throw "Launcher unit tests failed with exit code $testExitCode."
+    }
+
+    Write-Host 'Windows launcher unit tests passed.'
+}
+
+function Assert-PublishedLauncherBinary {
+    param(
+        [Parameter(Mandatory)][string]$ExecutablePath,
+        [Parameter(Mandatory)][string]$OutputDirectory
+    )
+
+    if (-not (Test-Path -LiteralPath $ExecutablePath -PathType Leaf)) {
+        throw "Published launcher was not found: $ExecutablePath"
+    }
+
+    $launcherInfo = Get-Item -LiteralPath $ExecutablePath
+    if ($launcherInfo.Length -gt $maximumLauncherBytes) {
+        throw "Native AOT launcher 超过 10 MiB 门槛：$($launcherInfo.Length) bytes。"
+    }
+
+    $allowedFiles = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::Ordinal)
+    $null = $allowedFiles.Add('IGoLibrary-Ex.exe')
+    $null = $allowedFiles.Add('IGoLibrary-Ex.pdb')
+    $unexpectedFiles = @(
+        Get-ChildItem -LiteralPath $OutputDirectory -File -Recurse | Where-Object {
+            $relativePath = [System.IO.Path]::GetRelativePath(
+                $OutputDirectory,
+                $_.FullName).Replace('\', '/')
+            -not $allowedFiles.Contains($relativePath)
+        }
+    )
+    if ($unexpectedFiles.Count -gt 0) {
+        throw "Native AOT launcher 发布输出包含额外 sidecar：$($unexpectedFiles.Name -join ', ')"
+    }
+
+    $launcherPdb = Join-Path $OutputDirectory 'IGoLibrary-Ex.pdb'
+    if (-not (Test-Path -LiteralPath $launcherPdb -PathType Leaf)) {
+        throw "Native AOT launcher 缺少内部故障诊断所需的 PDB：$launcherPdb"
+    }
+
+    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($ExecutablePath)
+    $expectedFileVersion = [version]::Parse("${AppVersion}.0")
+    $actualFileVersion = [version]::Parse($versionInfo.FileVersion)
+    if ($actualFileVersion -ne $expectedFileVersion -or
+        $versionInfo.ProductVersion -cne $AppVersion -or
+        $versionInfo.ProductName -cne '我去图书馆' -or
+        $versionInfo.FileDescription -cne '我去图书馆启动器') {
+        throw "Launcher 版本资源不匹配。FileDescription=$($versionInfo.FileDescription)，ProductName=$($versionInfo.ProductName)，FileVersion=$($versionInfo.FileVersion)，ProductVersion=$($versionInfo.ProductVersion)。"
+    }
+
+    $stream = [System.IO.File]::OpenRead($ExecutablePath)
+    try {
+        $reader = [System.Reflection.PortableExecutable.PEReader]::new($stream)
+        try {
+            if ([string]$reader.PEHeaders.CoffHeader.Machine -cne 'Amd64') {
+                throw 'Native AOT launcher 必须是 AMD64 PE。'
+            }
+            if ([string]$reader.PEHeaders.PEHeader.Subsystem -cne 'WindowsGui') {
+                throw 'Native AOT launcher 必须使用 Windows GUI 子系统。'
+            }
+            if ($null -ne $reader.PEHeaders.CorHeader) {
+                throw 'Native AOT launcher 不得包含 CLR 入口。'
+            }
+        }
+        finally {
+            $reader.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+
+    Write-Host 'Native AOT launcher binary verification passed.'
+}
+
+function Wait-ForLauncherSmokeFile {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][System.Diagnostics.Process]$LauncherProcess,
+        [Parameter(Mandatory)][string]$Label
+    )
+
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        if (Test-Path -LiteralPath $Path -PathType Leaf) {
+            return
+        }
+        if (-not $LauncherProcess.HasExited) {
+            Start-Sleep -Milliseconds 20
+            continue
+        }
+
+        Start-Sleep -Milliseconds 20
+    }
+
+    throw "Native AOT launcher 冒烟测试未生成 $Label：$Path"
+}
+
+function Remove-LauncherSmokeDirectory {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $temporaryRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath()).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $fullPath.StartsWith($temporaryRoot, $pathComparison)) {
+        throw "拒绝清理临时目录之外的 launcher 冒烟目录：$fullPath"
+    }
+
+    for ($attempt = 1; $attempt -le 30; $attempt++) {
+        try {
+            if ([System.IO.Directory]::Exists($fullPath)) {
+                [System.IO.Directory]::Delete($fullPath, $true)
+            }
+            return
+        }
+        catch [System.IO.IOException], [System.UnauthorizedAccessException] {
+            if ($attempt -eq 30) {
+                throw
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
+}
+
+function Assert-PublishedLauncherSmoke {
+    param(
+        [Parameter(Mandatory)][string]$ExecutablePath,
+        [Parameter(Mandatory)][string]$BuildConfiguration
+    )
+
+    $testProcessOutput = Join-Path $root "tests\IGoLibrary.Ex.TestProcess\bin\$BuildConfiguration\net10.0"
+    $testProcessExecutable = Join-Path $testProcessOutput 'IGoLibrary.Ex.TestProcess.exe'
+    $requiredHelperFiles = @(
+        $testProcessExecutable,
+        (Join-Path $testProcessOutput 'IGoLibrary.Ex.TestProcess.dll'),
+        (Join-Path $testProcessOutput 'IGoLibrary.Ex.TestProcess.deps.json'),
+        (Join-Path $testProcessOutput 'IGoLibrary.Ex.TestProcess.runtimeconfig.json')
+    )
+    foreach ($requiredFile in $requiredHelperFiles) {
+        if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+            throw "Launcher 冒烟测试缺少 TestProcess 构建产物：$requiredFile"
+        }
+    }
+
+    $smokeRoot = Join-Path (
+        [System.IO.Path]::GetTempPath()) (
+        "IGoLibrary-Launcher-含 空格与中文-$([Guid]::NewGuid().ToString('N'))")
+    $launcherDirectory = Join-Path $smokeRoot 'IGoLibrary-Ex'
+    $appDirectory = Join-Path $launcherDirectory 'app'
+    $smokeLauncher = Join-Path $launcherDirectory 'IGoLibrary-Ex.exe'
+    $fakeEntryExecutable = Join-Path $appDirectory 'IGoLibrary.Ex.Desktop.exe'
+    $recordPath = Join-Path $smokeRoot 'launch-record.json'
+    $readyPath = Join-Path $smokeRoot 'child-ready.txt'
+    $releasePath = Join-Path $smokeRoot 'child-release.txt'
+    $launcherProcess = $null
+    $childProcess = $null
+
+    try {
+        New-Item -ItemType Directory -Path $appDirectory -Force | Out-Null
+        Copy-Item -LiteralPath $ExecutablePath -Destination $smokeLauncher
+        Copy-Item -LiteralPath $testProcessExecutable -Destination $fakeEntryExecutable
+        foreach ($helperFile in $requiredHelperFiles | Select-Object -Skip 1) {
+            Copy-Item -LiteralPath $helperFile -Destination $appDirectory
+        }
+
+        $forwardedArguments = @(
+            '中文参数'
+            'value with spaces'
+            ''
+            '"quoted"'
+            'C:\尾部\'
+        )
+        $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $startInfo.FileName = $smokeLauncher
+        $startInfo.WorkingDirectory = [System.IO.Path]::GetTempPath()
+        $startInfo.UseShellExecute = $false
+        foreach ($argument in @(
+            'record-launch',
+            $recordPath,
+            $readyPath,
+            $releasePath) + $forwardedArguments) {
+            $null = $startInfo.ArgumentList.Add($argument)
+        }
+
+        $launcherProcess = [System.Diagnostics.Process]::Start($startInfo)
+        if ($null -eq $launcherProcess) {
+            throw '无法启动 Native AOT launcher 冒烟测试进程。'
+        }
+        if (-not $launcherProcess.WaitForExit(10000)) {
+            throw 'Native AOT launcher 未在 10 秒内退出，可能错误等待了 Desktop。'
+        }
+        if ($launcherProcess.ExitCode -ne 0) {
+            throw "Native AOT launcher 冒烟测试退出码无效：$($launcherProcess.ExitCode)，期望：0。"
+        }
+
+        Wait-ForLauncherSmokeFile -Path $readyPath -LauncherProcess $launcherProcess -Label '子进程就绪信号'
+        Wait-ForLauncherSmokeFile -Path $recordPath -LauncherProcess $launcherProcess -Label '启动记录'
+        $record = Get-Content -Raw -LiteralPath $recordPath | ConvertFrom-Json
+        $childProcess = [System.Diagnostics.Process]::GetProcessById([int]$record.processId)
+        if ($childProcess.HasExited) {
+            throw 'Native AOT launcher 退出后 TestProcess 未保持运行。'
+        }
+        if (-not [string]::Equals(
+                [System.IO.Path]::GetFullPath([string]$record.processPath),
+                [System.IO.Path]::GetFullPath($fakeEntryExecutable),
+                $pathComparison)) {
+            throw "Launcher 启动了错误的内层 EXE：$($record.processPath)"
+        }
+        if (-not [string]::Equals(
+                [System.IO.Path]::GetFullPath([string]$record.currentDirectory),
+                [System.IO.Path]::GetFullPath($appDirectory),
+                $pathComparison)) {
+            throw "Launcher 设置了错误的工作目录：$($record.currentDirectory)"
+        }
+
+        $actualArguments = @($record.arguments)
+        if ($actualArguments.Count -ne $forwardedArguments.Count) {
+            throw 'Launcher 未完整保留参数数量。'
+        }
+        for ($index = 0; $index -lt $forwardedArguments.Count; $index++) {
+            if ([string]$actualArguments[$index] -cne $forwardedArguments[$index]) {
+                throw "Launcher 参数边界发生变化，索引：$index。"
+            }
+        }
+
+        [System.IO.File]::WriteAllText($releasePath, 'release')
+        if (-not $childProcess.WaitForExit(10000)) {
+            throw 'Launcher 冒烟测试的内层 TestProcess 未按 release marker 退出。'
+        }
+        $childProcess.Dispose()
+        $childProcess = $null
+        $launcherProcess.Dispose()
+        $launcherProcess = $null
+
+        Remove-Item -LiteralPath $fakeEntryExecutable -Force
+        $errorStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $errorStartInfo.FileName = $smokeLauncher
+        $errorStartInfo.WorkingDirectory = [System.IO.Path]::GetTempPath()
+        $errorStartInfo.UseShellExecute = $false
+        $launcherProcess = [System.Diagnostics.Process]::Start($errorStartInfo)
+        if ($null -eq $launcherProcess) {
+            throw '无法启动 Native AOT launcher 错误对话框冒烟测试。'
+        }
+
+        $dialogDeadline = [DateTime]::UtcNow.AddSeconds(10)
+        $dialogObserved = $false
+        while ([DateTime]::UtcNow -lt $dialogDeadline -and -not $launcherProcess.HasExited) {
+            $launcherProcess.Refresh()
+            if ($launcherProcess.MainWindowTitle -ceq '我去图书馆 - 启动失败') {
+                $dialogObserved = $true
+                break
+            }
+            Start-Sleep -Milliseconds 20
+        }
+        if (-not $dialogObserved) {
+            throw 'Native AOT launcher 未显示预期的启动失败对话框。'
+        }
+        if (-not $launcherProcess.CloseMainWindow()) {
+            throw 'Native AOT launcher 启动失败对话框不接受系统关闭。'
+        }
+        if (-not $launcherProcess.WaitForExit(5000)) {
+            throw 'Native AOT launcher 启动失败对话框未在关闭后退出。'
+        }
+        if ($launcherProcess.ExitCode -ne 2) {
+            throw "Native AOT launcher 部署错误退出码无效：$($launcherProcess.ExitCode)，期望：2。"
+        }
+    }
+    finally {
+        if ([System.IO.Directory]::Exists($smokeRoot) -and
+            -not (Test-Path -LiteralPath $releasePath -PathType Leaf)) {
+            [System.IO.File]::WriteAllText($releasePath, 'release')
+        }
+        if ($null -ne $childProcess) {
+            if (-not $childProcess.HasExited) {
+                if (-not $childProcess.WaitForExit(3000)) {
+                    $childProcess.Kill($true)
+                    $childProcess.WaitForExit()
+                }
+            }
+            $childProcess.Dispose()
+        }
+        if ($null -ne $launcherProcess) {
+            if (-not $launcherProcess.HasExited) {
+                $launcherProcess.Kill($true)
+                $launcherProcess.WaitForExit()
+            }
+            $launcherProcess.Dispose()
+        }
+        Remove-LauncherSmokeDirectory -Path $smokeRoot
+    }
+
+    Write-Host 'Native AOT launcher published smoke tests passed.'
+}
+
 function Assert-PublishedUpdaterTransactions {
     param(
         [Parameter(Mandatory)][string]$AotUpdaterPath,
@@ -533,27 +864,61 @@ function Copy-DirectoryWithoutTools {
     }
 }
 
+function New-PortablePackageTree {
+    param(
+        [Parameter(Mandatory)][string]$AppSource,
+        [Parameter(Mandatory)][string]$Destination,
+        [Parameter(Mandatory)][string]$LauncherPath
+    )
+
+    $portableRootDirectory = Join-Path $Destination 'IGoLibrary-Ex'
+    $appDestination = Join-Path $portableRootDirectory 'app'
+    New-Item -ItemType Directory -Path $appDestination -Force | Out-Null
+    Copy-Item -LiteralPath $LauncherPath -Destination (
+        Join-Path $portableRootDirectory 'IGoLibrary-Ex.exe')
+    foreach ($item in Get-ChildItem -LiteralPath $AppSource -Force) {
+        $copyParameters = @{
+            LiteralPath = $item.FullName
+            Destination = $appDestination
+            Recurse = $true
+            Force = $true
+            ErrorAction = 'Stop'
+        }
+        Copy-Item @copyParameters
+    }
+}
+
 function Install-ValidatedReleaseArtifacts {
     param(
         [Parameter(Mandatory)][string]$StagedLightweightPath,
         [Parameter(Mandatory)][string]$StagedBundledPath,
+        [Parameter(Mandatory)][string]$StagedPortableLightweightPath,
+        [Parameter(Mandatory)][string]$StagedPortableBundledPath,
         [Parameter(Mandatory)][string]$StagedSymbolsPath,
         [Parameter(Mandatory)][string]$FinalLightweightPath,
         [Parameter(Mandatory)][string]$FinalBundledPath,
+        [Parameter(Mandatory)][string]$FinalPortableLightweightPath,
+        [Parameter(Mandatory)][string]$FinalPortableBundledPath,
         [Parameter(Mandatory)][string]$LegacyBundledPath,
         [Parameter(Mandatory)][string]$FinalSymbolsPath
     )
 
     $previousLightweightPath = Join-Path $packageStaging '.previous-lightweight.zip'
     $previousBundledPath = Join-Path $packageStaging '.previous-bundled.zip'
+    $previousPortableLightweightPath = Join-Path $packageStaging '.previous-portable-lightweight.zip'
+    $previousPortableBundledPath = Join-Path $packageStaging '.previous-portable-bundled.zip'
     $previousLegacyBundledPath = Join-Path $packageStaging '.previous-legacy-with-cloudflared.zip'
     $previousSymbolsPath = Join-Path $packageStaging '.previous-symbols'
     $lightweightBackedUp = $false
     $bundledBackedUp = $false
+    $portableLightweightBackedUp = $false
+    $portableBundledBackedUp = $false
     $legacyBundledBackedUp = $false
     $symbolsBackedUp = $false
     $lightweightInstalled = $false
     $bundledInstalled = $false
+    $portableLightweightInstalled = $false
+    $portableBundledInstalled = $false
     $symbolsInstalled = $false
 
     $symbolsParent = [System.IO.Path]::GetDirectoryName($FinalSymbolsPath)
@@ -571,6 +936,14 @@ function Install-ValidatedReleaseArtifacts {
             Move-Item -LiteralPath $FinalBundledPath -Destination $previousBundledPath
             $bundledBackedUp = $true
         }
+        if (Test-Path -LiteralPath $FinalPortableLightweightPath) {
+            Move-Item -LiteralPath $FinalPortableLightweightPath -Destination $previousPortableLightweightPath
+            $portableLightweightBackedUp = $true
+        }
+        if (Test-Path -LiteralPath $FinalPortableBundledPath) {
+            Move-Item -LiteralPath $FinalPortableBundledPath -Destination $previousPortableBundledPath
+            $portableBundledBackedUp = $true
+        }
         if (Test-Path -LiteralPath $LegacyBundledPath) {
             Move-Item -LiteralPath $LegacyBundledPath -Destination $previousLegacyBundledPath
             $legacyBundledBackedUp = $true
@@ -584,6 +957,10 @@ function Install-ValidatedReleaseArtifacts {
         $lightweightInstalled = $true
         Move-Item -LiteralPath $StagedBundledPath -Destination $FinalBundledPath
         $bundledInstalled = $true
+        Move-Item -LiteralPath $StagedPortableLightweightPath -Destination $FinalPortableLightweightPath
+        $portableLightweightInstalled = $true
+        Move-Item -LiteralPath $StagedPortableBundledPath -Destination $FinalPortableBundledPath
+        $portableBundledInstalled = $true
         Move-Item -LiteralPath $StagedSymbolsPath -Destination $FinalSymbolsPath
         $symbolsInstalled = $true
     }
@@ -594,6 +971,12 @@ function Install-ValidatedReleaseArtifacts {
         if ($bundledInstalled -and (Test-Path -LiteralPath $FinalBundledPath)) {
             Remove-Item -LiteralPath $FinalBundledPath -Force
         }
+        if ($portableLightweightInstalled -and (Test-Path -LiteralPath $FinalPortableLightweightPath)) {
+            Remove-Item -LiteralPath $FinalPortableLightweightPath -Force
+        }
+        if ($portableBundledInstalled -and (Test-Path -LiteralPath $FinalPortableBundledPath)) {
+            Remove-Item -LiteralPath $FinalPortableBundledPath -Force
+        }
         if ($symbolsInstalled -and (Test-Path -LiteralPath $FinalSymbolsPath)) {
             Remove-SafeBuildDirectory -Path $FinalSymbolsPath
         }
@@ -602,6 +985,12 @@ function Install-ValidatedReleaseArtifacts {
         }
         if ($bundledBackedUp -and (Test-Path -LiteralPath $previousBundledPath)) {
             Move-Item -LiteralPath $previousBundledPath -Destination $FinalBundledPath
+        }
+        if ($portableLightweightBackedUp -and (Test-Path -LiteralPath $previousPortableLightweightPath)) {
+            Move-Item -LiteralPath $previousPortableLightweightPath -Destination $FinalPortableLightweightPath
+        }
+        if ($portableBundledBackedUp -and (Test-Path -LiteralPath $previousPortableBundledPath)) {
+            Move-Item -LiteralPath $previousPortableBundledPath -Destination $FinalPortableBundledPath
         }
         if ($legacyBundledBackedUp -and (Test-Path -LiteralPath $previousLegacyBundledPath)) {
             Move-Item -LiteralPath $previousLegacyBundledPath -Destination $LegacyBundledPath
@@ -615,6 +1004,8 @@ function Install-ValidatedReleaseArtifacts {
     foreach ($backupPath in @(
         $previousLightweightPath,
         $previousBundledPath,
+        $previousPortableLightweightPath,
+        $previousPortableBundledPath,
         $previousLegacyBundledPath)) {
         if (Test-Path -LiteralPath $backupPath) {
             Remove-Item -LiteralPath $backupPath -Force
@@ -626,13 +1017,21 @@ function Install-ValidatedReleaseArtifacts {
 }
 
 Assert-NativeAotToolchain
+$launcherTestParameters = @{
+    TestProjectPath = $launcherTestsProject
+    BuildConfiguration = $Configuration
+}
+Assert-LauncherUnitTests @launcherTestParameters
 
 Remove-SafeBuildDirectory -Path $output
 Remove-SafeBuildDirectory -Path $updaterOutput
+Remove-SafeBuildDirectory -Path $launcherOutput
 Remove-SafeBuildDirectory -Path $lightweightStaging
+Remove-SafeBuildDirectory -Path $portableStaging
 Remove-SafeBuildDirectory -Path $packageStaging
 New-Item -ItemType Directory -Path $output -Force | Out-Null
 New-Item -ItemType Directory -Path $updaterOutput -Force | Out-Null
+New-Item -ItemType Directory -Path $launcherOutput -Force | Out-Null
 New-Item -ItemType Directory -Path $packageOutput -Force | Out-Null
 
 $selfContainedValue = if ($SelfContained) { 'true' } else { 'false' }
@@ -686,14 +1085,46 @@ if ($updaterPublishExitCode -ne 0) {
     throw "Updater dotnet publish failed with exit code $updaterPublishExitCode."
 }
 
+$launcherPublishArguments = @(
+    'publish'
+    $launcherProject
+    '-c'
+    $Configuration
+    '-r'
+    $Runtime
+    '--self-contained:true'
+    '-p:PublishAot=true'
+    '-p:OptimizationPreference=Size'
+    '-p:ILLinkTreatWarningsAsErrors=true'
+    '-p:IlcTreatWarningsAsErrors=true'
+    '-p:UseSharedCompilation=false'
+    "-p:Version=$AppVersion"
+    "-p:FileVersion=${AppVersion}.0"
+    "-p:InformationalVersion=$AppVersion"
+    '-p:IncludeSourceRevisionInInformationalVersion=false'
+    '-o'
+    $launcherOutput
+)
+& dotnet @launcherPublishArguments
+$launcherPublishExitCode = $LASTEXITCODE
+if ($launcherPublishExitCode -ne 0) {
+    throw "Launcher dotnet publish failed with exit code $launcherPublishExitCode."
+}
+
 $publishedExecutable = Join-Path $output 'IGoLibrary.Ex.Desktop.exe'
 $publishedUpdater = Join-Path $updaterOutput 'IGoLibrary.Ex.Updater.exe'
+$publishedLauncher = Join-Path $launcherOutput 'IGoLibrary-Ex.exe'
 if (-not (Test-Path -LiteralPath $publishedExecutable -PathType Leaf)) {
     throw "Published executable was not found: $publishedExecutable"
 }
 if (-not (Test-Path -LiteralPath $publishedUpdater -PathType Leaf)) {
     throw "Published updater was not found: $publishedUpdater"
 }
+$launcherVerificationParameters = @{
+    ExecutablePath = $publishedLauncher
+    OutputDirectory = $launcherOutput
+}
+Assert-PublishedLauncherBinary @launcherVerificationParameters
 $publishedUpdaterInfo = Get-Item -LiteralPath $publishedUpdater
 if ($publishedUpdaterInfo.Length -gt $maximumUpdaterBytes) {
     throw "Native AOT updater 超过 20 MiB 门槛：$($publishedUpdaterInfo.Length) bytes。"
@@ -728,12 +1159,24 @@ $acceptanceParameters = @{
     BuildConfiguration = $Configuration
 }
 Assert-PublishedUpdaterTransactions @acceptanceParameters
+$launcherSmokeParameters = @{
+    ExecutablePath = $publishedLauncher
+    BuildConfiguration = $Configuration
+}
+Assert-PublishedLauncherSmoke @launcherSmokeParameters
 
 $primarySymbols = Join-Path $updaterOutput 'IGoLibrary.Ex.Updater.pdb'
 if (-not (Test-Path -LiteralPath $primarySymbols -PathType Leaf)) {
     throw "Native AOT updater 缺少内部故障诊断所需的 PDB：$primarySymbols"
 }
-$publishedSymbols = @(Get-ChildItem -LiteralPath $updaterOutput -File -Filter '*.pdb')
+$primaryLauncherSymbols = Join-Path $launcherOutput 'IGoLibrary-Ex.pdb'
+if (-not (Test-Path -LiteralPath $primaryLauncherSymbols -PathType Leaf)) {
+    throw "Native AOT launcher 缺少内部故障诊断所需的 PDB：$primaryLauncherSymbols"
+}
+$publishedSymbols = @(
+    Get-ChildItem -LiteralPath $updaterOutput -File -Filter '*.pdb'
+    Get-ChildItem -LiteralPath $launcherOutput -File -Filter '*.pdb'
+)
 Copy-Item -LiteralPath $publishedUpdater -Destination (Join-Path $output 'IGoLibrary.Ex.Updater.exe') -Force
 
 $portableMarkerPath = Join-Path $output 'portable-release.marker'
@@ -771,12 +1214,55 @@ try {
     $verifyScript = Join-Path $PSScriptRoot 'verify-windows-package.ps1'
     & $verifyScript -PackagePath $stagedZipPath -CompanionPackagePath $stagedBundledZipPath
 
+    $portableLightweightParameters = @{
+        AppSource = $lightweightStaging
+        Destination = $portableLightweightStaging
+        LauncherPath = $publishedLauncher
+    }
+    New-PortablePackageTree @portableLightweightParameters
+    $portableBundledParameters = @{
+        AppSource = $output
+        Destination = $portableBundledStaging
+        LauncherPath = $publishedLauncher
+    }
+    New-PortablePackageTree @portableBundledParameters
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+        $portableLightweightStaging,
+        $stagedPortableZipPath,
+        [System.IO.Compression.CompressionLevel]::SmallestSize,
+        $false)
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+        $portableBundledStaging,
+        $stagedPortableBundledZipPath,
+        [System.IO.Compression.CompressionLevel]::SmallestSize,
+        $false)
+
+    $portableVerifyScript = Join-Path $PSScriptRoot 'verify-windows-portable-package.ps1'
+    $portableVerificationParameters = @{
+        PackagePath = $stagedPortableZipPath
+        RawPackagePath = $stagedZipPath
+        CompanionPackagePath = $stagedPortableBundledZipPath
+        CompanionRawPackagePath = $stagedBundledZipPath
+        PublishedLauncherPath = $publishedLauncher
+    }
+    & $portableVerifyScript @portableVerificationParameters
+    $portableVerifierTestScript = Join-Path $PSScriptRoot 'test-windows-portable-package-verifier.ps1'
+    $portableVerifierTestParameters = @{
+        PublishedLauncherPath = $publishedLauncher
+        AppVersion = $AppVersion
+    }
+    & $portableVerifierTestScript @portableVerifierTestParameters
+
     $installParameters = @{
         StagedLightweightPath = $stagedZipPath
         StagedBundledPath = $stagedBundledZipPath
+        StagedPortableLightweightPath = $stagedPortableZipPath
+        StagedPortableBundledPath = $stagedPortableBundledZipPath
         StagedSymbolsPath = $stagedSymbolsOutput
         FinalLightweightPath = $zipPath
         FinalBundledPath = $bundledZipPath
+        FinalPortableLightweightPath = $portableZipPath
+        FinalPortableBundledPath = $portableBundledZipPath
         LegacyBundledPath = $legacyBundledZipPath
         FinalSymbolsPath = $symbolsOutput
     }
@@ -784,13 +1270,16 @@ try {
 }
 finally {
     Remove-SafeBuildDirectory -Path $lightweightStaging
+    Remove-SafeBuildDirectory -Path $portableStaging
     Remove-SafeBuildDirectory -Path $packageStaging
 }
 
 Write-Host "Published complete desktop tree to $output"
 foreach ($package in @(
-    [pscustomobject]@{ Label = 'Windows without-cloudflared ZIP'; Path = $zipPath },
-    [pscustomobject]@{ Label = 'Windows default cloudflared ZIP'; Path = $bundledZipPath }
+    [pscustomobject]@{ Label = 'Windows recommended portable ZIP'; Path = $portableBundledZipPath },
+    [pscustomobject]@{ Label = 'Windows portable without-cloudflared ZIP'; Path = $portableZipPath },
+    [pscustomobject]@{ Label = 'Windows automatic-update payload ZIP'; Path = $bundledZipPath },
+    [pscustomobject]@{ Label = 'Windows legacy-compatible without-cloudflared payload ZIP'; Path = $zipPath }
 )) {
     $packageInfo = Get-Item -LiteralPath $package.Path
     $packageHash = (Get-FileHash -LiteralPath $package.Path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -824,4 +1313,21 @@ try {
 finally {
     $lightweightArchive.Dispose()
 }
-Write-Host '无后缀完整包是唯一的应用内自动更新资产；-without-cloudflared 是额外轻量包。首次启用自动更新仍需手动安装一次绿色版。'
+$portableArchive = [System.IO.Compression.ZipFile]::OpenRead($portableZipPath)
+try {
+    $launcherEntry = $portableArchive.GetEntry('IGoLibrary-Ex/IGoLibrary-Ex.exe')
+    if ($null -eq $launcherEntry) {
+        throw 'portable 轻量包缺少 IGoLibrary-Ex/IGoLibrary-Ex.exe。'
+    }
+    if ($launcherEntry.CompressedLength -gt $maximumLauncherCompressedBytes) {
+        throw "Native AOT launcher ZIP 条目超过 5 MiB 门槛：$($launcherEntry.CompressedLength) bytes。"
+    }
+
+    Write-Host 'Launcher size budget:'
+    Write-Host "  Raw: $($launcherEntry.Length) / $maximumLauncherBytes bytes"
+    Write-Host "  Compressed: $($launcherEntry.CompressedLength) / $maximumLauncherCompressedBytes bytes"
+}
+finally {
+    $portableArchive.Dispose()
+}
+Write-Host '普通 Windows 用户应下载 -portable.zip 并运行外层 IGoLibrary-Ex.exe；无后缀完整包仍是唯一的应用内自动更新资产。'

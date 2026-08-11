@@ -418,9 +418,7 @@ function Test-MacAppZip {
     $resolvedPath = (Resolve-Path -LiteralPath $Path).Path
     $archive = [System.IO.Compression.ZipFile]::OpenRead($resolvedPath)
     try {
-        $archiveEntries = @($archive.Entries | Where-Object {
-            $_.FullName.TrimEnd('/', '\').Length -gt 0
-        })
+        $archiveEntries = @($archive.Entries)
         $fileEntries = @($archiveEntries | Where-Object {
             -not ($_.FullName.EndsWith('/') -or $_.FullName.EndsWith('\'))
         })
@@ -433,10 +431,11 @@ function Test-MacAppZip {
             [System.StringComparer]::OrdinalIgnoreCase)
         foreach ($entry in $archiveEntries) {
             $path = $entry.FullName.TrimEnd('/', '\')
-            if ($entry.FullName.Contains('\') -or
+            if ([string]::IsNullOrWhiteSpace($path) -or
+                $entry.FullName.Contains('\') -or
                 $path.StartsWith('/', [System.StringComparison]::Ordinal) -or
                 $path.Split('/') -contains '..') {
-                throw "macOS ZIP 包含非法路径：$path"
+                throw "macOS ZIP 包含非法路径：$($entry.FullName)"
             }
             if (-not $pathSet.Add($path)) {
                 throw "macOS ZIP 包含大小写重复路径：$path"
@@ -581,6 +580,53 @@ function Test-MacAppZip {
     }
 }
 
+function Assert-MacZipVerifierRejectsSeparatorOnlyEntry {
+    $invalidPackage = Join-Path $PackageStaging '.separator-only-entry.zip'
+    $rejected = $false
+    try {
+        $archive = [System.IO.Compression.ZipFile]::Open(
+            $invalidPackage,
+            [System.IO.Compression.ZipArchiveMode]::Create)
+        try {
+            $entry = $archive.CreateEntry('////')
+            $destination = $entry.Open()
+            try {
+                $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes(
+                    'hidden-root-entry-data')
+                $destination.Write($bytes)
+            }
+            finally {
+                $destination.Dispose()
+            }
+        }
+        finally {
+            $archive.Dispose()
+        }
+
+        try {
+            Test-MacAppZip -Path $invalidPackage -IncludeTools $false
+        }
+        catch {
+            if (-not $_.Exception.Message.Contains(
+                    'macOS ZIP 包含非法路径',
+                    [System.StringComparison]::Ordinal)) {
+                throw "macOS ZIP verifier 因非预期原因拒绝分隔符根条目：$($_.Exception.Message)"
+            }
+            $rejected = $true
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $invalidPackage) {
+            Remove-Item -LiteralPath $invalidPackage -Force
+        }
+    }
+
+    if (-not $rejected) {
+        throw 'macOS ZIP verifier 未拒绝仅由分隔符组成的根条目。'
+    }
+    Write-Host 'macOS ZIP verifier separator-only-entry rejection test passed.'
+}
+
 function Install-ValidatedPackagePair {
     param(
         [Parameter(Mandatory)][string]$StagedLightweightPath,
@@ -697,6 +743,8 @@ Write-FirstRunCommand $FirstRunCommandPath
 Remove-SafeArtifactDirectory -Path $PackageStaging
 New-Item -ItemType Directory -Path $PackageStaging -Force | Out-Null
 try {
+    Assert-MacZipVerifierRejectsSeparatorOnlyEntry
+
     New-MacAppBundle -IncludeTools $false
     New-MacAppZip -SourceAppDir $AppDir -DestinationZip $StagedZipPath -AdditionalFiles @($FirstRunGuidePath, $FirstRunCommandPath)
 
