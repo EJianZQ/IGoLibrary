@@ -18,6 +18,59 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class MainWindowLayoutTests
 {
     [AvaloniaFact]
+    public void HomeHero_AlignsGreetingWithEyebrow_AndKeepsClockInRightColumn()
+    {
+        var window = new MainWindow();
+        var eyebrow = Assert.Single(
+            window.GetLogicalDescendants().OfType<TextBlock>(),
+            textBlock => textBlock.Text == "个人专属仪表盘");
+        var carousel = Assert.Single(eyebrow.GetLogicalAncestors().OfType<Carousel>());
+        var greetingTitle = Assert.Single(
+            window.GetLogicalDescendants().OfType<TextBlock>(),
+            textBlock => textBlock.Classes.Contains("dashboard-hero-title"));
+        var greetingSubtitle = Assert.Single(
+            window.GetLogicalDescendants().OfType<TextBlock>(),
+            textBlock => textBlock.Classes.Contains("dashboard-hero-subtitle"));
+        var clockDate = Assert.Single(
+            window.GetLogicalDescendants().OfType<TextBlock>(),
+            textBlock => textBlock.Classes.Contains("dashboard-clock-date"));
+        var clockTime = Assert.Single(
+            window.GetLogicalDescendants().OfType<TextBlock>(),
+            textBlock => textBlock.Classes.Contains("dashboard-clock-time"));
+        var clockBorder = Assert.IsType<Border>(clockDate.Parent?.Parent);
+
+        carousel.SelectedIndex = 0;
+        greetingTitle.Text = "早安，卡宇维";
+        greetingSubtitle.Text = "准备好开始今天的学习了吗？";
+        clockDate.Text = "2026 年 08 月 12 日 星期三";
+        clockTime.Text = "22:44:17";
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var eyebrowOrigin = eyebrow.TranslatePoint(default, window);
+            var titleOrigin = greetingTitle.TranslatePoint(default, window);
+            var subtitleOrigin = greetingSubtitle.TranslatePoint(default, window);
+
+            Assert.True(eyebrowOrigin.HasValue);
+            Assert.True(titleOrigin.HasValue);
+            Assert.True(subtitleOrigin.HasValue);
+            Assert.InRange(Math.Abs(titleOrigin.Value.X - eyebrowOrigin.Value.X), 0, 0.5);
+            Assert.InRange(Math.Abs(subtitleOrigin.Value.X - eyebrowOrigin.Value.X), 0, 0.5);
+            Assert.Equal(1, Grid.GetColumn(clockBorder));
+            Assert.Equal(HorizontalAlignment.Right, clockBorder.HorizontalAlignment);
+            Assert.Equal(HorizontalAlignment.Right, clockDate.HorizontalAlignment);
+            Assert.Equal(HorizontalAlignment.Right, clockTime.HorizontalAlignment);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public void MainWindow_ExposesExpectedLayoutContracts()
     {
         var window = new MainWindow();

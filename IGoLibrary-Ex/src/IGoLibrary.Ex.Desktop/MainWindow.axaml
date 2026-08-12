@@ -507,7 +507,9 @@
                   </Border>
 
                   <StackPanel Spacing="6"
-                              MaxWidth="580">
+                              MaxWidth="580"
+                              Margin="13,0,0,0"
+                              HorizontalAlignment="Left">
                     <TextBlock Classes="dashboard-hero-title"
                                Text="{Binding HomeGreetingTitleText}" />
                     <TextBlock Classes="dashboard-hero-subtitle"
