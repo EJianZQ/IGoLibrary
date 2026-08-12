@@ -511,9 +511,11 @@
                               Margin="13,0,0,0"
                               HorizontalAlignment="Left">
                     <TextBlock Classes="dashboard-hero-title"
-                               Text="{Binding HomeGreetingTitleText}" />
+                               x:Name="HomeGreetingTitleTextBlock"
+                               Text="{Binding HomeDashboard.HomeGreetingTitleText}" />
                     <TextBlock Classes="dashboard-hero-subtitle"
-                               Text="{Binding HomeGreetingMessageText}" />
+                               x:Name="HomeGreetingMessageTextBlock"
+                               Text="{Binding HomeDashboard.HomeGreetingMessageText}" />
                   </StackPanel>
                 </StackPanel>
 

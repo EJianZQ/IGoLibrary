@@ -70,6 +70,7 @@ public sealed partial class HomeDashboardViewModel : ViewModelBase
         HomeReservationBadgeBrush = _stateIdleBrush;
         HomeReservationBadgeBackgroundBrush = _neutralSoftBrush;
         HomeReservationProgressBrush = _stateIdleBrush;
+        UpdateGreetingAndClockPresentation(GetCurrentTime());
     }
 
     public string[] HomeReservationProgressTimingModes { get; } = ["固定预约到期时长", "软件运行时计算时长"];
@@ -219,11 +220,7 @@ public sealed partial class HomeDashboardViewModel : ViewModelBase
 
     public void UpdateHeroPresentation(DateTimeOffset now)
     {
-        var localNow = now.ToLocalTime();
-        HomeGreetingTitleText = BuildGreetingTitleText(localNow.Hour);
-        HomeGreetingMessageText = BuildGreetingMessageText(localNow.Hour);
-        HomeDateText = localNow.ToString("yyyy 年 MM 月 dd 日 dddd", DashboardCulture);
-        HomeTimeText = localNow.ToString("HH:mm:ss", DashboardCulture);
+        UpdateGreetingAndClockPresentation(now);
 
         var (statusText, detailText, brush, backgroundBrush) = ResolveHomeHeroStatusPresentation();
         HomeHeroStatusText = statusText;
@@ -540,29 +537,27 @@ public sealed partial class HomeDashboardViewModel : ViewModelBase
         return _timeProvider.GetUtcNow().ToLocalTime();
     }
 
-    private static string BuildGreetingTitleText(int hour)
+    private void UpdateGreetingAndClockPresentation(DateTimeOffset now)
     {
-        return hour switch
-        {
-            < 5 => $"夜深了，{GetSystemUserDisplayName()}",
-            < 11 => $"早安，{GetSystemUserDisplayName()}",
-            < 14 => $"中午好，{GetSystemUserDisplayName()}",
-            < 18 => $"下午好，{GetSystemUserDisplayName()}",
-            < 23 => $"晚上好，{GetSystemUserDisplayName()}",
-            _ => $"夜深了，{GetSystemUserDisplayName()}"
-        };
+        var localNow = now.ToLocalTime();
+        var (title, message) = BuildGreetingPresentation(localNow.Hour);
+        HomeGreetingTitleText = title;
+        HomeGreetingMessageText = message;
+        HomeDateText = localNow.ToString("yyyy 年 MM 月 dd 日 dddd", DashboardCulture);
+        HomeTimeText = localNow.ToString("HH:mm:ss", DashboardCulture);
     }
 
-    private static string BuildGreetingMessageText(int hour)
+    private static (string Title, string Message) BuildGreetingPresentation(int hour)
     {
+        var userDisplayName = GetSystemUserDisplayName();
         return hour switch
         {
-            < 5 => "也别忘了给自己留一点休息时间",
-            < 11 => "准备好开始今天的学习了吗？",
-            < 14 => "给今天的计划加把劲吧",
-            < 18 => "专注状态已经准备就绪",
-            < 23 => "把今天最后一段时间好好度过吧",
-            _ => "也别忘了给自己留一点休息时间"
+            < 5 => ($"夜深了，{userDisplayName}", "也别忘了给自己留一点休息时间"),
+            < 11 => ($"早安，{userDisplayName}", "准备好开始今天的学习了吗？"),
+            < 14 => ($"中午好，{userDisplayName}", "给今天的计划加把劲吧"),
+            < 18 => ($"下午好，{userDisplayName}", "专注状态已经准备就绪"),
+            < 23 => ($"晚上好，{userDisplayName}", "把今天最后一段时间好好度过吧"),
+            _ => ($"夜深了，{userDisplayName}", "也别忘了给自己留一点休息时间")
         };
     }
 

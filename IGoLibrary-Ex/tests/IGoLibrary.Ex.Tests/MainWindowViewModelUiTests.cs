@@ -15,6 +15,43 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class MainWindowViewModelUiTests
 {
     [AvaloniaFact]
+    public async Task HomeGreeting_UpdatesWhenClockCrossesIntoLateNight()
+    {
+        var localTime = new DateTimeOffset(
+            new DateTime(2026, 8, 12, 22, 59, 0, DateTimeKind.Unspecified),
+            TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 8, 12)));
+        var timeProvider = new FakeTimeProvider(localTime.ToUniversalTime());
+        var viewModel = MainWindowViewModelTests.CreateViewModel(timeProvider: timeProvider);
+        await viewModel.InitializeAsync();
+        var window = new MainWindow { DataContext = viewModel };
+
+        try
+        {
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+
+            var title = Assert.IsType<TextBlock>(
+                window.FindControl<TextBlock>("HomeGreetingTitleTextBlock"));
+            var message = Assert.IsType<TextBlock>(
+                window.FindControl<TextBlock>("HomeGreetingMessageTextBlock"));
+            Assert.StartsWith("晚上好，", title.Text, StringComparison.Ordinal);
+            Assert.Equal("把今天最后一段时间好好度过吧", message.Text);
+
+            timeProvider.Advance(TimeSpan.FromMinutes(1));
+            viewModel.HomeDashboard.UpdateClock();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.StartsWith("夜深了，", title.Text, StringComparison.Ordinal);
+            Assert.Equal("也别忘了给自己留一点休息时间", message.Text);
+        }
+        finally
+        {
+            window.DataContext = null;
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task TaskSleepPreventionSetting_RendersBelowTraySettingAndBindsImmediately()
     {
         var settingsService = new FakeSettingsService(AppSettings.Default with
