@@ -3,16 +3,20 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Application.Services;
 
-public sealed class SettingsService(ISettingsRepository settingsRepository) : ISettingsService
+public sealed class SettingsService(
+    ISettingsRepository settingsRepository,
+    IPersistentDataChangeTracker? changeTracker = null) : ISettingsService
 {
     private readonly SemaphoreSlim _settingsGate = new(1, 1);
+    private AppSettings? _cachedSettings;
+    private long _cachedVersion = -1;
 
     public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
         await _settingsGate.WaitAsync(cancellationToken);
         try
         {
-            return await settingsRepository.LoadAsync(cancellationToken);
+            return await LoadUnderLockAsync(cancellationToken);
         }
         finally
         {
@@ -26,6 +30,7 @@ public sealed class SettingsService(ISettingsRepository settingsRepository) : IS
         try
         {
             await settingsRepository.SaveAsync(settings, cancellationToken);
+            UpdateCacheAfterSave(settings);
         }
         finally
         {
@@ -42,7 +47,7 @@ public sealed class SettingsService(ISettingsRepository settingsRepository) : IS
         await _settingsGate.WaitAsync(cancellationToken);
         try
         {
-            var current = await settingsRepository.LoadAsync(cancellationToken);
+            var current = await LoadUnderLockAsync(cancellationToken);
             var updated = update(current);
             if (updated == current)
             {
@@ -50,11 +55,33 @@ public sealed class SettingsService(ISettingsRepository settingsRepository) : IS
             }
 
             await settingsRepository.SaveAsync(updated, cancellationToken);
+            UpdateCacheAfterSave(updated);
             return updated;
         }
         finally
         {
             _settingsGate.Release();
         }
+    }
+
+    private async Task<AppSettings> LoadUnderLockAsync(CancellationToken cancellationToken)
+    {
+        var currentVersion = changeTracker?.Version;
+        if (_cachedSettings is not null &&
+            (currentVersion is null || _cachedVersion == currentVersion.Value))
+        {
+            return _cachedSettings;
+        }
+
+        var settings = await settingsRepository.LoadAsync(cancellationToken);
+        _cachedSettings = settings;
+        _cachedVersion = changeTracker?.Version ?? 0;
+        return settings;
+    }
+
+    private void UpdateCacheAfterSave(AppSettings settings)
+    {
+        _cachedSettings = settings;
+        _cachedVersion = changeTracker?.Version ?? 0;
     }
 }

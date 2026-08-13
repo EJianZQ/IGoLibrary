@@ -1,4 +1,5 @@
 using System.Text.Json;
+using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Domain.Models;
 using IGoLibrary.Ex.Infrastructure.Persistence;
 using IGoLibrary.Ex.Infrastructure.Protocol;
@@ -167,6 +168,39 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task GetEditableTemplatesAsync_CachesUntilPersistentDataVersionChanges()
+    {
+        var tracker = new FakePersistentDataChangeTracker();
+        var store = await CreateStoreAsync(
+            AppSettings.Default with
+            {
+                TraceIntProtocol = new TraceIntProtocolSettings(true)
+            },
+            tracker);
+        await store.SaveOverridesAsync(new TraceIntProtocolTemplateOverrides
+        {
+            QueryLibrariesTemplate = "cached-value"
+        });
+
+        var first = await store.GetEditableTemplatesAsync();
+        await SaveRawOverridesJsonAsync("""
+            {
+              "queryLibrariesTemplate": "external-value"
+            }
+            """);
+        var stillCached = await store.GetEditableTemplatesAsync();
+
+        Assert.Same(first, stillCached);
+        Assert.Equal("cached-value", stillCached.QueryLibrariesTemplate);
+
+        tracker.MarkChanged();
+        var refreshed = await store.GetEditableTemplatesAsync();
+
+        Assert.Equal("external-value", refreshed.QueryLibrariesTemplate);
+        Assert.NotSame(first, refreshed);
+    }
+
+    [Fact]
     public async Task GetEffectiveTemplatesAsync_IgnoresSavedOverrides_WhenCustomApiOverridesAreDisabled()
     {
         var store = await CreateStoreAsync(AppSettings.Default with
@@ -287,13 +321,15 @@ public sealed class ProtocolTemplateStoreTests : IDisposable
         }
     }
 
-    private static async Task<DefaultProtocolTemplateStore> CreateStoreAsync(AppSettings? settings = null)
+    private static async Task<DefaultProtocolTemplateStore> CreateStoreAsync(
+        AppSettings? settings = null,
+        IPersistentDataChangeTracker? changeTracker = null)
     {
         var connectionFactory = new SqliteConnectionFactory();
         var initializer = new SqliteAppDataInitializer(connectionFactory);
         await initializer.InitializeAsync();
         var settingsService = new FakeSettingsService(settings ?? AppSettings.Default);
-        return new DefaultProtocolTemplateStore(connectionFactory, settingsService);
+        return new DefaultProtocolTemplateStore(connectionFactory, settingsService, changeTracker);
     }
 
     private static async Task SaveRawOverridesJsonAsync(string json)

@@ -9,6 +9,23 @@ namespace IGoLibrary.Ex.Tests;
 
 public sealed class GrabSeatWorkflowRunnerTests
 {
+    [Theory]
+    [InlineData(28800, 30)]
+    [InlineData(31, 1)]
+    [InlineData(30, 25)]
+    [InlineData(6, 1)]
+    [InlineData(5, 1)]
+    [InlineData(0.5, 0.5)]
+    public void ResolveScheduledWaitDelay_WakesOnlyAtUsefulLogOrFinalSecondBoundaries(
+        double remainingSeconds,
+        double expectedDelaySeconds)
+    {
+        var delay = GrabSeatStateMachine.ResolveScheduledWaitDelay(
+            TimeSpan.FromSeconds(remainingSeconds));
+
+        Assert.Equal(TimeSpan.FromSeconds(expectedDelaySeconds), delay);
+    }
+
     [Fact]
     public async Task ScheduledStart_UsesRuntimeDelayBeforePolling()
     {

@@ -199,14 +199,16 @@ public sealed class TomorrowReservationCoordinatorTests
             },
             runtime);
         var controller = new CoordinatorRunController("明日预约", runtime);
-        var context = new CoordinatorRunContext(controller);
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            runner.RunAsync(CreatePlan(executeImmediately: false), context, cts.Token));
+        await controller.StartAsync(
+            (context, token) => runner.RunAsync(CreatePlan(executeImmediately: false), context, token),
+            cts.Token);
+        await WaitForAsync(() => controller.GetStatus().State == CoordinatorTaskState.Completed);
 
         Assert.Equal(0, queueCalls);
+        Assert.Equal(CoordinatorStatusReason.Stopped, controller.GetStatus().Reason);
     }
 
     [Fact]
@@ -230,9 +232,11 @@ public sealed class TomorrowReservationCoordinatorTests
                 Session = new SessionCredentials("cookie", SessionSource.ManualCookie, DateTimeOffset.Now, true)
             },
             runtime);
-        var context = new CoordinatorRunContext(new CoordinatorRunController("明日预约", runtime));
+        var controller = new CoordinatorRunController("明日预约", runtime);
 
-        await runner.RunAsync(CreatePlan(executeImmediately: false), context, CancellationToken.None);
+        await controller.StartAsync(
+            (context, token) => runner.RunAsync(CreatePlan(executeImmediately: false), context, token));
+        await WaitForAsync(() => controller.GetStatus().State == CoordinatorTaskState.Completed);
 
         var waitEntries = activityLogService.Entries
             .Where(entry => entry.Message.StartsWith("明日预约等待中", StringComparison.Ordinal))

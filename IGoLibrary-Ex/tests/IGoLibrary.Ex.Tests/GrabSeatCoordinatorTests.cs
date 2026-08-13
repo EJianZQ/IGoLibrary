@@ -430,6 +430,39 @@ public sealed class GrabSeatCoordinatorTests
     }
 
     [Fact]
+    public async Task StartAsync_FailsImmediately_WhenPlanHasNoTargetSeats()
+    {
+        var layoutCallCount = 0;
+        var eventPublisher = new FakeCoordinatorEventPublisher();
+        var coordinator = CreateCoordinator(
+            new FakeTraceIntApiClient
+            {
+                OnGetLibraryLayoutAsync = (_, _, _) =>
+                {
+                    layoutCallCount++;
+                    throw new InvalidOperationException("空目标计划不应请求场馆布局");
+                }
+            },
+            AppSettings.Default,
+            eventPublisher: eventPublisher);
+        var plan = new GrabSeatPlan(
+            1,
+            "自科阅览区一",
+            [],
+            GrabPollingMode.Relaxed,
+            GrabPollingStrategyFactory.FromMode(GrabPollingMode.Relaxed),
+            new TimeOnly(23, 59),
+            GrabReservationStrategy.QueryThenReserve);
+
+        await coordinator.StartAsync(plan);
+        await WaitForStatusAsync(coordinator, CoordinatorTaskState.Failed);
+        await WaitForAsync(() => eventPublisher.EventsOf<TaskFailedCoordinatorEvent>().Count == 1);
+
+        Assert.Equal(0, layoutCallCount);
+        Assert.Contains("请至少选择一个目标座位", coordinator.GetStatus().Message);
+    }
+
+    [Fact]
     public void ResolveNextScheduledStart_ReturnsToday_WhenScheduledTimeIsLater()
     {
         var now = new DateTimeOffset(2026, 5, 8, 21, 30, 15, TimeSpan.FromHours(8));

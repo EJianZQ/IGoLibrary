@@ -14,8 +14,10 @@ internal sealed class OccupyReReservationExecutor(
         ReservationInfo reservation,
         OccupySeatPlan plan,
         int maxAttempts,
+        Action<string> markRequestSent,
         CancellationToken cancellationToken)
     {
+        markRequestSent("正在取消即将到期的预约");
         var cancelled = await apiClient.CancelReservationAsync(cookie, reservation.ReservationToken, cancellationToken);
         if (!cancelled)
         {
@@ -28,11 +30,25 @@ internal sealed class OccupyReReservationExecutor(
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            var reserved = await apiClient.ReserveSeatAsync(
-                cookie,
-                reservation.LibraryId,
-                reservation.SeatKey,
-                cancellationToken);
+            bool reserved;
+            try
+            {
+                markRequestSent($"正在进行第 {attempt} 次重新预约");
+                reserved = await apiClient.ReserveSeatAsync(
+                    cookie,
+                    reservation.LibraryId,
+                    reservation.SeatKey,
+                    cancellationToken);
+            }
+            catch (Exception ex) when (DirectReservationMissClassifier.TryClassify(ex, out _))
+            {
+                reserved = false;
+                activityLogService.Write(
+                    LogEntryKind.Warning,
+                    "Occupy",
+                    $"第 {attempt} 次重新预约收到可重试响应：{ex.Message}");
+            }
+
             if (reserved)
             {
                 if (attempt > 1)

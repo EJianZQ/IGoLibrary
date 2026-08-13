@@ -30,4 +30,30 @@ internal static class GrabSeatStateMachine
             ? pollingStrategy.MaximumDelay
             : DirectReserveRateLimitCycleDelay;
     }
+
+    internal static TimeSpan ResolveScheduledWaitDelay(TimeSpan remaining)
+    {
+        if (remaining <= TimeSpan.Zero)
+        {
+            return TimeSpan.Zero;
+        }
+
+        if (remaining <= TimeSpan.FromSeconds(5))
+        {
+            return remaining < TimeSpan.FromSeconds(1)
+                ? remaining
+                : TimeSpan.FromSeconds(1);
+        }
+
+        var remainingSeconds = Math.Max(1, (long)Math.Ceiling(remaining.TotalSeconds));
+        var nextLoggedRemainingSeconds = remainingSeconds - remainingSeconds % 30;
+        if (nextLoggedRemainingSeconds == remainingSeconds)
+        {
+            nextLoggedRemainingSeconds -= 30;
+        }
+
+        nextLoggedRemainingSeconds = Math.Max(5, nextLoggedRemainingSeconds);
+        var delay = remaining - TimeSpan.FromSeconds(nextLoggedRemainingSeconds);
+        return delay > TimeSpan.Zero ? delay : TimeSpan.FromMilliseconds(1);
+    }
 }

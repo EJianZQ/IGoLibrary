@@ -10,31 +10,77 @@ public sealed class DefaultProtocolTemplateStore(
     IPersistentDataChangeTracker? changeTracker = null) : IProtocolTemplateStore
 {
     private const string OverridesKey = "protocol-overrides";
+    private static readonly TraceIntProtocolTemplates DefaultTemplates =
+        TraceIntProtocolValidator.Normalize(DefaultTraceIntProtocolTemplates.Instance);
+
+    private readonly object _cacheGate = new();
+    private readonly SemaphoreSlim _cacheLoadGate = new(1, 1);
+    private TraceIntProtocolTemplates? _cachedEditableTemplates;
+    private long _cachedEditableTemplatesVersion = -1;
 
     public Task<TraceIntProtocolTemplates> GetDefaultTemplatesAsync(
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(TraceIntProtocolValidator.Normalize(DefaultTraceIntProtocolTemplates.Instance));
+        return Task.FromResult(DefaultTemplates);
     }
 
     public async Task<TraceIntProtocolTemplates> GetEffectiveTemplatesAsync(
         CancellationToken cancellationToken = default)
     {
-        var defaults = await GetDefaultTemplatesAsync(cancellationToken);
         var settings = await settingsService.LoadAsync(cancellationToken);
         if (!settings.TraceIntProtocol.GraphQlOverridesEnabled)
         {
-            return defaults;
+            return DefaultTemplates;
         }
 
-        return Merge(defaults, await LoadOverridesAsync(cancellationToken));
+        return await GetEditableTemplatesAsync(cancellationToken);
     }
 
     public async Task<TraceIntProtocolTemplates> GetEditableTemplatesAsync(
         CancellationToken cancellationToken = default)
     {
-        var defaults = await GetDefaultTemplatesAsync(cancellationToken);
-        return Merge(defaults, await LoadOverridesAsync(cancellationToken));
+        if (changeTracker is null)
+        {
+            return Merge(DefaultTemplates, await LoadOverridesAsync(cancellationToken));
+        }
+
+        var version = changeTracker.Version;
+        if (TryGetCachedEditableTemplates(version, out var cached))
+        {
+            return cached;
+        }
+
+        await _cacheLoadGate.WaitAsync(cancellationToken);
+        try
+        {
+            while (true)
+            {
+                version = changeTracker.Version;
+                if (TryGetCachedEditableTemplates(version, out cached))
+                {
+                    return cached;
+                }
+
+                var templates = Merge(DefaultTemplates, await LoadOverridesAsync(cancellationToken));
+                if (changeTracker.Version != version)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    continue;
+                }
+
+                lock (_cacheGate)
+                {
+                    _cachedEditableTemplates = templates;
+                    _cachedEditableTemplatesVersion = version;
+                }
+
+                return templates;
+            }
+        }
+        finally
+        {
+            _cacheLoadGate.Release();
+        }
     }
 
     public async Task SaveOverridesAsync(
@@ -42,11 +88,10 @@ public sealed class DefaultProtocolTemplateStore(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(overrides);
-        var defaults = await GetDefaultTemplatesAsync(cancellationToken);
         var normalizedOverrides = NormalizeLegacyOverrides(TraceIntProtocolValidator.Normalize(overrides));
-        var editableTemplates = Merge(defaults, normalizedOverrides);
+        var editableTemplates = Merge(DefaultTemplates, normalizedOverrides);
         TraceIntProtocolValidator.EnsureValid(editableTemplates);
-        var sparseOverrides = TraceIntProtocolTemplateOverrides.FromDifferences(editableTemplates, defaults);
+        var sparseOverrides = TraceIntProtocolTemplateOverrides.FromDifferences(editableTemplates, DefaultTemplates);
         var json = JsonSerializer.Serialize(sparseOverrides, AppJson.Default);
 
         await using var connection = connectionFactory.Create();
@@ -63,6 +108,7 @@ public sealed class DefaultProtocolTemplateStore(
         command.Parameters.AddWithValue("$value", json);
         await command.ExecuteNonQueryAsync(cancellationToken);
         changeTracker?.MarkChanged();
+        InvalidateCache();
     }
 
     public async Task ResetOverridesAsync(CancellationToken cancellationToken = default)
@@ -75,6 +121,34 @@ public sealed class DefaultProtocolTemplateStore(
         command.Parameters.AddWithValue("$key", OverridesKey);
         await command.ExecuteNonQueryAsync(cancellationToken);
         changeTracker?.MarkChanged();
+        InvalidateCache();
+    }
+
+    private bool TryGetCachedEditableTemplates(
+        long version,
+        out TraceIntProtocolTemplates templates)
+    {
+        lock (_cacheGate)
+        {
+            if (_cachedEditableTemplates is not null &&
+                _cachedEditableTemplatesVersion == version)
+            {
+                templates = _cachedEditableTemplates;
+                return true;
+            }
+        }
+
+        templates = null!;
+        return false;
+    }
+
+    private void InvalidateCache()
+    {
+        lock (_cacheGate)
+        {
+            _cachedEditableTemplates = null;
+            _cachedEditableTemplatesVersion = -1;
+        }
     }
 
     private static TraceIntProtocolTemplates Merge(

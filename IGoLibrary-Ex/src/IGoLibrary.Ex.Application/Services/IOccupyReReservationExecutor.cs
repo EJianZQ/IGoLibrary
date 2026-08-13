@@ -9,5 +9,6 @@ internal interface IOccupyReReservationExecutor
         ReservationInfo reservation,
         OccupySeatPlan plan,
         int maxAttempts,
+        Action<string> markRequestSent,
         CancellationToken cancellationToken);
 }

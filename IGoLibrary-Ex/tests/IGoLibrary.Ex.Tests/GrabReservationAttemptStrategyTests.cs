@@ -144,6 +144,116 @@ public sealed class GrabReservationAttemptStrategyTests
     }
 
     [Fact]
+    public async Task QueryThenReserve_ContinuesThroughAvailableTargets_UntilOneSucceeds()
+    {
+        var reserveRequests = new List<string>();
+        var layout = new LibraryLayout(
+            1,
+            "自科阅览区一",
+            "3层",
+            true,
+            3,
+            0,
+            0,
+            [
+                new SeatSnapshot("seat-1", "1号座", false, 0, 0),
+                new SeatSnapshot("seat-2", "2号座", false, 1, 0),
+                new SeatSnapshot("seat-3", "3号座", false, 2, 0)
+            ]);
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetLibraryLayoutAsync = (_, _, _) => Task.FromResult(layout),
+            OnReserveSeatAsync = (_, _, seatKey, _) =>
+            {
+                reserveRequests.Add(seatKey);
+                return Task.FromResult(seatKey == "seat-3");
+            }
+        };
+        var strategy = new QueryThenReserveGrabReservationStrategy(apiClient, new ActivityLogService());
+
+        var result = await strategy.TryReserveAsync(
+            CreateContext(
+                [
+                    new SeatReference("seat-1", "1号座"),
+                    new SeatReference("seat-3", "3号座")
+                ]),
+            CancellationToken.None);
+
+        Assert.Equal(["seat-1", "seat-3"], reserveRequests);
+        Assert.Equal("seat-3", result.ReservedSeat?.SeatKey);
+        Assert.Same(layout, result.LatestLayout);
+    }
+
+    [Fact]
+    public async Task QueryThenReserve_Continues_WhenAvailableSeatLosesReservationRace()
+    {
+        var reserveRequests = new List<string>();
+        var activityLogService = new ActivityLogService();
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetLibraryLayoutAsync = (_, _, _) => Task.FromResult(new LibraryLayout(
+                1,
+                "自科阅览区一",
+                "3层",
+                true,
+                2,
+                0,
+                0,
+                [
+                    new SeatSnapshot("seat-1", "1号座", false, 0, 0),
+                    new SeatSnapshot("seat-2", "2号座", false, 1, 0)
+                ])),
+            OnReserveSeatAsync = (_, _, seatKey, _) =>
+            {
+                reserveRequests.Add(seatKey);
+                return seatKey == "seat-1"
+                    ? Task.FromException<bool>(new InvalidOperationException("GraphQL 错误(code=1): 该座位已经被人预定了!"))
+                    : Task.FromResult(true);
+            }
+        };
+        var strategy = new QueryThenReserveGrabReservationStrategy(apiClient, activityLogService);
+
+        var result = await strategy.TryReserveAsync(
+            CreateContext(
+                [
+                    new SeatReference("seat-1", "1号座"),
+                    new SeatReference("seat-2", "2号座")
+                ]),
+            CancellationToken.None);
+
+        Assert.Equal(["seat-1", "seat-2"], reserveRequests);
+        Assert.Equal("seat-2", result.ReservedSeat?.SeatKey);
+        Assert.Contains(activityLogService.Entries, entry => entry.Message.Contains("继续尝试下一个目标座位"));
+    }
+
+    [Fact]
+    public async Task QueryThenReserve_ReturnsRateLimitSignal_WhenApiAsksToRetry()
+    {
+        var apiClient = new FakeTraceIntApiClient
+        {
+            OnGetLibraryLayoutAsync = (_, _, _) => Task.FromResult(new LibraryLayout(
+                1,
+                "自科阅览区一",
+                "3层",
+                true,
+                1,
+                0,
+                0,
+                [new SeatSnapshot("seat-1", "1号座", false, 0, 0)])),
+            OnReserveSeatAsync = (_, _, _, _) => Task.FromException<bool>(
+                new InvalidOperationException("GraphQL 错误(code=1): 请重新尝试"))
+        };
+        var strategy = new QueryThenReserveGrabReservationStrategy(apiClient, new ActivityLogService());
+
+        var result = await strategy.TryReserveAsync(
+            CreateContext([new SeatReference("seat-1", "1号座")]),
+            CancellationToken.None);
+
+        Assert.True(result.HadReservationAttempt);
+        Assert.True(result.RateLimitTriggered);
+    }
+
+    [Fact]
     public void Selector_ReturnsStrategyForConfiguredMode()
     {
         var apiClient = new FakeTraceIntApiClient();
@@ -170,6 +280,7 @@ public sealed class GrabReservationAttemptStrategyTests
                 GrabPollingStrategyFactory.FromMode(GrabPollingMode.Aggressive),
                 null,
                 GrabReservationStrategy.QueryThenReserve),
+            seats.Select(static seat => seat.SeatKey).ToHashSet(StringComparer.Ordinal),
             0,
             markRequestSent ?? (() => { }));
     }

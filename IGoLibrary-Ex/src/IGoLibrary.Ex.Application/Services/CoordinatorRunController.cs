@@ -12,9 +12,11 @@ internal sealed class CoordinatorRunController(
     IAppLogWriter? logWriter = null)
 {
     private readonly object _gate = new();
+    private readonly object _notificationGate = new();
     private CancellationTokenSource? _cts;
     private Task? _runningTask;
     private Guid? _runId;
+    private long _statusVersion;
     private CoordinatorStatus _status = CoordinatorStatus.Idle(title);
 
     public event EventHandler<CoordinatorStatus>? StatusChanged;
@@ -33,6 +35,7 @@ internal sealed class CoordinatorRunController(
     {
         CoordinatorStatus startingStatus;
         Guid runId;
+        long startingStatusVersion;
         var startSignal = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
         lock (_gate)
         {
@@ -56,8 +59,9 @@ internal sealed class CoordinatorRunController(
                 runtime.Now,
                 Reason: CoordinatorStatusReason.Starting);
             SetStatusUnsafe(startingStatus);
+            startingStatusVersion = _statusVersion;
 
-            var context = new CoordinatorRunContext(this);
+            var context = new CoordinatorRunContext(this, runId);
             _runningTask = RunCoreAsync(runAsync, context, startSignal.Task, runId, _cts.Token);
         }
 
@@ -67,7 +71,7 @@ internal sealed class CoordinatorRunController(
                 LogLevel.Information,
                 $"任务开始启动，运行标识={FormatRunId(runId)}。",
                 eventId: new EventId(2001, "CoordinatorStarting"));
-            NotifyStatusChanged(startingStatus, runId);
+            NotifyStatusChanged(startingStatus, runId, startingStatusVersion);
         }
         finally
         {
@@ -83,6 +87,7 @@ internal sealed class CoordinatorRunController(
         CancellationTokenSource cts;
         CoordinatorStatus stoppingStatus;
         Guid? stoppingRunId;
+        long stoppingStatusVersion;
         lock (_gate)
         {
             if (_cts is null)
@@ -98,6 +103,7 @@ internal sealed class CoordinatorRunController(
                 Reason = CoordinatorStatusReason.Stopping
             };
             SetStatusUnsafe(stoppingStatus);
+            stoppingStatusVersion = _statusVersion;
             cts = _cts;
             runningTask = _runningTask;
             stoppingRunId = _runId;
@@ -109,7 +115,7 @@ internal sealed class CoordinatorRunController(
                 LogLevel.Information,
                 $"收到任务停止请求，运行标识={FormatRunId(stoppingRunId)}。",
                 eventId: new EventId(2003, "CoordinatorStopping"));
-            NotifyStatusChanged(stoppingStatus, stoppingRunId);
+            NotifyStatusChanged(stoppingStatus, stoppingRunId, stoppingStatusVersion);
         }
         finally
         {
@@ -140,10 +146,7 @@ internal sealed class CoordinatorRunController(
             await startSignal;
             cancellationToken.ThrowIfCancellationRequested();
             await runAsync(context, cancellationToken);
-            if (!IsTerminal(GetStatus().State))
-            {
-                context.Complete($"{title}任务已停止", CoordinatorStatusReason.Stopped);
-            }
+            context.Complete($"{title}任务已停止", CoordinatorStatusReason.Stopped);
         }
         catch (OperationCanceledException)
         {
@@ -160,39 +163,49 @@ internal sealed class CoordinatorRunController(
         }
     }
 
-    private static bool IsTerminal(CoordinatorTaskState state)
-    {
-        return state is CoordinatorTaskState.Completed or CoordinatorTaskState.Failed;
-    }
-
     private CoordinatorStatus GetStatusUnsafe() => _status;
 
     private void SetStatusUnsafe(CoordinatorStatus status)
     {
         _status = status;
+        _statusVersion++;
     }
 
-    private void NotifyStatusChanged(CoordinatorStatus status, Guid? runId)
+    private void NotifyStatusChanged(
+        CoordinatorStatus status,
+        Guid? runId,
+        long expectedStatusVersion)
     {
-        var handlers = StatusChanged;
-        if (handlers is null)
+        lock (_notificationGate)
         {
-            return;
-        }
-
-        foreach (EventHandler<CoordinatorStatus> handler in handlers.GetInvocationList())
-        {
-            try
+            lock (_gate)
             {
-                handler(this, status);
+                if (_statusVersion != expectedStatusVersion)
+                {
+                    return;
+                }
             }
-            catch (Exception ex)
+
+            var handlers = StatusChanged;
+            if (handlers is null)
             {
-                WriteLog(
-                    LogLevel.Error,
-                    $"任务状态订阅者处理失败，运行标识={FormatRunId(runId)}，状态={status.State}。",
-                    ex,
-                    new EventId(2006, "CoordinatorStatusSubscriberFailed"));
+                return;
+            }
+
+            foreach (EventHandler<CoordinatorStatus> handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    handler(this, status);
+                }
+                catch (Exception ex)
+                {
+                    WriteLog(
+                        LogLevel.Error,
+                        $"任务状态订阅者处理失败，运行标识={FormatRunId(runId)}，状态={status.State}。",
+                        ex,
+                        new EventId(2006, "CoordinatorStatusSubscriberFailed"));
+                }
             }
         }
     }
@@ -205,13 +218,40 @@ internal sealed class CoordinatorRunController(
     }
 
     internal void SetRunning(
+        Guid expectedRunId,
         string message,
         CoordinatorStatusReason reason = CoordinatorStatusReason.Running)
     {
-        UpdateRunningMetrics(message, _status.PollCount, _status.RequestCount, _status.LastRequestAt, reason);
+        CoordinatorStatus status;
+        Guid? runId;
+        long statusVersion;
+        lock (_gate)
+        {
+            if (!IsCurrentRunUnsafe(expectedRunId))
+            {
+                return;
+            }
+
+            status = new CoordinatorStatus(
+                CoordinatorTaskState.Running,
+                title,
+                message,
+                _status.StartedAt ?? runtime.Now,
+                runtime.Now,
+                _status.PollCount,
+                _status.RequestCount,
+                _status.LastRequestAt,
+                reason);
+            SetStatusUnsafe(status);
+            statusVersion = _statusVersion;
+            runId = _runId;
+        }
+
+        NotifyStatusChanged(status, runId, statusVersion);
     }
 
     internal void UpdateRunningMetrics(
+        Guid expectedRunId,
         string message,
         int pollCount,
         int requestCount,
@@ -220,8 +260,14 @@ internal sealed class CoordinatorRunController(
     {
         CoordinatorStatus status;
         Guid? runId;
+        long statusVersion;
         lock (_gate)
         {
+            if (!IsCurrentRunUnsafe(expectedRunId))
+            {
+                return;
+            }
+
             status = new CoordinatorStatus(
                 CoordinatorTaskState.Running,
                 title,
@@ -233,18 +279,25 @@ internal sealed class CoordinatorRunController(
                 lastRequestAt,
                 reason);
             SetStatusUnsafe(status);
+            statusVersion = _statusVersion;
             runId = _runId;
         }
 
-        NotifyStatusChanged(status, runId);
+        NotifyStatusChanged(status, runId, statusVersion);
     }
 
-    internal void Complete(string message, CoordinatorStatusReason reason)
+    internal void Complete(Guid expectedRunId, string message, CoordinatorStatusReason reason)
     {
         CoordinatorStatus status;
         Guid? completedRunId;
+        long statusVersion;
         lock (_gate)
         {
+            if (!IsCurrentRunUnsafe(expectedRunId))
+            {
+                return;
+            }
+
             completedRunId = _runId;
             status = new CoordinatorStatus(
                 CoordinatorTaskState.Completed,
@@ -257,20 +310,27 @@ internal sealed class CoordinatorRunController(
                 _status.LastRequestAt,
                 reason);
             SetStatusUnsafe(status);
+            statusVersion = _statusVersion;
             ClearRunUnsafe();
             _runId = null;
         }
 
-        NotifyStatusChanged(status, completedRunId);
+        NotifyStatusChanged(status, completedRunId, statusVersion);
         WriteTerminalLog(LogLevel.Information, status, completedRunId, exception: null);
     }
 
-    internal void Fail(string message, CoordinatorStatusReason reason)
+    internal void Fail(Guid expectedRunId, string message, CoordinatorStatusReason reason)
     {
         CoordinatorStatus status;
         Guid? failedRunId;
+        long statusVersion;
         lock (_gate)
         {
+            if (!IsCurrentRunUnsafe(expectedRunId))
+            {
+                return;
+            }
+
             failedRunId = _runId;
             status = new CoordinatorStatus(
                 CoordinatorTaskState.Failed,
@@ -283,12 +343,18 @@ internal sealed class CoordinatorRunController(
                 _status.LastRequestAt,
                 reason);
             SetStatusUnsafe(status);
+            statusVersion = _statusVersion;
             ClearRunUnsafe();
             _runId = null;
         }
 
-        NotifyStatusChanged(status, failedRunId);
+        NotifyStatusChanged(status, failedRunId, statusVersion);
         WriteTerminalLog(LogLevel.Error, status, failedRunId, exception: null);
+    }
+
+    private bool IsCurrentRunUnsafe(Guid expectedRunId)
+    {
+        return _runId == expectedRunId;
     }
 
     private void WriteTerminalLog(
@@ -330,7 +396,9 @@ internal sealed class CoordinatorRunController(
     }
 }
 
-internal sealed class CoordinatorRunContext(CoordinatorRunController controller)
+internal sealed class CoordinatorRunContext(
+    CoordinatorRunController controller,
+    Guid runId)
 {
     public CoordinatorStatus Status => controller.GetStatus();
 
@@ -338,7 +406,7 @@ internal sealed class CoordinatorRunContext(CoordinatorRunController controller)
         string message,
         CoordinatorStatusReason reason = CoordinatorStatusReason.Running)
     {
-        controller.SetRunning(message, reason);
+        controller.SetRunning(runId, message, reason);
     }
 
     public void UpdateRunningMetrics(
@@ -348,16 +416,16 @@ internal sealed class CoordinatorRunContext(CoordinatorRunController controller)
         DateTimeOffset? lastRequestAt,
         CoordinatorStatusReason reason = CoordinatorStatusReason.Running)
     {
-        controller.UpdateRunningMetrics(message, pollCount, requestCount, lastRequestAt, reason);
+        controller.UpdateRunningMetrics(runId, message, pollCount, requestCount, lastRequestAt, reason);
     }
 
     public void Complete(string message, CoordinatorStatusReason reason)
     {
-        controller.Complete(message, reason);
+        controller.Complete(runId, message, reason);
     }
 
     public void Fail(string message, CoordinatorStatusReason reason)
     {
-        controller.Fail(message, reason);
+        controller.Fail(runId, message, reason);
     }
 }

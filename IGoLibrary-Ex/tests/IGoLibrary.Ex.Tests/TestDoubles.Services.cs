@@ -815,6 +815,42 @@ internal sealed class FakeCoordinatorRuntime : ICoordinatorRuntime
     }
 }
 
+internal sealed class FakePersistentDataChangeTracker : IPersistentDataChangeTracker
+{
+    private long _version;
+
+    public event EventHandler? Changed;
+
+    public long Version => Interlocked.Read(ref _version);
+
+    public bool IsDirty { get; private set; }
+
+    public bool IsAutomaticUploadPaused { get; private set; }
+
+    public string? AutomaticUploadPauseReason { get; private set; }
+
+    public void MarkChanged(bool pauseAutomaticUpload = false, string? pauseReason = null)
+    {
+        Interlocked.Increment(ref _version);
+        IsDirty = true;
+        if (pauseAutomaticUpload)
+        {
+            IsAutomaticUploadPaused = true;
+            AutomaticUploadPauseReason = pauseReason;
+        }
+
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void MarkSynchronized(long synchronizedVersion)
+    {
+        if (Version == synchronizedVersion)
+        {
+            IsDirty = false;
+        }
+    }
+}
+
 internal sealed class FakeSessionService : ISessionService
 {
     public SessionCredentials? CurrentSession { get; set; }

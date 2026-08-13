@@ -23,6 +23,12 @@ public sealed class OccupySeatWorkflowRunnerTests
 
         await coordinator.StartAsync(new OccupySeatPlan(TimeSpan.Zero, OccupyCheckIntervalMode.FixedTenSeconds));
         await runtime.DelayStarted!.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var runningStatus = coordinator.GetStatus();
+        Assert.Equal(1, runningStatus.PollCount);
+        Assert.Equal(1, runningStatus.RequestCount);
+        Assert.NotNull(runningStatus.LastRequestAt);
+
         await coordinator.StopAsync();
 
         Assert.Equal(TimeSpan.FromSeconds(10), Assert.Single(runtime.DelayRequests));

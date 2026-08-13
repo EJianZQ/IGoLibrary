@@ -19,30 +19,54 @@ internal sealed class QueryThenReserveGrabReservationStrategy(
             context.Cookie,
             context.Plan.LibraryId,
             cancellationToken);
-        var availableSeat = layout.Seats
-            .Where(seat => context.Plan.Seats.Any(target => target.SeatKey == seat.SeatKey))
-            .FirstOrDefault(seat => seat.IsAvailable);
-
-        if (availableSeat is null)
+        var hadReservationAttempt = false;
+        foreach (var availableSeat in layout.Seats)
         {
-            return new GrabReservationAttemptResult(null, false, false, 0, layout);
+            if (!availableSeat.IsAvailable || !context.TargetSeatKeys.Contains(availableSeat.SeatKey))
+            {
+                continue;
+            }
+
+            hadReservationAttempt = true;
+            activityLogService.Write(LogEntryKind.Success, "Grab", $"{availableSeat.SeatName} 空闲，正在尝试预约。");
+
+            bool reserved;
+            try
+            {
+                context.MarkRequestSent();
+                reserved = await apiClient.ReserveSeatAsync(
+                    context.Cookie,
+                    context.Plan.LibraryId,
+                    availableSeat.SeatKey,
+                    cancellationToken);
+            }
+            catch (Exception ex) when (DirectReservationMissClassifier.TryClassify(ex, out var missKind))
+            {
+                activityLogService.Write(
+                    LogEntryKind.Info,
+                    "Grab",
+                    DirectReservationMissClassifier.GetMessage(
+                        missKind,
+                        new SeatReference(availableSeat.SeatKey, availableSeat.SeatName)));
+                if (missKind == DirectReservationMissKind.RetryRequested)
+                {
+                    return new GrabReservationAttemptResult(null, true, true, 0, layout);
+                }
+
+                continue;
+            }
+
+            if (reserved)
+            {
+                return new GrabReservationAttemptResult(
+                    new SeatReference(availableSeat.SeatKey, availableSeat.SeatName),
+                    true,
+                    false,
+                    0,
+                    layout);
+            }
         }
 
-        activityLogService.Write(LogEntryKind.Success, "Grab", $"{availableSeat.SeatName} 空闲，正在尝试预约。");
-        context.MarkRequestSent();
-        var reserved = await apiClient.ReserveSeatAsync(
-            context.Cookie,
-            context.Plan.LibraryId,
-            availableSeat.SeatKey,
-            cancellationToken);
-
-        return reserved
-            ? new GrabReservationAttemptResult(
-                new SeatReference(availableSeat.SeatKey, availableSeat.SeatName),
-                true,
-                false,
-                0,
-                layout)
-            : new GrabReservationAttemptResult(null, true, false, 0, layout);
+        return new GrabReservationAttemptResult(null, hadReservationAttempt, false, 0, layout);
     }
 }

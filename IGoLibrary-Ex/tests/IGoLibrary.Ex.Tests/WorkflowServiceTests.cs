@@ -671,6 +671,48 @@ public sealed class WorkflowServiceTests
     }
 
     [Fact]
+    public async Task SettingsService_LoadAsync_UsesCacheUntilPersistentDataVersionChanges()
+    {
+        var tracker = new FakePersistentDataChangeTracker();
+        var repository = new CountingSettingsRepository(AppSettings.Default, tracker);
+        var service = new SettingsService(repository, tracker);
+
+        var first = await service.LoadAsync();
+        var second = await service.LoadAsync();
+
+        Assert.Same(first, second);
+        Assert.Equal(1, repository.LoadCalls);
+
+        repository.Current = AppSettings.Default with
+        {
+            Venue = new VenueSelectionSettings(9, "外部更新场馆")
+        };
+        tracker.MarkChanged();
+
+        var refreshed = await service.LoadAsync();
+
+        Assert.Equal(2, repository.LoadCalls);
+        Assert.Equal(9, refreshed.Venue.LastLibraryId);
+    }
+
+    [Fact]
+    public async Task SettingsService_SaveFailure_KeepsLastSuccessfulCache()
+    {
+        var tracker = new FakePersistentDataChangeTracker();
+        var repository = new CountingSettingsRepository(AppSettings.Default, tracker);
+        var service = new SettingsService(repository, tracker);
+        var initial = await service.LoadAsync();
+        repository.SaveException = new InvalidOperationException("保存失败");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.SaveAsync(
+            initial with { Venue = new VenueSelectionSettings(3, "不应进入缓存") }));
+        var afterFailure = await service.LoadAsync();
+
+        Assert.Same(initial, afterFailure);
+        Assert.Equal(1, repository.LoadCalls);
+    }
+
+    [Fact]
     public async Task ProtocolTemplateEditorService_DelegatesLoadSaveAndReset()
     {
         var templates = TestProtocolTemplates.Create();
@@ -733,6 +775,35 @@ public sealed class WorkflowServiceTests
         {
             await Task.Delay(25, cancellationToken);
             _settings = settings;
+        }
+    }
+
+    private sealed class CountingSettingsRepository(
+        AppSettings settings,
+        IPersistentDataChangeTracker changeTracker) : ISettingsRepository
+    {
+        public AppSettings Current { get; set; } = settings;
+
+        public int LoadCalls { get; private set; }
+
+        public Exception? SaveException { get; set; }
+
+        public Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
+        {
+            LoadCalls++;
+            return Task.FromResult(Current);
+        }
+
+        public Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
+        {
+            if (SaveException is not null)
+            {
+                return Task.FromException(SaveException);
+            }
+
+            Current = settings;
+            changeTracker.MarkChanged();
+            return Task.CompletedTask;
         }
     }
 }

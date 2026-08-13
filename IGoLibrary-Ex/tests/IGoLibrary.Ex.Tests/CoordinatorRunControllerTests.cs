@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Collections.Concurrent;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Application.Services;
@@ -112,6 +113,95 @@ public sealed class CoordinatorRunControllerTests
 
         Assert.Equal(2, attempts);
         Assert.Equal("第二次完成", controller.GetStatus().Message);
+    }
+
+    [Fact]
+    public async Task CompletedOldRun_CannotOverwriteOrClearRestartedRun()
+    {
+        var controller = new CoordinatorRunController("测试", new FakeCoordinatorRuntime());
+        var oldRunCanReturn = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondRunStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondRunCanReturn = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await controller.StartAsync(async (context, _) =>
+        {
+            context.Fail("第一轮失败", CoordinatorStatusReason.TaskFailed);
+            await oldRunCanReturn.Task;
+            context.SetRunning("第一轮迟到的状态");
+        });
+        await WaitForStatusAsync(controller, CoordinatorTaskState.Failed);
+
+        await controller.StartAsync(async (context, _) =>
+        {
+            context.SetRunning("第二轮运行中");
+            secondRunStarted.TrySetResult(null);
+            await secondRunCanReturn.Task;
+        });
+        await secondRunStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        oldRunCanReturn.SetResult(null);
+        await Task.Delay(50);
+
+        var status = controller.GetStatus();
+        Assert.Equal(CoordinatorTaskState.Running, status.State);
+        Assert.Equal("第二轮运行中", status.Message);
+
+        var conflict = await Assert.ThrowsAsync<TaskLaunchConflictException>(() =>
+            controller.StartAsync((_, _) => Task.CompletedTask));
+        Assert.Contains("任务已在运行", conflict.Message);
+
+        secondRunCanReturn.SetResult(null);
+        await WaitForStatusAsync(controller, CoordinatorTaskState.Completed);
+    }
+
+    [Fact]
+    public async Task StatusChanged_DoesNotPublishOldTerminalStatusAfterRestartStatus()
+    {
+        var controller = new CoordinatorRunController("测试", new FakeCoordinatorRuntime());
+        var failedSubscriberEntered = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFailedSubscriber = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var oldRunCanReturn = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondRunCanReturn = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var states = new ConcurrentQueue<CoordinatorTaskState>();
+
+        controller.StatusChanged += (_, status) =>
+        {
+            if (status.State == CoordinatorTaskState.Failed)
+            {
+                failedSubscriberEntered.TrySetResult(null);
+                releaseFailedSubscriber.Task.GetAwaiter().GetResult();
+            }
+        };
+        controller.StatusChanged += (_, status) => states.Enqueue(status.State);
+
+        await controller.StartAsync(async (context, _) =>
+        {
+            context.Fail("第一轮失败", CoordinatorStatusReason.TaskFailed);
+            await oldRunCanReturn.Task;
+        });
+        await failedSubscriberEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var restartTask = Task.Run(async () =>
+        {
+            await controller.StartAsync(async (context, _) =>
+            {
+                context.SetRunning("第二轮运行中");
+                await secondRunCanReturn.Task;
+            });
+        });
+        await WaitForStatusAsync(controller, CoordinatorTaskState.Starting);
+
+        releaseFailedSubscriber.SetResult(null);
+        await restartTask.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitForStatusAsync(controller, CoordinatorTaskState.Running);
+
+        Assert.Equal(
+            [CoordinatorTaskState.Starting, CoordinatorTaskState.Failed, CoordinatorTaskState.Starting, CoordinatorTaskState.Running],
+            states);
+
+        oldRunCanReturn.SetResult(null);
+        secondRunCanReturn.SetResult(null);
+        await WaitForStatusAsync(controller, CoordinatorTaskState.Completed);
     }
 
     [Fact]

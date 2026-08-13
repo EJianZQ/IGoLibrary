@@ -20,6 +20,17 @@ internal sealed class OccupySeatWorkflowRunner(
         CoordinatorRunContext context,
         CancellationToken cancellationToken)
     {
+        var cycle = 0;
+        var requestCount = 0;
+        DateTimeOffset? lastRequestAt = null;
+
+        void MarkRequestSent(string message)
+        {
+            requestCount++;
+            lastRequestAt = runtime.Now;
+            context.UpdateRunningMetrics(message, cycle, requestCount, lastRequestAt);
+        }
+
         try
         {
             context.SetRunning("占座任务已启动");
@@ -27,7 +38,10 @@ internal sealed class OccupySeatWorkflowRunner(
 
             while (!cancellationToken.IsCancellationRequested)
             {
+                cycle++;
+                context.UpdateRunningMetrics($"占座第 {cycle} 轮检测中", cycle, requestCount, lastRequestAt);
                 var cookie = GetCurrentCookieOrThrow();
+                MarkRequestSent("正在查询当前预约");
                 var info = await apiClient.GetReservationInfoAsync(cookie, cancellationToken);
                 if (info is null)
                 {
@@ -53,6 +67,7 @@ internal sealed class OccupySeatWorkflowRunner(
                     info,
                     plan,
                     maxAttempts,
+                    MarkRequestSent,
                     cancellationToken);
                 if (!reservationResult.Succeeded)
                 {

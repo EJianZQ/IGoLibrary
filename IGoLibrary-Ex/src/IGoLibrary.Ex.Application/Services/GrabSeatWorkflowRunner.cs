@@ -20,6 +20,11 @@ internal sealed class GrabSeatWorkflowRunner(
     {
         try
         {
+            if (plan.Seats.Count == 0)
+            {
+                throw new InvalidOperationException("请至少选择一个目标座位");
+            }
+
             if (plan.ScheduledStart is not null)
             {
                 await WaitUntilScheduledStartAsync(plan.ScheduledStart.Value, cancellationToken);
@@ -34,6 +39,9 @@ internal sealed class GrabSeatWorkflowRunner(
             var reservationStrategy = plan.ReservationStrategy;
             var reservationAttemptStrategy = strategySelector.Select(reservationStrategy);
             var directReservationStartIndex = 0;
+            var targetSeatKeys = plan.Seats
+                .Select(static seat => seat.SeatKey)
+                .ToHashSet(StringComparer.Ordinal);
             activityLogService.Write(LogEntryKind.Info, "Grab", $"当前执行策略：{GetReservationStrategyText(reservationStrategy)}。");
 
             while (!cancellationToken.IsCancellationRequested)
@@ -49,7 +57,12 @@ internal sealed class GrabSeatWorkflowRunner(
                 }
 
                 var reservationResult = await reservationAttemptStrategy.TryReserveAsync(
-                    new GrabReservationAttemptContext(cookie, plan, directReservationStartIndex, MarkRequestSent),
+                    new GrabReservationAttemptContext(
+                        cookie,
+                        plan,
+                        targetSeatKeys,
+                        directReservationStartIndex,
+                        MarkRequestSent),
                     cancellationToken);
                 directReservationStartIndex = reservationResult.NextSeatStartIndex;
                 if (reservationResult.LatestLayout is not null)
@@ -70,7 +83,7 @@ internal sealed class GrabSeatWorkflowRunner(
 
                 if (reservationResult.RateLimitTriggered)
                 {
-                    activityLogService.Write(LogEntryKind.Warning, "Grab", "直接预约触发速率限制，本轮提前结束，等待下一轮。");
+                    activityLogService.Write(LogEntryKind.Warning, "Grab", "预约请求触发速率限制，本轮提前结束，等待下一轮。");
                     var rateLimitDelay = GrabSeatStateMachine.GetDelayAfterRateLimit(plan.PollingStrategy);
                     await runtime.DelayAsync(rateLimitDelay, cancellationToken);
                     continue;
@@ -145,7 +158,9 @@ internal sealed class GrabSeatWorkflowRunner(
                     $"定时抢座等待中，目标启动时间 {targetStart:yyyy-MM-dd HH:mm:ss}，还剩 {remaining:hh\\:mm\\:ss}。");
             }
 
-            await runtime.DelayAsync(remaining < TimeSpan.FromSeconds(1) ? remaining : TimeSpan.FromSeconds(1), cancellationToken);
+            await runtime.DelayAsync(
+                GrabSeatStateMachine.ResolveScheduledWaitDelay(remaining),
+                cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
         }
     }
