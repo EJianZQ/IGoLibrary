@@ -41,7 +41,7 @@ public sealed class UpdateDialogService(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var dialog = new UpdateReleaseWindow(release, appVersionProvider.CurrentVersion.ToString());
+        var dialog = new UpdateReleaseWindow(release, appVersionProvider.CurrentVersion);
         if (appWindowService.MainWindow is { } owner)
         {
             return await dialog.ShowDialog<UpdateDialogResult>(owner);

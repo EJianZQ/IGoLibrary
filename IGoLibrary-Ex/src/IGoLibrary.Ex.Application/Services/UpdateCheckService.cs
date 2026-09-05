@@ -96,14 +96,14 @@ public sealed class UpdateCheckService(
                 "GitHub Release 列表没有变化");
         }
 
-        var latestRelease = SelectLatestRelease(
+        var latestCandidate = SelectLatestRelease(
             queryResult.Releases,
             currentVersion);
         logger.LogInformation(
             "更新检查已取得发布列表。发布数量={ReleaseCount}，找到候选版本={CandidateFound}。",
             queryResult.Releases.Count,
-            latestRelease is not null);
-        if (latestRelease is null)
+            latestCandidate is not null);
+        if (latestCandidate is null)
         {
             logger.LogInformation("更新检查完成：当前已是最新版本。");
             await SaveCheckStateAsync(
@@ -113,6 +113,9 @@ public sealed class UpdateCheckService(
                 cancellationToken);
             return UpdateCheckResult.NoUpdate("当前已是最新版本");
         }
+
+        var latestRelease = latestCandidate.Release;
+        LogAutomaticUpdatePolicy(latestCandidate, currentVersion);
 
         if (ReleaseVersion.TryParse(updateSettings.SkippedVersion, out var skippedVersion) &&
             latestRelease.Version <= skippedVersion)
@@ -137,9 +140,12 @@ public sealed class UpdateCheckService(
             etagVersion: null,
             cancellationToken);
         logger.LogInformation(
-            "发现可用更新。当前版本={CurrentVersion}，目标版本={TargetVersion}，包含已验证的 Windows 更新包={HasVerifiedWindowsPackage}。",
+            "发现可用更新。当前版本={CurrentVersion}，目标版本={TargetVersion}，自动更新策略={AutomaticUpdatePolicy}，最低自动更新版本={MinimumAutomaticUpdateVersion}，自动更新资格={AutomaticUpdateEligibility}，包含已验证的 Windows 更新包={HasVerifiedWindowsPackage}。",
             currentVersion,
             latestRelease.Version,
+            latestRelease.AutomaticUpdatePolicy.Kind,
+            latestRelease.AutomaticUpdatePolicy.MinimumVersion,
+            latestRelease.AutomaticUpdatePolicy.Evaluate(currentVersion),
             latestRelease.WindowsX64Package is not null);
         return UpdateCheckResult.UpdateAvailable(latestRelease);
     }
@@ -158,20 +164,20 @@ public sealed class UpdateCheckService(
         }, cancellationToken);
     }
 
-    private static ReleaseUpdateInfo? SelectLatestRelease(
+    private static ReleaseCandidate? SelectLatestRelease(
         IReadOnlyList<GitHubReleaseItem> releases,
         ReleaseVersion currentVersion)
     {
         return releases
             .Where(static release => !release.Draft && !release.Prerelease)
-            .Select(TryCreateReleaseInfo)
-            .OfType<ReleaseUpdateInfo>()
-            .Where(release => release.Version > currentVersion)
-            .OrderByDescending(static release => release.Version)
+            .Select(TryCreateReleaseCandidate)
+            .OfType<ReleaseCandidate>()
+            .Where(candidate => candidate.Release.Version > currentVersion)
+            .OrderByDescending(static candidate => candidate.Release.Version)
             .FirstOrDefault();
     }
 
-    private static ReleaseUpdateInfo? TryCreateReleaseInfo(GitHubReleaseItem release)
+    private static ReleaseCandidate? TryCreateReleaseCandidate(GitHubReleaseItem release)
     {
         if (release.Draft || release.Prerelease ||
             !ReleaseVersion.TryParse(release.TagName, out var version))
@@ -184,14 +190,53 @@ public sealed class UpdateCheckService(
             return null;
         }
 
-        return new ReleaseUpdateInfo(
+        var policyResult = ReleaseNoteUpdatePolicyParser.Parse(release.Body, version);
+        var releaseInfo = new ReleaseUpdateInfo(
             version,
             release.TagName,
             string.IsNullOrWhiteSpace(release.Name) ? release.TagName : release.Name.Trim(),
-            release.Body ?? string.Empty,
+            policyResult.DisplayBody,
             release.HtmlUrl,
             release.PublishedAt,
-            SelectWindowsX64Package(release, version));
+            SelectWindowsX64Package(release, version))
+        {
+            AutomaticUpdatePolicy = policyResult.Policy
+        };
+        return new ReleaseCandidate(releaseInfo, policyResult.Issue);
+    }
+
+    private void LogAutomaticUpdatePolicy(
+        ReleaseCandidate candidate,
+        ReleaseVersion currentVersion)
+    {
+        var release = candidate.Release;
+        var eligibility = release.AutomaticUpdatePolicy.Evaluate(currentVersion);
+        if (candidate.PolicyIssue != ReleaseNoteUpdatePolicyIssue.None)
+        {
+            logger.LogWarning(
+                "Release 自动更新兼容性标记无效，已禁止自动更新。当前版本={CurrentVersion}，目标版本={TargetVersion}，诊断={PolicyIssue}。",
+                currentVersion,
+                release.Version,
+                candidate.PolicyIssue);
+            return;
+        }
+
+        if (eligibility == AutomaticUpdateEligibility.CurrentVersionTooOld)
+        {
+            logger.LogWarning(
+                "当前版本低于 Release 允许自动更新的最低版本，已禁止自动更新。当前版本={CurrentVersion}，目标版本={TargetVersion}，最低自动更新版本={MinimumAutomaticUpdateVersion}。",
+                currentVersion,
+                release.Version,
+                release.AutomaticUpdatePolicy.MinimumVersion);
+            return;
+        }
+
+        logger.LogInformation(
+            "Release 自动更新兼容性策略校验通过。当前版本={CurrentVersion}，目标版本={TargetVersion}，策略={AutomaticUpdatePolicy}，最低自动更新版本={MinimumAutomaticUpdateVersion}。",
+            currentVersion,
+            release.Version,
+            release.AutomaticUpdatePolicy.Kind,
+            release.AutomaticUpdatePolicy.MinimumVersion);
     }
 
     private static bool IsProductRelease(GitHubReleaseItem release)
@@ -293,4 +338,8 @@ public sealed class UpdateCheckService(
             };
         }, cancellationToken);
     }
+
+    private sealed record ReleaseCandidate(
+        ReleaseUpdateInfo Release,
+        ReleaseNoteUpdatePolicyIssue PolicyIssue);
 }

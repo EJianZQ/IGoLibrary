@@ -1,6 +1,7 @@
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Application.Updates;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Tests;
@@ -446,18 +447,109 @@ public sealed class UpdateCheckServiceTests
         Assert.Null(result.Release?.WindowsX64Package);
     }
 
+    [Fact]
+    public async Task CheckAsync_CurrentVersionBeforeMinimum_KeepsReleaseAndPackageButBlocksAutomaticUpdate()
+    {
+        var release = Release("v1.0.6") with
+        {
+            Body =
+                "<!-- IGoLibrary-Ex-MinAutoUpdateVersion: 1.0.5 -->\n" +
+                "### 更新内容",
+            Assets = [WindowsAsset("1.0.6")]
+        };
+        var service = CreateService(
+            Parse("1.0.4"),
+            new FakeGitHubReleaseClient(release));
+
+        var result = await service.CheckAsync(UpdateCheckMode.Manual);
+
+        Assert.True(result.HasUpdate);
+        var update = Assert.IsType<ReleaseUpdateInfo>(result.Release);
+        Assert.NotNull(update.WindowsX64Package);
+        Assert.Equal("### 更新内容", update.Body);
+        Assert.Equal(Parse("1.0.5"), update.AutomaticUpdatePolicy.MinimumVersion);
+        Assert.Equal(
+            AutomaticUpdateEligibility.CurrentVersionTooOld,
+            update.AutomaticUpdatePolicy.Evaluate(Parse("1.0.4")));
+    }
+
+    [Fact]
+    public async Task CheckAsync_CurrentVersionAtMinimum_AllowsAutomaticUpdate()
+    {
+        var release = Release("v1.0.6") with
+        {
+            Body = "<!-- IGoLibrary-Ex-MinAutoUpdateVersion: 1.0.5 -->\nnotes",
+            Assets = [WindowsAsset("1.0.6")]
+        };
+        var service = CreateService(
+            Parse("1.0.5"),
+            new FakeGitHubReleaseClient(release));
+
+        var result = await service.CheckAsync(UpdateCheckMode.Manual);
+
+        Assert.Equal(
+            AutomaticUpdateEligibility.Supported,
+            result.Release?.AutomaticUpdatePolicy.Evaluate(Parse("1.0.5")));
+    }
+
+    [Fact]
+    public async Task CheckAsync_InvalidMarker_FailsClosedAndLogsDiagnosticWithoutReleaseBody()
+    {
+        const string sensitiveBody = "TOP-SECRET-RELEASE-BODY";
+        var release = Release("v1.0.6") with
+        {
+            Body =
+                "<!-- IGoLibrary-Ex-MinAutoUpdateVersion: v1.0.5 -->\n" +
+                sensitiveBody,
+            Assets = [WindowsAsset("1.0.6")]
+        };
+        var logger = new CapturingLogger<UpdateCheckService>();
+        var service = CreateService(
+            Parse("1.0.5"),
+            new FakeGitHubReleaseClient(release),
+            logger: logger);
+
+        var result = await service.CheckAsync(UpdateCheckMode.Manual);
+
+        Assert.True(result.HasUpdate);
+        Assert.NotNull(result.Release?.WindowsX64Package);
+        Assert.Same(AutomaticUpdatePolicy.Invalid, result.Release?.AutomaticUpdatePolicy);
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.Level == LogLevel.Warning &&
+                     entry.Message.Contains("InvalidMarkerSyntax", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            logger.Entries,
+            entry => entry.Message.Contains(sensitiveBody, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CheckAsync_WithoutMarker_RemainsUnrestricted()
+    {
+        var service = CreateService(
+            Parse("1.0.0"),
+            new FakeGitHubReleaseClient(Release("v1.0.1")));
+
+        var result = await service.CheckAsync(UpdateCheckMode.Manual);
+
+        Assert.Same(
+            AutomaticUpdatePolicy.Unrestricted,
+            result.Release?.AutomaticUpdatePolicy);
+    }
+
     private static UpdateCheckService CreateService(
         ReleaseVersion currentVersion,
         FakeGitHubReleaseClient releaseClient,
         FakeSettingsService? settingsService = null,
-        DateTimeOffset? now = null)
+        DateTimeOffset? now = null,
+        ILogger<UpdateCheckService>? logger = null)
     {
         return new UpdateCheckService(
             settingsService ?? new FakeSettingsService(AppSettings.Default),
             releaseClient,
             new FakeAppVersionProvider(currentVersion),
             new FixedTimeProvider(now ?? new DateTimeOffset(2026, 6, 9, 8, 0, 0, TimeSpan.Zero)),
-            NullLogger<UpdateCheckService>.Instance);
+            logger ?? NullLogger<UpdateCheckService>.Instance);
     }
 
     private static GitHubReleaseItem Release(
@@ -548,5 +640,24 @@ public sealed class UpdateCheckServiceTests
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add((logLevel, formatter(state, exception)));
+        }
     }
 }

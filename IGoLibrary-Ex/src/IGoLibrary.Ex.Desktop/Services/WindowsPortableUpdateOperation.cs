@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Updates;
 using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Desktop.Services;
@@ -67,7 +68,8 @@ internal sealed class WindowsPortableUpdateOperation(
         }
 
         var trackedProgress = new TrackingProgress(this, progress);
-        var currentVersion = appVersionProvider.CurrentVersionText;
+        var currentReleaseVersion = appVersionProvider.CurrentVersion;
+        var currentVersion = currentReleaseVersion.ToString();
         var targetVersion = release.Version.ToString();
         WindowsUpdateWorkspace? workspace = null;
         var preserveWorkspace = false;
@@ -76,6 +78,22 @@ internal sealed class WindowsPortableUpdateOperation(
 
         try
         {
+            var eligibility = release.AutomaticUpdatePolicy.Evaluate(currentReleaseVersion);
+            if (eligibility != AutomaticUpdateEligibility.Supported)
+            {
+                var message = AutomaticUpdateCompatibilityMessages.BuildBlockedMessage(
+                    release.AutomaticUpdatePolicy,
+                    currentReleaseVersion);
+                logger.LogWarning(
+                    "已拒绝不兼容的自动更新请求。当前版本={CurrentVersion}，目标版本={TargetVersion}，策略={AutomaticUpdatePolicy}，最低自动更新版本={MinimumAutomaticUpdateVersion}，自动更新资格={AutomaticUpdateEligibility}。",
+                    currentReleaseVersion,
+                    release.Version,
+                    release.AutomaticUpdatePolicy.Kind,
+                    release.AutomaticUpdatePolicy.MinimumVersion,
+                    eligibility);
+                return Blocked(message);
+            }
+
             if (!OperatingSystem.IsWindows() ||
                 RuntimeInformation.OSArchitecture != Architecture.X64)
             {
@@ -277,6 +295,11 @@ internal sealed class WindowsPortableUpdateOperation(
             message += $"。{suffix}";
         }
 
+        return new WindowsPortableUpdateResult(WindowsPortableUpdateOutcome.Blocked, message);
+    }
+
+    private static WindowsPortableUpdateResult Blocked(string message)
+    {
         return new WindowsPortableUpdateResult(WindowsPortableUpdateOutcome.Blocked, message);
     }
 

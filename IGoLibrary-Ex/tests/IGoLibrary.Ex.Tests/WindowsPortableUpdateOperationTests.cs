@@ -17,6 +17,52 @@ public sealed class WindowsPortableUpdateOperationTests : IDisposable
         "IGoLibrary-Ex-operation-tests",
         Guid.NewGuid().ToString("N"));
 
+    [Fact]
+    public async Task RunAsync_IncompatibleRelease_IsBlockedBeforeAnyUpdateSideEffect()
+    {
+        var release = new ReleaseUpdateInfo(
+            new ReleaseVersion(1, 0, 6),
+            "v1.0.6",
+            "IGoLibrary-Ex v1.0.6",
+            "notes",
+            new Uri("https://github.com/EJianZQ/IGoLibrary/releases/tag/v1.0.6"),
+            DateTimeOffset.UtcNow)
+        {
+            AutomaticUpdatePolicy = AutomaticUpdatePolicy.RequireMinimumVersion(
+                new ReleaseVersion(1, 0, 5))
+        };
+        var packagePreparation = new RecordingPackagePreparationService();
+        var handoff = new RecordingHandoffService();
+        var logger = new CapturingLogger<WindowsPortableUpdateOperation>();
+        using var operation = new WindowsPortableUpdateOperation(
+            release,
+            new ThrowingUpdateInstallGuard(),
+            new FakeAppVersionProvider(new ReleaseVersion(1, 0, 4)),
+            new AppWindowService(),
+            packagePreparation,
+            handoff,
+            new WindowsUpdateWorkspaceManager(
+                NullLogger<WindowsUpdateWorkspaceManager>.Instance,
+                Path.Combine(_root, "blocked-updates"),
+                TimeProvider.System),
+            logger);
+
+        var result = await operation.RunAsync(
+            new SynchronousProgress<WindowsUpdateProgress>(static _ => { }),
+            CancellationToken.None);
+
+        Assert.Equal(WindowsPortableUpdateOutcome.Blocked, result.Outcome);
+        Assert.Contains("v1.0.4", result.Message);
+        Assert.Equal(0, packagePreparation.ValidateCallCount);
+        Assert.Equal(0, packagePreparation.PrepareCallCount);
+        Assert.Equal(0, handoff.CallCount);
+        Assert.False(Directory.Exists(Path.Combine(_root, "blocked-updates")));
+        Assert.Contains(
+            logger.Entries,
+            entry => entry.Level == LogLevel.Warning &&
+                     entry.Message.Contains("CurrentVersionTooOld", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData(WindowsPortableUpdateOutcome.Canceled, true, false)]
     [InlineData(WindowsPortableUpdateOutcome.Failed, true, true)]
@@ -150,6 +196,55 @@ public sealed class WindowsPortableUpdateOperationTests : IDisposable
     private sealed class NoBlockingUpdateInstallGuard : IUpdateInstallGuard
     {
         public IReadOnlyList<string> GetBlockingTaskNames() => [];
+    }
+
+    private sealed class ThrowingUpdateInstallGuard : IUpdateInstallGuard
+    {
+        public IReadOnlyList<string> GetBlockingTaskNames()
+        {
+            throw new InvalidOperationException("不兼容请求不应检查运行任务");
+        }
+    }
+
+    private sealed class RecordingPackagePreparationService : IWindowsUpdatePackagePreparationService
+    {
+        public int ValidateCallCount { get; private set; }
+
+        public int PrepareCallCount { get; private set; }
+
+        public string ValidateInstallationDirectory(string currentVersion)
+        {
+            ValidateCallCount++;
+            throw new InvalidOperationException("不兼容请求不应验证安装目录");
+        }
+
+        public Task<PreparedWindowsUpdatePackage> PrepareAsync(
+            WindowsUpdateWorkspace workspace,
+            string validatedInstallationDirectory,
+            ReleaseAssetInfo asset,
+            string currentVersion,
+            string targetVersion,
+            ReleaseAssetDownloadPauseController transferController,
+            IProgress<WindowsUpdateProgress> progress,
+            CancellationToken cancellationToken)
+        {
+            PrepareCallCount++;
+            throw new InvalidOperationException("不兼容请求不应准备更新包");
+        }
+    }
+
+    private sealed class RecordingHandoffService : IWindowsUpdateHandoffService
+    {
+        public int CallCount { get; private set; }
+
+        public Task<WindowsUpdateHandoffResult> ExecuteAsync(
+            PreparedWindowsUpdatePackage package,
+            IProgress<WindowsUpdateProgress> progress,
+            CancellationToken cancellationToken)
+        {
+            CallCount++;
+            throw new InvalidOperationException("不兼容请求不应开始更新交接");
+        }
     }
 
     private sealed class TestPackagePreparationService(

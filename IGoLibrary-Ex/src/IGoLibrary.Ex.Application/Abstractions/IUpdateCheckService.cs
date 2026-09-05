@@ -65,7 +65,11 @@ public sealed record ReleaseUpdateInfo(
     string Body,
     Uri HtmlUrl,
     DateTimeOffset? PublishedAt,
-    ReleaseAssetInfo? WindowsX64Package = null);
+    ReleaseAssetInfo? WindowsX64Package = null)
+{
+    public AutomaticUpdatePolicy AutomaticUpdatePolicy { get; init; } =
+        AutomaticUpdatePolicy.Unrestricted;
+}
 
 public sealed record ReleaseAssetInfo(
     string Name,

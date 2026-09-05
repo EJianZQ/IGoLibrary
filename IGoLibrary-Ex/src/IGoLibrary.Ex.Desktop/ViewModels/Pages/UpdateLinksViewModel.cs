@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using IGoLibrary.Ex.Application.Abstractions;
+using IGoLibrary.Ex.Application.Updates;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
@@ -155,6 +156,19 @@ public sealed partial class UpdateLinksViewModel(
         if (result.HasUpdate && result.Release is { } release)
         {
             activityLogService.Write(LogEntryKind.Info, "Update", $"发现新版本：{release.TagName}");
+            var eligibility = release.AutomaticUpdatePolicy.Evaluate(
+                appVersionProvider.CurrentVersion);
+            if (eligibility != AutomaticUpdateEligibility.Supported)
+            {
+                var message = AutomaticUpdateCompatibilityMessages.BuildBlockedMessage(
+                    release.AutomaticUpdatePolicy,
+                    appVersionProvider.CurrentVersion);
+                activityLogService.Write(
+                    LogEntryKind.Warning,
+                    "Update",
+                    $"当前版本不支持自动更新（目标版本 {release.TagName}）：{message}");
+            }
+
             while (true)
             {
                 var dialogResult = await updateDialogService.ShowUpdateAsync(release);

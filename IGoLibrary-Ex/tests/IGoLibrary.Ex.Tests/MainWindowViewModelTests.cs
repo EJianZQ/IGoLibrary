@@ -2481,6 +2481,42 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task CheckForUpdatesAsync_IncompatibleRelease_LogsWarningAndOnlyOpensManualPageOnUserChoice()
+    {
+        var release = CreateReleaseUpdateInfo("v1.0.2") with
+        {
+            AutomaticUpdatePolicy = AutomaticUpdatePolicy.RequireMinimumVersion(
+                new ReleaseVersion(1, 0, 1))
+        };
+        var updateCheckService = new FakeUpdateCheckService();
+        updateCheckService.Results.Enqueue(UpdateCheckResult.UpdateAvailable(release));
+        var updateDialogService = new FakeUpdateDialogService
+        {
+            Result = UpdateDialogResult.OpenReleasePage
+        };
+        var installDialogService = new FakeWindowsUpdateProgressDialogService();
+        var externalLinkService = new FakeExternalLinkService();
+        var activityLogService = new ActivityLogService();
+        var viewModel = CreateViewModel(
+            updateCheckService: updateCheckService,
+            updateDialogService: updateDialogService,
+            externalLinkService: externalLinkService,
+            activityLogService: activityLogService,
+            windowsUpdateProgressDialogService: installDialogService);
+
+        await viewModel.CheckForUpdatesCommand.ExecuteAsync(null);
+
+        Assert.Equal(release.HtmlUrl, Assert.Single(externalLinkService.OpenedUris));
+        Assert.Empty(installDialogService.Releases);
+        var warning = Assert.Single(
+            activityLogService.Entries,
+            entry => entry.Kind == LogEntryKind.Warning && entry.Category == "Update");
+        Assert.Contains("当前版本不支持自动更新", warning.Message);
+        Assert.Contains("v1.0.1", warning.Message);
+        Assert.DoesNotContain(release.Body, warning.Message);
+    }
+
+    [Fact]
     public async Task CheckForUpdatesAsync_LogsInstallationFailure_WhenPackageManifestIsMissing()
     {
         var release = CreateReleaseUpdateInfo("v1.0.2");
