@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:IGoLibrary.Ex.Desktop.ViewModels"
+             xmlns:domain="using:IGoLibrary.Ex.Domain.Models"
+             xmlns:controls="using:IGoLibrary.Ex.Desktop.Controls"
+             x:Class="IGoLibrary.Ex.Desktop.Controls.GlobalLeakSeatBlacklistView"
+             KeyboardNavigation.TabNavigation="Cycle"
+             x:Name="BlacklistEditorRoot" x:DataType="vm:GlobalLeakSeatBlacklistEditorViewModel">
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" RowSpacing="14">
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+      <StackPanel Spacing="4">
+        <TextBlock Text="管理黑名单座位" FontSize="22" FontWeight="Bold" />
+        <TextBlock Text="{Binding SummaryText}" Classes="helper-text" />
+      </StackPanel>
+      <Button x:Name="CloseButton" Grid.Column="1" Content="关闭 (X)" Command="{Binding CancelCommand}"
+              IsEnabled="{Binding CanClose}" Classes="Secondary" />
+    </Grid>
+    <ComboBox Grid.Row="1" ItemsSource="{Binding Venues}" SelectedItem="{Binding SelectedVenue}"
+              IsEnabled="{Binding CanSwitchVenue}" HorizontalAlignment="Stretch">
+      <ComboBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:GlobalLeakBlacklistVenueViewModel">
+          <TextBlock Text="{Binding DisplayText}" />
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
+    <StackPanel Grid.Row="2" Spacing="8">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12">
+        <TextBox Text="{Binding Workspace.SeatFilterText}" Watermark="按座位号或标签过滤"
+                 IsEnabled="{Binding CanSwitchVenue}" />
+        <CheckBox Grid.Column="1" Content="隐藏被占座位" IsChecked="{Binding Workspace.ShowAvailableOnly}"
+                  IsEnabled="{Binding CanSwitchVenue}" />
+        <Button Grid.Column="2" Content="刷新 / 重试" Command="{Binding RefreshCommand}"
+                IsEnabled="{Binding CanRefresh}" Classes="Secondary" />
+        <Button Grid.Column="3" Content="清空当前场馆" Command="{Binding ClearCurrentVenueCommand}"
+                IsEnabled="{Binding CanEditSeats}" Classes="Secondary" />
+      </Grid>
+      <TextBlock Text="全域捡漏任务正在运行，请停止任务后再修改黑名单"
+                 IsVisible="{Binding IsTaskActive}" Classes="helper-text" />
+      <TextBlock Text="{Binding ErrorText}" IsVisible="{Binding HasError}" TextWrapping="Wrap"
+                 Foreground="{DynamicResource SemiWarningTextBrush}" />
+      <ProgressBar IsIndeterminate="True" Height="4" IsVisible="{Binding IsLoading}" />
+    </StackPanel>
+    <controls:SeatWorkspaceView Grid.Row="3" MinHeight="130"
+                                IsEnabled="{Binding DataContext.CanEditSeats, ElementName=BlacklistEditorRoot}" DataContext="{Binding Workspace}" />
+    <StackPanel Grid.Row="4" IsVisible="{Binding HasMissingSeats}" Spacing="6">
+      <TextBlock Text="以下黑名单座位暂不在当前布局中，记录仍会保留，可手动移除" Classes="helper-text" />
+      <ScrollViewer MaxHeight="80">
+        <ItemsControl ItemsSource="{Binding MissingSeats}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="domain:SeatReference">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                <TextBlock Text="{Binding SeatName}" ToolTip.Tip="{Binding SeatKey}" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="移除"
+                        Command="{Binding DataContext.RemoveMissingSeatCommand, ElementName=BlacklistEditorRoot}"
+                        IsEnabled="{Binding DataContext.CanEditSeats, ElementName=BlacklistEditorRoot}"
+                        CommandParameter="{Binding}" Classes="Secondary" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </StackPanel>
+    <Grid Grid.Row="5" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+      <TextBlock Text="勾选的座位将在全域捡漏时跳过，确认保存后生效"
+                 Classes="helper-text" TextWrapping="Wrap" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Content="确认保存" Command="{Binding SaveCommand}"
+              IsEnabled="{Binding CanSave}" Background="{DynamicResource AppAccentBrush}"
+              Foreground="{DynamicResource AppAccentForegroundBrush}" FontWeight="Bold" />
+    </Grid>
+  </Grid>
+</UserControl>

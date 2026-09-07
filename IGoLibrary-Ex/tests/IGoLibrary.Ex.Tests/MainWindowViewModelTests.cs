@@ -246,6 +246,7 @@ public sealed class MainWindowViewModelTests
             value => viewModel.IsGrabSeatSelectionOverlayOpen = value,
             value => viewModel.IsMobileControlDetailsOpen = value,
             value => viewModel.IsGlobalLeakLibraryPickerOpen = value,
+            value => viewModel.GlobalLeakPage.BlacklistEditor.IsOpen = value,
             value => viewModel.IsTomorrowSeatSelectionOverlayOpen = value,
             value => viewModel.IsVenuePickerOpen = value
         ];
@@ -3970,7 +3971,10 @@ public sealed class MainWindowViewModelTests
             windowSizePersistenceService: windowSizePersistenceService,
             windowsUpdateProgressDialogService: windowsUpdateProgressDialogService,
             mobileControlNetworkModeWorkflow: mobileControlNetworkModeWorkflow,
-            taskSleepPreventionService: taskSleepPreventionService);
+            taskSleepPreventionService: taskSleepPreventionService,
+            blacklistService: new GlobalLeakSeatBlacklistService(settingsService, globalLeakCoordinator,
+                new GlobalLeakConfigurationGate(), activityLogService,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<GlobalLeakSeatBlacklistService>.Instance));
     }
 
     private static ReleaseUpdateInfo CreateReleaseUpdateInfo(string tagName)

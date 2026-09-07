@@ -14,6 +14,31 @@ namespace IGoLibrary.Ex.Tests;
 public sealed class MobileControlTaskStartServiceTests
 {
     [Fact]
+    public async Task StartGlobalLeakAsync_OldHistoryUsesCurrentBlacklistThroughRealCoordinator()
+    {
+        using var fixture = new GlobalLeakBlacklistExecutionTests.Fixture();
+        var recordId = Guid.NewGuid().ToString("N");
+        var history = new FakeHistoryService
+        {
+            GlobalLeak = new GlobalLeakTaskLaunchRecord(recordId, DateTimeOffset.UtcNow,
+                [new(1, "历史场馆", "1层")], TimeSpan.FromSeconds(10))
+        };
+        await fixture.Blacklist.SaveAsync(new Dictionary<int, IReadOnlyList<SeatReference>>
+        { [1] = [new("a", "后来屏蔽的座位")] });
+        fixture.Api.OnGetLibraryLayoutAsync = (_, id, _) => Task.FromResult(GlobalLeakBlacklistExecutionTests.Layout(id,
+            new("a", "1", false, 0, 0), new("b", "2", false, 1, 0)));
+        string? reserved = null;
+        fixture.Api.OnReserveSeatAsync = (_, _, key, _) => { reserved = key; return Task.FromResult(true); };
+        var launcher = new TaskLaunchService(new FakeGrabSeatCoordinator(), fixture.Coordinator,
+            new FakeOccupySeatCoordinator(), history, fixture.Log,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<TaskLaunchService>.Instance);
+        var result = await CreateService(history, launcher).StartTaskAsync("globalLeak", recordId);
+        await fixture.Terminal.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(result.Success);
+        Assert.Equal("b", reserved);
+    }
+
+    [Fact]
     public async Task StartGrabAsync_ReplaysFrozenConfigurationImmediately()
     {
         var recordId = Guid.NewGuid().ToString("N");

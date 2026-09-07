@@ -48,6 +48,10 @@ public partial class MainWindowWorkflowViewModel
             nameof(GlobalLeakPage.IsGlobalLeakLibraryPickerOpen),
             targetPropertyNames);
         propertyBridge.Forward(
+            GlobalLeakPage.BlacklistEditor,
+            nameof(GlobalLeakSeatBlacklistEditorViewModel.IsOpen),
+            targetPropertyNames);
+        propertyBridge.Forward(
             TomorrowReservationPage,
             nameof(TomorrowReservationPage.IsTomorrowSeatSelectionOverlayOpen),
             targetPropertyNames);

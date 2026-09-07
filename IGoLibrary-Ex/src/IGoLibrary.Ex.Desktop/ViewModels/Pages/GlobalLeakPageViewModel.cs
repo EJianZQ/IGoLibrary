@@ -14,6 +14,8 @@ namespace IGoLibrary.Ex.Desktop.ViewModels;
 
 public sealed partial class GlobalLeakPageViewModel : ViewModelBase
 {
+    public GlobalLeakSeatBlacklistEditorViewModel BlacklistEditor { get; }
+
     private readonly IGlobalLeakCoordinator _globalLeakCoordinator;
     private readonly ITaskLaunchService _taskLaunchService;
     private readonly IVenueWorkflowService _venueWorkflowService;
@@ -50,9 +52,16 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
         INotificationService notificationService,
         IAppThemeService appThemeService,
         TimeProvider timeProvider,
-        GlobalLeakLibrarySelectionViewModel librarySelection)
+        GlobalLeakLibrarySelectionViewModel librarySelection,
+        GlobalLeakSeatBlacklistEditorViewModel blacklistEditor)
     {
         _globalLeakCoordinator = globalLeakCoordinator;
+        BlacklistEditor = blacklistEditor;
+        BlacklistEditor.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(BlacklistEditor.IsOpen) or nameof(BlacklistEditor.IsSaving))
+                OnPropertyChanged(nameof(CanEditGlobalLeakConfiguration));
+        };
         _taskLaunchService = taskLaunchService;
         _venueWorkflowService = venueWorkflowService;
         _settingsWorkflowService = settingsWorkflowService;
@@ -122,7 +131,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
 
     public bool HasNoDraftGlobalLeakLibraries => _librarySelection.HasNoDraftLibraries;
 
-    public bool CanEditGlobalLeakConfiguration => !IsGlobalLeakTaskActive && !IsGlobalLeakSelectionSaving;
+    public bool CanEditGlobalLeakConfiguration => !IsGlobalLeakTaskActive && !IsGlobalLeakSelectionSaving && !BlacklistEditor.IsOpen;
 
     public bool CanCancelGlobalLeakLibraryPicker => !IsGlobalLeakSelectionSaving;
 
@@ -194,6 +203,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
 
     public void ClearLibraries()
     {
+        BlacklistEditor.ResetSession();
         _librarySelection.ClearLibraries();
     }
 
@@ -260,6 +270,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
 
     partial void OnIsGlobalLeakTaskActiveChanged(bool value)
     {
+        BlacklistEditor.IsTaskActive = value;
         OnPropertyChanged(nameof(CanEditGlobalLeakConfiguration));
     }
 
@@ -276,6 +287,25 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
         {
             GlobalLeakScanIntervalSeconds = normalized;
         }
+    }
+
+    [RelayCommand]
+    private async Task ManageBlacklistAsync()
+    {
+        if (!CanEditGlobalLeakConfiguration || IsGlobalLeakLibraryPickerOpen) return;
+        var libraries = _librarySelection.GetSelectedSnapshot();
+        if (libraries.Length == 0)
+        {
+            _activityLogService.Write(LogEntryKind.Info, "GlobalLeak", "未打开黑名单编辑器：尚未选择扫描场馆。");
+            await _notificationService.ShowWarningAsync("未选择场馆", "请先选择至少一个场馆");
+            return;
+        }
+        if (_isAuthorized?.Invoke() != true)
+        {
+            await _notificationService.ShowWarningAsync("未登录", "请先授权后再管理黑名单座位");
+            return;
+        }
+        await BlacklistEditor.OpenAsync(libraries);
     }
 
     [RelayCommand]
@@ -480,7 +510,7 @@ public sealed partial class GlobalLeakPageViewModel : ViewModelBase
     [RelayCommand]
     private async Task StartGlobalLeakAsync()
     {
-        if (IsGlobalLeakTaskActive)
+        if (!CanEditGlobalLeakConfiguration || IsGlobalLeakLibraryPickerOpen)
         {
             return;
         }

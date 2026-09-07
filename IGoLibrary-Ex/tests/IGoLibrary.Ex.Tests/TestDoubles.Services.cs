@@ -989,6 +989,8 @@ internal sealed class FakeSeatLabelService : ISeatLabelService
 
     public int DeleteCalls { get; private set; }
 
+    public Exception? GetException { get; set; }
+
     public Exception? SetException { get; set; }
 
     public Exception? DeleteException { get; set; }
@@ -997,6 +999,7 @@ internal sealed class FakeSeatLabelService : ISeatLabelService
         int libraryId,
         CancellationToken cancellationToken = default)
     {
+        if (GetException is not null) throw GetException;
         return Task.FromResult(
             LabelsByLibraryId.TryGetValue(libraryId, out var labels)
                 ? labels

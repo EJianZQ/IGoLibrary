@@ -1,3 +1,6 @@
+using System.Collections.Frozen;
+using IGoLibrary.Ex.Application.Configuration;
+using Microsoft.Extensions.Logging;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Application.State;
 using IGoLibrary.Ex.Domain.Enums;
@@ -10,7 +13,9 @@ internal sealed class GlobalLeakWorkflowRunner(
     ICoordinatorEventPublisher coordinatorEventPublisher,
     IActivityLogService activityLogService,
     ISessionState sessionState,
-    ICoordinatorRuntime runtime)
+    ICoordinatorRuntime runtime,
+    ISettingsService settingsService,
+    ILogger<GlobalLeakWorkflowRunner> logger)
 {
     public async Task RunAsync(
         GlobalLeakPlan plan,
@@ -35,6 +40,15 @@ internal sealed class GlobalLeakWorkflowRunner(
                 throw new InvalidOperationException("请至少选择一个扫描场馆");
             }
 
+            var settings = await settingsService.LoadAsync(cancellationToken);
+            var libraryIds = plan.Libraries.Select(static library => library.LibraryId).ToHashSet();
+            var blacklist = GlobalLeakSeatBlacklistSettings.Normalize(settings.Tasks.GlobalLeak.BlacklistedSeats)
+                .Where(seat => libraryIds.Contains(seat.LibraryId))
+                .GroupBy(static seat => seat.LibraryId)
+                .ToFrozenDictionary(static group => group.Key,
+                    static group => group.Select(static seat => seat.SeatKey).ToFrozenSet(StringComparer.Ordinal));
+            activityLogService.Write(LogEntryKind.Info, "GlobalLeak",
+                $"本次任务已加载 {blacklist.Values.Sum(static seats => seats.Count)} 个黑名单座位。");
             var scanInterval = GlobalLeakStateMachine.NormalizeScanInterval(plan.ScanInterval);
             context.SetRunning("全域捡漏任务已启动");
             activityLogService.Write(LogEntryKind.Info, "GlobalLeak", $"开始扫描 {plan.Libraries.Count} 个场馆，扫描间隔 {scanInterval.TotalSeconds:0} 秒。");
@@ -53,10 +67,19 @@ internal sealed class GlobalLeakWorkflowRunner(
                         cookie,
                         target.LibraryId,
                         cancellationToken);
-                    var availableSeats = GlobalLeakStateMachine.GetAvailableSeats(layout);
+                    blacklist.TryGetValue(target.LibraryId, out var excludedKeys);
+                    var availableSeats = GlobalLeakStateMachine.GetAvailableSeats(layout, excludedKeys);
+                    var originalAvailableCount = layout.Seats.Count(static seat => seat.IsAvailable);
+                    var excludedCount = originalAvailableCount - availableSeats.Count;
+                    logger.LogInformation(new EventId(3103, "GlobalLeakBlacklistFiltered"),
+                        "全域捡漏座位过滤完成。轮次={Round}，场馆标识={LibraryId}，空座数量={AvailableCount}，排除数量={ExcludedCount}，候选数量={CandidateCount}。",
+                        cycle, target.LibraryId, originalAvailableCount, excludedCount, availableSeats.Count);
+                    if (excludedCount > 0)
+                        activityLogService.Write(LogEntryKind.Info, "GlobalLeak",
+                            $"{target.LibraryName} 发现 {originalAvailableCount} 个空座，黑名单排除 {excludedCount} 个，剩余 {availableSeats.Count} 个可尝试座位。");
                     if (availableSeats.Count == 0)
                     {
-                        activityLogService.Write(LogEntryKind.Info, "GlobalLeak", $"{target.LibraryName} 暂无空座。");
+                        activityLogService.Write(LogEntryKind.Info, "GlobalLeak", $"{target.LibraryName} {(excludedCount > 0 ? "空座均已列入黑名单，继续扫描" : "暂无空座")}。");
                         continue;
                     }
 

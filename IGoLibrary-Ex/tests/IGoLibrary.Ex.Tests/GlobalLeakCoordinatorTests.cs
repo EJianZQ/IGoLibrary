@@ -268,9 +268,11 @@ public sealed class GlobalLeakCoordinatorTests
             eventPublisher,
             activityLogService,
             runtimeState,
-            runtime);
+            runtime,
+            new FakeSettingsService(IGoLibrary.Ex.Application.Configuration.AppSettings.Default),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<GlobalLeakWorkflowRunner>.Instance);
 
-        return new GlobalLeakCoordinator(runner, runtime);
+        return new GlobalLeakCoordinator(runner, runtime, new GlobalLeakConfigurationGate());
     }
 
     private static GlobalLeakPlan CreatePlan(TimeSpan scanInterval)

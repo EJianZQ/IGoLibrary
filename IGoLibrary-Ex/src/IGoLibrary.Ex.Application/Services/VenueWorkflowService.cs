@@ -16,6 +16,12 @@ public sealed class VenueWorkflowService(
     private readonly ILogger<VenueWorkflowService> _logger =
         logger ?? NullLogger<VenueWorkflowService>.Instance;
 
+    public Task<LibraryLayout> LoadSeatLayoutAsync(int libraryId, CancellationToken cancellationToken = default)
+    {
+        var session = sessionService.CurrentSession ?? throw new InvalidOperationException("当前未登录");
+        return apiClient.GetLibraryLayoutAsync(session.Cookie, libraryId, cancellationToken);
+    }
+
     public async Task<VenueLibraryLoadResult> LoadLibrariesAsync(
         bool restorePreferredSelection,
         int? preferredLibraryId = null,

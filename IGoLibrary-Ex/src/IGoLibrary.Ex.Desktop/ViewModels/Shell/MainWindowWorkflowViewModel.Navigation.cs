@@ -40,6 +40,7 @@ public partial class MainWindowWorkflowViewModel
         IsGrabSeatSelectionOverlayOpen ||
         IsMobileControlDetailsOpen ||
         IsGlobalLeakLibraryPickerOpen ||
+        GlobalLeakPage.BlacklistEditor.IsOpen ||
         IsTomorrowSeatSelectionOverlayOpen ||
         IsVenuePickerOpen;
 

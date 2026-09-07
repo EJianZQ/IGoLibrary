@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:IGoLibrary.Ex.Desktop.ViewModels"
+             x:Class="IGoLibrary.Ex.Desktop.Controls.SeatWorkspaceView"
+             x:DataType="vm:SeatWorkspaceViewModel">
+              <Border
+                      Background="{DynamicResource SemiColorFill0}"
+                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="18"
+                      Padding="16">
+                <Grid>
+                  <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                VerticalScrollBarVisibility="Auto"
+                                IsVisible="{Binding HasSeatLayout}">
+                    <ItemsControl ItemsSource="{Binding VisibleSeats}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                  </ScrollViewer>
+
+                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
+                          CornerRadius="14"
+                          Padding="24"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          IsVisible="{Binding HasNoSeatLayout}">
+                    <TextBlock Text="当前场馆暂无座位布局，请刷新重试"
+                               Classes="helper-text"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center" />
+                  </Border>
+
+                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
+                          CornerRadius="14"
+                          Padding="24"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          IsVisible="{Binding ShowSeatFilterEmptyState}">
+                    <TextBlock Text="当前筛选条件下没有可显示的座位"
+                               Classes="helper-text"
+                               HorizontalAlignment="Center"
+                               TextAlignment="Center" />
+                  </Border>
+
+                  <Border Background="{DynamicResource AppOverlaySurfaceSoftBrush}"
+                          CornerRadius="16"
+                          IsVisible="{Binding IsApplyingSeatFilter}">
+                    <StackPanel Width="220"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="10">
+                      <ProgressBar IsIndeterminate="True"
+                                   Height="4"
+                                   Foreground="{DynamicResource SemiAccentBrush}" />
+                      <TextBlock Text="正在应用筛选并刷新座位工作区..."
+                                 Classes="helper-text"
+                                 HorizontalAlignment="Center"
+                                 TextAlignment="Center" />
+                    </StackPanel>
+                  </Border>
+                </Grid>
+              </Border>
+
+</UserControl>

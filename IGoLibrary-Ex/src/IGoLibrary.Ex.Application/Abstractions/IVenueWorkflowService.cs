@@ -4,6 +4,8 @@ namespace IGoLibrary.Ex.Application.Abstractions;
 
 public interface IVenueWorkflowService
 {
+    Task<LibraryLayout> LoadSeatLayoutAsync(int libraryId, CancellationToken cancellationToken = default);
+
     Task<VenueLibraryLoadResult> LoadLibrariesAsync(
         bool restorePreferredSelection,
         int? preferredLibraryId = null,

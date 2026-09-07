@@ -100,6 +100,13 @@ public sealed class DataBackupServiceIntegrationTests : IDisposable
 
         await using var restored = new SqliteConnection($"Data Source={restoredDatabase};Mode=ReadOnly");
         await restored.OpenAsync();
+        using (var settingsCommand = restored.CreateCommand())
+        {
+            settingsCommand.CommandText = "SELECT Value FROM Settings WHERE Key='app-settings'";
+            using var settingsDocument = JsonDocument.Parse((string)(await settingsCommand.ExecuteScalarAsync())!);
+            var restoredBlacklist = settingsDocument.RootElement.GetProperty("tasks").GetProperty("globalLeak").GetProperty("blacklistedSeats");
+            Assert.Equal("A-01", restoredBlacklist[0].GetProperty("seatKey").GetString());
+        }
         foreach (var table in new[]
                  {
                      "Settings", "Favorites", "SeatLabels", "ProtocolOverrides", "MobileTaskLaunchHistory"
@@ -195,7 +202,7 @@ public sealed class DataBackupServiceIntegrationTests : IDisposable
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
-            INSERT INTO Settings(Key, Value) VALUES('app-settings', '{}');
+            INSERT INTO Settings(Key, Value) VALUES('app-settings', '{"tasks":{"globalLeak":{"blacklistedSeats":[{"libraryId":1,"seatKey":"A-01","seatName":"A01"}]}}}');
             INSERT INTO Favorites(LibraryId, SeatKey, SeatName) VALUES(1, 'A-01', 'A01');
             INSERT INTO SeatLabels(LibraryId, SeatKey, SeatName, LabelText) VALUES(1, 'A-01', 'A01', '窗边');
             INSERT INTO ProtocolOverrides(Key, Value) VALUES('protocol-overrides', '{"query":"value"}');

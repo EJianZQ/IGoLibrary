@@ -97,6 +97,15 @@ public partial class MainWindowWorkflowViewModel
 
     public IBrush GlobalLeakDashboardStatusBrush => GlobalLeakPage.GlobalLeakDashboardStatusBrush;
 
+    public IAsyncRelayCommand ManageGlobalLeakBlacklistCommand
+    {
+        get
+        {
+            EnsureGlobalLeakPageConfigured();
+            return GlobalLeakPage.ManageBlacklistCommand;
+        }
+    }
+
     public IAsyncRelayCommand OpenGlobalLeakLibraryPickerCommand
     {
         get

@@ -40,7 +40,8 @@ internal static class MainWindowViewModelTestHarness
         IMainWindowSizePersistenceService? windowSizePersistenceService = null,
         IWindowsUpdateProgressDialogService? windowsUpdateProgressDialogService = null,
         IMobileControlNetworkModeWorkflow? mobileControlNetworkModeWorkflow = null,
-        ITaskSleepPreventionService? taskSleepPreventionService = null)
+        ITaskSleepPreventionService? taskSleepPreventionService = null,
+        IGlobalLeakSeatBlacklistService? blacklistService = null)
     {
         mobileControlService ??= new FakeMobileControlService();
         remoteCheckInWorkflowService ??= new FakeRemoteCheckInWorkflowService();
@@ -105,7 +106,13 @@ internal static class MainWindowViewModelTestHarness
                 notificationService,
                 appThemeService,
                 timeProvider,
-                new GlobalLeakLibrarySelectionViewModel()),
+                new GlobalLeakLibrarySelectionViewModel(),
+                new GlobalLeakSeatBlacklistEditorViewModel(
+                    blacklistService ?? new GlobalLeakSeatBlacklistService(new FakeSettingsService(IGoLibrary.Ex.Application.Configuration.AppSettings.Default),
+                        globalLeakCoordinator, new GlobalLeakConfigurationGate(), activityLogService,
+                        Microsoft.Extensions.Logging.Abstractions.NullLogger<GlobalLeakSeatBlacklistService>.Instance),
+                    venueWorkflowService, new FakeSeatLabelService(), activityLogService, notificationService,
+                    Microsoft.Extensions.Logging.Abstractions.NullLogger<GlobalLeakSeatBlacklistEditorViewModel>.Instance)),
             new OccupyPageViewModel(
                 occupySeatCoordinator,
                 taskLaunchService,

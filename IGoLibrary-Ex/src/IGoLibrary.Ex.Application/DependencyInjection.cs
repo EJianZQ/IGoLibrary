@@ -41,6 +41,8 @@ public static class DependencyInjection
         services.AddSingleton<GrabReservationStrategySelector>();
         services.AddSingleton<IOccupyReReservationExecutor, OccupyReReservationExecutor>();
         services.AddSingleton<GrabSeatWorkflowRunner>();
+        services.AddSingleton<GlobalLeakConfigurationGate>();
+        services.AddSingleton<IGlobalLeakSeatBlacklistService, GlobalLeakSeatBlacklistService>();
         services.AddSingleton<GlobalLeakWorkflowRunner>();
         services.AddSingleton<OccupySeatWorkflowRunner>();
         services.AddSingleton<TomorrowReservationWorkflowRunner>();

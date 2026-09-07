@@ -26,10 +26,10 @@ internal static class GlobalLeakStateMachine
             : scanInterval;
     }
 
-    internal static IReadOnlyList<SeatSnapshot> GetAvailableSeats(LibraryLayout layout)
+    internal static IReadOnlyList<SeatSnapshot> GetAvailableSeats(LibraryLayout layout, IReadOnlySet<string>? blacklistedSeatKeys = null)
     {
         return layout.Seats
-            .Where(static seat => seat.IsAvailable)
+            .Where(seat => seat.IsAvailable && blacklistedSeatKeys?.Contains(seat.SeatKey) != true)
             .ToArray();
     }
 

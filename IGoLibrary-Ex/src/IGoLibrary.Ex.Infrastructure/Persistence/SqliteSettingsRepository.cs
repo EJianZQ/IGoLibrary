@@ -37,7 +37,10 @@ public sealed class SqliteSettingsRepository(
 
                 var settings = JsonSerializer.Deserialize<AppSettings>(migratedJson, AppJson.Default)
                                ?? appSettingsDefaults.CreateDefault();
-                return Normalize(settings);
+                var normalized = Normalize(settings);
+                var discarded = (settings.Tasks?.GlobalLeak?.BlacklistedSeats?.Count ?? 0) - normalized.Tasks.GlobalLeak.BlacklistedSeats.Count;
+                if (discarded > 0) logger?.LogWarning("全域捡漏黑名单规范化已移除无效或重复记录。移除数量={DiscardedCount}。", discarded);
+                return normalized;
             }
             catch (Exception ex) when (ex is JsonException or NotSupportedException)
             {
@@ -290,6 +293,16 @@ public sealed class SqliteSettingsRepository(
         writer.WriteEndObject();
         writer.WritePropertyName("globalLeak");
         writer.WriteStartObject();
+        writer.WritePropertyName("blacklistedSeats");
+        if (globalLeak.ValueKind == JsonValueKind.Object && globalLeak.TryGetProperty("blacklistedSeats", out var blacklistedSeats))
+        {
+            blacklistedSeats.WriteTo(writer);
+        }
+        else
+        {
+            writer.WriteStartArray();
+            writer.WriteEndArray();
+        }
         writer.WritePropertyName("selectedLibraries");
         var selectedLibraries = ReadArray(globalLeak, "selectedLibraries");
         if (selectedLibraries.ValueKind == JsonValueKind.Array)
@@ -524,7 +537,8 @@ public sealed class SqliteSettingsRepository(
                 },
                 GlobalLeak = globalLeak with
                 {
-                    SelectedLibraries = NormalizeGlobalLeakSelectedLibraries(globalLeak.SelectedLibraries)
+                    SelectedLibraries = NormalizeGlobalLeakSelectedLibraries(globalLeak.SelectedLibraries),
+                    BlacklistedSeats = GlobalLeakSeatBlacklistSettings.Normalize(globalLeak.BlacklistedSeats)
                 }
             },
             Venue = settings.Venue ?? VenueSelectionSettings.Default,

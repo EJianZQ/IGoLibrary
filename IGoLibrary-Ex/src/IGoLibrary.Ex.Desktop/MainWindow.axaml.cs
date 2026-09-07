@@ -115,6 +115,11 @@ public partial class MainWindow : Window
         Opened += OnOpened;
         Activated += OnActivated;
         Closing += OnClosing;
+        Closed += (_, _) =>
+        {
+            if (DataContext is MainWindowViewModel viewModel)
+                viewModel.GlobalLeakPage.BlacklistEditor.ResetSession();
+        };
     }
 
     private void OnOpened(object? sender, EventArgs e)
@@ -377,6 +382,9 @@ public partial class MainWindow : Window
             return this.FindControl<Border>("MobileControlDetailsModal");
         }
 
+        if (viewModel.GlobalLeakPage.BlacklistEditor.IsOpen)
+            return this.FindControl<Border>("GlobalLeakBlacklistModal");
+
         if (viewModel.IsGlobalLeakLibraryPickerOpen)
         {
             return this.FindControl<Border>("GlobalLeakLibraryPickerModal");
@@ -457,6 +465,13 @@ public partial class MainWindow : Window
 
         _lastModalAttentionSoundTimestamp = now;
         _ = _alertSoundService.PlaySystemPromptAsync();
+    }
+
+    private void OnBlacklistOverlayPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        e.Handled = true;
+        if (DataContext is MainWindowViewModel viewModel)
+            viewModel.GlobalLeakPage.BlacklistEditor.CancelCommand.Execute(null);
     }
 
     private void OnGrabSeatOverlayPointerPressed(object? sender, PointerPressedEventArgs e)

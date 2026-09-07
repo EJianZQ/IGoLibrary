@@ -1631,8 +1631,13 @@
                   </Grid>
                 </StackPanel>
 
-                <Grid ColumnDefinitions="220">
-                  <StackPanel Spacing="0">
+                <Grid ColumnDefinitions="Auto,220" ColumnSpacing="14">
+                  <Button x:Name="ManageGlobalLeakBlacklistButton"
+                          Content="管理黑名单座位"
+                          Command="{Binding ManageGlobalLeakBlacklistCommand}"
+                          IsEnabled="{Binding CanEditGlobalLeakConfiguration}"
+                          Classes="Secondary" VerticalAlignment="Bottom" />
+                  <StackPanel Grid.Column="1" Spacing="0">
                     <TextBlock Text="扫描间隔"
                                Classes="field-label" />
                     <Grid ColumnDefinitions="*,Auto"
@@ -4492,67 +4497,7 @@
                 </Button>
               </Grid>
 
-              <Border Grid.Row="2"
-                      Background="{DynamicResource SemiColorFill0}"
-                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
-                      BorderThickness="1"
-                      CornerRadius="18"
-                      Padding="16">
-                <Grid>
-                  <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                                VerticalScrollBarVisibility="Auto"
-                                IsVisible="{Binding HasSeatLayout}">
-                    <ItemsControl ItemsSource="{Binding VisibleSeats}">
-                      <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                          <WrapPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                      </ItemsControl.ItemsPanel>
-                    </ItemsControl>
-                  </ScrollViewer>
-
-                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
-                          CornerRadius="14"
-                          Padding="24"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          IsVisible="{Binding HasNoSeatLayout}">
-                    <TextBlock Text="当前场馆暂无可编辑的座位布局，请先刷新或重新绑定场馆"
-                               Classes="helper-text"
-                               HorizontalAlignment="Center"
-                               TextAlignment="Center" />
-                  </Border>
-
-                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
-                          CornerRadius="14"
-                          Padding="24"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          IsVisible="{Binding ShowSeatFilterEmptyState}">
-                    <TextBlock Text="当前筛选条件下没有可显示的座位"
-                               Classes="helper-text"
-                               HorizontalAlignment="Center"
-                               TextAlignment="Center" />
-                  </Border>
-
-                  <Border Background="{DynamicResource AppOverlaySurfaceSoftBrush}"
-                          CornerRadius="16"
-                          IsVisible="{Binding IsApplyingSeatFilter}">
-                    <StackPanel Width="220"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Spacing="10">
-                      <ProgressBar IsIndeterminate="True"
-                                   Height="4"
-                                   Foreground="{DynamicResource SemiAccentBrush}" />
-                      <TextBlock Text="正在应用筛选并刷新座位工作区..."
-                                 Classes="helper-text"
-                                 HorizontalAlignment="Center"
-                                 TextAlignment="Center" />
-                    </StackPanel>
-                  </Border>
-                </Grid>
-              </Border>
+              <controls:SeatWorkspaceView Grid.Row="2" DataContext="{Binding MultiSeatSelection.Workspace}" />
 
               <Grid Grid.Row="3"
                     ColumnDefinitions="*,Auto"
@@ -4569,6 +4514,20 @@
                         HorizontalContentAlignment="Center" />
               </Grid>
             </Grid>
+          </Border>
+        </Grid>
+      </Border>
+
+      <Border Grid.Row="1" ZIndex="30"
+              IsVisible="{Binding GlobalLeakPage.BlacklistEditor.IsOpen}"
+              Background="{DynamicResource AppModalOverlayBrush}"
+              PointerPressed="OnBlacklistOverlayPointerPressed">
+        <Grid Margin="28,16,28,28">
+          <Border x:Name="GlobalLeakBlacklistModal" Classes="semi-card Shadow"
+                  MaxWidth="1180" MaxHeight="760" Padding="24"
+                  HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                  PointerPressed="OnGrabSeatModalPointerPressed">
+            <controls:GlobalLeakSeatBlacklistView DataContext="{Binding GlobalLeakPage.BlacklistEditor}" />
           </Border>
         </Grid>
       </Border>

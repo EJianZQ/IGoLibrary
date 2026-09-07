@@ -11,37 +11,50 @@ using IGoLibrary.Ex.Domain.Models;
 
 namespace IGoLibrary.Ex.Desktop.ViewModels;
 
-public sealed partial class MultiSeatSelectionViewModel(
-    IVenueWorkflowService venueWorkflowService,
-    IActivityLogService activityLogService,
-    INotificationService notificationService,
-    ISeatLabelDialogService seatLabelDialogService) : ViewModelBase
+public sealed partial class MultiSeatSelectionViewModel : ViewModelBase
 {
-    private readonly ObservableCollection<SeatItemViewModel> _allSeats = [];
-    private readonly object _filterGate = new();
+    private readonly IVenueWorkflowService venueWorkflowService;
+    private readonly IActivityLogService activityLogService;
+    private readonly INotificationService notificationService;
+    private readonly ISeatLabelDialogService seatLabelDialogService;
+    public SeatWorkspaceViewModel Workspace { get; }
+    private ObservableCollection<SeatItemViewModel> _allSeats => Workspace.Seats;
+
+    public MultiSeatSelectionViewModel(IVenueWorkflowService venueWorkflowService,
+        IActivityLogService activityLogService, INotificationService notificationService,
+        ISeatLabelDialogService seatLabelDialogService)
+    {
+        this.venueWorkflowService = venueWorkflowService;
+        this.activityLogService = activityLogService;
+        this.notificationService = notificationService;
+        this.seatLabelDialogService = seatLabelDialogService;
+        Workspace = new SeatWorkspaceViewModel(activityLogService);
+        Workspace.PropertyChanged += (_, e) =>
+        {
+            OnPropertyChanged(e.PropertyName);
+            if (e.PropertyName == nameof(VisibleSeatResultCount))
+            {
+                OnPropertyChanged(nameof(HasVisibleSeatResults));
+                OnPropertyChanged(nameof(HasNoVisibleSeatResults));
+            }
+        };
+    }
+
     private readonly HashSet<string> _committedSelectedSeatKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _draftSelectedSeatKeys = new(StringComparer.Ordinal);
-    private CancellationTokenSource? _filteringCts;
     private bool _isSynchronizingSeatSelection;
     private Func<LibrarySummary?>? _selectedLibrary;
     private Func<bool>? _canEditGrabConfiguration;
     private Func<bool>? _isGrabSeatSelectionOverlayOpen;
 
-    public ObservableCollection<SeatItemViewModel> VisibleSeats { get; } = [];
+    public ObservableCollection<SeatItemViewModel> VisibleSeats => Workspace.VisibleSeats;
 
     public ObservableCollection<SeatReference> SelectedSeats { get; } = [];
 
-    [ObservableProperty]
-    private string seatFilterText = string.Empty;
-
-    [ObservableProperty]
-    private bool showAvailableOnly;
-
-    [ObservableProperty]
-    private bool isApplyingSeatFilter;
-
-    [ObservableProperty]
-    private int visibleSeatResultCount;
+    public string SeatFilterText { get => Workspace.SeatFilterText; set => Workspace.SeatFilterText = value; }
+    public bool ShowAvailableOnly { get => Workspace.ShowAvailableOnly; set => Workspace.ShowAvailableOnly = value; }
+    public bool IsApplyingSeatFilter { get => Workspace.IsApplyingSeatFilter; set => Workspace.IsApplyingSeatFilter = value; }
+    public int VisibleSeatResultCount { get => Workspace.VisibleSeatResultCount; set => Workspace.VisibleSeatResultCount = value; }
 
     public int SeatCount => _allSeats.Count;
 
@@ -141,7 +154,6 @@ public sealed partial class MultiSeatSelectionViewModel(
         }
 
         _allSeats.Clear();
-        VisibleSeats.Clear();
         _isSynchronizingSeatSelection = true;
         foreach (var seat in layout.Seats)
         {
@@ -154,7 +166,6 @@ public sealed partial class MultiSeatSelectionViewModel(
             item.PropertyChanged += OnSeatItemPropertyChanged;
             item.IsSelected = selectedKeysToRestore.Contains(item.SeatKey, StringComparer.Ordinal);
             _allSeats.Add(item);
-            VisibleSeats.Add(item);
         }
         _isSynchronizingSeatSelection = false;
 
@@ -188,10 +199,9 @@ public sealed partial class MultiSeatSelectionViewModel(
         }
 
         _allSeats.Clear();
-        VisibleSeats.Clear();
         _committedSelectedSeatKeys.Clear();
         _draftSelectedSeatKeys.Clear();
-        VisibleSeatResultCount = 0;
+        Workspace.Clear();
         RefreshSelectedSeatsPresentation();
         UpdateDraftSelectionPresentation();
         OnPropertyChanged(nameof(SeatCount));
@@ -228,31 +238,7 @@ public sealed partial class MultiSeatSelectionViewModel(
         }
     }
 
-    public void CancelFiltering()
-    {
-        lock (_filterGate)
-        {
-            if (_filteringCts is null)
-            {
-                return;
-            }
-
-            _filteringCts.Cancel();
-            _filteringCts.Dispose();
-            _filteringCts = null;
-        }
-    }
-
-    partial void OnVisibleSeatResultCountChanged(int value)
-    {
-        OnPropertyChanged(nameof(HasVisibleSeatResults));
-        OnPropertyChanged(nameof(HasNoVisibleSeatResults));
-        OnPropertyChanged(nameof(ShowSeatFilterEmptyState));
-    }
-
-    partial void OnSeatFilterTextChanged(string value) => _ = ApplySeatFilterAsync();
-
-    partial void OnShowAvailableOnlyChanged(bool value) => _ = ApplySeatFilterAsync();
+    public void CancelFiltering() => Workspace.CancelFiltering();
 
     [RelayCommand]
     private void RemoveSelectedSeat(SeatReference? seat)
@@ -412,92 +398,7 @@ public sealed partial class MultiSeatSelectionViewModel(
         }
     }
 
-    private async Task ApplySeatFilterAsync()
-    {
-        CancellationTokenSource cts;
-        CancellationTokenSource? previousCts;
-        lock (_filterGate)
-        {
-            previousCts = _filteringCts;
-            _filteringCts = new CancellationTokenSource();
-            cts = _filteringCts;
-        }
-
-        previousCts?.Cancel();
-        previousCts?.Dispose();
-
-        var filterText = SeatFilterText;
-        var showAvailableOnly = ShowAvailableOnly;
-        var snapshot = _allSeats
-            .Select(seat => new SeatFilterSnapshot(seat, seat.SeatName, seat.LabelText, seat.IsOccupied))
-            .ToArray();
-
-        try
-        {
-            IsApplyingSeatFilter = true;
-            await Task.Yield();
-
-            var filtered = await Task.Run(() =>
-            {
-                cts.Token.ThrowIfCancellationRequested();
-
-                return snapshot
-                    .Select(seat => new SeatFilterResult(
-                        seat.ViewModel,
-                        ShouldSeatBeVisible(
-                            seat.SeatName,
-                            seat.LabelText,
-                            seat.IsOccupied,
-                            filterText,
-                            showAvailableOnly)))
-                    .ToArray();
-            }, cts.Token);
-
-            if (cts.IsCancellationRequested)
-            {
-                return;
-            }
-
-            VisibleSeatResultCount = filtered.Count(result => result.IsVisible);
-            const int batchSize = 48;
-            for (var start = 0; start < filtered.Length; start += batchSize)
-            {
-                cts.Token.ThrowIfCancellationRequested();
-
-                var count = Math.Min(batchSize, filtered.Length - start);
-                for (var offset = 0; offset < count; offset++)
-                {
-                    var result = filtered[start + offset];
-                    result.ViewModel.IsFilterVisible = result.IsVisible;
-                }
-
-                if (start + count < filtered.Length)
-                {
-                    await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            activityLogService.Write(LogEntryKind.Error, "Library", $"筛选座位失败：{ex.Message}", ex);
-        }
-        finally
-        {
-            lock (_filterGate)
-            {
-                if (ReferenceEquals(_filteringCts, cts))
-                {
-                    _filteringCts = null;
-                }
-            }
-
-            IsApplyingSeatFilter = false;
-            cts.Dispose();
-        }
-    }
+    private Task ApplySeatFilterAsync() => Workspace.RefreshAsync();
 
     private void RefreshSelectedSeatsPresentation()
     {
@@ -540,35 +441,4 @@ public sealed partial class MultiSeatSelectionViewModel(
         return _isGrabSeatSelectionOverlayOpen?.Invoke() == true;
     }
 
-    private static bool ShouldSeatBeVisible(
-        string seatName,
-        string? labelText,
-        bool isOccupied,
-        string filterText,
-        bool showAvailableOnly)
-    {
-        if (showAvailableOnly && isOccupied)
-        {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(filterText))
-        {
-            return true;
-        }
-
-        var normalizedFilterText = filterText.Trim();
-        return seatName.Contains(normalizedFilterText, StringComparison.OrdinalIgnoreCase) ||
-               labelText?.Contains(normalizedFilterText, StringComparison.OrdinalIgnoreCase) == true;
-    }
-
-    private sealed record SeatFilterSnapshot(
-        SeatItemViewModel ViewModel,
-        string SeatName,
-        string? LabelText,
-        bool IsOccupied);
-
-    private sealed record SeatFilterResult(
-        SeatItemViewModel ViewModel,
-        bool IsVisible);
 }
