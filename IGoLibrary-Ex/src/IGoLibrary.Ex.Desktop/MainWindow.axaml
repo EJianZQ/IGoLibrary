@@ -180,8 +180,8 @@
       <Setter Property="Padding" Value="22" />
     </Style>
     <Style Selector="Border.home-minimal-card">
-      <Setter Property="Background" Value="#FFFFFF" />
-      <Setter Property="BorderBrush" Value="#EAEAEA" />
+      <Setter Property="Background" Value="{DynamicResource DashboardSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DashboardCardBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BoxShadow" Value="0 4 16 0 #0C000000" />
     </Style>
@@ -266,8 +266,8 @@
       <Setter Property="Width" Value="34" />
       <Setter Property="Height" Value="34" />
       <Setter Property="CornerRadius" Value="17" />
-      <Setter Property="Background" Value="#F5F6F8" />
-      <Setter Property="BorderBrush" Value="#EAEAEA" />
+      <Setter Property="Background" Value="{DynamicResource DashboardIconSurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DashboardCardBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
     <Style Selector="Border.notify-toggle-card">
@@ -475,10 +475,10 @@
           RowDefinitions="40, *">
       <!-- Top drag area for content pane -->
       <Border Grid.Row="0"
-              Background="#F5F6F8"
+              Background="{DynamicResource AppContentBackgroundBrush}"
               IsHitTestVisible="False" />
       <Border Grid.Row="1"
-              Background="#F5F6F8"
+              Background="{DynamicResource AppContentBackgroundBrush}"
               IsHitTestVisible="False" />
       
       <!-- Views -->
@@ -488,10 +488,9 @@
         </Carousel.PageTransition>
         
         <!-- Tab 0: Home -->
-        <ScrollViewer Background="#F5F6F8">
+        <ScrollViewer Background="{DynamicResource AppContentBackgroundBrush}">
           <StackPanel Spacing="14" Margin="0,0,16,0">
             <Border Classes="dashboard-card home-minimal-card"
-                    Background="#FFFFFF"
                     Padding="22,20">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="22">
                 <StackPanel Spacing="14">
@@ -585,7 +584,6 @@
 
             <Grid>
               <Border Classes="dashboard-card home-minimal-card"
-                      Background="#FFFFFF"
                       MinHeight="228"
                       Padding="22,18">
                 <Grid>
@@ -778,7 +776,6 @@
 
             <Grid>
               <Border Classes="dashboard-card home-minimal-card"
-                      Background="#FFFFFF"
                       MinHeight="214"
                       Padding="24,22">
                 <Grid>

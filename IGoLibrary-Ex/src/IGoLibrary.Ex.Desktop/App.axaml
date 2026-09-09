@@ -9,6 +9,7 @@
       <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
           <SolidColorBrush x:Key="SemiPageBrush" Color="#F4F6FA" />
+          <SolidColorBrush x:Key="AppContentBackgroundBrush" Color="#F5F6F8" />
           <SolidColorBrush x:Key="SemiCardBackgroundBrush" Color="#FFFFFF" />
           <SolidColorBrush x:Key="SemiCardBorderBrush" Color="#E7EAEE" />
           <SolidColorBrush x:Key="SemiColorText0" Color="#1D2129" />
@@ -48,6 +49,8 @@
             <GradientStop Color="#F1F7FF" Offset="1" />
           </LinearGradientBrush>
           <SolidColorBrush x:Key="DashboardSurfaceBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="DashboardCardBorderBrush" Color="#EAEAEA" />
+          <SolidColorBrush x:Key="DashboardIconSurfaceBrush" Color="#F5F6F8" />
           <SolidColorBrush x:Key="DashboardMutedSurfaceBrush" Color="#F7FAFC" />
           <SolidColorBrush x:Key="DashboardDividerBrush" Color="#DCE6F2" />
           <SolidColorBrush x:Key="AppNotificationSegmentThumbBrush" Color="#FFFFFF" />
@@ -70,6 +73,7 @@
 
         <ResourceDictionary x:Key="Dark">
           <SolidColorBrush x:Key="SemiPageBrush" Color="#0F172A" />
+          <SolidColorBrush x:Key="AppContentBackgroundBrush" Color="#0F172A" />
           <SolidColorBrush x:Key="SemiCardBackgroundBrush" Color="#111827" />
           <SolidColorBrush x:Key="SemiCardBorderBrush" Color="#243244" />
           <SolidColorBrush x:Key="SemiColorText0" Color="#F8FAFC" />
@@ -109,6 +113,8 @@
             <GradientStop Color="#0D1523" Offset="1" />
           </LinearGradientBrush>
           <SolidColorBrush x:Key="DashboardSurfaceBrush" Color="#111827" />
+          <SolidColorBrush x:Key="DashboardCardBorderBrush" Color="#243244" />
+          <SolidColorBrush x:Key="DashboardIconSurfaceBrush" Color="#162132" />
           <SolidColorBrush x:Key="DashboardMutedSurfaceBrush" Color="#0F172A" />
           <SolidColorBrush x:Key="DashboardDividerBrush" Color="#243244" />
           <SolidColorBrush x:Key="AppNotificationSegmentThumbBrush" Color="#1E293B" />
