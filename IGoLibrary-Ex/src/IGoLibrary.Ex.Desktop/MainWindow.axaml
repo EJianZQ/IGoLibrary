@@ -447,9 +447,21 @@
             BorderBrush="{DynamicResource AppSidebarBorderBrush}"
             BorderThickness="0,0,1,0"
             PointerPressed="OnSidebarPointerPressed">
-      <Grid RowDefinitions="40, *, Auto">
-        <!-- Window Title / Drag Area -->
-        <TextBlock Grid.Row="0" Text="IGoLibrary-Ex 端" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Margin="24,0,0,0" Opacity="0.7" IsHitTestVisible="False"/>
+      <Grid RowDefinitions="Auto, *, Auto">
+        <!-- On macOS, reserve the native title bar above the app name for the traffic lights. -->
+        <Grid Grid.Row="0" IsHitTestVisible="False">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="{OnPlatform Default=0, macOS=40}" />
+            <RowDefinition Height="{OnPlatform Default=40, macOS=32}" />
+          </Grid.RowDefinitions>
+          <TextBlock Grid.Row="1"
+                     Text="IGoLibrary-Ex 端"
+                     FontWeight="Bold"
+                     FontSize="14"
+                     VerticalAlignment="Center"
+                     Margin="24,0,0,0"
+                     Opacity="0.7" />
+        </Grid>
         
         <!-- Navigation Menu -->
         <ListBox Grid.Row="1"
