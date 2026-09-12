@@ -82,6 +82,8 @@ public partial class MainWindowWorkflowViewModel
         try
         {
             await LoadSettingsAsync();
+            await MultiSeatSelection.Workspace.InitializeViewPreferenceAsync();
+            await GlobalLeakPage.BlacklistEditor.Workspace.InitializeViewPreferenceAsync();
             await InitializeMobileControlAsync();
             await StartMobileControlAutomaticallyAsync();
             await LoadProtocolTemplatesAsync();
@@ -143,6 +145,8 @@ public partial class MainWindowWorkflowViewModel
         try
         {
             await FlushPendingSystemSettingsAsync(cancellationToken);
+            await MultiSeatSelection.Workspace.FlushViewPreferenceAsync();
+            await GlobalLeakPage.BlacklistEditor.Workspace.FlushViewPreferenceAsync();
         }
         catch (Exception ex) when (suppressErrors)
         {

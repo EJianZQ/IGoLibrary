@@ -12,6 +12,14 @@ public sealed class SettingsWorkflowService(ISettingsService settingsService) : 
         return settingsService.LoadAsync(cancellationToken);
     }
 
+    public async Task SaveSeatWorkspaceViewAsync(bool listView, CancellationToken cancellationToken = default)
+    {
+        await settingsService.UpdateAsync(current => current with
+        {
+            Ui = current.Ui with { SeatWorkspaceListView = listView }
+        }, cancellationToken);
+    }
+
     public async Task<AppSettings> SaveSystemSettingsAsync(
         SystemSettingsSnapshot snapshot,
         CancellationToken cancellationToken = default)

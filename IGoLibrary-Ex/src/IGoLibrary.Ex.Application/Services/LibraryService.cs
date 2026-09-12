@@ -34,6 +34,8 @@ public sealed class LibraryService(
         var target = libraries.FirstOrDefault(x => x.LibraryId == libraryId)
             ?? throw new InvalidOperationException("未找到指定场馆");
         var layout = await apiClient.GetLibraryLayoutAsync(cookie, libraryId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (layout.LibraryId != libraryId) throw new InvalidOperationException("返回布局与请求场馆不一致");
 
         venueState.Libraries = libraries;
         venueState.BoundLibrary = target;
@@ -53,6 +55,10 @@ public sealed class LibraryService(
         var cookie = sessionState.Session?.Cookie ?? throw new InvalidOperationException("当前未登录");
         var library = venueState.BoundLibrary ?? throw new InvalidOperationException("当前未绑定场馆");
         var layout = await apiClient.GetLibraryLayoutAsync(cookie, library.LibraryId, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (layout.LibraryId != library.LibraryId) throw new InvalidOperationException("返回布局与请求场馆不一致");
+        if (venueState.BoundLibrary?.LibraryId != library.LibraryId)
+            throw new OperationCanceledException("场馆已切换，丢弃过期布局", cancellationToken);
         venueState.CurrentLayout = layout;
         return layout;
     }

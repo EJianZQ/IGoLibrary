@@ -7,6 +7,8 @@ using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IGoLibrary.Ex.Desktop.ViewModels;
 
@@ -37,6 +39,7 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
     private IBrush _successSoftBrush;
     private IBrush _warningBrush;
     private IBrush _warningSoftBrush;
+    private readonly ILogger<AccountVenueViewModel> _logger;
 
     public AccountVenueViewModel(
         ISessionWorkflowService sessionWorkflowService,
@@ -44,8 +47,9 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
         ISettingsWorkflowService settingsWorkflowService,
         IActivityLogService activityLogService,
         INotificationService notificationService,
-        IAppThemeService appThemeService)
+        IAppThemeService appThemeService, ILogger<AccountVenueViewModel>? logger = null)
     {
+        _logger = logger ?? NullLogger<AccountVenueViewModel>.Instance;
         _sessionWorkflowService = sessionWorkflowService;
         _venueWorkflowService = venueWorkflowService;
         _settingsWorkflowService = settingsWorkflowService;
@@ -261,6 +265,9 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
     [RelayCommand]
     private async Task BindSelectedLibraryAsync()
     {
+        if (_bindingLayoutRequest is not null) return;
+        var (request, version) = BeginLayoutRequest(binding: true);
+        var token = request.Token;
         try
         {
             if (SelectedLibrary is null)
@@ -269,14 +276,18 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
                 return;
             }
 
-            var result = await _venueWorkflowService.BindLibraryAsync(SelectedLibrary.LibraryId);
-            var preserveSelection = _lockedLibrarySummary?.LibraryId == SelectedLibrary.LibraryId;
+            var libraryId = SelectedLibrary.LibraryId;
+            var result = await _venueWorkflowService.BindLibraryAsync(libraryId, token);
+            if (!IsCurrentLayoutRequest(version, token)) return;
+            if (result.Layout.LibraryId != libraryId) throw new InvalidOperationException("返回布局与绑定场馆不一致");
+            var preserveSelection = _lockedLibrarySummary?.LibraryId == libraryId;
             UpdateBoundLibraryPresentation(result.Layout);
             ApplyVenueRuleResult(result.Rule, result.RuleFailureMessage, persistLockedSnapshot: true);
             if (_layoutLoadedAsync is not null)
             {
                 await _layoutLoadedAsync(result, preserveSelection);
             }
+            if (!IsCurrentLayoutRequest(version, token)) return;
 
             if (result.Favorites.Count > 0)
             {
@@ -288,19 +299,36 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
                 await _refreshReservationAsync();
             }
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            if (!IsCurrentLayoutRequest(version, token)) return;
             _activityLogService.Write(LogEntryKind.Error, "Library", $"绑定场馆失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("绑定场馆失败", ex.Message);
         }
+        finally { FinishLayoutRequest(request); }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanRefreshSeats))]
     private async Task RefreshSeatsAsync()
     {
+        // Binding may already have committed the underlying venue before its metadata is loaded.
+        // A refresh must not cancel it and leave the presentation on the previous venue.
+        if (!CanRefreshSeats()) return;
+        var (request, version) = BeginLayoutRequest();
+        var token = request.Token;
+        var libraryId = _lockedLibrarySummary?.LibraryId;
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
         try
         {
-            var result = await _venueWorkflowService.RefreshBoundLibraryAsync();
+            var result = await _venueWorkflowService.RefreshBoundLibraryAsync(token);
+            if (!IsCurrentLayoutRequest(version, token) || _lockedLibrarySummary?.LibraryId != libraryId)
+            {
+                _logger.LogDebug("已丢弃过期的选座刷新。场馆标识={LibraryId}，请求版本={RequestVersion}。", libraryId, version);
+                return;
+            }
+            if (libraryId is not null && result.Layout.LibraryId != libraryId)
+                throw new InvalidOperationException("返回布局与当前绑定场馆不一致");
             UpdateBoundLibraryPresentation(result.Layout);
             if (result.Rule is not null || !string.IsNullOrWhiteSpace(result.RuleFailureMessage))
             {
@@ -311,17 +339,23 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
             {
                 await _layoutLoadedAsync(result, true);
             }
+            if (!IsCurrentLayoutRequest(version, token)) return;
+            _logger.LogInformation("选座刷新完成。场馆标识={LibraryId}，请求版本={RequestVersion}，座位数量={SeatCount}，耗时毫秒={ElapsedMs}。",
+                libraryId, version, result.Layout.Seats.Count, System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds);
 
             if (result.Favorites.Count > 0)
             {
                 await _notificationService.ShowInfoAsync("收藏已加载", $"已加载 {result.Favorites.Count} 个收藏座位");
             }
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            if (!IsCurrentLayoutRequest(version, token)) return;
             _activityLogService.Write(LogEntryKind.Error, "Library", $"刷新座位失败：{ex.Message}", ex);
             await _notificationService.ShowWarningAsync("刷新座位失败", ex.Message);
         }
+        finally { FinishLayoutRequest(request); }
     }
 
     [RelayCommand]
@@ -394,6 +428,7 @@ public sealed partial class AccountVenueViewModel : ViewModelBase
 
     public void ClearVenueState()
     {
+        CancelLayoutRequest();
         AvailableLibraries.Clear();
         SelectedLibrary = null;
         UpdateBoundLibraryPresentation(null);

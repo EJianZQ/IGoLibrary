@@ -47,6 +47,23 @@ public sealed class GlobalLeakSettingsPersistenceTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SeatWorkspaceView_RoundTripsThroughExistingSettingsTable(bool listView)
+    {
+        var locations = new StorageLocations(_directory, Path.Combine(_directory, "logs"));
+        var factory = new SqliteConnectionFactory(locations);
+        await new SqliteAppDataInitializer(factory).InitializeAsync();
+        var repository = new SqliteSettingsRepository(factory, new TestAppSettingsDefaults());
+        await repository.SaveAsync(AppSettings.Default with
+        {
+            Ui = AppSettings.Default.Ui with { SeatWorkspaceListView = listView }
+        });
+        var reloaded = await new SqliteSettingsRepository(factory, new TestAppSettingsDefaults()).LoadAsync();
+        Assert.Equal(listView, reloaded.Ui.SeatWorkspaceListView);
+    }
+
     private sealed class TestAppSettingsDefaults : IAppSettingsDefaults
     {
         public AppSettings CreateDefault() => AppSettings.Default;

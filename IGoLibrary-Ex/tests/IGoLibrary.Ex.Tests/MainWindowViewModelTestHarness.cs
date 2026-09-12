@@ -55,6 +55,7 @@ internal static class MainWindowViewModelTestHarness
         windowsUpdateProgressDialogService ??= new FakeWindowsUpdateProgressDialogService();
         taskSleepPreventionService ??= new FakeTaskSleepPreventionService();
         var workflowState = new ShellWorkflowState();
+        var seatViewPreferences = new SeatViewPreferenceService(settingsWorkflowService, activityLogService);
         var taskLaunchService = new FakeTaskLaunchService(
             grabSeatCoordinator,
             globalLeakCoordinator,
@@ -87,7 +88,7 @@ internal static class MainWindowViewModelTestHarness
                 venueWorkflowService,
                 activityLogService,
                 notificationService,
-                seatLabelDialogService),
+                seatLabelDialogService, viewPreferences: seatViewPreferences),
             new GrabPageViewModel(
                 grabSeatCoordinator,
                 taskLaunchService,
@@ -112,7 +113,8 @@ internal static class MainWindowViewModelTestHarness
                         globalLeakCoordinator, new GlobalLeakConfigurationGate(), activityLogService,
                         Microsoft.Extensions.Logging.Abstractions.NullLogger<GlobalLeakSeatBlacklistService>.Instance),
                     venueWorkflowService, new FakeSeatLabelService(), activityLogService, notificationService,
-                    Microsoft.Extensions.Logging.Abstractions.NullLogger<GlobalLeakSeatBlacklistEditorViewModel>.Instance)),
+                    Microsoft.Extensions.Logging.Abstractions.NullLogger<GlobalLeakSeatBlacklistEditorViewModel>.Instance,
+                    viewPreferences: seatViewPreferences)),
             new OccupyPageViewModel(
                 occupySeatCoordinator,
                 taskLaunchService,

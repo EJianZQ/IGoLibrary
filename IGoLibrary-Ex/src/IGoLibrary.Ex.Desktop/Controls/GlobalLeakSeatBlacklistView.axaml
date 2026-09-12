@@ -24,14 +24,18 @@
       </ComboBox.ItemTemplate>
     </ComboBox>
     <StackPanel Grid.Row="2" Spacing="8">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="12">
         <TextBox Text="{Binding Workspace.SeatFilterText}" Watermark="按座位号或标签过滤"
                  IsEnabled="{Binding CanSwitchVenue}" />
-        <CheckBox Grid.Column="1" Content="隐藏被占座位" IsChecked="{Binding Workspace.ShowAvailableOnly}"
+        <ComboBox Grid.Column="1" Width="150" ItemsSource="{Binding Workspace.ViewModes}"
+                  SelectedIndex="{Binding Workspace.SelectedViewIndex, Mode=TwoWay}"
+                  IsEnabled="{Binding CanSwitchVenue}" AutomationProperties.Name="座位视图" />
+        <CheckBox Grid.Column="2" Content="仅看空闲座位" IsChecked="{Binding Workspace.ShowAvailableOnly}"
+                  IsVisible="{Binding Workspace.IsListMode}"
                   IsEnabled="{Binding CanSwitchVenue}" />
-        <Button Grid.Column="2" Content="刷新 / 重试" Command="{Binding RefreshCommand}"
+        <Button Grid.Column="3" Content="刷新 / 重试" Command="{Binding RefreshCommand}"
                 IsEnabled="{Binding CanRefresh}" Classes="Secondary" />
-        <Button Grid.Column="3" Content="清空当前场馆" Command="{Binding ClearCurrentVenueCommand}"
+        <Button Grid.Column="4" Content="清空当前场馆" Command="{Binding ClearCurrentVenueCommand}"
                 IsEnabled="{Binding CanEditSeats}" Classes="Secondary" />
       </Grid>
       <TextBlock Text="全域捡漏任务正在运行，请停止任务后再修改黑名单"

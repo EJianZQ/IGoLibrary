@@ -4450,16 +4450,21 @@
               </Grid>
 
               <Grid Grid.Row="1"
-                    ColumnDefinitions="2.1*,Auto,Auto,Auto,Auto"
+                    ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto"
                     ColumnSpacing="12">
                 <TextBox Text="{Binding SeatFilterText}"
                          Watermark="按座位号或标签过滤"
                          VerticalAlignment="Center" />
-                <CheckBox Grid.Column="1"
-                          Content="隐藏被占座位"
+                <ComboBox Grid.Column="1" Width="150" VerticalAlignment="Center"
+                          ItemsSource="{Binding MultiSeatSelection.Workspace.ViewModes}"
+                          SelectedIndex="{Binding MultiSeatSelection.Workspace.SelectedViewIndex, Mode=TwoWay}"
+                          AutomationProperties.Name="座位视图" />
+                <CheckBox Grid.Column="2"
+                          Content="仅看空闲座位"
                           IsChecked="{Binding ShowAvailableOnly}"
+                          IsVisible="{Binding MultiSeatSelection.Workspace.IsListMode}"
                           VerticalAlignment="Center" />
-                <Button Grid.Column="2"
+                <Button Grid.Column="3"
                         Command="{Binding RefreshSeatsCommand}"
                         Classes="Secondary"
                         HorizontalContentAlignment="Center">
@@ -4470,7 +4475,7 @@
                     <TextBlock Text="刷新" />
                   </StackPanel>
                 </Button>
-                <Button Grid.Column="3"
+                <Button Grid.Column="4"
                         Command="{Binding SaveFavoritesCommand}"
                         IsEnabled="{Binding HasDraftSelectedSeats}"
                         Classes="Secondary"
@@ -4482,7 +4487,7 @@
                     <TextBlock Text="收藏" />
                   </StackPanel>
                 </Button>
-                <Button Grid.Column="4"
+                <Button Grid.Column="5"
                         Command="{Binding SetSelectedSeatLabelCommand}"
                         IsEnabled="{Binding CanSetSelectedSeatLabel}"
                         Classes="Secondary"
@@ -4506,14 +4511,12 @@
                 </Button>
               </Grid>
 
-              <controls:SeatWorkspaceView Grid.Row="2" DataContext="{Binding MultiSeatSelection.Workspace}" />
+              <controls:SeatWorkspaceView Grid.Row="2" ShowLegend="False" DataContext="{Binding MultiSeatSelection.Workspace}" />
 
               <Grid Grid.Row="3"
                     ColumnDefinitions="*,Auto"
                     ColumnSpacing="12">
-                <TextBlock Text="关闭只会放弃本次目标座位勾选；已经保存的座位标签不会撤销"
-                           Classes="helper-text"
-                           VerticalAlignment="Center" />
+                <controls:SeatWorkspaceLegend VerticalAlignment="Center" />
                 <Button Grid.Column="1"
                         Content="确认完成"
                         Command="{Binding ConfirmGrabSeatSelectionCommand}"

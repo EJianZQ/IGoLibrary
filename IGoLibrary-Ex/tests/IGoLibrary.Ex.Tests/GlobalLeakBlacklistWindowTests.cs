@@ -100,6 +100,8 @@ public sealed class GlobalLeakBlacklistWindowTests
             Dispatcher.UIThread.RunJobs();
             var modal = window.FindControl<Border>("GlobalLeakBlacklistModal")!;
             var workspace = modal.GetLogicalDescendants().OfType<SeatWorkspaceView>().Single();
+            editor.Workspace.IsListMode = true;
+            Dispatcher.UIThread.RunJobs();
             var scroll = workspace.GetLogicalDescendants().OfType<ScrollViewer>().Single();
             Assert.True(scroll.Extent.Height > scroll.Viewport.Height);
             var save = modal.GetLogicalDescendants().OfType<Button>().Single(button => Equals(button.Content, "确认保存"));
@@ -160,7 +162,8 @@ public sealed class GlobalLeakBlacklistWindowTests
             var workspace = view.GetLogicalDescendants().OfType<SeatWorkspaceView>().Single();
             Assert.Same(viewModel.GlobalLeakPage.BlacklistEditor.Workspace, workspace.DataContext);
             Assert.True(workspace.IsEnabled);
-            var toggles = workspace.GetLogicalDescendants().OfType<Avalonia.Controls.Primitives.ToggleButton>().ToArray();
+            var toggles = workspace.GetLogicalDescendants().OfType<SeatTile>()
+                .Select(tile => tile.FindControl<Avalonia.Controls.Primitives.ToggleButton>("SeatToggle")!).ToArray();
             Assert.Equal(2, toggles.Length);
             toggles[0].IsChecked = true;
             Assert.True(viewModel.GlobalLeakPage.BlacklistEditor.Workspace.Seats[0].IsSelected);

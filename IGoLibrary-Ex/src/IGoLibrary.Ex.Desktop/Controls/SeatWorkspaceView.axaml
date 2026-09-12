@@ -1,68 +1,47 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:IGoLibrary.Ex.Desktop.ViewModels"
+             xmlns:controls="using:IGoLibrary.Ex.Desktop.Controls"
              x:Class="IGoLibrary.Ex.Desktop.Controls.SeatWorkspaceView"
+             x:Name="WorkspaceRoot"
              x:DataType="vm:SeatWorkspaceViewModel">
-              <Border
-                      Background="{DynamicResource SemiColorFill0}"
-                      BorderBrush="{DynamicResource SemiCardBorderBrush}"
-                      BorderThickness="1"
-                      CornerRadius="18"
-                      Padding="16">
-                <Grid>
-                  <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                                VerticalScrollBarVisibility="Auto"
-                                IsVisible="{Binding HasSeatLayout}">
-                    <ItemsControl ItemsSource="{Binding VisibleSeats}">
-                      <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                          <WrapPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                      </ItemsControl.ItemsPanel>
-                    </ItemsControl>
-                  </ScrollViewer>
-
-                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
-                          CornerRadius="14"
-                          Padding="24"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          IsVisible="{Binding HasNoSeatLayout}">
-                    <TextBlock Text="当前场馆暂无座位布局，请刷新重试"
-                               Classes="helper-text"
-                               HorizontalAlignment="Center"
-                               TextAlignment="Center" />
-                  </Border>
-
-                  <Border Background="{DynamicResource AppOverlaySurfaceStrongBrush}"
-                          CornerRadius="14"
-                          Padding="24"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Center"
-                          IsVisible="{Binding ShowSeatFilterEmptyState}">
-                    <TextBlock Text="当前筛选条件下没有可显示的座位"
-                               Classes="helper-text"
-                               HorizontalAlignment="Center"
-                               TextAlignment="Center" />
-                  </Border>
-
-                  <Border Background="{DynamicResource AppOverlaySurfaceSoftBrush}"
-                          CornerRadius="16"
-                          IsVisible="{Binding IsApplyingSeatFilter}">
-                    <StackPanel Width="220"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Spacing="10">
-                      <ProgressBar IsIndeterminate="True"
-                                   Height="4"
-                                   Foreground="{DynamicResource SemiAccentBrush}" />
-                      <TextBlock Text="正在应用筛选并刷新座位工作区..."
-                                 Classes="helper-text"
-                                 HorizontalAlignment="Center"
-                                 TextAlignment="Center" />
-                    </StackPanel>
-                  </Border>
-                </Grid>
-              </Border>
-
+  <Border Background="{DynamicResource SemiColorFill0}" BorderBrush="{DynamicResource SemiCardBorderBrush}"
+          BorderThickness="1" CornerRadius="18" Padding="12">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="8">
+      <WrapPanel Orientation="Horizontal">
+        <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsMapMode}" Margin="0,0,12,0">
+          <Button Content="−" Click="OnZoomOut" ToolTip.Tip="缩小" />
+          <Button Content="＋" Click="OnZoomIn" ToolTip.Tip="放大" />
+          <Button Content="100%" Click="OnActualSize" />
+          <Button Content="适应宽度" Click="OnFitWidth" />
+          <Button Content="全图" Click="OnFitAll" />
+          <TextBlock x:Name="ZoomText" VerticalAlignment="Center" Margin="6,0" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="5">
+          <TextBox x:Name="LocateInput" Width="120" Watermark="定位座位号" Text="{Binding LocateText}" KeyDown="OnLocateKeyDown" />
+          <Button Content="定位" Command="{Binding LocateCommand}" />
+        </StackPanel>
+      </WrapPanel>
+      <StackPanel Grid.Row="1" Spacing="4">
+        <ComboBox ItemsSource="{Binding LocateResults}" SelectedItem="{Binding LocatedSeat}" IsVisible="{Binding HasLocateResults}"
+                  HorizontalAlignment="Stretch" MaxHeight="34">
+          <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:SeatItemViewModel"><TextBlock Text="{Binding LocationDisplayText}" /></DataTemplate></ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock Text="{Binding LocateHint}" Classes="helper-text" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding LayoutNotice}" IsVisible="{Binding HasLayoutNotice}" TextWrapping="Wrap"
+                   Foreground="{DynamicResource SemiWarningTextBrush}" />
+      </StackPanel>
+      <controls:SeatWorkspaceLegend Grid.Row="2" IsVisible="{Binding ShowLegend, ElementName=WorkspaceRoot}" />
+      <Grid Grid.Row="3" MinHeight="100" ClipToBounds="True">
+        <ContentControl x:Name="DisplayHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+        <TextBlock Text="当前场馆暂无座位布局，请刷新重试" IsVisible="{Binding HasNoSeatLayout}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" Classes="helper-text" IsHitTestVisible="False" />
+      </Grid>
+      <StackPanel Grid.Row="4">
+        <ProgressBar IsIndeterminate="True" Height="3" IsVisible="{Binding IsApplyingSeatFilter}" />
+        <TextBlock Text="当前条件下没有可选座位；地图位置保持不变" IsVisible="{Binding ShowSeatFilterEmptyState}"
+                   Classes="helper-text" TextWrapping="Wrap" IsHitTestVisible="False" />
+      </StackPanel>
+    </Grid>
+  </Border>
 </UserControl>

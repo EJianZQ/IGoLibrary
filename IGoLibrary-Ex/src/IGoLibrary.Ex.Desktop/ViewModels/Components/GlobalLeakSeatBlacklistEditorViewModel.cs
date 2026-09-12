@@ -28,7 +28,8 @@ public sealed partial class GlobalLeakSeatBlacklistEditorViewModel : ViewModelBa
     public GlobalLeakSeatBlacklistEditorViewModel(IGlobalLeakSeatBlacklistService blacklistService,
         IVenueWorkflowService venueService, ISeatLabelService labelService,
         IActivityLogService activityLog, INotificationService notifications,
-        ILogger<GlobalLeakSeatBlacklistEditorViewModel> logger)
+        ILogger<GlobalLeakSeatBlacklistEditorViewModel> logger, ILoggerFactory? loggerFactory = null,
+        SeatViewPreferenceService? viewPreferences = null)
     {
         _blacklistService = blacklistService;
         _venueService = venueService;
@@ -36,7 +37,7 @@ public sealed partial class GlobalLeakSeatBlacklistEditorViewModel : ViewModelBa
         _activityLog = activityLog;
         _notifications = notifications;
         _logger = logger;
-        Workspace = new SeatWorkspaceViewModel(activityLog);
+        Workspace = new SeatWorkspaceViewModel(activityLog, loggerFactory?.CreateLogger<SeatWorkspaceViewModel>(), viewPreferences);
     }
 
     public SeatWorkspaceViewModel Workspace { get; }
@@ -138,7 +139,7 @@ public sealed partial class GlobalLeakSeatBlacklistEditorViewModel : ViewModelBa
         var session = _sessionVersion;
         IsLoading = true;
         ErrorText = string.Empty;
-        ClearWorkspace();
+        if (Workspace.LibraryId != venue.Target.LibraryId) ClearWorkspace();
         try
         {
             if (refresh || venue.Layout is null)
@@ -185,18 +186,23 @@ public sealed partial class GlobalLeakSeatBlacklistEditorViewModel : ViewModelBa
 
     private async Task PopulateWorkspaceAsync(GlobalLeakBlacklistVenueViewModel venue)
     {
+        Workspace.CancelFiltering();
+        foreach (var oldSeat in Workspace.Seats) oldSeat.PropertyChanged -= OnSeatChanged;
+        Workspace.Seats.Clear();
         var labels = venue.Labels.DistinctBy(static label => label.SeatKey, StringComparer.Ordinal)
             .ToDictionary(static label => label.SeatKey, StringComparer.Ordinal);
         foreach (var seat in venue.Layout!.Seats)
         {
             var item = new SeatItemViewModel(seat.SeatKey, seat.SeatName, seat.IsOccupied)
             {
+                SeatStatus = seat.SeatStatus,
                 IsSelected = venue.Draft.ContainsKey(seat.SeatKey),
                 LabelText = labels.GetValueOrDefault(seat.SeatKey)?.Text
             };
             item.PropertyChanged += OnSeatChanged;
             Workspace.Seats.Add(item);
         }
+        Workspace.ApplyLayout(venue.Layout);
         UpdateSelectionPresentation();
         await Workspace.RefreshAsync();
     }

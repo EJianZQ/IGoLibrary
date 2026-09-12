@@ -7,6 +7,8 @@ public interface ISettingsWorkflowService
 {
     Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default);
 
+    Task SaveSeatWorkspaceViewAsync(bool listView, CancellationToken cancellationToken = default);
+
     Task<AppSettings> SaveSystemSettingsAsync(
         SystemSettingsSnapshot snapshot,
         CancellationToken cancellationToken = default);

@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:IGoLibrary.Ex.Desktop.ViewModels"
+             x:Class="IGoLibrary.Ex.Desktop.Controls.SeatTile"
+             x:DataType="vm:SeatItemViewModel" Width="52" Height="52" UseLayoutRounding="False"
+             Classes.dim="{Binding !IsFilterVisible}" ToolTip.Tip="{Binding LayoutToolTipText}">
+  <UserControl.Styles>
+    <Style Selector="UserControl.dim"><Setter Property="Opacity" Value="0.28" /></Style>
+  </UserControl.Styles>
+  <Grid>
+    <Border Background="{DynamicResource SemiColorFill0}" CornerRadius="9"
+            BorderBrush="{DynamicResource SemiCardBorderBrush}" BorderThickness="1" />
+    <Border x:Name="StatusStripe" Height="5" VerticalAlignment="Top" CornerRadius="9,9,0,0" />
+    <ToggleButton x:Name="SeatToggle" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                  IsEnabled="{Binding IsFilterVisible}" Background="Transparent" BorderThickness="0"
+                  Width="52" Height="52" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                  Padding="3" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                  AutomationProperties.Name="{Binding LocationDisplayText}">
+      <ToggleButton.ContextMenu>
+        <ContextMenu IsVisible="{Binding SupportsLabelEditing}" IsEnabled="{Binding IsFilterVisible}">
+          <MenuItem Header="{Binding LabelMenuHeader}" Command="{Binding EditLabelCommand}" />
+          <MenuItem Header="删除标签" Command="{Binding DeleteLabelCommand}" IsVisible="{Binding HasLabel}" />
+        </ContextMenu>
+      </ToggleButton.ContextMenu>
+      <Viewbox x:Name="SeatNumberBox" Width="44" Height="33" StretchDirection="DownOnly">
+        <TextBlock x:Name="SeatNumber" Text="{Binding SeatName}" FontSize="22" FontWeight="SemiBold"
+                   Foreground="{DynamicResource SemiColorText0}" TextTrimming="CharacterEllipsis" MaxWidth="44" />
+      </Viewbox>
+    </ToggleButton>
+    <Border IsVisible="{Binding IsSelected}" BorderBrush="{DynamicResource SemiAccentBrush}"
+            BorderThickness="2" CornerRadius="9" IsHitTestVisible="False" />
+    <Border x:Name="SelectionBadge" IsVisible="{Binding IsSelected}" Background="{DynamicResource SemiAccentBrush}"
+            Width="12" Height="12" CornerRadius="6" HorizontalAlignment="Right" VerticalAlignment="Top"
+            Margin="0,-2,-2,0" IsHitTestVisible="False">
+      <Path Data="M 1,5 L 4,8 L 10,1" Stroke="White" StrokeThickness="2" Stretch="Uniform" Margin="2" />
+    </Border>
+    <Border IsVisible="{Binding IsLocated}" BorderBrush="{DynamicResource SemiWarningTextBrush}"
+            BorderThickness="2" CornerRadius="11" Margin="-2" IsHitTestVisible="False" />
+    <Border x:Name="FavoriteBadge" IsVisible="{Binding IsFavorite}" Width="14" Height="14"
+            Background="#FFD66B" BorderBrush="#926000" BorderThickness="1" CornerRadius="7"
+            HorizontalAlignment="Left" VerticalAlignment="Bottom" IsHitTestVisible="False">
+      <Path x:Name="FavoriteGlyph" Data="M 10,0 L 13,6.5 L 20,7.5 L 15,12.5 L 16,20 L 10,16.5 L 4,20 L 5,12.5 L 0,7.5 L 7,6.5 Z"
+            Fill="#603900" Stretch="Uniform" Margin="2" />
+    </Border>
+    <Border x:Name="LabelBadge" IsVisible="{Binding HasLabel}" Width="14" Height="14"
+            Background="#2369BC" BorderBrush="#D9E9FF" BorderThickness="1" CornerRadius="3"
+            HorizontalAlignment="Right" VerticalAlignment="Bottom" IsHitTestVisible="False">
+      <Path x:Name="LabelGlyph" Data="M 1,0 L 11,0 L 11,16 L 6,12 L 1,16 Z"
+            Fill="White" Stretch="Uniform" Margin="3,2" />
+    </Border>
+  </Grid>
+</UserControl>

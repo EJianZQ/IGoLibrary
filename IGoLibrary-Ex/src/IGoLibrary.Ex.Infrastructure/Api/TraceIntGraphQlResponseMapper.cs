@@ -56,52 +56,8 @@ internal static class TraceIntGraphQlResponseMapper
             .GetProperty("libs")[0];
 
         var layout = lib.GetProperty("lib_layout");
-        var seats = new List<SeatSnapshot>();
-        foreach (var seat in layout.GetProperty("seats").EnumerateArray())
-        {
-            if (!IsSeatLayoutItem(seat))
-            {
-                continue;
-            }
-
-            var key = ReadOptionalStringProperty(seat, "key").Trim();
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                continue;
-            }
-
-            if (!TryReadBooleanLikeProperty(seat, "status", out var isOccupied) ||
-                !TryReadRequiredIntProperty(seat, "x", out var x) ||
-                !TryReadRequiredIntProperty(seat, "y", out var y))
-            {
-                continue;
-            }
-
-            var name = ReadOptionalStringProperty(seat, "name").Trim();
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                name = key;
-            }
-
-            seats.Add(new SeatSnapshot(
-                key,
-                name,
-                isOccupied,
-                x,
-                y));
-        }
-
-        return new LibraryLayout(
-            lib.GetProperty("lib_id").GetInt32(),
-            lib.GetProperty("lib_name").GetString() ?? "Unknown",
-            lib.GetProperty("lib_floor").GetString() ?? string.Empty,
-            lib.GetProperty("is_open").GetBoolean(),
-            layout.GetProperty("seats_total").GetInt32(),
-            layout.GetProperty("seats_booking").GetInt32(),
-            layout.GetProperty("seats_used").GetInt32(),
-            seats.OrderBy(x => int.TryParse(x.SeatName, out var number) ? number : int.MaxValue).ToList());
+        return TraceIntLibraryLayoutParser.Parse(lib, layout);
     }
-
     public static LibraryRule MapLibraryRule(string raw, int libraryId)
     {
         using var document = JsonDocument.Parse(raw);
@@ -376,22 +332,7 @@ internal static class TraceIntGraphQlResponseMapper
         };
     }
 
-    private static bool IsSeatLayoutItem(JsonElement element)
-    {
-        if (element.ValueKind is not JsonValueKind.Object)
-        {
-            return false;
-        }
-
-        if (!element.TryGetProperty("type", out _))
-        {
-            return true;
-        }
-
-        return TryReadRequiredIntProperty(element, "type", out var type) && type == 1;
-    }
-
-    private static bool TryReadBooleanLikeProperty(JsonElement element, string propertyName, out bool value)
+    internal static bool TryReadBooleanLikeProperty(JsonElement element, string propertyName, out bool value)
     {
         value = default;
         if (element.ValueKind is not JsonValueKind.Object || !element.TryGetProperty(propertyName, out var property))
@@ -410,7 +351,7 @@ internal static class TraceIntGraphQlResponseMapper
         }
     }
 
-    private static bool TryReadRequiredIntProperty(JsonElement element, string propertyName, out int value)
+    internal static bool TryReadRequiredIntProperty(JsonElement element, string propertyName, out int value)
     {
         value = default;
         if (element.ValueKind is not JsonValueKind.Object || !element.TryGetProperty(propertyName, out var property))
@@ -426,7 +367,7 @@ internal static class TraceIntGraphQlResponseMapper
         };
     }
 
-    private static string ReadOptionalStringProperty(JsonElement element, string propertyName)
+    internal static string ReadOptionalStringProperty(JsonElement element, string propertyName)
     {
         if (element.ValueKind is not JsonValueKind.Object ||
             !element.TryGetProperty(propertyName, out var property) ||

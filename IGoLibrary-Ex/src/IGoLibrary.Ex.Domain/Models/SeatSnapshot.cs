@@ -7,5 +7,6 @@ public sealed record SeatSnapshot(
     int X,
     int Y)
 {
+    public int? SeatStatus { get; init; }
     public bool IsAvailable => !IsOccupied;
 }

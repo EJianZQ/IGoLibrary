@@ -925,6 +925,7 @@ internal sealed class FakeSessionService : ISessionService
 
 internal sealed class FakeLibraryService : ILibraryService
 {
+    public Func<CancellationToken, Task<LibraryLayout>>? OnRefreshLayoutAsync { get; set; }
     public LibrarySummary? BoundLibrary { get; private set; }
 
     public IReadOnlyList<LibrarySummary> LibrariesToLoad { get; set; } = [];
@@ -957,6 +958,7 @@ internal sealed class FakeLibraryService : ILibraryService
     public Task<LibraryLayout> RefreshBoundLibraryAsync(CancellationToken cancellationToken = default)
     {
         RefreshBoundLibraryCalls++;
+        if (OnRefreshLayoutAsync is not null) return OnRefreshLayoutAsync(cancellationToken);
         if (BoundLibrary is null)
         {
             throw new InvalidOperationException("No bound library configured.");

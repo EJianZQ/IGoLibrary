@@ -9,6 +9,19 @@ namespace IGoLibrary.Ex.Tests;
 
 public sealed class SettingsSerializationTests
 {
+    [Theory]
+    [InlineData("{}", false)]
+    [InlineData("{\"ui\":{\"seatWorkspaceListView\":true}}", true)]
+    [InlineData("{\"ui\":{\"seatWorkspaceListView\":false}}", false)]
+    [InlineData("{\"ui\":{\"seatWorkspaceListView\":\"invalid\"}}", false)]
+    public void SeatViewPreference_MigratesWithMapDefault(string json, bool expected)
+    {
+        var settings = MigrateAndDeserialize(json);
+        Assert.Equal(expected, settings.Ui.SeatWorkspaceListView);
+        var restored = MigrateAndDeserialize(JsonSerializer.Serialize(settings, AppJson.Default));
+        Assert.Equal(expected, restored.Ui.SeatWorkspaceListView);
+    }
+
     [Fact]
     public void LegacyFlatJson_MigratesToNestedAppSettings()
     {

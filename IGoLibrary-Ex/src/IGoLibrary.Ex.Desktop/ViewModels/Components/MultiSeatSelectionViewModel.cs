@@ -8,6 +8,7 @@ using IGoLibrary.Ex.Application.Services;
 using IGoLibrary.Ex.Desktop.Services;
 using IGoLibrary.Ex.Domain.Enums;
 using IGoLibrary.Ex.Domain.Models;
+using Microsoft.Extensions.Logging;
 
 namespace IGoLibrary.Ex.Desktop.ViewModels;
 
@@ -22,13 +23,14 @@ public sealed partial class MultiSeatSelectionViewModel : ViewModelBase
 
     public MultiSeatSelectionViewModel(IVenueWorkflowService venueWorkflowService,
         IActivityLogService activityLogService, INotificationService notificationService,
-        ISeatLabelDialogService seatLabelDialogService)
+        ISeatLabelDialogService seatLabelDialogService, ILoggerFactory? loggerFactory = null,
+        SeatViewPreferenceService? viewPreferences = null)
     {
         this.venueWorkflowService = venueWorkflowService;
         this.activityLogService = activityLogService;
         this.notificationService = notificationService;
         this.seatLabelDialogService = seatLabelDialogService;
-        Workspace = new SeatWorkspaceViewModel(activityLogService);
+        Workspace = new SeatWorkspaceViewModel(activityLogService, loggerFactory?.CreateLogger<SeatWorkspaceViewModel>(), viewPreferences);
         Workspace.PropertyChanged += (_, e) =>
         {
             OnPropertyChanged(e.PropertyName);
@@ -43,6 +45,7 @@ public sealed partial class MultiSeatSelectionViewModel : ViewModelBase
     private readonly HashSet<string> _committedSelectedSeatKeys = new(StringComparer.Ordinal);
     private readonly HashSet<string> _draftSelectedSeatKeys = new(StringComparer.Ordinal);
     private bool _isSynchronizingSeatSelection;
+    private long _populationVersion;
     private Func<LibrarySummary?>? _selectedLibrary;
     private Func<bool>? _canEditGrabConfiguration;
     private Func<bool>? _isGrabSeatSelectionOverlayOpen;
@@ -109,6 +112,7 @@ public sealed partial class MultiSeatSelectionViewModel : ViewModelBase
 
     public void BeginDraft()
     {
+        Workspace.NotifyOpened();
         _draftSelectedSeatKeys.Clear();
         foreach (var seatKey in _committedSelectedSeatKeys)
         {
@@ -135,6 +139,7 @@ public sealed partial class MultiSeatSelectionViewModel : ViewModelBase
 
     public async Task PopulateSeatsAsync(LibraryLayout layout, bool preserveSelection)
     {
+        var version = ++_populationVersion;
         CancelFiltering();
         var selectedKeysToRestore = preserveSelection
             ? IsGrabSeatSelectionOverlayOpen()
@@ -162,14 +167,16 @@ public sealed partial class MultiSeatSelectionViewModel : ViewModelBase
                 seat.SeatName,
                 seat.IsOccupied,
                 EditSeatLabelAsync,
-                DeleteSeatLabelAsync);
+                DeleteSeatLabelAsync) { SeatStatus = seat.SeatStatus };
             item.PropertyChanged += OnSeatItemPropertyChanged;
             item.IsSelected = selectedKeysToRestore.Contains(item.SeatKey, StringComparer.Ordinal);
             _allSeats.Add(item);
         }
         _isSynchronizingSeatSelection = false;
 
+        Workspace.ApplyLayout(layout);
         await ApplySeatFilterAsync();
+        if (version != _populationVersion) return;
         OnPropertyChanged(nameof(SeatCount));
         OnPropertyChanged(nameof(HasSeatLayout));
         OnPropertyChanged(nameof(HasNoSeatLayout));
@@ -192,6 +199,7 @@ public sealed partial class MultiSeatSelectionViewModel : ViewModelBase
 
     public void ClearSeats()
     {
+        ++_populationVersion;
         CancelFiltering();
         foreach (var seat in _allSeats)
         {
@@ -426,6 +434,7 @@ public sealed partial class MultiSeatSelectionViewModel : ViewModelBase
 
         return _allSeats
             .Where(seat => selectedKeySet.Contains(seat.SeatKey))
+            .DistinctBy(seat => seat.SeatKey, StringComparer.Ordinal)
             .OrderBy(seat => int.TryParse(seat.SeatName, out var number) ? number : int.MaxValue)
             .ThenBy(seat => seat.SeatName, StringComparer.OrdinalIgnoreCase)
             .Select(seat => new SeatReference(seat.SeatKey, seat.SeatName));

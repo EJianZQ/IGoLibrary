@@ -34,16 +34,35 @@ public sealed partial class SeatItemViewModel : ObservableObject
 
     public string StatusText => IsOccupied ? "有人" : "无人";
 
+    public int? SeatStatus { get; init; }
+    public string LayoutStatusText => SeatStatus switch
+    {
+        1 => "空闲",
+        2 => "平台已选",
+        3 => "有人",
+        4 => "暂离",
+        _ => $"{StatusText}（{(SeatStatus is null ? "无详细状态" : $"未知状态 {SeatStatus}")}）"
+    };
+    public string LocationDisplayText => $"{SeatName} · {SeatKey}";
+    public string LayoutToolTipText => $"座位 {SeatName}\n标识：{SeatKey}\n状态：{LayoutStatusText}\n占用标记：{StatusText}" +
+        (IsFavorite ? "\n已收藏" : string.Empty) +
+        (HasLabel ? $"\n标签：{LabelText}" : string.Empty) +
+        (IsFilterVisible ? string.Empty : "\n不符合当前筛选条件");
+    [ObservableProperty] private bool isLocated;
+
     [ObservableProperty]
     private bool isSelected;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LayoutToolTipText))]
     private bool isFavorite;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LayoutToolTipText))]
     private bool isFilterVisible = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LayoutToolTipText))]
     private string? labelText;
 
     public bool HasLabel => !string.IsNullOrWhiteSpace(LabelText);

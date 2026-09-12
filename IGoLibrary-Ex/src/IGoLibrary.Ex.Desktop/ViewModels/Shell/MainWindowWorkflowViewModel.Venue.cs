@@ -251,6 +251,7 @@ public partial class MainWindowWorkflowViewModel
             {
                 EnsureMultiSeatSelectionConfigured();
                 await MultiSeatSelection.PopulateSeatsAsync(result.Layout, preserveSelection);
+                if (!ReferenceEquals(MultiSeatSelection.Workspace.SourceLayout, result.Layout)) return;
                 TomorrowReservationPage.PopulateSeats(result.Layout);
                 MultiSeatSelection.ApplyFavoriteStates(result.Favorites.Select(x => x.SeatKey), syncSelection: false);
                 MultiSeatSelection.ApplySeatLabels(result.SeatLabels);

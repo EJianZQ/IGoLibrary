@@ -11,6 +11,8 @@ public sealed record UiPreferences
 
     public bool LaunchOnStartup { get; init; }
 
+    public bool SeatWorkspaceListView { get; init; }
+
     [JsonPropertyName("windowSize")]
     public MainViewSizePreferences? MainViewSize { get; init; } = MainViewSizePreferences.Default;
 

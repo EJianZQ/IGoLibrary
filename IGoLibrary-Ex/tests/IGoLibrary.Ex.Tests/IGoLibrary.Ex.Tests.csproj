@@ -25,4 +25,7 @@
     <Using Include="Microsoft.Extensions.Time.Testing" />
     <Using Include="Xunit" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Fixtures\library-layout-117580.json" />
+  </ItemGroup>
 </Project>

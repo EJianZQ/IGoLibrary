@@ -129,6 +129,7 @@ public sealed class SqliteSettingsRepository(
 
         writer.WritePropertyName("ui");
         writer.WriteStartObject();
+        writer.WriteBoolean("seatWorkspaceListView", ReadBool(ui, "seatWorkspaceListView") ?? defaults.Ui.SeatWorkspaceListView);
         writer.WriteBoolean(
             "minimizeToTray",
             ReadBool(ui, "minimizeToTray")
@@ -583,6 +584,7 @@ public sealed class SqliteSettingsRepository(
         var backupSync = ReadObject(root, "backupSync");
         return ReadBool(taskEventAlertEvents, "cookieExpiring").HasValue &&
                ReadBool(ui, "preventSystemSleepWhileTasksActive").HasValue &&
+               ReadBool(ui, "seatWorkspaceListView").HasValue &&
                windowSize.ValueKind == JsonValueKind.Object &&
                ReadBool(windowSize, "rememberSize").HasValue &&
                HasCanonicalWindowSizeDimensions(windowSize) &&

@@ -53,6 +53,7 @@ internal static class HostBuilderFactory
                 services.AddSingleton<IAppThemeService, AppThemeService>();
                 services.AddSingleton<AppWindowService>();
                 services.AddSingleton<IMainWindowSizePersistenceService, MainWindowSizePersistenceService>();
+                services.AddSingleton<SeatViewPreferenceService>();
                 services.AddSingleton<IErrorDialogService, ErrorDialogService>();
                 services.AddSingleton<IUpdateDialogService, UpdateDialogService>();
                 services.AddSingleton<WindowsUpdateWorkspaceManager>();

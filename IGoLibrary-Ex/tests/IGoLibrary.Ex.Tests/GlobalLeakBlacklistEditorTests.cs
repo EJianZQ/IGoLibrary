@@ -42,6 +42,7 @@ public sealed class GlobalLeakBlacklistEditorTests
         first.IsSelected = true;
         occupied.IsSelected = true;
         fixture.Editor.Workspace.ShowAvailableOnly = true;
+        fixture.Editor.Workspace.SelectedViewIndex = 1;
         await fixture.Editor.Workspace.RefreshAsync();
         Assert.False(occupied.IsFilterVisible);
         fixture.Editor.SelectedVenue = fixture.Editor.Venues[1];

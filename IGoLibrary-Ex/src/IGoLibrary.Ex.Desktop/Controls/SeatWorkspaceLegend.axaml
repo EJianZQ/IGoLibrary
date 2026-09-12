@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="IGoLibrary.Ex.Desktop.Controls.SeatWorkspaceLegend">
+  <WrapPanel>
+    <TextBlock Text="● 空闲  " Foreground="#8995A2" />
+    <TextBlock Text="● 平台已选  " Foreground="#50AF78" />
+    <TextBlock Text="● 有人  " Foreground="#F56870" />
+    <TextBlock Text="● 暂离  " Foreground="#9EA4AC" />
+    <TextBlock Text="✓ 本次勾选  " Foreground="{DynamicResource SemiAccentBrush}" />
+    <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,10,0">
+      <Border Width="14" Height="14" Background="#FFD66B" BorderBrush="#926000" BorderThickness="1" CornerRadius="7">
+        <Path Data="M 10,0 L 13,6.5 L 20,7.5 L 15,12.5 L 16,20 L 10,16.5 L 4,20 L 5,12.5 L 0,7.5 L 7,6.5 Z"
+              Fill="#603900" Stretch="Uniform" Margin="2" />
+      </Border>
+      <TextBlock Text="收藏" />
+    </StackPanel>
+    <StackPanel Orientation="Horizontal" Spacing="4">
+      <Border Width="14" Height="14" Background="#2369BC" BorderBrush="#D9E9FF" BorderThickness="1" CornerRadius="3">
+        <Path Data="M 1,0 L 11,0 L 11,16 L 6,12 L 1,16 Z" Fill="White" Stretch="Uniform" Margin="3,2" />
+      </Border>
+      <TextBlock Text="有标签" />
+    </StackPanel>
+  </WrapPanel>
+</UserControl>
