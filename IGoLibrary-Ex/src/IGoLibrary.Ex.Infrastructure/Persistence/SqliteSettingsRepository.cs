@@ -431,6 +431,7 @@ public sealed class SqliteSettingsRepository(
         writer.WriteBoolean(
             "enabled",
             ReadBool(logging, "enabled") ?? defaults.Logging.Enabled);
+        writer.WriteBoolean("recordNetworkRequests", ReadStrictBool(logging, "recordNetworkRequests") ?? false);
         writer.WriteNumber(
             "retainedFileCount",
             LogFileSettings.Normalize(new LogFileSettings(
@@ -602,6 +603,7 @@ public sealed class SqliteSettingsRepository(
                root.TryGetProperty("remoteCheckIn", out _) &&
                logging.ValueKind == JsonValueKind.Object &&
                ReadBool(logging, "enabled").HasValue &&
+               ReadStrictBool(logging, "recordNetworkRequests").HasValue &&
                ReadInt(logging, "retainedFileCount").HasValue &&
                backupSync.ValueKind == JsonValueKind.Object &&
                backupSync.TryGetProperty("endpoint", out _) &&
@@ -842,6 +844,17 @@ public sealed class SqliteSettingsRepository(
                property.ValueKind == JsonValueKind.Array
             ? property
             : default;
+    }
+
+    private static bool? ReadStrictBool(JsonElement parent, string propertyName)
+    {
+        if (parent.ValueKind != JsonValueKind.Object || !parent.TryGetProperty(propertyName, out var value)) return null;
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => null
+        };
     }
 
     private static bool? ReadBool(JsonElement parent, string propertyName)

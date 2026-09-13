@@ -6,12 +6,62 @@ using IGoLibrary.Ex.Application.Configuration;
 using IGoLibrary.Ex.Application.Exceptions;
 using IGoLibrary.Ex.Domain.Models;
 using IGoLibrary.Ex.Infrastructure.Api;
+using IGoLibrary.Ex.Application.Logging;
+using IGoLibrary.Ex.Infrastructure.Logging;
 
 namespace IGoLibrary.Ex.Tests;
 
 public sealed class RemoteCheckInProtocolTests
 {
     private const string BeaconUuid = "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0";
+
+    [Theory]
+    [InlineData(false, 40)]
+    [InlineData(true, 48)]
+    public async Task DetailedLoggingKeepsDevicesAndSignCredentialsOnWireButOutOfFile(bool customEndpoints, int tokenLength)
+    {
+        var directory = Directory.CreateTempSubdirectory("remote-session-log-");
+        var token = new string('a', tokenLength);
+        try
+        {
+            using var writer = new AppLogFileWriter(directory.FullName);
+            var state = new NetworkLogState();
+            state.Apply(true);
+            var handler = new SequenceHttpMessageHandler(
+                async (request, ct) =>
+                {
+                    Assert.Equal("t=" + token, await request.Content!.ReadAsStringAsync(ct));
+                    Assert.False(request.Headers.Contains("Cookie"));
+                    return await SequenceHttpMessageHandler.JsonResponseAsync(
+                        JsonSerializer.Serialize(new { code = 0, msg = "", data = new { user = new { user_nick = "N" }, devices = new[] { BeaconUuid } } }));
+                },
+                async (request, ct) =>
+                {
+                    var form = await request.Content!.ReadAsStringAsync(ct);
+                    Assert.Contains("t=" + token, form);
+                    Assert.Contains("devices=", form);
+                    Assert.Contains("location=", form);
+                    Assert.Contains("pass=", form);
+                    Assert.False(request.Headers.Contains("Cookie"));
+                    return await SequenceHttpMessageHandler.JsonResponseAsync("""{"code":0,"msg":"验证成功","data":{"seat_name":"A001"}}""");
+                });
+            using var loggingHandler = new NetworkLoggingHandler(new NetworkTrafficLogger(state, writer), "TraceIntRemoteCheckInTransport") { InnerHandler = handler };
+            var templates = CreateRemoteTemplates();
+            if (customEndpoints)
+                templates = templates with { RemoteCheckInDevicesEndpointUrl = "https://proxy.test/devices", RemoteCheckInSignEndpointUrl = "https://proxy.test/sign" };
+            var client = CreateClient(loggingHandler, templates);
+            Assert.Equal([BeaconUuid], (await client.GetDeviceInfoAsync(token)).BeaconUuids);
+            Assert.Equal("A001", (await client.SignAsync(token, CreateRequest())).SeatName);
+            Assert.Equal(2, handler.CallCount);
+            writer.Flush();
+            writer.Dispose();
+            var text = File.ReadAllText(Assert.Single(Directory.GetFiles(directory.FullName, "*.log")));
+            Assert.DoesNotContain(token, text);
+            Assert.Contains("A001", text);
+            Assert.Equal(2, text.Split('\n').Count(line => line.Contains("请求体；") && line.Contains("正文=t=")));
+        }
+        finally { directory.Delete(true); }
+    }
 
     [Fact]
     public async Task ApiClient_UsesConfiguredEndpointsCallbacksAndReferers()

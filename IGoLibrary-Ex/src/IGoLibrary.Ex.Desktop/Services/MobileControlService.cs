@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Infrastructure.Logging;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -16,7 +17,8 @@ public sealed class MobileControlService(
     IMobileControlTaskRecordsProvider taskRecordsProvider,
     IMobileControlTaskStartService taskStartService,
     IMobileControlActionService actionService,
-    ILogger<MobileControlService> logger) : IMobileControlService, IAsyncDisposable
+    ILogger<MobileControlService> logger,
+    NetworkTrafficLogger? networkLogger = null) : IMobileControlService, IAsyncDisposable
 {
     private static readonly TimeSpan DeviceActiveWindow = TimeSpan.FromSeconds(45);
     private static readonly TimeSpan DevicePruneInterval = TimeSpan.FromSeconds(10);
@@ -88,6 +90,7 @@ public sealed class MobileControlService(
             });
 
             var app = builder.Build();
+            app.UseNetworkLogging(networkLogger, "手机控制", token);
             app.MapGet("/", context => WriteLandingPageAsync(context, token));
             app.MapGet(healthCheckPath, WriteHealthCheckAsync);
             app.MapGet("/api/status", context => WriteStatusAsync(context, token));

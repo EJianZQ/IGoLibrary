@@ -17,7 +17,7 @@ internal static partial class UpdaterLogSanitizer
 
         var sanitized = UrlQueryRegex().Replace(
             value,
-            static match => $"{match.Groups["base"].Value}?<redacted>");
+            SanitizeQuery);
         sanitized = UrlUserInfoRegex().Replace(
             sanitized,
             static match => $"{match.Groups["scheme"].Value}{Redacted}@");
@@ -40,8 +40,20 @@ internal static partial class UpdaterLogSanitizer
         return sanitized;
     }
 
+    private static string SanitizeQuery(Match match)
+    {
+        var query = match.Groups["query"].Value;
+        // Keep encoded placeholders intact when sanitizing serialized JSON/XML repeatedly.
+        var alreadyRedacted = query.Equals(Redacted, StringComparison.OrdinalIgnoreCase) ||
+            query.Equals(@"\u003Credacted\u003E", StringComparison.OrdinalIgnoreCase) ||
+            query == "&lt;redacted&gt;";
+        return $"{match.Groups["quote"].Value}{match.Groups["base"].Value}?{(alreadyRedacted ? query : Redacted)}";
+    }
+
+    // Match the opening quote (including nested JSON escapes) and stop at that same delimiter.
+    // Other JSON escapes and apostrophes inside unquoted/double-quoted URIs remain URL data.
     [GeneratedRegex(
-        @"(?<base>\b(?:https?|wss?)://[^\s?#]+)\?[^\s#|]*",
+        """(?:(?<quote>\\*(?:["']|\\u0022|\\u0027))|(?<![\w"']|\\u0022|\\u0027))(?<base>(?:https?|wss?)://(?:(?!\k<quote>)(?:<redacted>|\\(?:u[0-9a-f]{4}|["\\/bfnrt])|&lt;redacted&gt;|[^\s?#"<>\\|；]))+)\?(?<query>(?:(?!\k<quote>)(?:<redacted>|\\(?:u[0-9a-f]{4}|["\\/bfnrt])|&lt;redacted&gt;|[^\s#|"<>\\；]))*)""",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex UrlQueryRegex();
 
@@ -56,7 +68,7 @@ internal static partial class UpdaterLogSanitizer
     private static partial Regex HeaderSecretRegex();
 
     [GeneratedRegex(
-        @"(?<key>[""']?\b(?:access[_-]?token|refresh[_-]?token|token|wechatSESS_ID|password|passwd|secret|sendkey|api[_-]?key|authorization|serverid|chat[_-]?id|device[_-]?key)\b[""']?\s*[:=]\s*)(?:""[^""\r\n]*""|'[^'\r\n]*'|[^&,\s;|}\]]+)",
+        @"(?<key>[""']?\b(?:access[_-]?token|refresh[_-]?token|token|wechatSESS_ID|password|passwd|secret|sendkey|api[_-]?key|authorization|serverid|chat[_-]?id|device[_-]?key)\b[""']?\s*[:=]\s*)(?:<redacted>(?=$|[\s,;|}\]>])|""[^""\r\n]*""|'[^'\r\n]*'|[^&,\s;|}\]]+)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex NamedSecretRegex();
 

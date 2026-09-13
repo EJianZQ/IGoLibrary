@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Application.Logging;
 using System.Net;
 using IGoLibrary.Ex.Application.Abstractions;
 using IGoLibrary.Ex.Infrastructure.Api;
@@ -28,8 +29,9 @@ public static class DependencyInjection
             serviceProvider.GetRequiredService<PersistentDataChangeTracker>());
         services.AddSingleton<IAppDataInitializer, SqliteAppDataInitializer>();
         services.TryAddSingleton<IAppLogWriter, AppLogFileWriter>();
-        services.TryAddSingleton<IAppLogRuntimeController>(serviceProvider =>
-            (IAppLogRuntimeController)serviceProvider.GetRequiredService<IAppLogWriter>());
+        services.TryAddSingleton<NetworkLogState>();
+        services.TryAddSingleton<IAppLogRuntimeController, AppLogRuntimeController>();
+        services.TryAddSingleton<NetworkTrafficLogger>();
         services.AddSingleton<AppTraceListener>();
         services.AddSingleton<TraceListenerRegistrar>();
         services.AddSingleton<ISettingsRepository, SqliteSettingsRepository>();
@@ -53,32 +55,32 @@ public static class DependencyInjection
         services.AddHttpClient<IBarkAlertSender, BarkAlertSender>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        }).AddHttpMessageHandler(sp => new NetworkLoggingHandler(sp.GetRequiredService<NetworkTrafficLogger>(), "BarkAlertSender"));
         services.AddHttpClient<IWxPusherAlertSender, WxPusherAlertSender>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        }).AddHttpMessageHandler(sp => new NetworkLoggingHandler(sp.GetRequiredService<NetworkTrafficLogger>(), "WxPusherAlertSender"));
         services.AddHttpClient<IServerChanAlertSender, ServerChanAlertSender>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        }).AddHttpMessageHandler(sp => new NetworkLoggingHandler(sp.GetRequiredService<NetworkTrafficLogger>(), "ServerChanAlertSender"));
         services.AddHttpClient<ITelegramAlertSender, TelegramAlertSender>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
-        });
+        }).AddHttpMessageHandler(sp => new NetworkLoggingHandler(sp.GetRequiredService<NetworkTrafficLogger>(), "TelegramAlertSender"));
         services.AddHttpClient<IGitHubReleaseClient, GitHubReleaseClient>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.UserAgent.ParseAdd("IGoLibrary-Ex");
             client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
             client.DefaultRequestHeaders.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
-        });
+        }).AddHttpMessageHandler(sp => new NetworkLoggingHandler(sp.GetRequiredService<NetworkTrafficLogger>(), "GitHubReleaseClient"));
         services.AddHttpClient<IReleaseAssetDownloader, GitHubReleaseAssetDownloader>(client =>
         {
             client.Timeout = Timeout.InfiniteTimeSpan;
             client.DefaultRequestHeaders.UserAgent.ParseAdd("IGoLibrary-Ex");
             client.DefaultRequestHeaders.Accept.ParseAdd("application/octet-stream");
-        }).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+        }).AddHttpMessageHandler(sp => new NetworkLoggingHandler(sp.GetRequiredService<NetworkTrafficLogger>(), "GitHubReleaseAssetDownloader")).ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
         {
             ConnectTimeout = TimeSpan.FromSeconds(30)
         });
@@ -93,7 +95,7 @@ public static class DependencyInjection
                 client.DefaultRequestHeaders.TryAddWithoutValidation(
                     "User-Agent",
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-            })
+            }).AddHttpMessageHandler(sp => new NetworkLoggingHandler(sp.GetRequiredService<NetworkTrafficLogger>(), "TraceIntGraphQlTransport"))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
                 AutomaticDecompression = DecompressionMethods.All,
@@ -102,7 +104,7 @@ public static class DependencyInjection
         services.AddHttpClient<TraceIntRemoteCheckInTransport>(client =>
             {
                 client.Timeout = Timeout.InfiniteTimeSpan;
-            })
+            }).AddHttpMessageHandler(sp => new NetworkLoggingHandler(sp.GetRequiredService<NetworkTrafficLogger>(), "TraceIntRemoteCheckInTransport"))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
                 AllowAutoRedirect = false,

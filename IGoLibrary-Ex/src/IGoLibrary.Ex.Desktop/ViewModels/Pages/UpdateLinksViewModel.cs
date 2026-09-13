@@ -19,7 +19,8 @@ public sealed partial class UpdateLinksViewModel(
     IUpdateDialogService updateDialogService,
     IWindowsUpdateProgressDialogService windowsUpdateProgressDialogService,
     IExternalLinkService externalLinkService,
-    IAppVersionProvider appVersionProvider) : ViewModelBase
+    IAppVersionProvider appVersionProvider,
+    IHttpClientFactory? httpClientFactory = null) : ViewModelBase
 {
     private readonly SemaphoreSlim _updateCheckGate = new(1, 1);
 
@@ -272,8 +273,8 @@ public sealed partial class UpdateLinksViewModel(
         try
         {
             using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            using var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "IGoLibrary-Ex");
+            if (httpClientFactory is null) return;
+            using var httpClient = httpClientFactory.CreateClient("ProjectAvatar");
 
             var bytes = await httpClient.GetByteArrayAsync(ProjectAuthorAvatarUrl, cancellationTokenSource.Token);
             using var stream = new MemoryStream(bytes);

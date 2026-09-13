@@ -34,10 +34,6 @@ internal static class HostBuilderFactory
                 if (sharedLogWriter is not null)
                 {
                     services.AddSingleton(sharedLogWriter);
-                    if (sharedLogWriter is IAppLogRuntimeController runtimeController)
-                    {
-                        services.AddSingleton(runtimeController);
-                    }
                 }
 
                 if (storageLocationManager is not null && storageLocations is not null)
@@ -50,6 +46,8 @@ internal static class HostBuilderFactory
                 services.AddApplication();
                 services.AddSingleton<IAppSettingsDefaults, DesktopAppSettingsDefaults>();
                 services.AddInfrastructure();
+                services.AddHttpClient("ProjectAvatar", client => client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "IGoLibrary-Ex"))
+                    .AddHttpMessageHandler(sp => new NetworkLoggingHandler(sp.GetRequiredService<NetworkTrafficLogger>(), "作者头像"));
                 services.AddSingleton<IAppThemeService, AppThemeService>();
                 services.AddSingleton<AppWindowService>();
                 services.AddSingleton<IMainWindowSizePersistenceService, MainWindowSizePersistenceService>();

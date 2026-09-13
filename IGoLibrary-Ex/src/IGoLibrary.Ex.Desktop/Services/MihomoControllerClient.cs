@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Infrastructure.Logging;
 using System.IO.Pipes;
 using System.Net;
 using System.Net.Http.Headers;
@@ -6,7 +7,7 @@ using System.Text.Json;
 
 namespace IGoLibrary.Ex.Desktop.Services;
 
-internal sealed class MihomoControllerClient : IMihomoControllerClient
+internal sealed class MihomoControllerClient(NetworkTrafficLogger? networkLogger = null) : IMihomoControllerClient
 {
     public async Task ReloadAsync(
         MihomoConfiguration configuration,
@@ -14,7 +15,7 @@ internal sealed class MihomoControllerClient : IMihomoControllerClient
         CancellationToken cancellationToken = default)
     {
         using var handler = CreateHandler(configuration.Controller);
-        using var httpClient = new HttpClient(handler)
+        using var httpClient = new HttpClient(NetworkLoggingHandler.Wrap(handler, networkLogger, "Mihomo"))
         {
             Timeout = TimeSpan.FromSeconds(10)
         };

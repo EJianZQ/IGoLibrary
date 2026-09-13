@@ -24,7 +24,10 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
     private readonly Task _processingTask;
     private readonly object _stateGate = new();
     private readonly Func<Task>? _beforeWriteAsync;
+    private readonly NetworkLogQueueBudget _networkBudget = new();
+    private long _droppedNetworkEntryCount;
     private long _droppedEntryCount;
+    internal long PendingNetworkBytes => _networkBudget.Used;
     private int _acceptingWrites = 1;
     private int _consecutiveFailureCount;
     private DateTimeOffset _lastHealthFailureNotificationAt = DateTimeOffset.MinValue;
@@ -121,9 +124,17 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
             }
         }
 
-        if (!_queue.Writer.TryWrite(new QueuedLogEntry(effectiveTimestamp, line, requiresFlush)))
+        var networkBytes = category == NetworkTrafficLogger.Category ? checked(line.Length * sizeof(char)) : 0;
+        if (networkBytes > 0 && !_networkBudget.TryAcquire(networkBytes))
         {
-            Interlocked.Increment(ref _droppedEntryCount);
+            Interlocked.Increment(ref _droppedNetworkEntryCount);
+            return;
+        }
+        if (!_queue.Writer.TryWrite(new QueuedLogEntry(effectiveTimestamp, line, requiresFlush, networkBytes)))
+        {
+            _networkBudget.Release(networkBytes);
+            if (networkBytes > 0) Interlocked.Increment(ref _droppedNetworkEntryCount);
+            else Interlocked.Increment(ref _droppedEntryCount);
         }
     }
 
@@ -263,130 +274,139 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
                 enforceRetention: true));
             await foreach (var workItem in _queue.Reader.ReadAllAsync())
             {
-                switch (workItem)
+                try
                 {
-                    case QueuedLogEntry entry when currentSettings.Enabled:
-                        try
-                        {
-                            if (activeWriter is null)
+                    switch (workItem)
+                    {
+                        case QueuedLogEntry entry when currentSettings.Enabled:
+                            try
                             {
-                                (activeFilePath, activeWriter) = CreateWriter(activeFilePath);
-                                var creationCleanup = AppLogFileCatalog.EnforceRetention(
-                                    _logDirectory,
-                                    currentSettings.RetainedFileCount,
-                                    activeFilePath,
-                                    ReportCatalogFailure);
-                                _ = creationCleanup;
-                            }
+                                if (activeWriter is null)
+                                {
+                                    (activeFilePath, activeWriter) = CreateWriter(activeFilePath);
+                                    var creationCleanup = AppLogFileCatalog.EnforceRetention(
+                                        _logDirectory,
+                                        currentSettings.RetainedFileCount,
+                                        activeFilePath,
+                                        ReportCatalogFailure);
+                                    _ = creationCleanup;
+                                }
 
-                            pendingWriteCount += await WriteDroppedEntryWarningAsync(activeWriter, entry.Timestamp);
-                            if (_beforeWriteAsync is not null)
-                            {
-                                await _beforeWriteAsync();
-                            }
+                                pendingWriteCount += await WriteDroppedEntryWarningAsync(activeWriter, entry.Timestamp);
+                                if (_beforeWriteAsync is not null)
+                                {
+                                    await _beforeWriteAsync();
+                                }
 
-                            await activeWriter.WriteAsync(entry.Line);
-                            pendingWriteCount++;
-                            if (entry.RequiresFlush ||
-                                pendingWriteCount >= FlushBatchSize ||
-                                flushStopwatch.Elapsed >= FlushInterval)
+                                await activeWriter.WriteAsync(entry.Line);
+                                pendingWriteCount++;
+                                if (entry.RequiresFlush ||
+                                    pendingWriteCount >= FlushBatchSize ||
+                                    flushStopwatch.Elapsed >= FlushInterval)
+                                {
+                                    await activeWriter.FlushAsync();
+                                    pendingWriteCount = 0;
+                                    flushStopwatch.Restart();
+                                }
+                            }
+                            catch (Exception ex)
                             {
-                                await activeWriter.FlushAsync();
+                                ReportFailure("写入日志文件", ex);
+                                if (activeWriter is not null)
+                                {
+                                    try
+                                    {
+                                        await activeWriter.DisposeAsync();
+                                    }
+                                    catch (Exception disposeException)
+                                    {
+                                        ReportFailure("释放失效的日志文件", disposeException);
+                                    }
+
+                                    activeWriter = null;
+                                    activeFilePath = null;
+                                }
+
                                 pendingWriteCount = 0;
                                 flushStopwatch.Restart();
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            ReportFailure("写入日志文件", ex);
-                            if (activeWriter is not null)
+                            finally
                             {
-                                try
+                                if (activeWriter is not null)
+                                {
+                                    ReportRecovered("写入日志文件");
+                                }
+                            }
+
+                            break;
+
+                        case ApplySettingsRequest request:
+                            try
+                            {
+                                if (activeWriter is not null &&
+                                    (!request.Settings.Enabled ||
+                                     request.Settings.RetainedFileCount != currentSettings.RetainedFileCount))
+                                {
+                                    await FlushWriterAsync(activeWriter, pendingWriteCount);
+                                    pendingWriteCount = 0;
+                                }
+
+                                if (!request.Settings.Enabled && activeWriter is not null)
                                 {
                                     await activeWriter.DisposeAsync();
-                                }
-                                catch (Exception disposeException)
-                                {
-                                    ReportFailure("释放失效的日志文件", disposeException);
+                                    activeWriter = null;
                                 }
 
-                                activeWriter = null;
-                                activeFilePath = null;
-                            }
-
-                            pendingWriteCount = 0;
-                            flushStopwatch.Restart();
-                        }
-                        finally
-                        {
-                            if (activeWriter is not null)
-                            {
-                                ReportRecovered("写入日志文件");
-                            }
-                        }
-
-                        break;
-
-                    case ApplySettingsRequest request:
-                        try
-                        {
-                            if (activeWriter is not null &&
-                                (!request.Settings.Enabled ||
-                                 request.Settings.RetainedFileCount != currentSettings.RetainedFileCount))
-                            {
-                                await FlushWriterAsync(activeWriter, pendingWriteCount);
-                                pendingWriteCount = 0;
-                            }
-
-                            if (!request.Settings.Enabled && activeWriter is not null)
-                            {
-                                await activeWriter.DisposeAsync();
-                                activeWriter = null;
-                            }
-
-                            var retainedFileCountChanged =
-                                request.Settings.RetainedFileCount != currentSettings.RetainedFileCount;
-                            currentSettings = request.Settings;
-                            request.Completion.SetResult(ApplyFilePolicies(
-                                currentSettings,
-                                activeFilePath,
-                                deleteLegacyFiles: true,
-                                enforceRetention: retainedFileCountChanged));
-                            flushStopwatch.Restart();
-                        }
-                        catch (Exception ex)
-                        {
-                            ReportFailure("应用日志设置", ex);
-                            request.Completion.SetException(ex);
-                        }
-
-                        break;
-
-                    case FlushRequest flushRequest:
-                        try
-                        {
-                            if (activeWriter is not null)
-                            {
-                                pendingWriteCount += await WriteDroppedEntryWarningAsync(activeWriter, _clock());
-                                await FlushWriterAsync(activeWriter, pendingWriteCount);
-                                pendingWriteCount = 0;
+                                var retainedFileCountChanged =
+                                    request.Settings.RetainedFileCount != currentSettings.RetainedFileCount;
+                                currentSettings = request.Settings;
+                                request.Completion.SetResult(ApplyFilePolicies(
+                                    currentSettings,
+                                    activeFilePath,
+                                    deleteLegacyFiles: true,
+                                    enforceRetention: retainedFileCountChanged));
                                 flushStopwatch.Restart();
                             }
+                            catch (Exception ex)
+                            {
+                                ReportFailure("应用日志设置", ex);
+                                request.Completion.SetException(ex);
+                            }
 
-                            flushRequest.Completion.SetResult();
-                        }
-                        catch (Exception ex)
-                        {
-                            ReportFailure("刷新日志文件", ex);
-                            flushRequest.Completion.SetException(ex);
-                        }
+                            break;
 
-                        break;
+                        case FlushRequest flushRequest:
+                            try
+                            {
+                                if (activeWriter is not null)
+                                {
+                                    pendingWriteCount += await WriteDroppedEntryWarningAsync(activeWriter, _clock());
+                                    await FlushWriterAsync(activeWriter, pendingWriteCount);
+                                    pendingWriteCount = 0;
+                                    flushStopwatch.Restart();
+                                }
+
+                                flushRequest.Completion.SetResult();
+                            }
+                            catch (Exception ex)
+                            {
+                                ReportFailure("刷新日志文件", ex);
+                                flushRequest.Completion.SetException(ex);
+                            }
+
+                            break;
+                    }
+                }
+                finally
+                {
+                    if (workItem is QueuedLogEntry processed) _networkBudget.Release(processed.NetworkBytes);
                 }
             }
         }
         finally
         {
+            while (_queue.Reader.TryRead(out var abandoned))
+                if (abandoned is QueuedLogEntry entry) _networkBudget.Release(entry.NetworkBytes);
             if (activeWriter is not null)
             {
                 pendingWriteCount += await WriteDroppedEntryWarningAsync(activeWriter, _clock());
@@ -495,7 +515,8 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
     private async Task<int> WriteDroppedEntryWarningAsync(StreamWriter writer, DateTimeOffset timestamp)
     {
         var droppedCount = Interlocked.Exchange(ref _droppedEntryCount, 0);
-        if (droppedCount <= 0)
+        var networkDroppedCount = Interlocked.Exchange(ref _droppedNetworkEntryCount, 0);
+        if (droppedCount <= 0 && networkDroppedCount <= 0)
         {
             return 0;
         }
@@ -504,7 +525,7 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
             timestamp,
             LogLevel.Warning,
             "Logging",
-            $"日志队列已满，已丢弃 {droppedCount} 条日志。",
+            $"日志队列已满，已丢弃 {droppedCount} 条日志。网络日志队列或字节预算不足，已丢弃 {networkDroppedCount} 条网络记录。",
             exception: null,
             eventId: default));
         return 1;
@@ -620,7 +641,8 @@ public sealed class AppLogFileWriter : IAppLogWriter, IAppLogRuntimeController, 
     private sealed record QueuedLogEntry(
         DateTimeOffset Timestamp,
         string Line,
-        bool RequiresFlush) : QueuedWorkItem;
+        bool RequiresFlush,
+        int NetworkBytes = 0) : QueuedWorkItem;
 
     private sealed record ApplySettingsRequest(
         LogFileSettings Settings,

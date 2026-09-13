@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Infrastructure.Logging;
 using System.Net;
 using IGoLibrary.Ex.Application.Abstractions;
 using RestSharp;
@@ -93,13 +94,16 @@ internal interface ITraceIntCookieHttpClient
     Task<TraceIntCookieHttpResponse> ExecuteGetAsync(string requestUrl, CancellationToken cancellationToken);
 }
 
-internal sealed class RestSharpTraceIntCookieHttpClient : ITraceIntCookieHttpClient
+internal sealed class RestSharpTraceIntCookieHttpClient(NetworkTrafficLogger? networkLogger = null) : ITraceIntCookieHttpClient
 {
     public async Task<TraceIntCookieHttpResponse> ExecuteGetAsync(
         string requestUrl,
         CancellationToken cancellationToken)
     {
-        using var client = new RestClient(requestUrl);
+        using var client = new RestClient(new RestClientOptions(requestUrl)
+        {
+            ConfigureMessageHandler = handler => NetworkLoggingHandler.Wrap(handler, networkLogger, "Cookie 登录")
+        });
         var request = new RestRequest
         {
             Method = Method.Get

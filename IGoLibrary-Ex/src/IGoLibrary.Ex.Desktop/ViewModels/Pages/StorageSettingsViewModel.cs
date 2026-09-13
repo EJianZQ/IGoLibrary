@@ -50,6 +50,9 @@ public sealed partial class StorageSettingsViewModel(
     private bool isFileLoggingEnabled = LogFileSettings.Default.Enabled;
 
     [ObservableProperty]
+    private bool recordNetworkRequests;
+
+    [ObservableProperty]
     private int retainedLogFileCount = LogFileSettings.Default.RetainedFileCount;
 
     [ObservableProperty]
@@ -73,6 +76,7 @@ public sealed partial class StorageSettingsViewModel(
         {
             IsFileLoggingEnabled = normalizedLoggingSettings.Enabled;
             RetainedLogFileCount = normalizedLoggingSettings.RetainedFileCount;
+            RecordNetworkRequests = normalizedLoggingSettings.RecordNetworkRequests;
             _lastPersistedLoggingSettings = normalizedLoggingSettings;
             _pendingLoggingSettings = normalizedLoggingSettings;
         }
@@ -210,6 +214,8 @@ public sealed partial class StorageSettingsViewModel(
 
     partial void OnIsFileLoggingEnabledChanged(bool value) => QueueLoggingSettingsSave();
 
+    partial void OnRecordNetworkRequestsChanged(bool value) => QueueLoggingSettingsSave();
+
     partial void OnRetainedLogFileCountChanged(int value)
     {
         var normalized = Math.Clamp(
@@ -238,136 +244,6 @@ public sealed partial class StorageSettingsViewModel(
         OnPropertyChanged(nameof(HasStorageLocationChanges));
         OnPropertyChanged(nameof(CanApplyStorageLocationChanges));
         ApplyStorageLocationChangesCommand.NotifyCanExecuteChanged();
-    }
-
-    private void QueueLoggingSettingsSave()
-    {
-        if (_isLoadingLoggingSettings)
-        {
-            return;
-        }
-
-        var shouldStartLoop = false;
-        lock (_loggingSettingsSaveGate)
-        {
-            _pendingLoggingSettings = LogFileSettings.Normalize(new LogFileSettings(
-                IsFileLoggingEnabled,
-                RetainedLogFileCount));
-            _pendingLoggingSettingsVersion++;
-            if (!_loggingSettingsSaveLoopRunning)
-            {
-                _loggingSettingsSaveLoopRunning = true;
-                shouldStartLoop = true;
-            }
-        }
-
-        if (!shouldStartLoop)
-        {
-            return;
-        }
-
-        var saveTask = PersistLoggingSettingsLoopAsync();
-        lock (_loggingSettingsSaveGate)
-        {
-            _loggingSettingsSaveTask = saveTask;
-        }
-    }
-
-    private async Task PersistLoggingSettingsLoopAsync()
-    {
-        IsLoggingSettingsSaveInProgress = true;
-        try
-        {
-            while (true)
-            {
-                LogFileSettings pending;
-                long version;
-                lock (_loggingSettingsSaveGate)
-                {
-                    if (_processedLoggingSettingsVersion == _pendingLoggingSettingsVersion)
-                    {
-                        _loggingSettingsSaveLoopRunning = false;
-                        return;
-                    }
-
-                    pending = _pendingLoggingSettings;
-                    version = _pendingLoggingSettingsVersion;
-                }
-
-                try
-                {
-                    var result = await loggingSettingsWorkflowService.SaveAsync(pending);
-                    bool hasNewerValue;
-                    lock (_loggingSettingsSaveGate)
-                    {
-                        _lastPersistedLoggingSettings = result.Settings;
-                        _processedLoggingSettingsVersion = version;
-                        hasNewerValue = _pendingLoggingSettingsVersion != version;
-                    }
-
-                    if (!hasNewerValue)
-                    {
-                        ApplyNormalizedLoggingSettings(result.Settings);
-                    }
-                    if (result.RuntimeResult.TotalDeleteFailureCount > 0)
-                    {
-                        var message =
-                            $"设置已保存，但有 {result.RuntimeResult.TotalDeleteFailureCount} 个日志文件暂时无法清理，将在后续重试。";
-                        activityLogService.Write(LogEntryKind.Warning, "Logging", message);
-                        await TryShowLoggingWarningAsync("部分日志暂未清理", message);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogFileSettings persisted;
-                    bool hasNewerValue;
-                    lock (_loggingSettingsSaveGate)
-                    {
-                        _processedLoggingSettingsVersion = version;
-                        persisted = _lastPersistedLoggingSettings;
-                        hasNewerValue = _pendingLoggingSettingsVersion != version;
-                    }
-
-                    if (!hasNewerValue)
-                    {
-                        ApplyNormalizedLoggingSettings(persisted);
-                    }
-
-                    activityLogService.Write(LogEntryKind.Warning, "Settings", $"保存日志设置失败：{ex.Message}", ex);
-                    await TryShowLoggingWarningAsync("无法保存日志设置", ex.Message);
-                }
-            }
-        }
-        finally
-        {
-            IsLoggingSettingsSaveInProgress = false;
-        }
-    }
-
-    private void ApplyNormalizedLoggingSettings(LogFileSettings settings)
-    {
-        _isLoadingLoggingSettings = true;
-        try
-        {
-            IsFileLoggingEnabled = settings.Enabled;
-            RetainedLogFileCount = settings.RetainedFileCount;
-        }
-        finally
-        {
-            _isLoadingLoggingSettings = false;
-        }
-    }
-
-    private async Task TryShowLoggingWarningAsync(string title, string message)
-    {
-        try
-        {
-            await notificationService.ShowWarningAsync(title, message, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            activityLogService.Write(LogEntryKind.Warning, "Settings", $"显示日志设置提示失败：{ex.Message}", ex);
-        }
     }
 
     private static bool PathsEqual(string left, string right)

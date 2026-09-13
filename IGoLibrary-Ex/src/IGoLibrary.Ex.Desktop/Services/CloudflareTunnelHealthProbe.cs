@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Infrastructure.Logging;
 using System.Net;
 
 namespace IGoLibrary.Ex.Desktop.Services;
@@ -24,7 +25,7 @@ internal sealed record CloudflareTunnelHealthProbeResult(
     public static CloudflareTunnelHealthProbeResult Failed(Exception failure) => new(false, failure);
 }
 
-internal sealed class CloudflareTunnelHealthProbeFactory : ICloudflareTunnelHealthProbeFactory
+internal sealed class CloudflareTunnelHealthProbeFactory(NetworkTrafficLogger? networkLogger = null) : ICloudflareTunnelHealthProbeFactory
 {
     public ICloudflareTunnelHealthProbeSession Create(Uri? proxyUri)
     {
@@ -33,7 +34,7 @@ internal sealed class CloudflareTunnelHealthProbeFactory : ICloudflareTunnelHeal
             UseProxy = proxyUri is not null,
             Proxy = proxyUri is null ? null : new WebProxy(proxyUri)
         };
-        return new CloudflareTunnelHealthProbeSession(handler);
+        return new CloudflareTunnelHealthProbeSession(NetworkLoggingHandler.Wrap(handler, networkLogger, "Tunnel 健康检查"));
     }
 }
 

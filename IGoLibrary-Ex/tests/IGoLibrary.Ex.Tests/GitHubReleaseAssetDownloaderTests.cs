@@ -16,6 +16,12 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
         "IGoLibrary-Ex-downloader-tests",
         Guid.NewGuid().ToString("N"));
 
+    // Exercise the downloader's existing range, pause, cancellation and integrity scenarios
+    // with detailed network logging enabled, including its streaming content wrapper.
+    private static HttpClient CreateLoggedClient(HttpMessageHandler handler) =>
+        new(IGoLibrary.Ex.Infrastructure.Logging.NetworkLoggingHandler.Wrap(
+            handler, new NetworkLogTestContext().Logger, "下载回归"));
+
     [Fact]
     public void AddInfrastructure_ResolvesTypedDownloader()
     {
@@ -38,7 +44,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
             Assert.Contains(request.Headers.AcceptEncoding, value => value.Value == "identity");
             return Task.FromResult(Response(bytes));
         });
-        var downloader = new GitHubReleaseAssetDownloader(new HttpClient(handler));
+        var downloader = new GitHubReleaseAssetDownloader(CreateLoggedClient(handler));
         var progress = new List<ReleaseAssetDownloadProgress>();
         var destination = Path.Combine(_root, "package.zip");
 
@@ -73,7 +79,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
                 bytes.Length));
         });
 
-        await new GitHubReleaseAssetDownloader(new HttpClient(handler))
+        await new GitHubReleaseAssetDownloader(CreateLoggedClient(handler))
             .DownloadAsync(Asset(bytes), destination);
 
         Assert.Equal(bytes, await File.ReadAllBytesAsync(destination));
@@ -100,7 +106,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
                 return Task.FromResult(PartialResponse(bytes[6..], 6, 9, bytes.Length));
             });
 
-        await new GitHubReleaseAssetDownloader(new HttpClient(handler))
+        await new GitHubReleaseAssetDownloader(CreateLoggedClient(handler))
             .DownloadAsync(Asset(bytes), destination);
 
         Assert.Equal(bytes, await File.ReadAllBytesAsync(destination));
@@ -120,7 +126,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
             return Task.FromResult(Response(bytes));
         });
 
-        await new GitHubReleaseAssetDownloader(new HttpClient(handler))
+        await new GitHubReleaseAssetDownloader(CreateLoggedClient(handler))
             .DownloadAsync(Asset(bytes), destination);
 
         Assert.Equal(bytes, await File.ReadAllBytesAsync(destination));
@@ -145,7 +151,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
                 return Task.FromResult(Response(bytes));
             });
 
-        await new GitHubReleaseAssetDownloader(new HttpClient(handler))
+        await new GitHubReleaseAssetDownloader(CreateLoggedClient(handler))
             .DownloadAsync(Asset(bytes), destination);
 
         Assert.Equal(bytes, await File.ReadAllBytesAsync(destination));
@@ -166,7 +172,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
             return Task.FromResult(StatusResponse(HttpStatusCode.RequestedRangeNotSatisfiable));
         });
 
-        await new GitHubReleaseAssetDownloader(new HttpClient(handler))
+        await new GitHubReleaseAssetDownloader(CreateLoggedClient(handler))
             .DownloadAsync(Asset(bytes), destination);
 
         Assert.Equal(bytes, await File.ReadAllBytesAsync(destination));
@@ -182,7 +188,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
         await File.WriteAllBytesAsync(destination + ".partial", bytes);
         var handler = new SequenceHttpMessageHandler();
 
-        await new GitHubReleaseAssetDownloader(new HttpClient(handler))
+        await new GitHubReleaseAssetDownloader(CreateLoggedClient(handler))
             .DownloadAsync(Asset(bytes), destination);
 
         Assert.Equal(0, handler.CallCount);
@@ -277,7 +283,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
             (_, _) => Task.FromResult(NeverProgressResponse()),
             (_, _) => Task.FromResult(NeverProgressResponse()));
         var downloader = new GitHubReleaseAssetDownloader(
-            new HttpClient(handler),
+            CreateLoggedClient(handler),
             NullLogger<GitHubReleaseAssetDownloader>.Instance,
             TimeProvider.System,
             TimeSpan.FromMilliseconds(20),
@@ -330,7 +336,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
             (_, _) => Task.FromResult(retryResponse),
             (_, _) => Task.FromResult(Response(bytes)));
         var downloader = new GitHubReleaseAssetDownloader(
-            new HttpClient(handler),
+            CreateLoggedClient(handler),
             NullLogger<GitHubReleaseAssetDownloader>.Instance,
             TimeProvider.System,
             TimeSpan.FromSeconds(1),
@@ -406,7 +412,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
                     bytes.Length));
             });
         var downloader = new GitHubReleaseAssetDownloader(
-            new HttpClient(handler),
+            CreateLoggedClient(handler),
             NullLogger<GitHubReleaseAssetDownloader>.Instance,
             TimeProvider.System,
             TimeSpan.FromMilliseconds(20),
@@ -509,7 +515,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
         var destination = Path.Combine(_root, "package.zip");
 
         await Assert.ThrowsAsync<InvalidDataException>(() =>
-            new GitHubReleaseAssetDownloader(new HttpClient(
+            new GitHubReleaseAssetDownloader(CreateLoggedClient(
                     new SequenceHttpMessageHandler((_, _) => Task.FromResult(response))))
                 .DownloadAsync(Asset(bytes), destination));
 
@@ -522,7 +528,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
         var bytes = "short"u8.ToArray();
         var response = Response(bytes);
         response.Content.Headers.ContentLength = bytes.Length + 1;
-        var downloader = new GitHubReleaseAssetDownloader(new HttpClient(
+        var downloader = new GitHubReleaseAssetDownloader(CreateLoggedClient(
             new SequenceHttpMessageHandler((_, _) => Task.FromResult(response))));
         var destination = Path.Combine(_root, "package.zip");
 
@@ -542,7 +548,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
             Content = new UnknownLengthContent(bytes),
             RequestMessage = FinalRequest()
         };
-        var downloader = new GitHubReleaseAssetDownloader(new HttpClient(
+        var downloader = new GitHubReleaseAssetDownloader(CreateLoggedClient(
             new SequenceHttpMessageHandler((_, _) => Task.FromResult(response))));
 
         var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
@@ -559,7 +565,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
         {
             Digest = "sha256:" + new string('0', 64)
         };
-        var downloader = new GitHubReleaseAssetDownloader(new HttpClient(
+        var downloader = new GitHubReleaseAssetDownloader(CreateLoggedClient(
             new SequenceHttpMessageHandler((_, _) => Task.FromResult(Response(bytes)))));
         var destination = Path.Combine(_root, "package.zip");
 
@@ -578,7 +584,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
         Directory.CreateDirectory(_root);
         await File.WriteAllBytesAsync(destination + ".partial", bytes[..3]);
         var response = PartialResponse(bytes[3..], 2, bytes.Length - 1, bytes.Length);
-        var downloader = new GitHubReleaseAssetDownloader(new HttpClient(
+        var downloader = new GitHubReleaseAssetDownloader(CreateLoggedClient(
             new SequenceHttpMessageHandler((_, _) => Task.FromResult(response))));
 
         await Assert.ThrowsAsync<InvalidDataException>(() =>
@@ -594,7 +600,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
         var destination = Path.Combine(_root, "package.zip");
         Directory.CreateDirectory(_root);
         await File.WriteAllBytesAsync(destination + ".partial", bytes[..4]);
-        var downloader = new GitHubReleaseAssetDownloader(new HttpClient(
+        var downloader = new GitHubReleaseAssetDownloader(CreateLoggedClient(
             new SequenceHttpMessageHandler((_, _) =>
                 Task.FromResult(StatusResponse(HttpStatusCode.NotFound)))));
 
@@ -622,7 +628,7 @@ public sealed class GitHubReleaseAssetDownloaderTests : IDisposable
         SequenceHttpMessageHandler handler)
     {
         return new GitHubReleaseAssetDownloader(
-            new HttpClient(handler),
+            CreateLoggedClient(handler),
             NullLogger<GitHubReleaseAssetDownloader>.Instance,
             TimeProvider.System,
             TimeSpan.FromSeconds(1),

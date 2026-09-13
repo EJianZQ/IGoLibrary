@@ -139,6 +139,53 @@ public sealed class StorageSettingsViewModelTests
         Assert.Contains(notification.Warnings, item => item.Title == "无法保存日志设置");
     }
 
+    [Fact]
+    public async Task NetworkLogging_PersistsWhileMasterIsOff_AndRestoresOnLoad()
+    {
+        var workflow = new FakeLoggingSettingsWorkflowService();
+        var viewModel = Create(new(), new(), new(), out _, workflow);
+        await viewModel.InitializeAsync(new LogFileSettings(false, 42));
+        viewModel.RecordNetworkRequests = true;
+        await viewModel.FlushPendingLoggingSettingsSaveAsync();
+        var saved = workflow.SavedSettings[^1];
+        Assert.True(saved.RecordNetworkRequests);
+        Assert.False(saved.Enabled);
+        Assert.Equal(42, saved.RetainedFileCount);
+        var restarted = Create(new(), new(), new(), out _, new());
+        await restarted.InitializeAsync(saved);
+        Assert.True(restarted.RecordNetworkRequests);
+    }
+
+    [Fact]
+    public async Task NetworkLogging_RuntimeFailureRetainsSavedChoiceAndShowsAccurateWarning()
+    {
+        var workflow = new FakeLoggingSettingsWorkflowService
+        {
+            SaveHandler = settings => Task.FromResult(new LoggingSettingsUpdateResult(settings,
+                LogRuntimeApplyResult.Success with { ApplicationFailure = "应用失败" }))
+        };
+        var viewModel = Create(new(), new(), new(), out var notification, workflow);
+        await viewModel.InitializeAsync(LogFileSettings.Default);
+        viewModel.RecordNetworkRequests = true;
+        await viewModel.FlushPendingLoggingSettingsSaveAsync();
+        Assert.True(viewModel.RecordNetworkRequests);
+        Assert.Contains(notification.Warnings, w => w.Title == "日志设置已保存，但未能应用");
+    }
+
+    [Fact]
+    public async Task NetworkLogging_SaveFailureRollsBackChoice()
+    {
+        var workflow = new FakeLoggingSettingsWorkflowService
+        {
+            SaveHandler = _ => throw new IOException("保存失败")
+        };
+        var viewModel = Create(new(), new(), new(), out _, workflow);
+        await viewModel.InitializeAsync(LogFileSettings.Default);
+        viewModel.RecordNetworkRequests = true;
+        await viewModel.FlushPendingLoggingSettingsSaveAsync();
+        Assert.False(viewModel.RecordNetworkRequests);
+    }
+
     private static StorageSettingsViewModel Create(
         FakeStorageLocationService storage,
         FakeFolderPickerService picker,

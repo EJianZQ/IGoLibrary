@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Infrastructure.Logging;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -11,7 +12,8 @@ namespace IGoLibrary.Ex.Desktop.Services;
 public sealed class LanCookieRelayService(
     ILanAddressProvider addressProvider,
     INetworkExposureManager networkExposureManager,
-    ILogger<LanCookieRelayService> logger) : ILanCookieRelayService, IAsyncDisposable
+    ILogger<LanCookieRelayService> logger,
+    NetworkTrafficLogger? networkLogger = null) : ILanCookieRelayService, IAsyncDisposable
 {
     private static readonly TimeSpan DefaultSessionTimeout = TimeSpan.FromMinutes(10);
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -65,6 +67,7 @@ public sealed class LanCookieRelayService(
 
             var submitGate = new SubmitGate();
             var app = builder.Build();
+            app.UseNetworkLogging(networkLogger, "授权链接快传", token);
             app.MapGet("/", context => WriteLandingPageAsync(context, token, purpose));
             app.MapGet("/auth-qrcode", context => WriteAuthQrCodeAsync(context, token));
             app.MapGet(healthCheckPath, WriteHealthCheckAsync);

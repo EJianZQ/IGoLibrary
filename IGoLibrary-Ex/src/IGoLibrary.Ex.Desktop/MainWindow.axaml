@@ -4061,7 +4061,7 @@
                                    Text="每次运行使用一份独立日志" />
                       </StackPanel>
 
-                      <Grid RowDefinitions="Auto,Auto"
+                      <Grid RowDefinitions="Auto,Auto,Auto"
                             ColumnDefinitions="*,160"
                             RowSpacing="12"
                             ColumnSpacing="12">
@@ -4078,14 +4078,27 @@
                                       HorizontalAlignment="Right"
                                       VerticalAlignment="Center" />
 
-                        <StackPanel Grid.Row="1"
+                        <StackPanel Grid.Row="1" Spacing="4">
+                          <TextBlock Classes="field-label" Text="记录网络请求" />
+                          <TextBlock Classes="helper-text" TextWrapping="Wrap"
+                                     Text="记录所有网络交互的请求地址、请求体和响应" />
+                          <TextBlock Classes="helper-text" Text="开启记录运行日志后生效"
+                                     IsVisible="{Binding !SystemSettings.StorageSettings.IsFileLoggingEnabled}" />
+                        </StackPanel>
+                        <ToggleSwitch Grid.Row="1" Grid.Column="1"
+                                      Name="RecordNetworkRequestsToggle"
+                                      IsChecked="{Binding SystemSettings.StorageSettings.RecordNetworkRequests}"
+                                      OnContent="开" OffContent="关"
+                                      HorizontalAlignment="Right" VerticalAlignment="Center" />
+
+                        <StackPanel Grid.Row="2"
                                     Spacing="4">
                           <TextBlock Classes="field-label"
                                      Text="最多保留日志" />
                           <TextBlock Classes="helper-text"
                                      Text="调小数量后会立即清理最旧的运行日志" />
                         </StackPanel>
-                        <NumericUpDown Grid.Row="1"
+                        <NumericUpDown Grid.Row="2"
                                        Grid.Column="1"
                                        Minimum="1"
                                        Maximum="365"

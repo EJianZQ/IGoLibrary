@@ -2,6 +2,8 @@ namespace IGoLibrary.Ex.Application.Configuration;
 
 public sealed record LogFileSettings(bool Enabled, int RetainedFileCount)
 {
+    public bool RecordNetworkRequests { get; init; }
+
     public const int DefaultRetainedFileCount = 30;
     public const int MinRetainedFileCount = 1;
     public const int MaxRetainedFileCount = 365;

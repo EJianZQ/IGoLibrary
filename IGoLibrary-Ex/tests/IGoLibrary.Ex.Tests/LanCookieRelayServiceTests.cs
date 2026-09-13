@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Infrastructure.Logging;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Text;
@@ -9,6 +10,27 @@ namespace IGoLibrary.Ex.Tests;
 
 public sealed class LanCookieRelayServiceTests
 {
+    [Fact]
+    public async Task NetworkLogging_RealServiceLogsSuccessAndRejectionWithoutAccessTokens()
+    {
+        var logs = new NetworkLogTestContext();
+        await using var service = CreateService(networkLogger: logs.Logger);
+        var session = await service.StartAsync((_, _) => Task.FromResult(LanCookieRelaySubmitResult.Succeeded("ok")));
+        using var client = new HttpClient();
+        using var good = await client.GetAsync(session.Url);
+        Assert.Equal(HttpStatusCode.OK, good.StatusCode);
+        using var bad = await client.GetAsync(new Uri(session.Url, "/?token=invalid-network-token"));
+        Assert.Equal(HttpStatusCode.Forbidden, bad.StatusCode);
+        await service.StopAsync();
+        Assert.Contains("方向=入站", logs.Writer.Text);
+        Assert.Contains("状态码=200", logs.Writer.Text);
+        Assert.Contains("状态码=403", logs.Writer.Text);
+        Assert.DoesNotContain("private-network-token", logs.Writer.Text);
+        Assert.DoesNotContain("invalid-network-token", logs.Writer.Text);
+        var token = Uri.UnescapeDataString(session.Url.Query.Split('=', 2)[1]);
+        Assert.DoesNotContain(token, logs.Writer.Text);
+    }
+
     [Theory]
     [InlineData(LanAuthLinkRelayPurpose.GraphQlSession, "Cookie 获取成功")]
     [InlineData(LanAuthLinkRelayPurpose.RemoteCheckIn, "签到授权获取成功")]
@@ -358,12 +380,12 @@ public sealed class LanCookieRelayServiceTests
         Assert.Equal("https", updated.Url.Scheme);
     }
 
-    private static LanCookieRelayService CreateService(INetworkExposureManager? exposureManager = null)
+    private static LanCookieRelayService CreateService(INetworkExposureManager? exposureManager = null, NetworkTrafficLogger? networkLogger = null)
     {
         return new LanCookieRelayService(
             new FixedLanAddressProvider(IPAddress.Loopback),
             exposureManager ?? new FakeNetworkExposureManager(),
-            NullLogger<LanCookieRelayService>.Instance);
+            NullLogger<LanCookieRelayService>.Instance, networkLogger);
     }
 
     private static Uri BuildSubmitUri(LanCookieRelaySession session, string? token = null)

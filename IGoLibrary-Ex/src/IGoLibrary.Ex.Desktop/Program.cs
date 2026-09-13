@@ -124,7 +124,7 @@ internal static class Program
             catch (Exception ex)
             {
                 loggingSettings = LogFileSettings.Default;
-                var fallbackResult = sharedLogWriter.ApplyAsync(loggingSettings)
+                var fallbackResult = Host.Services.GetRequiredService<IAppLogRuntimeController>().ApplyAsync(loggingSettings)
                     .GetAwaiter()
                     .GetResult();
                 logWriterConfigured = true;
@@ -138,7 +138,7 @@ internal static class Program
 
             if (!logWriterConfigured)
             {
-                var applyResult = sharedLogWriter.ApplyAsync(loggingSettings)
+                var applyResult = Host.Services.GetRequiredService<IAppLogRuntimeController>().ApplyAsync(loggingSettings)
                     .GetAwaiter()
                     .GetResult();
                 logWriterConfigured = true;
@@ -259,6 +259,10 @@ internal static class Program
         IAppLogWriter logWriter,
         LogRuntimeApplyResult result)
     {
+        if (result.ApplicationFailure is { } failure)
+        {
+            logWriter.Write(LogLevel.Warning, "Logging", failure);
+        }
         if (result.TotalDeleteFailureCount <= 0)
         {
             return;

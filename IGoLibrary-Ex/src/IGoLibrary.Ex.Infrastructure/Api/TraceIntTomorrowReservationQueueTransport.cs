@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Infrastructure.Logging;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -40,9 +41,10 @@ internal sealed class TraceIntTomorrowReservationQueueTransport
     private readonly ILogger<TraceIntTomorrowReservationQueueTransport> _logger;
 
     public TraceIntTomorrowReservationQueueTransport(
-        ILogger<TraceIntTomorrowReservationQueueTransport>? logger = null)
+        ILogger<TraceIntTomorrowReservationQueueTransport>? logger = null,
+        NetworkTrafficLogger? networkLogger = null)
         : this(
-            static () => new ClientWebSocketAdapter(),
+            () => networkLogger is null ? new ClientWebSocketAdapter() : new LoggingQueueSocket(new ClientWebSocketAdapter(), networkLogger),
             DefaultSendInterval,
             DefaultMaxWait,
             DefaultSuccessSettleDelay,

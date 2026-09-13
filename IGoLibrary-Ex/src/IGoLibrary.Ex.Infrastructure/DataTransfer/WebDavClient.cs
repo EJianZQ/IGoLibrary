@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Infrastructure.Logging;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -16,7 +17,8 @@ namespace IGoLibrary.Ex.Infrastructure.DataTransfer;
 /// </summary>
 internal sealed class WebDavClient(
     TimeProvider timeProvider,
-    ILogger<WebDavClient> logger)
+    ILogger<WebDavClient> logger,
+    NetworkTrafficLogger? networkLogger = null)
 {
     private const int MaximumAttempts = 3;
     private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(30);
@@ -29,7 +31,7 @@ internal sealed class WebDavClient(
         WebDavTlsVerifyMode tlsVerifyMode)
     {
         var handler = CreateHandler(username, password, tlsVerifyMode);
-        var client = new HttpClient(handler, disposeHandler: true)
+        var client = new HttpClient(NetworkLoggingHandler.Wrap(handler, networkLogger, "WebDAV"), disposeHandler: true)
         {
             Timeout = RequestTimeout
         };

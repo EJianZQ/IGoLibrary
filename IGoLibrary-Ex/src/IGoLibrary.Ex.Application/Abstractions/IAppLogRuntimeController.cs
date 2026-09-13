@@ -11,6 +11,8 @@ public sealed record LogRuntimeApplyResult(
     int LegacyDeleteFailureCount,
     int RetentionDeleteFailureCount)
 {
+    public string? ApplicationFailure { get; init; }
+
     public static LogRuntimeApplyResult Success { get; } = new(0, 0);
 
     public int TotalDeleteFailureCount => LegacyDeleteFailureCount + RetentionDeleteFailureCount;

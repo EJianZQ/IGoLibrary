@@ -1,3 +1,4 @@
+using IGoLibrary.Ex.Infrastructure.Logging;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -10,6 +11,27 @@ namespace IGoLibrary.Ex.Tests;
 
 public sealed class MobileControlServiceTests
 {
+    [Fact]
+    public async Task NetworkLogging_RealServiceLogsSuccessAndRejectionWithoutAccessTokens()
+    {
+        var logs = new NetworkLogTestContext();
+        await using var service = CreateService(networkLogger: logs.Logger);
+        var session = await service.StartAsync(new MobileControlSettings(GetFreeTcpPort(), "private-network-token"));
+        using var client = new HttpClient();
+        using var good = await client.GetAsync(session.Url);
+        Assert.Equal(HttpStatusCode.OK, good.StatusCode);
+        using var bad = await client.GetAsync(new Uri(session.Url, "/?token=invalid-network-token"));
+        Assert.Equal(HttpStatusCode.Forbidden, bad.StatusCode);
+        await service.StopAsync();
+        Assert.Contains("方向=入站", logs.Writer.Text);
+        Assert.Contains("状态码=200", logs.Writer.Text);
+        Assert.Contains("状态码=403", logs.Writer.Text);
+        Assert.DoesNotContain("private-network-token", logs.Writer.Text);
+        Assert.DoesNotContain("invalid-network-token", logs.Writer.Text);
+        var token = Uri.UnescapeDataString(session.Url.Query.Split('=', 2)[1]);
+        Assert.DoesNotContain(token, logs.Writer.Text);
+    }
+
     [Fact]
     public async Task StartAndReadEndpoints_ReturnExpectedContentAndSessionState()
     {
@@ -518,7 +540,7 @@ public sealed class MobileControlServiceTests
         INetworkExposureManager? exposureManager = null,
         IMobileControlTaskRecordsProvider? taskRecordsProvider = null,
         IMobileControlTaskStartService? taskStartService = null,
-        ILogger<MobileControlService>? logger = null)
+        ILogger<MobileControlService>? logger = null, NetworkTrafficLogger? networkLogger = null)
     {
         return new MobileControlService(
             new FixedLanAddressProvider(IPAddress.Loopback),
@@ -527,7 +549,7 @@ public sealed class MobileControlServiceTests
             taskRecordsProvider ?? new FakeMobileControlTaskRecordsProvider(),
             taskStartService ?? new FakeMobileControlTaskStartService(),
             actionService ?? new FakeMobileControlActionService(),
-            logger ?? NullLogger<MobileControlService>.Instance);
+            logger ?? NullLogger<MobileControlService>.Instance, networkLogger);
     }
 
     private static int GetFreeTcpPort()
