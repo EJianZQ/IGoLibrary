@@ -11,7 +11,7 @@ using IGoLibrary.Ex.Desktop.ViewModels;
 namespace IGoLibrary.Ex.Desktop.Controls;
 
 /// <summary>地图渲染与指针视口，不执行业务选择或网络请求。</summary>
-public sealed class SeatMapView : UserControl
+public sealed partial class SeatMapView : UserControl
 {
     private readonly Canvas _canvas = new() { Background = Brushes.Transparent };
     private readonly Canvas _surface = new()
@@ -43,6 +43,7 @@ public sealed class SeatMapView : UserControl
     {
         _canvas.RenderTransformOrigin = RelativePoint.TopLeft;
         _surface.Children.Add(_canvas);
+        InitializeMarquee();
         _scroll.Content = _surface;
         Content = _scroll;
         ClipToBounds = true;
@@ -53,9 +54,9 @@ public sealed class SeatMapView : UserControl
         AddHandler(PointerWheelChangedEvent, OnWheel, RoutingStrategies.Tunnel);
         AddHandler(KeyDownEvent, OnMapKeyDown, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, OnMapKeyUp, RoutingStrategies.Tunnel);
-        PointerCaptureLost += (_, _) => EndDrag();
+        PointerCaptureLost += (_, _) => { EndDrag(); CancelMarquee(); };
         LostFocus += (_, _) => _space = false;
-        DetachedFromVisualTree += (_, _) => { _space = false; EndDrag(); ++_viewportVersion; };
+        DetachedFromVisualTree += (_, _) => { _space = false; EndDrag(); CancelMarquee(); ++_viewportVersion; };
         _scroll.SizeChanged += (_, _) => { if (_needsFit && _scroll.Viewport.Width > 0) Fit(false); };
     }
 
@@ -81,6 +82,8 @@ public sealed class SeatMapView : UserControl
         _canvas.Height = projection?.Height ?? 0;
         _surface.Width = _canvas.Width * Zoom;
         _surface.Height = _canvas.Height * Zoom;
+        CancelMarquee();
+        ApplyMarqueeZoom(Zoom);
         if (workspace is not null && projection is { CanShowMap: true })
         {
             for (var i = 0; i < projection.Items.Count; i++)
@@ -134,6 +137,7 @@ public sealed class SeatMapView : UserControl
     {
         Zoom = zoom;
         _canvas.RenderTransform = new ScaleTransform(zoom, zoom);
+        ApplyMarqueeZoom(zoom);
         foreach (var tile in _canvas.Children.OfType<SeatTile>()) tile.SetMapZoom(zoom);
         _surface.Width = _canvas.Width * zoom;
         _surface.Height = _canvas.Height * zoom;
@@ -156,9 +160,15 @@ public sealed class SeatMapView : UserControl
     {
         var properties = e.GetCurrentPoint(this).Properties;
         var source = e.Source as Visual;
-        var overSeat = source is SeatTile || source?.GetVisualAncestors().OfType<SeatTile>().Any() == true;
         var overScrollbar = source?.GetVisualAncestors().OfType<Avalonia.Controls.Primitives.ScrollBar>().Any() == true;
-        if (overScrollbar || !(properties.IsMiddleButtonPressed || properties.IsLeftButtonPressed && (_space || !overSeat))) return;
+        if (overScrollbar) return;
+        // 左键拖动统一为框选，空白处起框同样有效；平移保留给中键、空格加拖动和滚动条。
+        if (properties.IsLeftButtonPressed && !_space)
+        {
+            ArmMarquee(e.GetPosition(_canvas), e.Pointer);
+            return;
+        }
+        if (!(properties.IsMiddleButtonPressed || properties.IsLeftButtonPressed && _space)) return;
         _pressed = e.GetPosition(_scroll);
         _dragOffset = _scroll.Offset;
         _pointer = e.Pointer;
@@ -168,6 +178,7 @@ public sealed class SeatMapView : UserControl
     }
     private void OnMoved(object? sender, PointerEventArgs e)
     {
+        if (TryUpdateMarquee(e)) return;
         if (_pressed is not { } pressed) return;
         var position = e.GetPosition(_scroll);
         var delta = new Vector(position.X - pressed.X, position.Y - pressed.Y);
@@ -179,6 +190,21 @@ public sealed class SeatMapView : UserControl
     }
     private void OnReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (_marqueeActive)
+        {
+            CommitMarquee();
+            CancelMarquee();
+            e.Handled = true;
+            return;
+        }
+
+        if (_marqueeArmed)
+        {
+            // 未越过阈值：交还给座位自身的单击切换。
+            CancelMarquee();
+            return;
+        }
+
         if (_pressed is null) return;
         EndDrag();
         e.Handled = true;
@@ -193,6 +219,7 @@ public sealed class SeatMapView : UserControl
     }
     private void OnMapKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Escape && _marqueeActive) { CancelMarquee(); e.Handled = true; return; }
         // A focused seat retains Space-to-toggle keyboard access.
         if (e.Key == Key.Space && (e.Source == this || e.Source == _scroll)) { _space = true; e.Handled = true; }
     }

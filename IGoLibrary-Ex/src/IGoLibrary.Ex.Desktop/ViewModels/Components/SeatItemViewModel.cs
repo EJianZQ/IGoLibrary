@@ -53,6 +53,10 @@ public sealed partial class SeatItemViewModel : ObservableObject
     [ObservableProperty]
     private bool isSelected;
 
+    /// <summary>框选拖拽过程中的临时高亮，松手前不改变选中状态。</summary>
+    [ObservableProperty]
+    private bool isMarqueePreview;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LayoutToolTipText))]
     private bool isFavorite;

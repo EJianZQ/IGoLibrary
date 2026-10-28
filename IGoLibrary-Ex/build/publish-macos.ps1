@@ -29,6 +29,8 @@ $BundleVersion = $AppVersion
 $ExecutableName = "IGoLibrary.Ex.Desktop"
 $Root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $ArtifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $Root 'artifacts'))
+$IconFileName = 'AppIcon.icns'
+$IconSource = [System.IO.Path]::GetFullPath((Join-Path $Root 'src/IGoLibrary.Ex.Desktop/Assets/AppIcon.icns'))
 $PathComparison = if ([System.OperatingSystem]::IsWindows()) {
     [System.StringComparison]::OrdinalIgnoreCase
 }
@@ -161,6 +163,8 @@ function Write-InfoPlist {
     <string>$executableText</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>NSHighResolutionCapable</key>
@@ -392,6 +396,10 @@ function New-MacAppBundle {
             Copy-Item -LiteralPath $sourcePath -Destination (Join-Path $cloudflaredTarget $fileName) -Force
         }
     }
+    if (-not (Test-Path -LiteralPath $IconSource -PathType Leaf)) {
+        throw "缺少 macOS 应用图标：$IconSource"
+    }
+    Copy-Item -LiteralPath $IconSource -Destination (Join-Path $ResourcesDir $IconFileName) -Force
     Write-InfoPlist (Join-Path $ContentsDir 'Info.plist')
 }
 

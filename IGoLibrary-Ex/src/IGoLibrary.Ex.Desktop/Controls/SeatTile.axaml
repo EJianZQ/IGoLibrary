@@ -29,6 +29,9 @@
     </ToggleButton>
     <Border IsVisible="{Binding IsSelected}" BorderBrush="{DynamicResource SemiAccentBrush}"
             BorderThickness="2" CornerRadius="9" IsHitTestVisible="False" />
+    <Rectangle IsVisible="{Binding IsMarqueePreview}" Stroke="{DynamicResource SemiAccentBrush}"
+               StrokeThickness="2" StrokeDashArray="3,2" RadiusX="9" RadiusY="9"
+               Margin="-1" IsHitTestVisible="False" />
     <Border x:Name="SelectionBadge" IsVisible="{Binding IsSelected}" Background="{DynamicResource SemiAccentBrush}"
             Width="12" Height="12" CornerRadius="6" HorizontalAlignment="Right" VerticalAlignment="Top"
             Margin="0,-2,-2,0" IsHitTestVisible="False">
